@@ -45,6 +45,9 @@ IOS_OUT=ios$(SEP)Frameworks
 DESKTOP_OUT=hiddify-core$(SEP)bin
 GEO_ASSETS_DIR=assets$(SEP)core
 
+# Muse VPN: Android core comes from our own fork (yywgov/muse-core, branch muse).
+MUSE_CORE_URL=https://github.com/yywgov/muse-core/releases/download/v$(muse.core.version)
+
 CORE_PRODUCT_NAME=hiddify-core
 CORE_NAME=hiddify-lib
 LIB_NAME=hiddify-core
@@ -471,7 +474,7 @@ ios-release: #not tested
 
 android-libs:
 	$(MKDIR) $(ANDROID_OUT) || echo Folder already exists. Skipping...
-	curl -L $(CORE_URL)/$(CORE_NAME)-android.tar.gz | tar xz -C $(ANDROID_OUT)/
+	curl -fL $(MUSE_CORE_URL)/$(CORE_NAME)-android.tar.gz | tar xz -C $(ANDROID_OUT)/
 
 android-apk-libs: android-libs
 android-aab-libs: android-libs
