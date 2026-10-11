@@ -149,7 +149,7 @@ abstract class ConfigOptions {
 
   static final tunImplementation = PreferencesNotifier.create<TunImplementation, String>(
     "tun-implementation",
-    TunImplementation.mixed, // Muse VPN: system TCP stack is much faster than gvisor
+    TunImplementation.gvisor, // Muse VPN: mixed/system stack breaks traffic on Android (bind forwarder: operation not permitted)
     mapFrom: TunImplementation.values.byName,
     mapTo: (value) => value.name,
   );
