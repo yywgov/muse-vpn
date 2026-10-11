@@ -57,7 +57,7 @@ class ProfileTile extends HookConsumerWidget {
         if (Breakpoint(context).isMobile()) {
           ref.read(bottomSheetsNotifierProvider.notifier).showProfilesOverview();
         } else {
-          context.goNamed('profiles');
+          context.goNamed('config');
         }
         return;
       }
@@ -401,11 +401,9 @@ class ProfileActionsMenu extends HookConsumerWidget {
       ),
       AdaptiveMenuItem(
         leadingIcon: const Icon(Icons.edit_rounded),
-        title: t.common.edit,
-        onTap: () {
-          if (Breakpoint(context).isMobile()) context.pop();
-          context.goNamed('profileDetails', pathParameters: {'id': profile.id});
-        },
+        title: '编辑',
+        // MenuAnchor closes itself; popping here would pop the 配置 tab root and swallow the tap.
+        onTap: () => context.pushNamed('profileDetails', pathParameters: {'id': profile.id}),
       ),
       AdaptiveMenuItem(
         leadingIcon: const Icon(Icons.delete_outline_rounded),

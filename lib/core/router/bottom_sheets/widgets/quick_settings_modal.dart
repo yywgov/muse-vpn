@@ -1,9 +1,7 @@
-// Quick settings sheet, reworked for Muse VPN (fork of Hiddify, GPLv3) in plain Chinese,
+// Quick settings sheet, reworked for 穿云 (fork of Hiddify, GPLv3) in plain Chinese,
 // grouped-list style: each item is a title plus a one-line grey explanation.
 
 import 'package:flutter/material.dart';
-import 'package:hiddify/features/chain/overview/chain_quick_settings.dart';
-import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/settings/widget/lan_sharing_tile.dart';
@@ -22,7 +20,6 @@ class QuickSettingsModal extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final serviceMode = ref.watch(ConfigOptions.serviceMode);
-    final routeMode = ref.watch(ConfigOptions.museRouteMode);
     final mixedPort = ref.watch(ConfigOptions.mixedPort);
 
     return ColoredBox(
@@ -50,18 +47,6 @@ class QuickSettingsModal extends HookConsumerWidget {
                     ),
                 ],
               ),
-              MuseSection(
-                header: '全局路由',
-                children: [
-                  for (final mode in MuseRouteMode.values)
-                    MuseChoiceTile(
-                      title: mode.title,
-                      subtitle: mode.explain,
-                      selected: routeMode == mode,
-                      onTap: () => ref.read(ConfigOptions.museRouteMode.notifier).update(mode),
-                    ),
-                ],
-              ),
               const MuseSection(
                 header: '局域网共享',
                 children: [
@@ -72,7 +57,6 @@ class QuickSettingsModal extends HookConsumerWidget {
                   ),
                 ],
               ),
-              const ChainQuickSettings(),
             ],
           ),
         ),
