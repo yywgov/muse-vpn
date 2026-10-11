@@ -212,7 +212,7 @@ class _ConnectButton extends HookWidget {
 
     const size = 168.0;
     final active = connected || busy;
-    final off = dark ? const Color(0xFF1E2A4D) : const Color(0xFFDDE5F4);
+    final off = MuseColors.isTrueBlack(context) ? const Color(0xFF1C1C1C) : (dark ? const Color(0xFF1E2A4D) : const Color(0xFFDDE5F4));
     final glyphColor = active ? Colors.white : (dark ? const Color(0xFF8A94B3) : const Color(0xFF7B8AA8));
 
     return Semantics(
