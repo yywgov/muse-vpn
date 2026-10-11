@@ -150,7 +150,7 @@ abstract class ConfigOptions {
 
   static final connectionTestUrl = PreferencesNotifier.create<String, String>(
     "connection-test-url",
-    "http://captive.apple.com/hotspot-detect.html",
+    "http://www.gstatic.com/generate_204", // Muse VPN: same as Shadowrocket, tiny 204 response
     possibleValues: List.of([
       "http://connectivitycheck.gstatic.com/generate_204",
       "http://www.gstatic.com/generate_204",
