@@ -1,0 +1,102 @@
+name: Muse VPN Android
+
+# Muse VPN: slim Android-only build (fork of hiddify-app, GPLv3).
+# Push to main / PR -> build APKs as workflow artifacts.
+# Push a tag v* -> also publish a GitHub Release with the APKs.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.38.5'
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      HAS_SIGNING_KEY: ${{ secrets.ANDROID_SIGNING_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo apt-get clean
+          df -h
+
+      - uses: subosito/flutter-action@v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Install deps
+        run: |
+          make android-install-deps
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+
+      - name: Signing key (optional)
+        if: env.HAS_SIGNING_KEY == 'true'
+        run: |
+          echo "${{ secrets.ANDROID_SIGNING_KEY }}" | base64 --decode > android/key.jks
+          echo "storeFile=$(pwd)/android/key.jks" > android/key.properties
+          echo "storePassword=${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}" >> android/key.properties
+          echo "keyPassword=${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}" >> android/key.properties
+
+      - name: Prepare (codegen + prebuilt core)
+        run: make android-prepare
+
+      - name: Build APKs
+        run: make android-apk-release
+
+      - name: Collect APKs
+        run: |
+          mkdir out
+          cp build/app/outputs/flutter-apk/*arm64-v8a*.apk   out/MuseVPN-Android-arm64.apk   || true
+          cp build/app/outputs/flutter-apk/*armeabi-v7a*.apk out/MuseVPN-Android-arm7.apk    || true
+          cp build/app/outputs/flutter-apk/*x86_64*.apk      out/MuseVPN-Android-x86_64.apk  || true
+          cp build/app/outputs/flutter-apk/app-release.apk   out/MuseVPN-Android-universal.apk || true
+          find dist -name '*.apk' -exec cp {} out/ \; 2>/dev/null || true
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MuseVPN-Android
+          path: out/*.apk
+          retention-days: 14
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
+          prerelease: ${{ contains(github.ref, '-') }}
