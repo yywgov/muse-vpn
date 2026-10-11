@@ -178,35 +178,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
       ),
     );
 
-    // the apps you added that auto selection didn't pick; with the removed auto picks, this is what Share sends
-    final added = [
-      for (final entry in (selectedApps.valueOrNull ?? const <String, int>{}).entries)
-        if (PkgFlag.userSelection.check(entry.value) && !PkgFlag.autoSelection.check(entry.value)) entry.key,
-    ];
-    final autoOn = ref.watch(Preferences.autoAppsSelectionRegion) != null;
-    Future<void> openShare() => ref
-        .read(bottomSheetsNotifierProvider.notifier)
-        .showAppListShare(
-          added: added,
-          removed: removed,
-          apps: {for (final app in asyncApps.data ?? const <AppPackageInfo>{}) app.packageName: app},
-        );
-
     return Scaffold(
-      // only while your list differs from the region's list: the bar counts how, Share shows what gets sent;
-      // it steps aside for the keyboard, which would push it up over the list
-      bottomNavigationBar:
-          autoOn && (added.isNotEmpty || removed.isNotEmpty) && MediaQuery.viewInsetsOf(context).bottom == 0
-          ? _ShareBar(
-              title: appBasedRouting.share.invite,
-              counts: [
-                if (removed.isNotEmpty) appBasedRouting.share.removed(n: removed.length),
-                if (added.isNotEmpty) appBasedRouting.share.added(n: added.length),
-              ].join(' · '),
-              label: t.common.share,
-              onShare: openShare,
-            )
-          : null,
       appBar: isSearching.value
           ? AppBar(
               title: TextFormField(
@@ -351,46 +323,6 @@ class AppListPage extends HookConsumerWidget with PresLogger {
         ),
         error: (error, _) => SliverErrorBodyPlaceholder(error.toString()),
         loading: () => const Center(child: CircularProgressIndicator()),
-      ),
-    );
-  }
-}
-
-class _ShareBar extends StatelessWidget {
-  const _ShareBar({required this.title, required this.counts, required this.label, required this.onShare});
-
-  final String title;
-  final String counts;
-  final String label;
-  final VoidCallback onShare;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = theme.colorScheme.onSecondaryContainer;
-    return Material(
-      color: theme.colorScheme.secondaryContainer,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 12, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(title, style: theme.textTheme.titleSmall?.copyWith(color: color)),
-                    Text(counts, style: theme.textTheme.bodySmall?.copyWith(color: color)),
-                  ],
-                ),
-              ),
-              const Gap(8),
-              FilledButton(onPressed: onShare, child: Text(label)),
-            ],
-          ),
-        ),
       ),
     );
   }

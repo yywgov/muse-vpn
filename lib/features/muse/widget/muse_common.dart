@@ -1,5 +1,5 @@
-// Muse VPN - shared bits for the Shadowrocket-style screens.
-// Part of Muse VPN, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
+// 穿云 - shared bits for the Shadowrocket-style screens.
+// Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
@@ -49,8 +49,9 @@ String museProtocolLabel(String type, {bool isGroup = false}) {
     'http' => 'HTTP',
     'direct' => '直连',
     'block' => '拒绝',
-    'urltest' => '自动',
-    'selector' => '策略组',
+    'urltest' || 'url-test' => '自动最快',
+    'selector' || 'select' => '手动选择',
+    'loadbalance' || 'load-balance' || 'balancer' || 'round-robin' => '负载均衡',
     _ when isGroup => '策略组',
     _ => type.isEmpty ? '?' : type.toUpperCase(),
   };
@@ -109,4 +110,23 @@ class MuseRouteModeSelector extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Full protocol name for node subtitles.
+String museProtocolName(String type, {bool isGroup = false}) {
+  final t = type.toLowerCase();
+  return switch (t) {
+    'vless' => 'VLESS',
+    'vmess' => 'VMess',
+    'trojan' => 'Trojan',
+    'shadowsocks' || 'ss' => 'Shadowsocks',
+    'shadowsocksr' || 'ssr' => 'ShadowsocksR',
+    'hysteria2' || 'hy2' => 'Hysteria2',
+    'hysteria' => 'Hysteria',
+    'tuic' => 'TUIC',
+    'wireguard' => 'WireGuard',
+    'anytls' => 'AnyTLS',
+    'shadowtls' => 'ShadowTLS',
+    _ => museProtocolLabel(type, isGroup: isGroup),
+  };
 }

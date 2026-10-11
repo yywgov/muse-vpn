@@ -34,12 +34,13 @@ abstract class ConfigOptions {
 
   static final region = PreferencesNotifier.create<Region, String>(
     "region",
-    Region.cn, // Muse VPN: mainland China users by default -> CN sites go direct
+    Region.cn, // 穿云: fixed to mainland China -> CN sites/IPs go direct
     mapFrom: Region.values.byName,
     mapTo: (value) => value.name,
+    overrideValue: Region.cn,
   );
 
-  /// Muse VPN: global routing mode (配置 / 代理 / 直连), applied on top of the route rules.
+  /// 穿云: global routing mode (配置 / 代理 / 直连), applied on top of the route rules.
   static final museRouteMode = PreferencesNotifier.create<MuseRouteMode, String>(
     "muse-route-mode",
     MuseRouteMode.rule,
@@ -95,7 +96,7 @@ abstract class ConfigOptions {
 
   static final directDnsAddress = PreferencesNotifier.create<String, String>(
     "direct-dns-address",
-    "udp://223.5.5.5", // Muse VPN: 1.1.1.1 is slow/unreliable from mainland China
+    "udp://223.5.5.5", // 穿云: 1.1.1.1 is slow/unreliable from mainland China
     possibleValues: List.of([
       "udp://223.5.5.5",
       "udp://223.6.6.6",
@@ -111,7 +112,8 @@ abstract class ConfigOptions {
       "local",
     ]),
     defaultValueFunction: (ref) => "udp://223.5.5.5",
-    validator: (value) => value.isNotBlank,
+    // 穿云: Cloudflare is slow / unreliable from mainland China, never use it for direct DNS
+    validator: (value) => value.isNotBlank && !value.contains("1.1.1.1") && !value.contains("1.0.0.1"),
   );
 
   static final directDnsDomainStrategy = PreferencesNotifier.create<DomainStrategy, String>(
@@ -149,9 +151,10 @@ abstract class ConfigOptions {
 
   static final tunImplementation = PreferencesNotifier.create<TunImplementation, String>(
     "tun-implementation",
-    TunImplementation.gvisor, // Muse VPN: mixed/system stack breaks traffic on Android (bind forwarder: operation not permitted)
+    TunImplementation.gvisor, // 穿云: mixed/system stack breaks traffic on Android (bind forwarder: operation not permitted)
     mapFrom: TunImplementation.values.byName,
     mapTo: (value) => value.name,
+    overrideValue: TunImplementation.gvisor, // fixed: no traffic on Android with the other stacks
   );
 
   static final mtu = PreferencesNotifier.create<int, int>("mtu", 9000);
@@ -160,7 +163,7 @@ abstract class ConfigOptions {
 
   static final connectionTestUrl = PreferencesNotifier.create<String, String>(
     "connection-test-url",
-    "http://www.gstatic.com/generate_204", // Muse VPN: same as Shadowrocket, tiny 204 response
+    "http://www.gstatic.com/generate_204", // 穿云: same as Shadowrocket, tiny 204 response
     possibleValues: List.of([
       "http://connectivitycheck.gstatic.com/generate_204",
       "http://www.gstatic.com/generate_204",
@@ -368,7 +371,6 @@ abstract class ConfigOptions {
   };
 
   static final Map<String, StateNotifierProvider<PreferencesNotifier, dynamic>> preferences = {
-    "region": region,
     "balancer-strategy": balancerStrategy,
     // "block-ads": blockAds,
     "use-xray-core-when-possible": useXrayCoreWhenPossible,
@@ -388,7 +390,6 @@ abstract class ConfigOptions {
     "enable-tproxy-port": enableTproxyPort,
     "enable-direct-port": enableDirectPort,
     "enable-redirect-port": enableRedirectPort,
-    "tun-implementation": tunImplementation,
     "mtu": mtu,
     "strict-route": strictRoute,
     "connection-test-url": connectionTestUrl,
@@ -504,7 +505,7 @@ abstract class ConfigOptions {
       enableTproxyPort: ref.watch(enableTproxyPort),
       enableDirectPort: ref.watch(enableDirectPort),
       enableRedirectPort: ref.watch(enableRedirectPort),
-      tunImplementation: ref.watch(tunImplementation),
+      tunImplementation: TunImplementation.gvisor, // 穿云: always gVisor (other stacks pass no traffic on Android)
       mtu: ref.watch(mtu),
       strictRoute: ref.watch(strictRoute),
       connectionTestUrl: ref.watch(connectionTestUrl),
@@ -534,7 +535,7 @@ abstract class ConfigOptions {
         enablePadding: ref.watch(enableTlsPadding),
         paddingSize: ref.watch(tlsPaddingSize),
       ),
-      chainStatus: ref.watch(chainStatus),
+      chainStatus: ChainStatus.off, // 穿云: no chain (WARP / Psiphon) proxies
       extraSecurity: SingboxExtraSecurityOption(
         mode: ref.watch(extraSecurityMode),
         warp: SingboxExtraSecurityWarpOption(licenseKey: ref.watch(extraSecurityWarpLicenseKey)),

@@ -1,16 +1,13 @@
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+// 穿云 - 设置 > 关于.
+// Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
-import 'package:hiddify/core/directories/directories_provider.dart';
-import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
-import 'package:hiddify/core/model/failures.dart';
-import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
-import 'package:hiddify/core/widget/adaptive_icon.dart';
-import 'package:hiddify/features/app_update/notifier/app_update_notifier.dart';
-import 'package:hiddify/features/app_update/notifier/app_update_state.dart';
+import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -20,122 +17,56 @@ class AboutPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
     final appInfo = ref.watch(appInfoProvider).requireValue;
-    final appUpdate = ref.watch(appUpdateNotifierProvider);
+    final theme = Theme.of(context);
 
-    ref.listen(appUpdateNotifierProvider, (_, next) async {
-      if (!context.mounted) return;
-      switch (next) {
-        case AppUpdateStateAvailable(:final versionInfo) || AppUpdateStateIgnored(:final versionInfo):
-          return await ref
-              .read(dialogNotifierProvider.notifier)
-              .showNewVersion(currentVersion: appInfo.presentVersion, newVersion: versionInfo, canIgnore: false);
-        case AppUpdateStateError(:final error):
-          return CustomToast.error(t.presentShortError(error)).show(context);
-        case AppUpdateStateNotAvailable():
-          return CustomToast.success(t.pages.about.notAvailableMsg).show(context);
-      }
-    });
-
-    final conditionalTiles = [
-      if (appInfo.release.allowCustomUpdateChecker)
-        ListTile(
-          title: Text(t.pages.about.checkForUpdate),
-          trailing: switch (appUpdate) {
-            AppUpdateStateChecking() => const SizedBox(width: 24, height: 24, child: CircularProgressIndicator()),
-            _ => const Icon(FluentIcons.arrow_sync_24_regular),
-          },
-          onTap: () async {
-            await ref.read(appUpdateNotifierProvider.notifier).check();
-          },
-        ),
-      if (PlatformUtils.isDesktop)
-        ListTile(
-          title: Text(t.pages.about.openWorkingDir),
-          trailing: const Icon(FluentIcons.open_folder_24_regular),
-          onTap: () async {
-            final path = ref.watch(appDirectoriesProvider).requireValue.workingDir.uri;
-            await UriUtils.tryLaunch(path);
-          },
-        ),
-    ];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.pages.about.title),
-        actions: [
-          PopupMenuButton(
-            icon: Icon(AdaptiveIcon(context).more),
-            itemBuilder: (context) {
-              return [
-                PopupMenuItem(
-                  child: Text(t.common.addToClipboard),
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: appInfo.format()));
-                  },
+    return MuseScaffold(
+      title: '关于',
+      body: MuseGroupedBody(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Column(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Assets.images.logo.svg(width: 72, height: 72),
                 ),
-              ];
-            },
-          ),
-          const Gap(8),
-        ],
-      ),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Assets.images.logo.svg(width: 64, height: 64),
-                  const Gap(16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(t.common.appTitle, style: Theme.of(context).textTheme.titleLarge),
-                      const Gap(4),
-                      Text("${t.common.version} ${appInfo.presentVersion}"),
-                    ],
-                  ),
-                ],
-              ),
+                const Gap(12),
+                Text(Constants.appName, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+                const Gap(4),
+                Text(
+                  '版本 ${appInfo.presentVersion}',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: MuseColors.secondaryText(context)),
+                ),
+              ],
             ),
           ),
-          SliverList(
-            delegate: SliverChildListDelegate([
-              ...conditionalTiles,
-              if (conditionalTiles.isNotEmpty) const Divider(),
-              ListTile(
-                title: Text(t.pages.about.sourceCode),
-                trailing: const Icon(FluentIcons.open_24_regular),
+          MuseSection(
+            footer: '穿云基于开源项目 Hiddify 修改，以 GPLv3 许可发布，仅供学习交流，不得用于商业用途。',
+            children: [
+              MuseTile(
+                leading: const Icon(Icons.system_update_rounded),
+                title: '检查更新',
+                subtitle: '在 GitHub 发布页查看最新版本',
+                chevron: true,
+                onTap: () => UriUtils.tryLaunch(Uri.parse(Constants.githubReleasesUrl)),
+              ),
+              MuseTile(
+                leading: const Icon(Icons.code_rounded),
+                title: '开源许可 · 源代码',
+                chevron: true,
+                onTap: () => UriUtils.tryLaunch(Uri.parse(Constants.githubUrl)),
+              ),
+              MuseTile(
+                leading: const Icon(Icons.copy_rounded),
+                title: '复制版本信息',
                 onTap: () async {
-                  await UriUtils.tryLaunch(Uri.parse(Constants.githubUrl));
+                  await Clipboard.setData(ClipboardData(text: appInfo.format()));
+                  ref.read(inAppNotificationControllerProvider).showSuccessToast('已复制');
                 },
               ),
-              ListTile(
-                title: Text(t.pages.about.telegramChannel),
-                trailing: const Icon(FluentIcons.open_24_regular),
-                onTap: () async {
-                  await UriUtils.tryLaunch(Uri.parse(Constants.telegramChannelUrl));
-                },
-              ),
-              ListTile(
-                title: Text(t.pages.about.termsAndConditions),
-                trailing: const Icon(FluentIcons.open_24_regular),
-                onTap: () async {
-                  await UriUtils.tryLaunch(Uri.parse(Constants.termsAndConditionsUrl));
-                },
-              ),
-              ListTile(
-                title: Text(t.pages.about.privacyPolicy),
-                trailing: const Icon(FluentIcons.open_24_regular),
-                onTap: () async {
-                  await UriUtils.tryLaunch(Uri.parse(Constants.privacyPolicyUrl));
-                },
-              ),
-            ]),
+            ],
           ),
         ],
       ),

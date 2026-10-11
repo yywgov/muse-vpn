@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="stop">Stop</string>
-    <string name="quick_toggle">Toggle</string>
-    <string name="status_starting">Service starting…</string>
-    <string name="status_started">Service started</string>
+    <string name="app_name">穿云</string>
+    <string name="stop">断开</string>
+    <string name="quick_toggle">穿云开关</string>
+    <string name="status_starting">正在连接…</string>
+    <string name="status_started">已连接</string>
+    <string name="notification_channel_name">连接状态</string>
+    <string name="notification_channel_desc">穿云连接时的常驻通知，可在系统设置中关闭</string>
+    <string name="auto_connect_channel_name">自动连接提醒</string>
+    <string name="auto_connect_tap">已离开可信 Wi-Fi，点此重新连接穿云</string>
 </resources>

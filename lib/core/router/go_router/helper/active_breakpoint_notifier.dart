@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -34,7 +35,8 @@ class Breakpoint {
 
   Breakpoint(BuildContext context) {
     _width = MediaQuery.of(context).size.width;
-    if (_width < eMobile) {
+    // 穿云: phones always get the phone layout (3 tabs), also in landscape / on large screens
+    if (PlatformUtils.isAndroid || PlatformUtils.isIOS || _width < eMobile) {
       activeBreakpoint = Breakpoints.mobile;
     } else if (_width < eTable) {
       activeBreakpoint = Breakpoints.tablet;

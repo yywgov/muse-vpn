@@ -49,6 +49,7 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
         flutterEngine.plugins.add(PlatformSettingsHandler())
         flutterEngine.plugins.add(EventHandler())
         flutterEngine.plugins.add(LogHandler())
+        flutterEngine.plugins.add(ChuanyunHandler())
 //        flutterEngine.plugins.add(GroupsChannel(lifecycleScope))
 //        flutterEngine.plugins.add(ActiveGroupsChannel(lifecycleScope))
 //        flutterEngine.plugins.add(StatsChannel(lifecycleScope))
@@ -102,12 +103,10 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
     private val notificationPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission(),
-        ) { isGranted ->
-            if (Settings.dynamicNotification && !isGranted) {
-                onServiceAlert(Alert.RequestNotificationPermission, null)
-            } else {
-                startService0()
-            }
+        ) { _ ->
+            // 穿云: the tunnel works without the notification permission (the user may turn
+            // notifications off on purpose), so connect either way
+            startService0()
         }
 
     private val prepareLauncher =
@@ -131,6 +130,12 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
 
 
 
+
+    override fun onResume() {
+        super.onResume()
+        // 穿云: 「不在最近任务显示」
+        if (Settings.excludeFromRecents) ChuanyunHandler.applyExcludeFromRecents(this, true)
+    }
 
     override fun onDestroy() {
         connection.disconnect()

@@ -1,6 +1,6 @@
 {
   "common": {
-    "appTitle": "Muse VPN",
+    "appTitle": "穿云",
     "start": "开始",
     "version": "版本",
     "ok": "确定",
@@ -25,7 +25,7 @@
     "scanQr": "扫描二维码",
     "free": "免费",
     "warp": "WARP",
-    "fragment": "Fragment",
+    "fragment": "分片",
     "help": "帮助",
     "save": "保存",
     "update": "更新",
@@ -98,7 +98,7 @@
   "intro": {
     "banner": "畅享无限制网络的所需一切",
     "termsAndPolicyCaution(rich)": "继续即表示您同意 ${tap(@:pages.about.termsAndConditions)}",
-    "info(rich)": "Muse VPN，基于 Hiddify 开发。${tap_source(开源)} 和 ${tap_license(许可证)}"
+    "info(rich)": "穿云，基于开源项目 Hiddify 修改。${tap_source(源代码)} 与 ${tap_license(许可证)}"
   },
   "pages": {
     "home": {
@@ -342,24 +342,24 @@
           "bypassRegion": "绕过${region}的网站"
         },
         "appBasedRouting": {
-          "title": "分应用路由",
+          "title": "分应用代理",
           "hideSysApps": "隐藏系统应用",
           "listTitle": {
-            "bypass": "绕过的应用",
-            "proxy": "代理的应用"
+            "bypass": "不走代理的 App",
+            "proxy": "走代理的 App"
           },
-          "chooseApps": "选择应用",
+          "chooseApps": "选择 App",
           "apps": {
-            "one": "应用",
-            "other": "应用"
+            "one": "$n 个 App",
+            "other": "$n 个 App"
           },
           "moreApps": {
-            "one": "+$n 个应用",
-            "other": "+$n 个应用"
+            "one": "另外 $n 个 App",
+            "other": "另外 $n 个 App"
           },
-          "autoTag": "自动",
-          "outsideVpn": "不经过 VPN",
-          "ruleWontApply": "不经过 VPN · 规则不会生效",
+          "autoTag": "预设",
+          "outsideVpn": "不经过穿云",
+          "ruleWontApply": "不经过穿云 · 规则不会生效",
           "notInstalled": "未安装",
           "share": {
             "invite": "帮助改进自动选择",
@@ -388,8 +388,8 @@
             "clearAllSelections": "清除所有选择"
           },
           "modes": {
-            "proxy": "仅代理",
-            "bypass": "绕过"
+            "proxy": "仅以下 App 走代理",
+            "bypass": "以下 App 不走代理"
           },
           "autoSelection": {
             "title": "基于${region}自动选择",
@@ -424,9 +424,9 @@
         },
         "balancerStrategy": {
           "title": "Balancer 策略",
-          "roundRobin": "Round robin",
-          "consistentHash": "Consistent hash",
-          "stickySession": "Sticky session"
+          "roundRobin": "轮询",
+          "consistentHash": "一致性哈希",
+          "stickySession": "粘性会话"
         },
         "resolveDestination": "解析目的地",
         "ipv6Route": "IPv6 路由",
@@ -677,12 +677,8 @@
       "disable": "不再显示"
     },
     "noActiveProfile": {
-      "title": "选择一个配置文件",
-      "msg": "让我们开始吧。添加一个包含您 VPN 服务器信息的连接配置文件。\n\n还没有服务器？没关系。下面的指南会告诉您如何免费搭建一个。",
-      "helpBtn": {
-        "label": "告诉我如何操作",
-        "url": "https://hiddify.com/manager/"
-      }
+      "title": "还没有配置",
+      "msg": "请先添加订阅链接或节点配置：可粘贴订阅链接、从剪贴板导入，或扫描二维码。"
     },
     "unknownDomainsWarning": {
       "title": "请先检查此链接",
@@ -727,7 +723,8 @@
     "disconnect": "断开连接",
     "disconnecting": "断开连接中…",
     "reconnect": "重新连接",
-    "reconnectMsg": "正在重新连接以应用更改…"
+    "reconnectMsg": "正在重新连接以应用更改…",
+    "hotReloading": "正在重新加载…"
   },
   "errors": {
     "unexpected": "意外错误",

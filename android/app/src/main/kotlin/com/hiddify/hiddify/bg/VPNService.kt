@@ -4,7 +4,6 @@ import android.util.Log
 import com.hiddify.hiddify.Settings
 import android.content.Intent
 import android.content.pm.PackageManager.NameNotFoundException
-import android.net.ProxyInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.IBinder
@@ -93,7 +92,7 @@ class VPNService : VpnService(), PlatformInterfaceWrapper {
 //        service.fileDescriptor?.close()
 
         val builder = Builder()
-            .setSession("Muse VPN")
+            .setSession(getString(com.hiddify.hiddify.R.string.app_name))
             .setMtu(options.mtu)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -200,18 +199,11 @@ class VPNService : VpnService(), PlatformInterfaceWrapper {
             }
         }
 
-        if (options.isHTTPProxyEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            systemProxyAvailable = true
-            systemProxyEnabled = Settings.systemProxyEnabled
-            if (systemProxyEnabled) builder.setHttpProxy(
-                ProxyInfo.buildDirectProxy(
-                    options.httpProxyServer, options.httpProxyServerPort
-                )
-            )
-        } else {
-            systemProxyAvailable = false
-            systemProxyEnabled = false
-        }
+        // 穿云: never publish an HTTP proxy (setHttpProxy) on the VPN. In TUN mode every app's traffic
+        // already goes through the tunnel, and a system proxy is an easy VPN/proxy signal for bank and
+        // anti-fraud apps (and leaks the local port to apps that bypass the VPN).
+        systemProxyAvailable = false
+        systemProxyEnabled = false
 
         val pfd = builder.establish() ?: error("android: the application is not prepared or is revoked")
         service.fileDescriptor = pfd

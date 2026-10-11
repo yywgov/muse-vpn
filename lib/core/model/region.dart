@@ -10,7 +10,7 @@ enum Region {
   br,
   other;
 
-  String present(TranslationsEn t) => switch (this) {
+  String present(Translations t) => switch (this) {
     ir => t.pages.settings.routing.regions.ir,
     cn => t.pages.settings.routing.regions.cn,
     ru => t.pages.settings.routing.regions.ru,
@@ -22,5 +22,5 @@ enum Region {
   };
 
   /// The name alone, for text around it: "Iran" where [present] gives "Iran (ir)".
-  String presentName(TranslationsEn t) => present(t).replaceFirst(RegExp(r'\s*\(\w+\)$'), '');
+  String presentName(Translations t) => present(t).replaceFirst(RegExp(r'\s*\(\w+\)$'), '');
 }

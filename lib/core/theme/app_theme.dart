@@ -5,27 +5,44 @@ import 'package:hiddify/core/theme/theme_extensions.dart';
 
 class AppTheme {
   AppTheme(this.mode, this.fontFamily);
+
+  static const brand = Color(0xFF2F6BFF);
+
+  // smooth on 120 Hz phones: the predictive-back aware Android transition
+  static const _transitions = PageTransitionsTheme(
+    builders: {TargetPlatform.android: FadeForwardsPageTransitionsBuilder()},
+  );
   final AppThemeMode mode;
   final String fontFamily;
 
   ThemeData lightTheme(ColorScheme? lightColorScheme) {
-    final ColorScheme scheme = lightColorScheme ?? ColorScheme.fromSeed(seedColor: const Color(0xFF293CA0));
+    // 穿云: always the brand blue (Material You wallpaper colours are ignored on purpose)
+    final ColorScheme scheme = ColorScheme.fromSeed(
+      seedColor: brand,
+    ).copyWith(primary: brand, onPrimary: Colors.white, surface: const Color(0xFFF3F6FB));
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
+      scaffoldBackgroundColor: const Color(0xFFF3F6FB),
       fontFamily: fontFamily,
+      pageTransitionsTheme: _transitions,
       extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
     );
   }
 
   ThemeData darkTheme(ColorScheme? darkColorScheme) {
-    final ColorScheme scheme =
-        darkColorScheme ?? ColorScheme.fromSeed(seedColor: const Color(0xFF293CA0), brightness: Brightness.dark);
+    final ColorScheme scheme = ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.dark).copyWith(
+      primary: brand,
+      onPrimary: Colors.white,
+      surface: mode.trueBlack ? Colors.black : const Color(0xFF0E1A3A),
+      surfaceContainerHighest: const Color(0xFF1B2747),
+    );
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: mode.trueBlack ? Colors.black : scheme.surface,
+      scaffoldBackgroundColor: mode.trueBlack ? Colors.black : const Color(0xFF0E1A3A),
       fontFamily: fontFamily,
+      pageTransitionsTheme: _transitions,
       extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
     );
   }

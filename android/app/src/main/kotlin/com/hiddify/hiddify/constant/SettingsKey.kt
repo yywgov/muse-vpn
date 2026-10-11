@@ -17,6 +17,13 @@ object SettingsKey {
     const val DYNAMIC_NOTIFICATION = "${KEY_PREFIX}dynamic_notification"
     const val SYSTEM_PROXY_ENABLED = "${KEY_PREFIX}system_proxy_enabled"
 
+    // 穿云 privacy / automation (written by the Flutter side, read here)
+    const val HIDE_NOTIFICATION = "${KEY_PREFIX}hide_notification"
+    const val EXCLUDE_FROM_RECENTS = "${KEY_PREFIX}exclude_from_recents"
+    const val NET_AUTO_ENABLED = "${KEY_PREFIX}net_auto_enabled"
+    const val NET_TRUSTED_SSIDS = "${KEY_PREFIX}net_trusted_ssids"
+    const val NET_AUTO_PAUSED = "${KEY_PREFIX}net_auto_paused"
+
     // cache
 
     const val STARTED_BY_USER = "${KEY_PREFIX}started_by_user"

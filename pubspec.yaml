@@ -1,7 +1,7 @@
 name: hiddify
-description: Cross Platform Multi Protocol Proxy Frontend.
+description: 穿云 - Android proxy client (fork of Hiddify, GPLv3).
 publish_to: "none"
-version: 5.0.0+50000
+version: 0.0.2+2
 
 environment:
   sdk: ^3.10.4
@@ -56,8 +56,6 @@ dependencies:
   url_launcher: ^6.2.5
   vclibs: ^0.1.2
   launch_at_startup: ^0.5.1
-  sentry_flutter: ^8.14.0
-  sentry_dart_plugin: ^2.4.1
   sqlite3_flutter_libs: ^0.5.28
 
   path: ^1.9.0
@@ -148,6 +146,7 @@ flutter:
     # - assets/core/geoip.db
     # - assets/core/geosite.db
     - assets/images/logo.svg
+    - assets/images/glyph.svg
     - assets/images/tray_icon.ico
     - assets/images/tray_icon.png
     - assets/images/tray_icon_dark.ico
@@ -193,9 +192,3 @@ ffigen:
     entry-points:
       - "hiddify-core/bin/desktop.h"
 
-sentry:
-  upload_debug_symbols: true
-  upload_source_maps: true
-  upload_sources: true
-  log_level: info
-  ignore_missing: true

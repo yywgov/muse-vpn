@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:hiddify/core/analytics/analytics_controller.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -31,7 +31,6 @@ import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hiddify/riverpod_observer.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 
 Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async {
   if (!kIsWeb) {
@@ -58,11 +57,6 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   // The ring starts at a safe default and only now learns the size the user
   // picked, since nothing could be read from disk before this point.
   logRing.capacity = container.read(Preferences.logBufferSize);
-
-  final enableAnalytics = await container.read(analyticsControllerProvider.future);
-  if (enableAnalytics) {
-    await _init("analytics", () => container.read(analyticsControllerProvider.notifier).enableAnalytics());
-  }
 
   await _init("preferences migration", () async {
     try {
@@ -134,6 +128,7 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
     if (PlatformUtils.isAndroid) {
       await _safeInit("android display mode", () async {
         await FlutterDisplayMode.setHighRefreshRate();
+        await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       });
     }
   }
@@ -144,14 +139,13 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   runApp(
     UncontrolledProviderScope(
       container: container,
-      child: SentryUserInteractionWidget(child: const App()),
+      child: const App(),
     ),
   );
 
   if (!kIsWeb) {
     FlutterNativeSplash.remove();
   }
-  // SentryFlutter.s(DateTime.now().toUtc());
 }
 
 Future<T> _init<T>(String name, Future<T> Function() initializer, {int? timeout}) async {
