@@ -1,9 +1,7 @@
 name: Release
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+.*'
+  # Muse VPN: upstream release needs Hiddify's signing secrets; releases come from muse-android.yml (tag v*).
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
