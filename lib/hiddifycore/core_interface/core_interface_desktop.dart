@@ -75,6 +75,7 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
         port: port,
         options: const ChannelOptions(credentials: channelOption),
       ),
+      options: CallOptions(metadata: {"x-muse-token": secret}),
     );
 
     try {
@@ -113,6 +114,7 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
           // ),
         ),
       ),
+      options: CallOptions(metadata: {"x-muse-token": secret}),
     );
 
     return "";
