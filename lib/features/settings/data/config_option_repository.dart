@@ -34,7 +34,7 @@ abstract class ConfigOptions {
 
   static final region = PreferencesNotifier.create<Region, String>(
     "region",
-    Region.other,
+    Region.cn, // Muse VPN: mainland China users by default -> CN sites go direct
     mapFrom: Region.values.byName,
     mapTo: (value) => value.name,
   );
@@ -69,15 +69,19 @@ abstract class ConfigOptions {
     "remote-dns-address",
     "tcp://8.8.8.8",
     possibleValues: List.of([
-      "local",
-      // "udp://223.5.5.5",
-      // "udp://1.1.1.1",
-      // "udp://1.1.1.2",
       "tcp://8.8.8.8",
+      "tcp://8.8.4.4",
       "tcp://1.1.1.1",
+      "tcp://9.9.9.9",
+      "https://dns.google/dns-query",
       "https://1.1.1.1/dns-query",
       "https://dns.cloudflare.com/dns-query",
-      "tcp://4.4.2.2",
+      "https://dns.quad9.net/dns-query",
+      "https://doh.opendns.com/dns-query",
+      "tls://8.8.8.8",
+      "tls://1.1.1.1",
+      "tls://dns.quad9.net",
+      "local",
     ]),
     validator: (value) => value.isNotBlank,
   );
@@ -91,19 +95,22 @@ abstract class ConfigOptions {
 
   static final directDnsAddress = PreferencesNotifier.create<String, String>(
     "direct-dns-address",
-    "udp://1.1.1.1",
+    "udp://223.5.5.5", // Muse VPN: 1.1.1.1 is slow/unreliable from mainland China
     possibleValues: List.of([
-      "local",
       "udp://223.5.5.5",
-      "udp://1.1.1.1",
-      "udp://1.1.1.2",
-      "tcp://1.1.1.1",
-      "https://1.1.1.1/dns-query",
-      "https://dns.cloudflare.com/dns-query",
-      "4.4.2.2",
-      "8.8.8.8",
+      "udp://223.6.6.6",
+      "udp://119.29.29.29",
+      "udp://180.184.1.1",
+      "udp://180.76.76.76",
+      "udp://114.114.114.114",
+      "https://dns.alidns.com/dns-query",
+      "https://doh.pub/dns-query",
+      "https://doh.360.cn/dns-query",
+      "tls://dns.alidns.com",
+      "tls://dot.pub",
+      "local",
     ]),
-    defaultValueFunction: (ref) => ref.read(region) == Region.cn ? "223.5.5.5" : "1.1.1.1",
+    defaultValueFunction: (ref) => "udp://223.5.5.5",
     validator: (value) => value.isNotBlank,
   );
 
@@ -142,7 +149,7 @@ abstract class ConfigOptions {
 
   static final tunImplementation = PreferencesNotifier.create<TunImplementation, String>(
     "tun-implementation",
-    TunImplementation.gvisor,
+    TunImplementation.mixed, // Muse VPN: system TCP stack is much faster than gvisor
     mapFrom: TunImplementation.values.byName,
     mapTo: (value) => value.name,
   );
@@ -153,7 +160,7 @@ abstract class ConfigOptions {
 
   static final connectionTestUrl = PreferencesNotifier.create<String, String>(
     "connection-test-url",
-    "http://captive.apple.com/hotspot-detect.html",
+    "http://www.gstatic.com/generate_204", // Muse VPN: same as Shadowrocket, tiny 204 response
     possibleValues: List.of([
       "http://connectivitycheck.gstatic.com/generate_204",
       "http://www.gstatic.com/generate_204",
