@@ -14,6 +14,7 @@ class PreferencesMigration with InfraLogger {
     final migrationSteps = <PreferencesMigrationStep>[
       PreferencesVersion1Migration(sharedPreferences),
       PreferencesVersion2Migration(sharedPreferences),
+      MuseDefaultsV1Migration(sharedPreferences),
     ];
 
     if (currentVersion == migrationSteps.length) {
@@ -127,5 +128,20 @@ class PreferencesVersion2Migration extends PreferencesMigrationStep with InfraLo
         await sharedPreferences.setBool("per_app_proxy_enabled", true);
       }
     }
+  }
+}
+
+
+/// Muse VPN: one-time switch of existing installs to the faster China defaults
+/// (CN direct routing, AliDNS for direct queries, mixed TUN stack).
+class MuseDefaultsV1Migration extends PreferencesMigrationStep with InfraLogger {
+  MuseDefaultsV1Migration(super.sharedPreferences);
+
+  @override
+  Future<void> migrate() async {
+    loggy.debug("applying Muse VPN defaults v1");
+    await sharedPreferences.setString("region", "cn");
+    await sharedPreferences.setString("direct-dns-address", "udp://223.5.5.5");
+    await sharedPreferences.setString("tun-implementation", "mixed");
   }
 }
