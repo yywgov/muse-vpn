@@ -34,6 +34,7 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
             Restart("restart"),
             AddGrpcClientPublicKey("add_grpc_client_public_key"),
             GetGrpcServerPublicKey("get_grpc_server_public_key"),
+            GetGrpcToken("get_grpc_token"),
 
         }
     }
@@ -65,6 +66,10 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
                 }
             }
 
+            Trigger.GetGrpcToken.method -> {
+                result.success(com.hiddify.hiddify.utils.GrpcAuth.token)
+            }
+
             Trigger.GetGrpcServerPublicKey.method -> {
                 GlobalScope.launch {
                     result.runCatching {
@@ -93,7 +98,7 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
                                     it.fixAndroidStack = Bugs.fixAndroidStack
                                     it.mode=mode.toLong()
                                     it.listen= "127.0.0.1:" + grpcPort
-                                    it.secret=""
+                                    it.secret = com.hiddify.hiddify.utils.GrpcAuth.token
                                     it.debug = Settings.debugMode
                                 },null)
 
