@@ -1,3 +1,19 @@
+# Muse VPN
+
+Muse VPN is an Android-first proxy client built on top of [Hiddify](https://github.com/hiddify/hiddify-app) (sing-box based). It is an open-source fork of https://github.com/hiddify/hiddify-app and is distributed under the same [Hiddify Extended GPLv3 license](LICENSE.md). Non-commercial use only.
+
+Muse VPN 是基于 [Hiddify](https://github.com/hiddify/hiddify-app) 二次开发的代理客户端，以 Hiddify 公开 fork 的形式开源，遵循同一许可证，禁止商用。
+
+## Changes from Hiddify / 相对 Hiddify 的改动
+
+- Renamed the app to Muse VPN (app label, in-app title, VPN session and notification names); Android application id is now `com.musevpn.app` so it can be installed alongside Hiddify.
+- Fixed start-on-boot: `BootReceiver` is now registered in the Android manifest (it existed in code but was never declared).
+- Planned: full Clash/Mihomo config support (rules and proxy-groups, not only nodes) and a Shadowrocket-style UI redesign.
+
+---
+
+Original Hiddify README follows.
+
 <div dir="ltr" align=center>
     
 [**![Lang_farsi](https://user-images.githubusercontent.com/125398461/234186932-52f1fa82-52c6-417f-8b37-08fe9250a55f.png) فارسی**](README_fa.md) / [**Русский 🇷🇺**](README_ru.md) / [**简体中文 🇨🇳**](README_cn.md) / [**日本語 🇯🇵**](README_ja.md) / [**Portugês-BR 🇧🇷**](README_br.md)
