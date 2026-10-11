@@ -170,7 +170,7 @@ class BoxService(
                         it.fixAndroidStack = com.hiddify.hiddify.bg.Bugs.fixAndroidStack
                         it.mode=4L//mode.toLong()
                         it.listen= "127.0.0.1:${Settings.grpcServiceModePort}"
-                        it.secret=""
+                        it.secret = com.hiddify.hiddify.utils.GrpcAuth.token
                         it.debug = Settings.debugMode
                     },platformInterface)
 

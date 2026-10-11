@@ -38,12 +38,16 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
         ? MTLSChannelCredentials(serverPublicKey: serverPublicKey, clientKey: cert)
         : const ChannelCredentials.insecure();
     _debug = debug;
+    // Muse VPN: the core rejects gRPC calls without the per-process token.
+    final token = await methodChannel.invokeMethod<String>("get_grpc_token") ?? "";
+    final callOptions = CallOptions(metadata: {"x-muse-token": token});
     final helloClient = HelloClient(
       ClientChannel(
         '127.0.0.1',
         port: portFront,
         options: ChannelOptions(credentials: channelOption),
       ),
+      options: callOptions,
     );
     final status = statusChannel.receiveBroadcastStream().map(CoreStatus.fromEvent);
     final alerts = alertsChannel.receiveBroadcastStream().map(CoreStatus.fromEvent);
@@ -84,6 +88,7 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
         port: portFront,
         options: ChannelOptions(credentials: channelOption),
       ),
+      options: callOptions,
     );
 
     bgClient = CoreClient(
@@ -92,6 +97,7 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
         port: portBack,
         options: ChannelOptions(credentials: channelOption),
       ),
+      options: callOptions,
     );
     // await start("/sdcard/Android/data/app.hiddify.com/files/configs/cdc633e9-8cfc-4a67-948d-009f779a5c91.json", "hiddify");
     return "";

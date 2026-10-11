@@ -46,6 +46,13 @@ object GrpcClientProvider {
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(10, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            chain.proceed(
+                chain.request().newBuilder()
+                    .header(GrpcAuth.HEADER, GrpcAuth.token)
+                    .build(),
+            )
+        }
         .build()
 
     val grpcClient: GrpcClient = GrpcClient.Builder()
