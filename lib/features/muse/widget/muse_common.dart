@@ -2,21 +2,30 @@
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 DateTime? _connectedSince;
 
-/// When the current connection came up, as seen by the app (null while not connected).
-/// Kept for the app's lifetime; a tunnel that was already up when the app started counts
-/// from the moment the app saw it.
-final museConnectedSinceProvider = Provider<DateTime?>((ref) {
-  final running = ref.watch(serviceRunningProvider);
-  if (!running) {
+/// When the current connection came up (null while not connected).
+/// On Android the VPN service records the real start time natively, so the 首页 timer
+/// survives backgrounding, engine re-creation and process restarts; elsewhere it counts
+/// from the moment the app saw the tunnel up. A transient non-connected state (e.g. the
+/// status stream re-subscribing on resume) does not reset it — only a real Disconnected.
+final museConnectedSinceProvider = FutureProvider<DateTime?>((ref) async {
+  final status = ref.watch(connectionNotifierProvider.select((s) => s.valueOrNull));
+  if (status is Disconnected) {
     _connectedSince = null;
     return null;
+  }
+  if (status is! Connected) return _connectedSince; // loading / switching: keep what we had
+  final millis = await ChuanyunPlatform.connectedSince();
+  if (millis != null && millis > 0) {
+    _connectedSince = DateTime.fromMillisecondsSinceEpoch(millis);
   }
   return _connectedSince ??= DateTime.now();
 });

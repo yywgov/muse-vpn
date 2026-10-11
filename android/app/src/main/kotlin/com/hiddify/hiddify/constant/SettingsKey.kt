@@ -23,6 +23,7 @@ object SettingsKey {
     const val NET_AUTO_ENABLED = "${KEY_PREFIX}net_auto_enabled"
     const val NET_TRUSTED_SSIDS = "${KEY_PREFIX}net_trusted_ssids"
     const val NET_AUTO_PAUSED = "${KEY_PREFIX}net_auto_paused"
+    const val CONNECTED_SINCE = "${KEY_PREFIX}connected_since"
 
     // cache
 

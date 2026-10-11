@@ -182,6 +182,8 @@ class BoxService(
                 return
             }
             status.postValue(Status.Started)
+            // 穿云: real connect time for the 首页 timer (survives app/engine restarts)
+            Settings.connectedSince = System.currentTimeMillis()
             // 穿云: a (re)connect ends any 按网络自动开关 pause
             Settings.netAutoPaused = false
             NetworkAuto.cancelNotification()
@@ -303,6 +305,7 @@ class BoxService(
             Settings.startedByUser = false
             withContext(Dispatchers.Main) {
                 Mobile.close(4L)
+                Settings.connectedSince = 0L
                 status.value = Status.Stopped
                 service.stopSelf()
             }
@@ -321,7 +324,8 @@ class BoxService(
             binder.broadcast { callback ->
                 callback.onServiceAlert(type.ordinal, message)
             }
-            status.value = Status.Stopped
+            Settings.connectedSince = 0L
+                status.value = Status.Stopped
         }
     }
 

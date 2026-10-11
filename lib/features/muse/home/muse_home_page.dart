@@ -115,7 +115,7 @@ class _ConnectSection extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final connection = ref.watch(connectionNotifierProvider);
-    final since = ref.watch(museConnectedSinceProvider);
+    final since = ref.watch(museConnectedSinceProvider).valueOrNull;
     final stats = ref.watch(statsNotifierProvider).asData?.value ?? SystemInfo.create();
     final secondary = MuseColors.secondaryText(context);
 
