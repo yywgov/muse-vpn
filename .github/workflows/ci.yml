@@ -1,23 +1,8 @@
 name: CI
 on:
-  # pull_request:
-  #   paths-ignore:
-  #     - '**.md'
-  #     - 'docs/**'
-  #     - 'test.configs/**'
-  #     - '.vscode/'
-  #     - 'appcast.xml'
-  push:
-    branches:
-       - main
-       - dev
-       - android-fix-action-bug
-       - new-design-v2 
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.vscode/'
-      - 'appcast.xml'
+  # Muse VPN: upstream multi-platform CI needs Hiddify's signing secrets.
+  # Disabled on push; Android builds run from muse-android.yml instead.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
