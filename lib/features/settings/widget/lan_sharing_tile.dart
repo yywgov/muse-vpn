@@ -24,12 +24,17 @@ String _generatePassword() {
 }
 
 class LanSharingPreferenceWidget extends HookConsumerWidget {
-  const LanSharingPreferenceWidget({super.key, this.showLeading = true});
+  const LanSharingPreferenceWidget({super.key, this.showLeading = true, this.title, this.subtitle});
 
   /// Whether to show the leading icon of the [ListTile].
   ///
   /// Hidden when the widget is embedded in the quick settings modal.
   final bool showLeading;
+
+  /// Muse VPN: optional plain-language title / one-line explanation (quick settings sheet).
+  /// When [subtitle] is set, the device's LAN address and port are shown while sharing is on.
+  final String? title;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -64,6 +69,22 @@ class LanSharingPreferenceWidget extends HookConsumerWidget {
       return 'socks://hiddify:$password@$ip:$port';
     }
 
+    // Muse VPN: show "ip:port" while sharing is on, so other devices know where to connect.
+    final lanAddress = useState<String?>(null);
+    final mixedPort = ref.watch(ConfigOptions.mixedPort);
+    useEffect(() {
+      if (!enabled || subtitle == null) {
+        lanAddress.value = null;
+        return null;
+      }
+      var active = true;
+      ref.read(hiddifyCoreServiceProvider).getLANIP().run().then((result) {
+        if (!active) return;
+        lanAddress.value = result.fold((_) => null, (r) => r.ip.isEmpty ? null : '${r.ip}:$mixedPort');
+      });
+      return () => active = false;
+    }, [enabled, mixedPort, subtitle]);
+
     // The action buttons live below the tile instead of in its trailing slot to
     // avoid overflowing the tile on narrow screens (e.g. iOS).
     return Column(
@@ -71,7 +92,15 @@ class LanSharingPreferenceWidget extends HookConsumerWidget {
       children: [
         SwitchListTile.adaptive(
           secondary: showLeading ? const Icon(Icons.share_rounded) : null,
-          title: Text(t.pages.settings.inbound.lanSharing),
+          title: Text(title ?? t.pages.settings.inbound.lanSharing),
+          subtitle: subtitle == null
+              ? null
+              : Text(
+                  enabled && lanAddress.value != null
+                      ? '$subtitle\n本机地址：${lanAddress.value}（SOCKS，需要密码，可复制链接或扫码）'
+                      : subtitle!,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                ),
           value: enabled,
           onChanged: (value) async {
             if (value) await ensurePassword();
