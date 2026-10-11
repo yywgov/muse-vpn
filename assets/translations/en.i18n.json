@@ -1,6 +1,6 @@
 {
   "common": {
-    "appTitle": "Hiddify",
+    "appTitle": "Muse VPN",
     "start": "Start",
     "version": "Version",
     "ok": "OK",
@@ -98,7 +98,7 @@
   "intro": {
     "banner": "All you need for an unrestricted internet",
     "termsAndPolicyCaution(rich)": "By continuing you agree to ${tap(@:pages.about.termsAndConditions)}",
-    "info(rich)": "Made with ❤️ by Hiddify. ${tap_source(Open source)} and ${tap_license(License)}"
+    "info(rich)": "Muse VPN, based on Hiddify. ${tap_source(Open source)} and ${tap_license(License)}"
   },
   "pages": {
     "home": {
