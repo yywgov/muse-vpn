@@ -8,7 +8,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 class TlsTricksPage extends HookConsumerWidget {
   const TlsTricksPage({super.key});
 
-  String _presentFragmentPackets(TranslationsEn t, String value) => switch (value) {
+  String _presentFragmentPackets(Translations t, String value) => switch (value) {
     "tlshello" => t.pages.settings.tlsTricks.packetsTlsHello,
     "1-1" => t.pages.settings.tlsTricks.packets1_1,
     "1-2" => t.pages.settings.tlsTricks.packets1_2,

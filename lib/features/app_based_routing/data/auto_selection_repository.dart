@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:hiddify/core/http_client/dio_http_client.dart';
 import 'package:hiddify/core/http_client/http_client_provider.dart';
 import 'package:hiddify/core/model/region.dart';
+import 'package:hiddify/features/app_based_routing/data/cn_direct_apps.dart';
 import 'package:hiddify/features/app_based_routing/model/per_app_proxy_mode.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -22,6 +23,8 @@ class AutoSelectionRepositoryImpl with AppLogger implements AutoSelectionReposit
     required AppProxyMode mode,
     required Region region,
   }) async {
+    // 穿云: the 「常用国内 App 不走代理」 list ships with the app (works offline, no GitHub needed)
+    if (mode == AppProxyMode.exclude && region == Region.cn) return (cnDirectApps, AutoSelectionResult.success);
     try {
       final rs = await _getHttp().get(_genUrl(mode, region));
       if (rs.statusCode == 200) {

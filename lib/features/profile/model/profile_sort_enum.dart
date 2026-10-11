@@ -6,7 +6,7 @@ enum ProfilesSort {
   lastUpdate,
   name;
 
-  String present(TranslationsEn t) {
+  String present(Translations t) {
     return switch (this) {
       lastUpdate => t.dialogs.sortProfiles.sort.lastUpdate,
       name => t.dialogs.sortProfiles.sort.name,
@@ -14,7 +14,7 @@ enum ProfilesSort {
   }
 
   /// Human-readable label for the current sort direction, worded per type.
-  String directionLabel(TranslationsEn t, SortMode mode) {
+  String directionLabel(Translations t, SortMode mode) {
     return switch (this) {
       lastUpdate =>
         mode == SortMode.descending

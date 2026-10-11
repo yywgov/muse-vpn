@@ -12,7 +12,7 @@ targets:
           store_date_time_values_as_text: true
       slang_build_runner:
         options:
-          base_locale: en
+          base_locale: zh-CN
           fallback_strategy: base_locale
           input_directory: assets/translations
           input_file_pattern: .i18n.json

@@ -25,7 +25,7 @@ sealed class ProfileFailure with _$ProfileFailure, Failure {
   const factory ProfileFailure.cancelByUser([String? message]) = ProfileCancelByUserFailure;
 
   @override
-  ({String type, String? message}) present(TranslationsEn t) {
+  ({String type, String? message}) present(Translations t) {
     return switch (this) {
       ProfileUnexpectedFailure() => (type: t.errors.profiles.unexpected, message: null),
       ProfileNotFoundFailure() => (type: t.errors.profiles.notFound, message: null),

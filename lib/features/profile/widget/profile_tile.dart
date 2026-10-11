@@ -57,7 +57,7 @@ class ProfileTile extends HookConsumerWidget {
         if (Breakpoint(context).isMobile()) {
           ref.read(bottomSheetsNotifierProvider.notifier).showProfilesOverview();
         } else {
-          context.goNamed('profiles');
+          context.goNamed('config');
         }
         return;
       }
@@ -127,7 +127,7 @@ class ProfileTile extends HookConsumerWidget {
   /// affordance on the main card) followed by the subscription info.
   Widget _body(
     BuildContext context,
-    TranslationsEn t,
+    Translations t,
     ThemeData theme,
     SubscriptionInfo? subInfo,
     bool showActionButton,
@@ -169,7 +169,7 @@ class ProfileTile extends HookConsumerWidget {
 
   /// Profile name with a trailing affordance: a dropdown on the main card, or a
   /// pin badge on list rows when the profile is pinned.
-  Widget _title(TranslationsEn t, ThemeData theme) {
+  Widget _title(Translations t, ThemeData theme) {
     final nameText = Text(
       profile.name,
       maxLines: 2,
@@ -250,7 +250,7 @@ class ProfileActionButton extends HookConsumerWidget {
 
   /// The current leading content. Each state carries a distinct key so the
   /// [AnimatedSwitcher] cross-fades between them.
-  Widget _leading(BuildContext context, WidgetRef ref, TranslationsEn t, bool isUpdating, bool? outcome) {
+  Widget _leading(BuildContext context, WidgetRef ref, Translations t, bool isUpdating, bool? outcome) {
     if (profile case RemoteProfileEntity()) {
       // While updating, the leading is a spinning indicator; its action is blocked.
       if (isUpdating) {
@@ -401,11 +401,9 @@ class ProfileActionsMenu extends HookConsumerWidget {
       ),
       AdaptiveMenuItem(
         leadingIcon: const Icon(Icons.edit_rounded),
-        title: t.common.edit,
-        onTap: () {
-          if (Breakpoint(context).isMobile()) context.pop();
-          context.goNamed('profileDetails', pathParameters: {'id': profile.id});
-        },
+        title: '编辑',
+        // MenuAnchor closes itself; popping here would pop the 配置 tab root and swallow the tap.
+        onTap: () => context.pushNamed('profileDetails', pathParameters: {'id': profile.id}),
       ),
       AdaptiveMenuItem(
         leadingIcon: const Icon(Icons.delete_outline_rounded),
@@ -471,7 +469,7 @@ class ProfileLinkButtons extends HookConsumerWidget {
   /// (see [TrustedLinks]) get a light confirmation; anything else gets a serious
   /// anti-impersonation warning with a countdown, so scammers can't pass off a
   /// look-alike channel/site as an official one.
-  static Future<void> _confirmAndOpen(WidgetRef ref, TranslationsEn t, String url) async {
+  static Future<void> _confirmAndOpen(WidgetRef ref, Translations t, String url) async {
     final notifier = ref.read(dialogNotifierProvider.notifier);
     final bool confirmed;
     if (TrustedLinks.isTrusted(url)) {
@@ -633,7 +631,7 @@ class ProfileSubscriptionInfo extends HookConsumerWidget {
 
   final SubscriptionInfo subInfo;
 
-  (String, Color?) remainingText(TranslationsEn t, ThemeData theme) {
+  (String, Color?) remainingText(Translations t, ThemeData theme) {
     if (subInfo.isExpired) {
       return (t.components.subscriptionInfo.expired, theme.colorScheme.error);
     } else if (subInfo.ratio >= 1) {

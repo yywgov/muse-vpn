@@ -37,14 +37,14 @@ enum ServiceMode {
   //       _ => false,
   //     };
 
-  String present(TranslationsEn t) => switch (this) {
+  String present(Translations t) => switch (this) {
     proxy => t.pages.settings.inbound.serviceModes.proxy,
     systemProxy => t.pages.settings.inbound.serviceModes.systemProxy,
     tun => t.pages.settings.inbound.serviceModes.tun,
     // tunService => t.pages.settings.inbound.serviceModes.tunService,
   };
 
-  String presentShort(TranslationsEn t) => switch (this) {
+  String presentShort(Translations t) => switch (this) {
     proxy => t.pages.settings.inbound.shortServiceModes.proxy,
     systemProxy => t.pages.settings.inbound.shortServiceModes.systemProxy,
     tun => t.pages.settings.inbound.shortServiceModes.tun,
@@ -62,7 +62,7 @@ enum BalancerStrategy {
 
   final String key;
 
-  String present(TranslationsEn t) => switch (this) {
+  String present(Translations t) => switch (this) {
     roundRobin => t.pages.settings.routing.balancerStrategy.roundRobin,
     consistentHash => t.pages.settings.routing.balancerStrategy.consistentHash,
     stickySession => t.pages.settings.routing.balancerStrategy.stickySession,
@@ -80,7 +80,7 @@ enum IPv6Mode {
 
   final String key;
 
-  String present(TranslationsEn t) => switch (this) {
+  String present(Translations t) => switch (this) {
     disable => t.pages.settings.routing.ipv6Modes.disable,
     enable => t.pages.settings.routing.ipv6Modes.enable,
     prefer => t.pages.settings.routing.ipv6Modes.prefer,
@@ -100,7 +100,7 @@ enum DomainStrategy {
 
   final String key;
 
-  String present(TranslationsEn t) => switch (this) {
+  String present(Translations t) => switch (this) {
     auto => t.pages.settings.dns.domainStrategy.auto,
     preferIpv6 => t.pages.settings.dns.domainStrategy.preferIpv6,
     preferIpv4 => t.pages.settings.dns.domainStrategy.preferIpv4,
@@ -114,7 +114,7 @@ enum TunImplementation {
   system,
   gvisor;
 
-  String present(TranslationsEn t) => switch (this) {
+  String present(Translations t) => switch (this) {
     mixed => t.pages.settings.inbound.tunImplementations.mixed,
     system => t.pages.settings.inbound.tunImplementations.system,
     gvisor => t.pages.settings.inbound.tunImplementations.gvisor,
@@ -265,12 +265,12 @@ enum MuxProtocol { h2mux, smux, yamux }
 
 //   final String key;
 
-//   String present(TranslationsEn t) => switch (this) {
+//   String present(Translations t) => switch (this) {
 //     proxyOverWarp => t.pages.settings.warp.detourModes.proxyOverWarp,
 //     warpOverProxy => t.pages.settings.warp.detourModes.warpOverProxy,
 //   };
 
-//   String presentExplain(TranslationsEn t) => switch (this) {
+//   String presentExplain(Translations t) => switch (this) {
 //     proxyOverWarp => t.pages.settings.warp.detourModes.proxyOverWarpExplain,
 //     warpOverProxy => t.pages.settings.warp.detourModes.warpOverProxyExplain,
 //   };

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/preferences/actions_at_closing.dart';
@@ -9,14 +8,20 @@ import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-bool _debugIntroPage = false;
-
 abstract class Preferences {
-  static final introCompleted = PreferencesNotifier.create(
-    "intro_completed",
-    false,
-    overrideValue: _debugIntroPage && kDebugMode ? false : null,
-  );
+  // 穿云: no first-run intro (region is fixed to cn, language to 简体中文)
+  static final introCompleted = PreferencesNotifier.create("intro_completed", true, overrideValue: true);
+
+  // 穿云 隐私 (read by the Android side too)
+  static final hideNotification = PreferencesNotifier.create<bool, bool>("hide_notification", false);
+  static final excludeFromRecents = PreferencesNotifier.create<bool, bool>("exclude_from_recents", false);
+
+  // 穿云 按网络自动开关: trusted Wi-Fi names are kept one per line (read by the Android side)
+  static final netAutoEnabled = PreferencesNotifier.create<bool, bool>("net_auto_enabled", false);
+  static final netTrustedSsids = PreferencesNotifier.create<String, String>("net_trusted_ssids", "");
+
+  // 穿云: switch the main group to 自动最快 when the hand-picked node stops answering
+  static final nodeFailover = PreferencesNotifier.create<bool, bool>("node_failover", true);
 
   // Null means that auto selection has not been performed yet.
   static final autoAppsSelectionRegion = PreferencesNotifier.create<Region?, String?>(
@@ -84,7 +89,11 @@ abstract class Preferences {
     PlatformUtils.isDesktop,
   );
 
-  static final perAppProxyEnabled = PreferencesNotifier.create<bool, bool>("per_app_proxy_enabled", false);
+  // 穿云: on by default, with the built-in 「常用国内 App 不走代理」 preset (see AppBasedRouting)
+  static final perAppProxyEnabled = PreferencesNotifier.create<bool, bool>("per_app_proxy_enabled", true);
+
+  // 穿云: set once the first-run per-app defaults were written
+  static final cnAppPresetInitialized = PreferencesNotifier.create<bool, bool>("cn_app_preset_initialized", false);
 
   // Kept while App-based routing is off, for when it is turned on again.
   static final perAppProxyMode = PreferencesNotifier.create<AppProxyMode, String>(

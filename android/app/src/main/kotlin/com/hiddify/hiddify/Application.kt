@@ -28,6 +28,12 @@ class Application : Application() {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addDataScheme("package")
         })
+
+        // 穿云: keep the 按网络自动开关 watcher registered (no-op when the feature is off)
+        try {
+            com.hiddify.hiddify.bg.NetworkAuto.apply(this)
+        } catch (_: Exception) {
+        }
     }
 
     companion object {

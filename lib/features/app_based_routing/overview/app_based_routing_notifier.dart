@@ -38,7 +38,20 @@ class AppBasedRouting extends _$AppBasedRouting with AppLogger {
       _excludeSubscription?.cancel();
       _timer?.cancel();
     });
+    await _initChuanyunDefaults();
     await _autoSelectionUpdate();
+  }
+
+  /// 穿云 first run: per-app proxy on in bypass mode with the built-in domestic-app preset, written out
+  /// so the Android side (which reads the saved values) uses them even before the user opens the page.
+  Future<void> _initChuanyunDefaults() async {
+    if (ref.read(Preferences.cnAppPresetInitialized)) return;
+    await ref.read(Preferences.cnAppPresetInitialized.notifier).update(true);
+    if (ref.read(Preferences.autoAppsSelectionOffByUser)) return;
+    await ref.read(Preferences.perAppProxyEnabled.notifier).update(ref.read(Preferences.perAppProxyEnabled));
+    await ref.read(Preferences.perAppProxyMode.notifier).update(ref.read(Preferences.perAppProxyMode));
+    final mode = _mode;
+    if (mode == AppProxyMode.exclude && _autoFollows) await _loading(() => _applyAutoSelection(AppProxyMode.exclude));
   }
 
   AppProxyMode? get _mode => ref.read(Preferences.perAppProxyModeInUse);

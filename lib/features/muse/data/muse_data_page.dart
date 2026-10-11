@@ -1,5 +1,5 @@
-// Muse VPN - Shadowrocket-style data tab (数据): traffic, connection info, logs.
-// Part of Muse VPN, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
+// 穿云 - 设置 › 连接信息：本次流量、当前节点、出口 IP、日志入口（原「数据」页，测速与流量曲线已移到首页）。
+// Part of 穿云 (Chuanyun), a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -28,17 +28,10 @@ class MuseDataPage extends HookConsumerWidget {
       appBar: AppBar(
         backgroundColor: MuseColors.background(context),
         scrolledUnderElevation: 0,
-        title: const Text('数据'),
+        title: const Text('连接信息'),
       ),
       body: MuseGroupedBody(
         children: [
-          MuseSection(
-            header: '实时速度',
-            children: [
-              MuseTile(title: '上传', trailing: value(stats.uplink.toInt().speed())),
-              MuseTile(title: '下载', trailing: value(stats.downlink.toInt().speed())),
-            ],
-          ),
           MuseSection(
             header: '本次连接流量',
             footer: running ? null : '未连接，连接后开始统计。',
@@ -84,14 +77,14 @@ class MuseDataPage extends HookConsumerWidget {
                 title: '全部节点',
                 subtitle: '节点列表、排序和流量（连接后可用）',
                 chevron: true,
-                onTap: () => context.goNamed('dataProxies'),
+                onTap: () => context.pushNamed('proxies'),
               ),
               MuseTile(
                 leading: const Icon(Icons.description_outlined),
                 title: '日志',
                 subtitle: '查看内核运行日志，排查连接问题',
                 chevron: true,
-                onTap: () => context.goNamed('dataLogs'),
+                onTap: () => context.goNamed('logs'),
               ),
               MuseTile(
                 leading: const Icon(Icons.history_rounded),

@@ -21,7 +21,7 @@ sealed class ProxyFailure with _$ProxyFailure, Failure {
   const factory ProxyFailure.unableToRetrieveIp([Object? error, StackTrace? stackTrace]) = UnableToRetrieveIp;
 
   @override
-  ({String type, String? message}) present(TranslationsEn t) {
+  ({String type, String? message}) present(Translations t) {
     return switch (this) {
       ProxyUnexpectedFailure() => (type: t.errors.unexpected, message: null),
       ServiceNotRunning() => (type: t.errors.singbox.serviceNotRunning, message: null),

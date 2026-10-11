@@ -12,7 +12,7 @@ sealed class StatsFailure with _$StatsFailure, Failure {
   const factory StatsFailure.unexpected([Object? error, StackTrace? stackTrace]) = StatsUnexpectedFailure;
 
   @override
-  ({String type, String? message}) present(TranslationsEn t) {
+  ({String type, String? message}) present(Translations t) {
     return switch (this) {
       StatsUnexpectedFailure() => (type: t.errors.unexpected, message: null),
     };

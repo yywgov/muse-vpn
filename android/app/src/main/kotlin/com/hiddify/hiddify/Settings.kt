@@ -90,6 +90,25 @@ object Settings {
         set(value) =
             preferences.edit().putBoolean(SettingsKey.SYSTEM_PROXY_ENABLED, value).apply()
 
+    val hideNotification: Boolean
+        get() = preferences.getBoolean(SettingsKey.HIDE_NOTIFICATION, false)
+
+    val excludeFromRecents: Boolean
+        get() = preferences.getBoolean(SettingsKey.EXCLUDE_FROM_RECENTS, false)
+
+    val netAutoEnabled: Boolean
+        get() = preferences.getBoolean(SettingsKey.NET_AUTO_ENABLED, false)
+
+    /** Trusted Wi-Fi names, one per line (Flutter saves them as a single string). */
+    val netTrustedSsids: Set<String>
+        get() = (preferences.getString(SettingsKey.NET_TRUSTED_SSIDS, "") ?: "")
+            .split('\n').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+    /** Set when 穿云 disconnected by itself on a trusted Wi-Fi, so it may reconnect later. */
+    var netAutoPaused: Boolean
+        get() = preferences.getBoolean(SettingsKey.NET_AUTO_PAUSED, false)
+        set(value) = preferences.edit().putBoolean(SettingsKey.NET_AUTO_PAUSED, value).apply()
+
     var startedByUser: Boolean
         get() = preferences.getBoolean(SettingsKey.STARTED_BY_USER, false)
         set(value) = preferences.edit().putBoolean(SettingsKey.STARTED_BY_USER, value).apply()

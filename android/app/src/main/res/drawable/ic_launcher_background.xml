@@ -1,12 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 穿云 launcher background: brand blue gradient (#3B8BFF -> #1A4FD6). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="2048dp"
-    android:height="2048dp"
-    android:viewportWidth="2048"
-    android:viewportHeight="2048">
-  <group>
-    <!-- Filled rectangle -->
-    <path
-        android:pathData="M0,0 L2048,0 L2048,2048 L0,2048 Z"
-        android:fillColor="#FFF0F3FA" />
-  </group>
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108">
+                <item android:offset="0" android:color="#FF3B8BFF" />
+                <item android:offset="1" android:color="#FF1A4FD6" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>

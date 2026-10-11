@@ -1,5 +1,5 @@
-// Muse VPN - Shadowrocket-style config tab (配置): subscriptions/profiles + routing.
-// Part of Muse VPN, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
+// 穿云 - config tab (配置): subscriptions/profiles + routing.
+// Part of 穿云 (Chuanyun), a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +8,6 @@ import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
-import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
 import 'package:hiddify/features/profile/widget/profile_tile.dart';
@@ -51,7 +50,7 @@ class MuseConfigPage extends HookConsumerWidget {
         children: [
           MuseSection(
             header: '订阅 / 配置',
-            footer: '点击切换当前使用的配置；右侧菜单可更新、编辑、分享或删除。',
+            footer: '点击切换当前使用的配置；右侧 ⋮ 菜单可更新、编辑、分享或删除。全局路由模式在「首页」切换。',
             children: [
               ...asyncProfiles.when(
                 data: (profiles) => profiles.isEmpty
@@ -81,16 +80,22 @@ class MuseConfigPage extends HookConsumerWidget {
               ),
             ],
           ),
-          const MuseSection(header: '全局路由', children: [MuseRouteModeSelector()]),
           MuseSection(
             header: '规则',
             children: [
               MuseTile(
                 leading: const Icon(Icons.route_rounded),
                 title: '路由规则',
-                subtitle: '哪些网站/应用直连、走代理或拦截（「配置」模式下生效）',
+                subtitle: '哪些网站/应用直连、走代理或拦截（首页选「配置」模式时生效）',
                 chevron: true,
                 onTap: () => context.goNamed('routingOptions'),
+              ),
+              MuseTile(
+                leading: const Icon(Icons.playlist_add_rounded),
+                title: '规则集',
+                subtitle: '一键导入常用分流规则（国外走代理、国内直连、去广告等）',
+                chevron: true,
+                onTap: () => context.goNamed('ruleSets'),
               ),
               MuseTile(
                 leading: const Icon(Icons.dns_rounded),

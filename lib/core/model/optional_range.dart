@@ -13,7 +13,7 @@ class OptionalRange with OptionalRangeMappable {
   final int? max;
 
   String format() => [min, max].whereNotNull().join("-");
-  String present(TranslationsEn t) => format().isEmpty ? t.common.notSet : format();
+  String present(Translations t) => format().isEmpty ? t.common.notSet : format();
 
   factory OptionalRange.parse(String input, {bool allowEmpty = false}) => switch (input.split("-")) {
     [final String val] when val.isEmpty && allowEmpty => const OptionalRange(),

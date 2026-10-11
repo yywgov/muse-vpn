@@ -49,7 +49,11 @@ import kotlinx.coroutines.CancellationException
 class ServiceNotification(private val status: MutableLiveData<Status>, private val service: Service) : BroadcastReceiver(){
     companion object {
         private const val notificationId = 1
-        private const val notificationChannel = "service"
+        // 穿云: two channels because a channel's importance can't change once created.
+        // "隐藏通知" uses the MIN channel: no status-bar icon, folded into the silent section.
+        private const val channelNormal = "chuanyun_status"
+        private const val channelMin = "chuanyun_status_min"
+        private val notificationChannel get() = if (Settings.hideNotification) channelMin else channelNormal
         var coreClient: CoreClient?=null
         val flags =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
@@ -74,7 +78,7 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
         NotificationCompat.Builder(service, notificationChannel)
                 .setShowWhen(false)
                 .setOngoing(true)
-                .setContentTitle("Muse VPN")
+                .setContentTitle(service.getString(R.string.app_name))
                 .setOnlyAlertOnce(true)
                 .setSmallIcon(R.drawable.ic_stat_logo)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -89,7 +93,7 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
                                 flags
                         )
                 )
-                .setPriority(NotificationCompat.PRIORITY_LOW).apply {
+                .setPriority(if (Settings.hideNotification) NotificationCompat.PRIORITY_MIN else NotificationCompat.PRIORITY_LOW).apply {
                     addAction(
                             NotificationCompat.Action.Builder(
                                     0, service.getText(R.string.stop), PendingIntent.getBroadcast(
@@ -107,15 +111,19 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
 
     fun show(profileName: String, @StringRes contentTextId: Int) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val importance = if (Settings.hideNotification) NotificationManager.IMPORTANCE_MIN else NotificationManager.IMPORTANCE_LOW
             Application.notification.createNotificationChannel(
                 NotificationChannel(
-                    notificationChannel, "Muse VPN service", NotificationManager.IMPORTANCE_LOW
-                )
+                    notificationChannel, service.getString(R.string.notification_channel_name), importance
+                ).apply {
+                    description = service.getString(R.string.notification_channel_desc)
+                    setShowBadge(false)
+                }
             )
         }
         service.startForeground(
             notificationId, notificationBuilder
-                .setContentTitle(profileName.takeIf { it.isNotBlank() } ?: "Muse VPN")
+                .setContentTitle(profileName.takeIf { it.isNotBlank() } ?: service.getString(R.string.app_name))
                 .setContentText(service.getString(contentTextId)).build()
         )
     }
@@ -142,8 +150,9 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
     fun updateStatus(previous:SystemInfo,status: SystemInfo) {
         val uplink=status.uplink_total - previous.uplink_total
         val downlink=status.downlink_total - previous.downlink_total
-        val content = "${Libbox.formatBytes(uplink)}/s ↑\t${Libbox.formatBytes(downlink)}/s ↓ \n${status.current_outbound}"
-        val title = "${status.current_profile}"
+        val speed = "↑ ${Libbox.formatBytes(uplink)}/s   ↓ ${Libbox.formatBytes(downlink)}/s"
+        val content = if (status.current_outbound.isBlank()) speed else "$speed   ${status.current_outbound}"
+        val title = status.current_profile.ifBlank { service.getString(R.string.app_name) }
         Application.notificationManager.notify(
                 notificationId,
                 notificationBuilder.setContentTitle(title).setContentText(content).build()

@@ -5,7 +5,7 @@ import 'package:hiddify/core/localization/translations.dart';
 typedef PresentableError = ({String type, String? message});
 
 mixin Failure {
-  ({String type, String? message}) present(TranslationsEn t);
+  ({String type, String? message}) present(Translations t);
 }
 
 /// failures that are not expected to happen but depending on [error] type might not be relevant (eg network errors)
@@ -21,7 +21,7 @@ mixin ExpectedMeasuredFailure {}
 /// failures ignored by analytics service etc.
 mixin ExpectedFailure {}
 
-extension ErrorPresenter on TranslationsEn {
+extension ErrorPresenter on Translations {
   PresentableError errorToPair(Object error) => switch (error) {
     GrpcError(message: final nestedErr?) => errorToPair(nestedErr),
     UnexpectedFailure(error: final nestedErr?) => errorToPair(nestedErr),
@@ -44,7 +44,7 @@ extension ErrorPresenter on TranslationsEn {
 }
 
 extension DioExceptionPresenter on DioException {
-  PresentableError present(TranslationsEn t) => switch (type) {
+  PresentableError present(Translations t) => switch (type) {
     DioExceptionType.connectionTimeout ||
     DioExceptionType.sendTimeout ||
     DioExceptionType.receiveTimeout => (type: t.errors.connection.timeout, message: null),

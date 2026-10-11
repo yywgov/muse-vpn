@@ -140,23 +140,13 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
   }
 
-  // Muse VPN: Shadowrocket-style tabs on phones.
-  List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) =>
-      isMobileBreakpoint ? _mobileActions : _desktopActions(t, showProfilesAction, isMobileBreakpoint);
+  // 穿云: 首页 / 配置 / 设置 on every form factor.
+  List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => _mobileActions;
 
   static final _mobileActions = [
     ShellRouteAction(Icons.home_rounded, '首页'),
     ShellRouteAction(Icons.description_rounded, '配置'),
-    ShellRouteAction(Icons.insert_chart_rounded, '数据'),
     ShellRouteAction(Icons.settings_rounded, '设置'),
-  ];
-
-  List<ShellRouteAction> _desktopActions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => [
-    ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title),
-    if (showProfilesAction && !isMobileBreakpoint) ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title),
-    ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
-    if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title),
-    if (!isMobileBreakpoint) ShellRouteAction(Icons.info_rounded, t.pages.about.title),
   ];
 
   List<NavigationDestination> _navDests(List<ShellRouteAction> actions) =>

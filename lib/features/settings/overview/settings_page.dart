@@ -1,229 +1,149 @@
+// 穿云 - 设置 tab.
+// Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
+
 import 'package:flutter/material.dart';
-import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hiddify/core/localization/translations.dart';
-import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
-import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
-import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
-import 'package:hiddify/features/settings/notifier/config_option/config_option_notifier.dart';
-import 'package:hiddify/features/settings/notifier/reset_tunnel/reset_tunnel_notifier.dart';
+import 'package:hiddify/core/haptic/haptic_service.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/features/common/general_pref_tiles.dart';
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/widget/grouped_list.dart';
+import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-enum ConfigOptionSection {
-  warp,
-  fragment;
-
-  static final _warpKey = GlobalKey(debugLabel: "warp-section-key");
-  static final _fragmentKey = GlobalKey(debugLabel: "fragment-section-key");
-
-  GlobalKey get key => switch (this) {
-    ConfigOptionSection.warp => _warpKey,
-    ConfigOptionSection.fragment => _fragmentKey,
-  };
-}
-
 class SettingsPage extends HookConsumerWidget {
-  SettingsPage({super.key, String? section})
-    : section = section != null ? ConfigOptionSection.values.byName(section) : null;
-
-  final ConfigOptionSection? section;
+  const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    // final scrollController = useScrollController();
+    final android = PlatformUtils.isAndroid;
+    final batteryIgnored = android ? ref.watch(batteryOptimizationNotifierProvider).valueOrNull : null;
+    final perAppMode = ref.watch(Preferences.perAppProxyModeInUse);
 
-    // useMemoized(
-    //   () {
-    //     if (section != null) {
-    //       WidgetsBinding.instance.addPostFrameCallback(
-    //         (_) {
-    //           final box = section!.key.currentContext?.findRenderObject() as RenderBox?;
-
-    //           final offset = box?.localToGlobal(Offset.zero);
-    //           if (offset == null) return;
-    //           final height = scrollController.offset + offset.dy - MediaQueryData.fromView(View.of(context)).padding.top - kToolbarHeight;
-    //           scrollController.animateTo(
-    //             height,
-    //             duration: const Duration(milliseconds: 500),
-    //             curve: Curves.decelerate,
-    //           );
-    //         },
-    //       );
-    //     }
-    //   },
-    // );
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.pages.settings.title),
-        actions: [
-          MenuAnchor(
-            menuChildren: <Widget>[
-              SubmenuButton(
-                menuChildren: <Widget>[
-                  MenuItemButton(
-                    onPressed: () async => await ref
-                        .read(dialogNotifierProvider.notifier)
-                        .showConfirmation(
-                          title: t.common.msg.import.confirm,
-                          message: t.dialogs.confirmation.settings.import.msg,
-                        )
-                        .then((shouldImport) async {
-                          if (shouldImport) {
-                            await ref.read(configOptionNotifierProvider.notifier).importFromClipboard();
-                          }
-                        }),
-                    child: Text(t.pages.settings.options.import.clipboard),
-                  ),
-                  MenuItemButton(
-                    onPressed: () async => await ref
-                        .read(dialogNotifierProvider.notifier)
-                        .showConfirmation(
-                          title: t.common.msg.import.confirm,
-                          message: t.dialogs.confirmation.settings.import.msg,
-                        )
-                        .then((shouldImport) async {
-                          if (shouldImport) {
-                            await ref.read(configOptionNotifierProvider.notifier).importFromJsonFile();
-                          }
-                        }),
-                    child: Text(t.pages.settings.options.import.file),
-                  ),
-                ],
-                child: Text(t.common.import),
-              ),
-              SubmenuButton(
-                menuChildren: <Widget>[
-                  MenuItemButton(
-                    onPressed: () async => await ref.read(configOptionNotifierProvider.notifier).exportJsonClipboard(),
-                    child: Text(t.pages.settings.options.export.anonymousToClipboard),
-                  ),
-                  MenuItemButton(
-                    onPressed: () async => await ref.read(configOptionNotifierProvider.notifier).exportJsonFile(),
-                    child: Text(t.pages.settings.options.export.anonymousToFile),
-                  ),
-                  const PopupMenuDivider(),
-                  MenuItemButton(
-                    onPressed: () async => await ref
-                        .read(configOptionNotifierProvider.notifier)
-                        .exportJsonClipboard(excludePrivate: false),
-                    child: Text(t.pages.settings.options.export.allToClipboard),
-                  ),
-                  MenuItemButton(
-                    onPressed: () async =>
-                        await ref.read(configOptionNotifierProvider.notifier).exportJsonFile(excludePrivate: false),
-                    child: Text(t.pages.settings.options.export.allToFile),
-                  ),
-                ],
-                child: Text(t.common.export),
-              ),
-              const PopupMenuDivider(),
-              MenuItemButton(
-                child: Text(t.pages.settings.options.reset),
-                onPressed: () async => await ref.read(configOptionNotifierProvider.notifier).resetOption(),
+    return MuseScaffold(
+      title: '设置',
+      body: MuseGroupedBody(
+        children: [
+          MuseSection(
+            header: '常规',
+            children: [
+              const ThemeModePrefTile(),
+              if (android) ...[
+                MuseSwitchTile(
+                  leading: const Icon(Icons.speed_rounded),
+                  title: '通知栏显示网速',
+                  value: ref.watch(Preferences.dynamicNotification),
+                  onChanged: ref.read(Preferences.dynamicNotification.notifier).update,
+                ),
+                MuseSwitchTile(
+                  leading: const Icon(Icons.vibration_rounded),
+                  title: '触感反馈',
+                  value: ref.watch(hapticServiceProvider),
+                  onChanged: ref.read(hapticServiceProvider.notifier).updatePreference,
+                ),
+              ],
+            ],
+          ),
+          MuseSection(
+            header: '网络',
+            children: [
+              if (android)
+                MuseTile(
+                  leading: const Icon(Icons.apps_rounded),
+                  title: '分应用代理',
+                  subtitle: switch (perAppMode) {
+                    null => '已关闭：所有 App 都经过穿云',
+                    _ => perAppMode.name == 'exclude' ? '列表里的 App 不走代理' : '仅列表里的 App 走代理',
+                  },
+                  chevron: true,
+                  onTap: () => context.goNamed('perAppProxy'),
+                ),
+              if (android)
+                MuseTile(
+                  leading: const Icon(Icons.wifi_rounded),
+                  title: '按网络自动开关',
+                  subtitle: ref.watch(Preferences.netAutoEnabled) ? '已开启：可信 Wi-Fi 自动断开' : '连上家里/公司 Wi-Fi 时自动断开',
+                  chevron: true,
+                  onTap: () => context.goNamed('networkAuto'),
+                ),
+              MuseSwitchTile(
+                leading: const Icon(Icons.swap_horiz_rounded),
+                title: '节点失效自动切换',
+                subtitle: '手动选的节点测速超时后，自动改用「自动最快」',
+                value: ref.watch(Preferences.nodeFailover),
+                onChanged: ref.read(Preferences.nodeFailover.notifier).update,
               ),
             ],
-            builder: (context, controller, child) => IconButton(
-              onPressed: () {
-                if (controller.isOpen) {
-                  controller.close();
-                } else {
-                  controller.open();
-                }
-              },
-              icon: const Icon(Icons.more_vert_rounded),
+          ),
+          if (android)
+            MuseSection(
+              header: '隐私与后台',
+              footer: 'ColorOS 等系统会清理后台应用。建议允许穿云后台运行和自启动，避免连接被系统断开。',
+              children: [
+                MuseTile(
+                  leading: const Icon(Icons.shield_moon_rounded),
+                  title: '隐私',
+                  subtitle: '隐藏桌面图标、不在最近任务显示、隐藏通知',
+                  chevron: true,
+                  onTap: () => context.goNamed('privacy'),
+                ),
+                MuseTile(
+                  leading: Icon(
+                    batteryIgnored == true ? Icons.battery_full_rounded : Icons.battery_alert_rounded,
+                    color: batteryIgnored == false ? Colors.orange : null,
+                  ),
+                  title: '允许后台运行',
+                  subtitle: batteryIgnored == true ? '已关闭电池优化' : '关闭电池优化，锁屏后也保持连接',
+                  trailing: batteryIgnored == true ? const Icon(Icons.check_rounded, color: Colors.green) : null,
+                  chevron: batteryIgnored != true,
+                  onTap: batteryIgnored == true
+                      ? ChuanyunPlatform.openAppDetails
+                      : () => ref.read(batteryOptimizationNotifierProvider.notifier).requestToIgnore(),
+                ),
+                const MuseTile(
+                  leading: Icon(Icons.rocket_launch_rounded),
+                  title: '自启动',
+                  subtitle: 'ColorOS：在「自启动管理」里打开穿云，开机后可自动恢复连接',
+                  chevron: true,
+                  onTap: ChuanyunPlatform.openAutostartSettings,
+                ),
+              ],
             ),
-          ),
-          const Gap(8),
-        ],
-      ),
-      body: ListView(
-        children: [
-          // TipCard(message: t.settings.experimentalMsg),
-          SettingsSection(
-            title: t.pages.settings.general.title,
-            icon: Icons.layers_rounded,
-            namedLocation: context.namedLocation('general'),
-          ),
-          if (ref.watch(hasAnyProfileProvider).value ?? false)
-            SettingsSection(
-              title: t.pages.settings.chain.title,
-              icon: Icons.webhook_rounded,
-              subtitle: Text(t.pages.settings.chain.subtitle),
-              namedLocation: context.namedLocation('chainOptions'),
-            ),
-          SettingsSection(
-            title: t.pages.settings.routing.title,
-            icon: Icons.route_rounded,
-            namedLocation: context.namedLocation('routingOptions'),
-          ),
-          SettingsSection(
-            title: t.pages.settings.dns.title,
-            icon: Icons.dns_rounded,
-            namedLocation: context.namedLocation('dnsOptions'),
-          ),
-          SettingsSection(
-            title: t.pages.settings.inbound.title,
-            icon: Icons.input_rounded,
-            namedLocation: context.namedLocation('inboundOptions'),
-          ),
-          SettingsSection(
-            title: t.pages.settings.tlsTricks.title,
-            icon: Icons.content_cut_rounded,
-            namedLocation: context.namedLocation('tlsTricks'),
-          ),
-          if (PlatformUtils.isIOS)
-            Material(
-              child: ListTile(
-                title: Text(t.pages.settings.resetTunnel),
-                leading: const Icon(Icons.autorenew_rounded),
-                onTap: () async {
-                  await ref.read(resetTunnelNotifierProvider.notifier).run();
-                },
+          MuseSection(
+            header: '更多',
+            children: [
+              MuseTile(
+                leading: const Icon(Icons.insights_rounded),
+                title: '连接信息',
+                subtitle: '本次流量、出口 IP、活动连接',
+                chevron: true,
+                onTap: () => context.goNamed('connections'),
               ),
-            ),
-          if (Breakpoint(context).isMobile()) ...[
-            SettingsSection(
-              title: t.pages.logs.title,
-              icon: Icons.description_rounded,
-              namedLocation: context.namedLocation('logs'),
-            ),
-            SettingsSection(
-              title: t.pages.about.title,
-              icon: Icons.info_rounded,
-              namedLocation: context.namedLocation('about'),
-            ),
-          ],
+              MuseTile(
+                leading: const Icon(Icons.description_rounded),
+                title: '日志',
+                subtitle: '排查连接问题',
+                chevron: true,
+                onTap: () => context.goNamed('logs'),
+              ),
+              MuseTile(
+                leading: const Icon(Icons.tune_rounded),
+                title: '高级',
+                subtitle: 'VPN 模式与端口、TLS 分片、测速、内核、备份',
+                chevron: true,
+                onTap: () => context.goNamed('advanced'),
+              ),
+              MuseTile(
+                leading: const Icon(Icons.info_rounded),
+                title: '关于',
+                chevron: true,
+                onTap: () => context.goNamed('about'),
+              ),
+            ],
+          ),
         ],
       ),
-    );
-  }
-}
-
-class SettingsSection extends HookConsumerWidget {
-  const SettingsSection({
-    super.key,
-    required this.title,
-    required this.icon,
-    this.subtitle,
-    required this.namedLocation,
-  });
-
-  final String title;
-  final Widget? subtitle;
-  final IconData icon;
-  final String namedLocation;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      subtitle: subtitle,
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () => context.go(namedLocation),
     );
   }
 }

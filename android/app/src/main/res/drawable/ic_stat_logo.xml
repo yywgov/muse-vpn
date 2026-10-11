@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 穿云 monochrome glyph: notification small icon and quick-settings tile. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="84"
+    android:viewportHeight="84"
+    android:tint="#FFFFFFFF">
+    <group android:translateX="-12" android:translateY="-9">
+        <path android:pathData="M33,66 L54,28 L75,66" android:strokeColor="#FFFFFFFF" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>
+        <path android:pathData="M18,74 C22,66 30,64 36,67 C40,60 50,58 56,64 C62,58 74,60 76,67 C82,64 90,68 90,74" android:strokeColor="#FFFFFFFF" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>
+    </group>
+</vector>

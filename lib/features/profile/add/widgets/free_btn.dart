@@ -16,7 +16,7 @@ class FreeBtn extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final locale = ref.watch(localePreferencesProvider);
-    final isFa = locale.name == AppLocale.fa.name;
+    final isFa = locale.name == 'fa';
     final theme = Theme.of(context);
     final borderRadius = BorderRadius.circular(18);
 

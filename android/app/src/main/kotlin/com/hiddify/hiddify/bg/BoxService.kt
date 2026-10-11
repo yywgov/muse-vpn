@@ -182,6 +182,9 @@ class BoxService(
                 return
             }
             status.postValue(Status.Started)
+            // 穿云: a (re)connect ends any 按网络自动开关 pause
+            Settings.netAutoPaused = false
+            NetworkAuto.cancelNotification()
 
             if (Settings.startCoreAfterStartingService){
                 Mobile.start("","")
@@ -261,6 +264,10 @@ class BoxService(
     }
 
     private fun stopService() {
+        // 穿云: a stop the user asked for cancels the 按网络自动开关 pause (no auto reconnect)
+        val byNetworkAuto = NetworkAuto.autoStopping
+        NetworkAuto.autoStopping = false
+        if (!byNetworkAuto) Settings.netAutoPaused = false
         if (status.value == Status.Stopped) return
         status.value = Status.Stopping
         if (receiverRegistered) {
