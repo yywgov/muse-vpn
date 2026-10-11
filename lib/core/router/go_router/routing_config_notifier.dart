@@ -10,9 +10,11 @@ import 'package:hiddify/core/router/go_router/helper/custom_transition.dart';
 import 'package:hiddify/core/router/go_router/refresh_listenable.dart';
 import 'package:hiddify/features/about/widget/about_page.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
-import 'package:hiddify/features/home/widget/home_page.dart';
 import 'package:hiddify/features/intro/widget/intro_page.dart';
 import 'package:hiddify/features/log/overview/logs_page.dart';
+import 'package:hiddify/features/muse/config/muse_config_page.dart';
+import 'package:hiddify/features/muse/data/muse_data_page.dart';
+import 'package:hiddify/features/muse/home/muse_home_page.dart';
 import 'package:hiddify/features/profile/details/profile_details_page.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/overview/profiles_page.dart';
@@ -36,6 +38,8 @@ part 'routing_config_notifier.g.dart';
 // each branch in go router has its own focus scope
 final branchesScope = <String, FocusScopeNode>{
   'home': FocusScopeNode(),
+  'config': FocusScopeNode(),
+  'data': FocusScopeNode(),
   'profiles': FocusScopeNode(),
   'settings': FocusScopeNode(),
   'logs': FocusScopeNode(),
@@ -47,12 +51,15 @@ final loadingConfig = RoutingConfig(
   routes: <RouteBase>[GoRoute(path: '/home', builder: (context, state) => const Material())],
 );
 
+// Muse VPN: on phones the shell has four Shadowrocket-style tabs.
+const mobileBranches = ['home', 'config', 'data', 'settings'];
+
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => isMobileBreakpoint
-    ? ['home', 'settings'][index]
+    ? mobileBranches[index]
     : ['home', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'][index];
 
 int getIndexOfBranch(bool isMobileBreakpoint, bool showProfilesAction, String name) => isMobileBreakpoint
-    ? ['home', 'settings'].indexOf(name)
+    ? mobileBranches.indexOf(name)
     : ['home', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'].indexOf(name);
 
 @Riverpod(keepAlive: true)
@@ -126,7 +133,7 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                 GoRoute(
                   name: 'home',
                   path: '/home',
-                  builder: (_, _) => FocusScope(node: branchesScope['home'], child: const HomePage()),
+                  builder: (_, _) => FocusScope(node: branchesScope['home'], child: const MuseHomePage()),
                   routes: <GoRoute>[
                     GoRoute(
                       name: 'proxies',
@@ -134,7 +141,18 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       pageBuilder: (_, state) =>
                           customTransition(TransitionType.fade, state.pageKey, const ProxiesOverviewPage()),
                     ),
-                    if (isMobileBreakpoint)
+                  ],
+                ),
+              ],
+            ),
+            if (isMobileBreakpoint) ...[
+              StatefulShellBranch(
+                routes: <GoRoute>[
+                  GoRoute(
+                    name: 'config',
+                    path: '/config',
+                    builder: (_, _) => FocusScope(node: branchesScope['config'], child: const MuseConfigPage()),
+                    routes: <GoRoute>[
                       GoRoute(
                         name: 'profileDetails',
                         path: 'profile-details/:id',
@@ -144,10 +162,34 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                           ProfileDetailsPage(id: state.pathParameters['id']!),
                         ),
                       ),
-                  ],
-                ),
-              ],
-            ),
+                    ],
+                  ),
+                ],
+              ),
+              StatefulShellBranch(
+                routes: <GoRoute>[
+                  GoRoute(
+                    name: 'data',
+                    path: '/data',
+                    builder: (_, _) => FocusScope(node: branchesScope['data'], child: const MuseDataPage()),
+                    routes: <GoRoute>[
+                      GoRoute(
+                        name: 'dataProxies',
+                        path: 'proxies',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const ProxiesOverviewPage()),
+                      ),
+                      GoRoute(
+                        name: 'dataLogs',
+                        path: 'logs',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const LogsPage()),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
             if (showProfilesAction)
               StatefulShellBranch(
                 routes: <GoRoute>[

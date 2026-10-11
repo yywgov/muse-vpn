@@ -15,6 +15,7 @@ class PreferencesMigration with InfraLogger {
       PreferencesVersion1Migration(sharedPreferences),
       PreferencesVersion2Migration(sharedPreferences),
       MuseDefaultsV1Migration(sharedPreferences),
+      MuseDefaultsV2Migration(sharedPreferences),
     ];
 
     if (currentVersion == migrationSteps.length) {
@@ -143,5 +144,17 @@ class MuseDefaultsV1Migration extends PreferencesMigrationStep with InfraLogger 
     await sharedPreferences.setString("region", "cn");
     await sharedPreferences.setString("direct-dns-address", "udp://223.5.5.5");
     await sharedPreferences.setString("tun-implementation", "mixed");
+  }
+}
+
+/// Muse VPN: revert TUN stack to gVisor. mixed/system connect but pass no
+/// traffic on Android (hiddify-app#1179: "bind forwarder to interface: operation not permitted").
+class MuseDefaultsV2Migration extends PreferencesMigrationStep with InfraLogger {
+  MuseDefaultsV2Migration(super.sharedPreferences);
+
+  @override
+  Future<void> migrate() async {
+    loggy.debug("applying Muse VPN defaults v2 (gvisor)");
+    await sharedPreferences.setString("tun-implementation", "gvisor");
   }
 }

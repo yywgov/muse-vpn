@@ -6,6 +6,7 @@ import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/core/utils/json_converters.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/log/model/log_level.dart';
+import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/profile/data/profile_parser.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/settings/model/config_option_failure.dart';
@@ -37,6 +38,15 @@ abstract class ConfigOptions {
     mapFrom: Region.values.byName,
     mapTo: (value) => value.name,
   );
+
+  /// Muse VPN: global routing mode (配置 / 代理 / 直连), applied on top of the route rules.
+  static final museRouteMode = PreferencesNotifier.create<MuseRouteMode, String>(
+    "muse-route-mode",
+    MuseRouteMode.rule,
+    mapFrom: MuseRouteMode.fromKey,
+    mapTo: (value) => value.key,
+  );
+
   static final useXrayCoreWhenPossible = PreferencesNotifier.create<bool, bool>("use-xray-core-when-possible", false);
   // static final blockAds = PreferencesNotifier.create<bool, bool>("block-ads", false);
   static final logLevel = PreferencesNotifier.create<LogLevel, String>(
@@ -139,7 +149,7 @@ abstract class ConfigOptions {
 
   static final tunImplementation = PreferencesNotifier.create<TunImplementation, String>(
     "tun-implementation",
-    TunImplementation.mixed, // Muse VPN: system TCP stack is much faster than gvisor
+    TunImplementation.gvisor, // Muse VPN: mixed/system stack breaks traffic on Android (bind forwarder: operation not permitted)
     mapFrom: TunImplementation.values.byName,
     mapTo: (value) => value.name,
   );
@@ -551,7 +561,9 @@ abstract class ConfigOptions {
         ),
         profile: SingboxUnblockerProfileOption(id: ref.watch(unblockerProfileId)),
       ),
-      routeRule: RouteRule(rules: ref.watch(rulesNotifierProvider)).toProto3Json()! as Map<String, dynamic>,
+      routeRule:
+          RouteRule(rules: ref.watch(museRouteMode).applyTo(ref.watch(rulesNotifierProvider))).toProto3Json()!
+              as Map<String, dynamic>,
     );
   });
 }

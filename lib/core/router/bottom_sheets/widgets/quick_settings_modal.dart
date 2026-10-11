@@ -1,6 +1,10 @@
+// Quick settings sheet, reworked for Muse VPN (fork of Hiddify, GPLv3) in plain Chinese,
+// grouped-list style: each item is a title plus a one-line grey explanation.
+
 import 'package:flutter/material.dart';
-import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/chain/overview/chain_quick_settings.dart';
+import 'package:hiddify/features/muse/model/route_mode.dart';
+import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/settings/widget/lan_sharing_tile.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
@@ -9,71 +13,68 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 class QuickSettingsModal extends HookConsumerWidget {
   const QuickSettingsModal({super.key});
 
+  static (String, String) _serviceModeText(ServiceMode mode) => switch (mode) {
+    ServiceMode.tun => ('VPN（全局接管，推荐）', '接管手机上所有应用的网络，不用额外设置'),
+    ServiceMode.proxy => ('仅代理', '只在本机开一个代理端口，需要应用自己设置代理才会生效'),
+    ServiceMode.systemProxy => ('系统代理', '设置为系统代理，支持系统代理的应用会自动使用'),
+  };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
+    final serviceMode = ref.watch(ConfigOptions.serviceMode);
+    final routeMode = ref.watch(ConfigOptions.museRouteMode);
+    final mixedPort = ref.watch(ConfigOptions.mixedPort);
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SegmentedButton(
-                showSelectedIcon: false,
-                segments: ServiceMode.choices
-                    .map(
-                      (e) => ButtonSegment(
-                        value: e,
-                        label: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Text(e.presentShort(t), textAlign: TextAlign.center),
-                        ),
-                        // tooltip: e.isExperimental ? t.settings.experimental : null,
-                      ),
-                    )
-                    .toList(),
-                selected: {ref.watch(ConfigOptions.serviceMode)},
-                onSelectionChanged: (newSet) => ref.read(ConfigOptions.serviceMode.notifier).update(newSet.first),
+    return ColoredBox(
+      color: MuseColors.background(context),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(top: 8, bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(32, 8, 32, 0),
+                child: Text('快速设置', style: Theme.of(context).textTheme.titleMedium),
               ),
-            ),
-            const Divider(height: 2, thickness: 2),
-            const LanSharingPreferenceWidget(showLeading: false),
-            const Divider(height: 2, thickness: 2),
-            const ChainQuickSettings(),
-            // const Gap(12),
-            // ListTile(
-            //   leading: const Icon(Icons.cloud_rounded),
-            //   title: Text(ref.watch(ConfigOptions.warpDetourMode).presentExplain(t)),
-            //   onLongPress: () {
-            //     context.pop();
-            //     context.goNamed('warpOptions');
-            //   },
-            //   onTap: () async {
-            //     final value = ref.watch(ConfigOptions.enableWarp);
-            //     await ref.read(ConfigOptions.enableWarp.notifier).update(!value);
-            //   },
-            //   trailing: Switch.adaptive(
-            //     value: ref.watch(ConfigOptions.enableWarp),
-            //     onChanged: (value) async {
-            //       await ref.read(ConfigOptions.enableWarp.notifier).update(value);
-            //       // await ref.read(warpOptionNotifierProvider.notifier).genWarps();
-            //     },
-            //   ),
-            // ),
-            // ListTile(
-            //   leading: const Icon(Icons.content_cut_rounded),
-            //   title: Text(t.pages.settings.tlsTricks.title),
-            //   onTap: () {
-            //     context.pop();
-            //     context.goNamed('tlsTricks');
-            //   },
-            //   trailing: Switch.adaptive(
-            //     value: ref.watch(ConfigOptions.enableTlsFragment),
-            //     onChanged: ref.read(ConfigOptions.enableTlsFragment.notifier).update,
-            //   ),
-            // ),
-          ],
+              MuseSection(
+                header: '运行模式',
+                footer: serviceMode == ServiceMode.proxy ? '代理地址：127.0.0.1:$mixedPort（HTTP / SOCKS 均可）' : null,
+                children: [
+                  for (final mode in ServiceMode.choices)
+                    MuseChoiceTile(
+                      title: _serviceModeText(mode).$1,
+                      subtitle: _serviceModeText(mode).$2,
+                      selected: serviceMode == mode,
+                      onTap: () => ref.read(ConfigOptions.serviceMode.notifier).update(mode),
+                    ),
+                ],
+              ),
+              MuseSection(
+                header: '全局路由',
+                children: [
+                  for (final mode in MuseRouteMode.values)
+                    MuseChoiceTile(
+                      title: mode.title,
+                      subtitle: mode.explain,
+                      selected: routeMode == mode,
+                      onTap: () => ref.read(ConfigOptions.museRouteMode.notifier).update(mode),
+                    ),
+                ],
+              ),
+              const MuseSection(
+                header: '局域网共享',
+                children: [
+                  LanSharingPreferenceWidget(
+                    showLeading: false,
+                    title: '局域网共享',
+                    subtitle: '允许同一 WiFi 下的其他设备通过本机上网，会显示 IP 和端口',
+                  ),
+                ],
+              ),
+              const ChainQuickSettings(),
+            ],
+          ),
         ),
       ),
     );

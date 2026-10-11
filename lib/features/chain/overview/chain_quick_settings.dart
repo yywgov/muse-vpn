@@ -1,12 +1,12 @@
+// Chain (前置/出口代理) part of the quick settings sheet.
+// Reworked for Muse VPN (fork of Hiddify, GPLv3): plain Chinese, grouped-list rows,
+// same providers and menus as before (ChainModeButton / ConfigOptions.chainStatus).
+
 import 'package:flutter/material.dart';
-import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hiddify/core/localization/translations.dart';
-import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/features/chain/overview/chain_mode_button.dart';
-import 'package:hiddify/features/common/custom_text_scroll.dart';
+import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class ChainQuickSettings extends HookConsumerWidget {
@@ -14,189 +14,35 @@ class ChainQuickSettings extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    final theme = Theme.of(context);
-    final onSurfaceVariant = theme.colorScheme.onSurfaceVariant;
-    return Padding(
-      padding: const EdgeInsets.all(10),
-      child: IntrinsicHeight(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Gap(4),
-                      Icon(ChainConst.iconByPlatform(), size: 20, color: onSurfaceVariant),
-                      const Gap(4),
-                      Text(
-                        t.pages.settings.chain.levels.app.title,
-                        style: theme.textTheme.labelSmall?.copyWith(color: onSurfaceVariant),
-                      ),
-                      const Gap(4),
-                    ],
-                  ),
-                  const Gap(4),
-                  Icon(Icons.arrow_downward_rounded, size: 20, color: theme.colorScheme.primary),
-                  const Gap(4),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      t.pages.settings.chain.levels.extraSecurity.title,
-                      style: theme.textTheme.labelSmall?.copyWith(color: onSurfaceVariant),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const Gap(2),
-                  const ChainModeButton.extraSecurity(showConfiguration: true),
-                  const Gap(2),
-                  AnimatedOpacity(
-                    duration: ChainConst.finalIpDuration,
-                    opacity: ref.watch(ConfigOptions.chainStatus).isExtraSecurity() ? 1 : 0,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        t.pages.settings.chain.finalIp,
-                        style: theme.textTheme.labelSmall?.copyWith(color: ChainConst.finalIpColor(theme)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Container(
-                      alignment: Alignment.topCenter,
-                      child: Material(
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(100),
-                          onTap: () {
-                            context.pop();
-                            context.goNamed('chainOptions');
-                          },
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Gap(4),
-                              Icon(Icons.webhook_rounded, size: 20, color: theme.colorScheme.primary),
-                              const Gap(4),
-                              Text(
-                                t.pages.settings.chain.title,
-                                style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.primary),
-                              ),
-                              const Gap(4),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Icon(Icons.arrow_forward_rounded, size: 20, color: theme.colorScheme.primary),
-                      ),
-                      Flexible(
-                        child: Column(
-                          children: [
-                            Text(
-                              t.pages.settings.chain.levels.mainProfile.title,
-                              style: theme.textTheme.labelSmall?.copyWith(color: onSurfaceVariant),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const Gap(2),
-                            Container(
-                              height: 32,
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              alignment: Alignment.center,
-                              child: CustomTextScroll(
-                                ref.watch(activeProfileProvider).value?.name ?? t.common.notSet,
-                                style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurface),
-                              ),
-                            ),
-                            AnimatedOpacity(
-                              duration: ChainConst.finalIpDuration,
-                              opacity: ref.watch(ConfigOptions.chainStatus).isExtraSecurity() ? 0 : 1,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                child: Text(
-                                  t.pages.settings.chain.finalIp,
-                                  style: theme.textTheme.labelSmall?.copyWith(color: ChainConst.finalIpColor(theme)),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Icon(Icons.arrow_forward_rounded, size: 20, color: theme.colorScheme.primary),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Gap(4),
-                      Icon(Icons.wifi_rounded, size: 20, color: onSurfaceVariant),
-                      const Gap(4),
-                      Text(
-                        t.pages.settings.chain.levels.filtering.title,
-                        style: theme.textTheme.labelSmall?.copyWith(color: onSurfaceVariant),
-                      ),
-                      const Gap(4),
-                    ],
-                  ),
-                  const Gap(4),
-                  Icon(Icons.arrow_upward_rounded, size: 20, color: theme.colorScheme.primary),
-                  const Gap(4),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      t.pages.settings.chain.levels.unblocker.title,
-                      style: theme.textTheme.labelSmall?.copyWith(color: onSurfaceVariant),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const Gap(2),
-                  const ChainModeButton.unblocker(showConfiguration: true),
-                  const Gap(2),
-                  // For equal height
-                  Opacity(
-                    opacity: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        t.pages.settings.chain.finalIp,
-                        style: theme.textTheme.labelSmall?.copyWith(color: ChainConst.finalIpColor(theme)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+    final hasProfile = ref.watch(hasAnyProfileProvider).value ?? false;
+
+    Widget button(Widget child) => ConstrainedBox(constraints: const BoxConstraints(maxWidth: 130), child: child);
+
+    return MuseSection(
+      header: '链式代理（一般不用开）',
+      footer: '两项同时只能开一个。点右侧按钮选择 WARP / Psiphon 或关闭。',
+      children: [
+        MuseTile(
+          title: '前置代理',
+          subtitle: '先经过 WARP/Psiphon 再连到你的节点；节点被封、连不上时再试，一般不用开',
+          trailing: button(const ChainModeButton.unblocker(showConfiguration: true)),
         ),
-      ),
+        MuseTile(
+          title: '出口代理',
+          subtitle: '先连你的节点，再从 WARP/Psiphon 出去，网站看到的是它的 IP；一般不用开',
+          trailing: button(const ChainModeButton.extraSecurity(showConfiguration: true)),
+        ),
+        if (hasProfile)
+          MuseTile(
+            title: '链式代理详细设置',
+            subtitle: 'WARP 密钥、Psiphon 地区等',
+            chevron: true,
+            onTap: () {
+              context.pop();
+              context.goNamed('chainOptions');
+            },
+          ),
+      ],
     );
   }
 }

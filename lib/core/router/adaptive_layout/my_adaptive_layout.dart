@@ -121,7 +121,9 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                 ? FocusScope(
                     node: navScopeNode,
                     child: NavigationBar(
-                      selectedIndex: navigationShell.currentIndex <= 1 ? navigationShell.currentIndex : 0,
+                      selectedIndex: navigationShell.currentIndex < mobileBranches.length
+                          ? navigationShell.currentIndex
+                          : 0,
                       destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
                       onDestinationSelected: (index) => _onTap(context, index),
                     ),
@@ -138,7 +140,18 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
   }
 
-  List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => [
+  // Muse VPN: Shadowrocket-style tabs on phones.
+  List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) =>
+      isMobileBreakpoint ? _mobileActions : _desktopActions(t, showProfilesAction, isMobileBreakpoint);
+
+  static final _mobileActions = [
+    ShellRouteAction(Icons.home_rounded, '首页'),
+    ShellRouteAction(Icons.description_rounded, '配置'),
+    ShellRouteAction(Icons.insert_chart_rounded, '数据'),
+    ShellRouteAction(Icons.settings_rounded, '设置'),
+  ];
+
+  List<ShellRouteAction> _desktopActions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => [
     ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title),
     if (showProfilesAction && !isMobileBreakpoint) ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title),
     ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
