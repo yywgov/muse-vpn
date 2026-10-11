@@ -33,7 +33,7 @@ abstract class ConfigOptions {
 
   static final region = PreferencesNotifier.create<Region, String>(
     "region",
-    Region.other,
+    Region.cn, // Muse VPN: mainland China users by default -> CN sites go direct
     mapFrom: Region.values.byName,
     mapTo: (value) => value.name,
   );
@@ -81,7 +81,7 @@ abstract class ConfigOptions {
 
   static final directDnsAddress = PreferencesNotifier.create<String, String>(
     "direct-dns-address",
-    "udp://1.1.1.1",
+    "udp://223.5.5.5", // Muse VPN: 1.1.1.1 is slow/unreliable from mainland China
     possibleValues: List.of([
       "local",
       "udp://223.5.5.5",
@@ -132,7 +132,7 @@ abstract class ConfigOptions {
 
   static final tunImplementation = PreferencesNotifier.create<TunImplementation, String>(
     "tun-implementation",
-    TunImplementation.gvisor,
+    TunImplementation.mixed, // Muse VPN: system TCP stack is much faster than gvisor
     mapFrom: TunImplementation.values.byName,
     mapTo: (value) => value.name,
   );
