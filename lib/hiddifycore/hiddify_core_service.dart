@@ -48,6 +48,7 @@ class HiddifyCoreService with InfraLogger {
   Future<void> resume() async {
     if (!_ready || !PlatformUtils.isAndroid) return init();
     if (!subscriptions.containsKey("bgStatusListener")) {
+      _statusRecoveries = 0;
       await startListeningStatus("bg", core.bgClient);
     }
   }
@@ -437,6 +438,7 @@ class HiddifyCoreService with InfraLogger {
     await listenSingle<CoreStatus>(
       "${key}StatusListener",
       () => cc.coreInfoListener(Empty(), options: grpcOptions).map((event) {
+        _statusRecoveries = 0;
         currentState = CoreStatus.fromCoreInfo(event);
         statusController.add(currentState);
         return currentState;
@@ -458,8 +460,16 @@ class HiddifyCoreService with InfraLogger {
 
   bool _statusRecovering = false;
 
+  /// Re-subscriptions since the last status event; bounded so a stream that keeps failing
+  /// right away does not turn into a busy loop (resume() re-arms it later).
+  int _statusRecoveries = 0;
+
   Future<void> _recoverStatus(String key) async {
     if (_statusRecovering) return;
+    if (++_statusRecoveries > 8) {
+      loggy.warning("status stream keeps failing, waiting for the next resume/connect");
+      return;
+    }
     _statusRecovering = true;
     try {
       for (var attempt = 1; attempt <= 5; attempt++) {
