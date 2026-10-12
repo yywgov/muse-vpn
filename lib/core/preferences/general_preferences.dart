@@ -23,6 +23,9 @@ abstract class Preferences {
   // 穿云: switch the main group to 自动最快 when the hand-picked node stops answering
   static final nodeFailover = PreferencesNotifier.create<bool, bool>("node_failover", true);
 
+  // 穿云 1.0: 负载均衡 used to be the default pick of the main group; moved once to 自动最快
+  static final autoFastestMigrated = PreferencesNotifier.create<bool, bool>("auto_fastest_migrated", false);
+
   // Null means that auto selection has not been performed yet.
   static final autoAppsSelectionRegion = PreferencesNotifier.create<Region?, String?>(
     "auto_apps_selection_region",

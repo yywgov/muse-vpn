@@ -7,6 +7,7 @@ import 'package:gap/gap.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/features/muse/data/diagnostics.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -64,6 +65,22 @@ class AboutPage extends HookConsumerWidget {
                 onTap: () async {
                   await Clipboard.setData(ClipboardData(text: appInfo.format()));
                   ref.read(inAppNotificationControllerProvider).showSuccessToast('已复制');
+                },
+              ),
+            ],
+          ),
+          // 穿云: deliberately low-key — only needed when reporting a connection problem
+          MuseSection(
+            footer: '连接异常时可导出，内含断开原因与最近日志，仅在你主动分享时才会发出。',
+            children: [
+              MuseTile(
+                leading: const Icon(Icons.bug_report_outlined),
+                title: '导出诊断',
+                onTap: () async {
+                  final ok = await MuseDiagnostics.export(ref);
+                  if (!ok && context.mounted) {
+                    ref.read(inAppNotificationControllerProvider).showErrorToast('导出失败');
+                  }
                 },
               ),
             ],

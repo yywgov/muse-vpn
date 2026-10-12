@@ -121,16 +121,9 @@ class SettingsPage extends HookConsumerWidget {
                 onTap: () => context.goNamed('connections'),
               ),
               MuseTile(
-                leading: const Icon(Icons.description_rounded),
-                title: '日志',
-                subtitle: '排查连接问题',
-                chevron: true,
-                onTap: () => context.goNamed('logs'),
-              ),
-              MuseTile(
                 leading: const Icon(Icons.tune_rounded),
                 title: '高级',
-                subtitle: 'VPN 模式与端口、TLS 分片、测速、内核、备份',
+                subtitle: 'TLS 分片（个别网络才需要）',
                 chevron: true,
                 onTap: () => context.goNamed('advanced'),
               ),

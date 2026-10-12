@@ -52,7 +52,7 @@ class ShortcutActivity : Activity(), ServiceConnection.Callback {
 
     override fun onServiceStatusChanged(status: Status) {
         when (status) {
-            Status.Started -> BoxService.stop()
+            Status.Started -> BoxService.stop("用户通过桌面快捷方式断开")
             Status.Stopped -> BoxService.start()
             else -> {}
         }

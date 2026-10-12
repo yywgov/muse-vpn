@@ -9,12 +9,12 @@ import 'package:hiddify/features/connection/data/connection_repository.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/model/startup_connection.dart';
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/hiddifycore/init_signal.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:in_app_review/in_app_review.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -29,20 +29,6 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
         loggy.error("error setting up connection repository", l);
       }).run();
     }
-
-    listenSelf((previous, next) async {
-      if (previous == next) return;
-      if (previous case AsyncData(:final value) when !value.isConnected) {
-        if (next case AsyncData(value: final Connected _)) {
-          if (Platform.isAndroid && !ref.read(Preferences.storeReviewedByUser)) {
-            if (await InAppReview.instance.isAvailable()) {
-              InAppReview.instance.requestReview();
-              ref.read(Preferences.storeReviewedByUser.notifier).update(true);
-            }
-          }
-        }
-      }
-    });
 
     ref.listen(activeProfileProvider.select((value) => value.asData?.value), (previous, next) async {
       if (previous == null) return;
@@ -61,8 +47,10 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       // comings and goings. A failure carries the core's own panic text, which
       // is the last thing that should need hunting for.
       final status = "connection status: ${event.format()}";
-      if (event case Disconnected(connectionFailure: final _?)) {
+      if (event case Disconnected(connectionFailure: final failure?)) {
         loggy.error(status);
+        // 穿云: also into the disconnect log kept by the VPN service (导出诊断)
+        ChuanyunPlatform.recordDisconnect("界面收到断开及错误: $failure");
       } else {
         loggy.info(status);
       }

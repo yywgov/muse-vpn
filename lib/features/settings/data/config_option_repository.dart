@@ -482,7 +482,11 @@ abstract class ConfigOptions {
     //   _ => <SingboxRule>[],
     // };
 
-    final mode = ref.watch(serviceMode);
+    // 穿云 1.0: the run-mode, LAN-sharing, DNS and test-interval screens are gone, so on
+    // Android these are fixed to the values the app is built around (a value changed in an
+    // older build must not keep the tunnel in a mode the user can no longer see).
+    final android = PlatformUtils.isAndroid;
+    final mode = android ? ServiceMode.tun : ref.watch(serviceMode);
     // final reg = ref.watch(Preferences.region.notifier).raw();
     return SingboxConfigOption(
       region: ref.watch(region).name,
@@ -495,7 +499,7 @@ abstract class ConfigOptions {
       ipv6Mode: ref.watch(ipv6Mode),
       remoteDnsAddress: ref.watch(remoteDnsAddress),
       remoteDnsDomainStrategy: ref.watch(remoteDnsDomainStrategy),
-      directDnsAddress: ref.watch(directDnsAddress),
+      directDnsAddress: android ? 'udp://223.5.5.5' : ref.watch(directDnsAddress),
       directDnsDomainStrategy: ref.watch(directDnsDomainStrategy),
       mixedPort: ref.watch(mixedPort),
       tproxyPort: ref.watch(tproxyPort),
@@ -509,14 +513,15 @@ abstract class ConfigOptions {
       mtu: ref.watch(mtu),
       strictRoute: ref.watch(strictRoute),
       connectionTestUrl: ref.watch(connectionTestUrl),
-      urlTestInterval: ref.watch(urlTestInterval),
+      // re-test every 5 minutes while in use (the core stops testing when idle)
+      urlTestInterval: android ? const Duration(minutes: 5) : ref.watch(urlTestInterval),
       enableClashApi: ref.watch(enableClashApi),
       clashApiPort: ref.watch(clashApiPort),
       enableTun: mode == ServiceMode.tun,
       // enableTunService: mode == false, //ServiceMode.tunService,
       setSystemProxy: mode == ServiceMode.systemProxy,
       // bypassLan: ref.watch(bypassLan),
-      allowConnectionFromLan: ref.watch(allowConnectionFromLan),
+      allowConnectionFromLan: !android && ref.watch(allowConnectionFromLan),
       lanSharingPassword: ref.watch(lanSharingPassword),
       enableFakeDns: ref.watch(enableFakeDns),
       // enableDnsRouting: ref.watch(enableDnsRouting),

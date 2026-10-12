@@ -90,6 +90,7 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
                         val grpcPort = args["grpcPort"] as Int
                         Log.d("debugmode","${Settings.debugMode}")
                         runCatching {
+                            com.hiddify.hiddify.bg.DisconnectLog.preserveCrashTraces()
                             Mobile.setup(
                                 SetupOptions().also {
                                     it.basePath = Settings.baseDir
@@ -100,7 +101,9 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
                                     it.listen= "127.0.0.1:" + grpcPort
                                     it.secret = com.hiddify.hiddify.utils.GrpcAuth.token
                                     it.debug = Settings.debugMode
-                                },null)
+                                    // 穿云: when the VPN service already runs in this process, hand
+                                    // the core its platform interface instead of none (see muse-core)
+                                },com.hiddify.hiddify.bg.VPNService.running)
 
 //                            Libbox.setup(Settings.baseDir, Settings.workingDir, Settings.tempDir, false)
                             Libbox.redirectStderr(File(Settings.workingDir, "stderr2.log").path)
@@ -147,7 +150,7 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
                             Log.w(TAG, "service is not running")
                             //    return@launch success(true)
                         }
-                        BoxService.stop()
+                        BoxService.stop("用户在应用内断开")
                         success(true)
                     }
                 }

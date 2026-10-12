@@ -55,4 +55,10 @@ abstract final class ChuanyunPlatform {
 
   /// Re-reads the 按网络自动开关 settings on the Android side and acts on the current network.
   static Future<void> applyNetworkAuto() => _call<bool>('apply_network_auto');
+
+  /// 穿云: what the Android side keeps for 导出诊断 (device facts, disconnect reasons, crash traces).
+  static Future<Map<Object?, Object?>?> nativeDiagnostics() => _call<Map<Object?, Object?>>('diagnostics_native');
+
+  /// Adds a line to the disconnect log kept on the Android side.
+  static Future<void> recordDisconnect(String reason) => _call<bool>('record_disconnect', {'reason': reason});
 }

@@ -55,7 +55,7 @@ class TileService : TileService(), ServiceConnection.Callback {
                 }
             }
             Status.Started -> {
-                BoxService.stop()
+                BoxService.stop("用户通过快捷开关断开")
                 qsTile?.apply {
                     state = Tile.STATE_INACTIVE
                     updateTile()

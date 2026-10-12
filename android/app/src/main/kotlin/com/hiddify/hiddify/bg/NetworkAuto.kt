@@ -87,6 +87,9 @@ object NetworkAuto {
         return ssid
     }
 
+    /** Whether a non-VPN network with internet access is up right now. */
+    fun hasUsableNetworkNow(): Boolean = hasUsableNetwork()
+
     private fun hasUsableNetwork(): Boolean {
         val cm = Application.connectivity
         @Suppress("DEPRECATION")
@@ -109,7 +112,7 @@ object NetworkAuto {
         if (running && trusted) {
             autoStopping = true
             Settings.netAutoPaused = true
-            BoxService.stop()
+            BoxService.stop("按网络自动开关：连上可信 Wi-Fi「$ssid」，自动断开")
             return
         }
         if (!running && !trusted && Settings.netAutoPaused && hasUsableNetwork()) {

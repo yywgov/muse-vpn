@@ -30,6 +30,7 @@ object DefaultNetworkMonitor {
     }
 
     suspend fun stop() {
+        lastInterface = null
         DefaultNetworkListener.stop(this)
     }
 
@@ -46,6 +47,22 @@ object DefaultNetworkMonitor {
         checkDefaultInterfaceUpdate(defaultNetwork)
     }
 
+    // 穿云: the last default interface, so the disconnect log notes real changes only
+    @Volatile
+    private var lastInterface: String? = null
+
+    private fun noteNetwork(interfaceName: String) {
+        val previous = lastInterface
+        if (previous == interfaceName) return
+        lastInterface = interfaceName
+        when {
+            interfaceName.isEmpty() -> DisconnectLog.record("网络断开（没有可用网络）")
+            previous == null -> {}
+            previous.isEmpty() -> DisconnectLog.record("网络恢复：$interfaceName")
+            else -> DisconnectLog.record("网络切换：$previous → $interfaceName")
+        }
+    }
+
     private fun checkDefaultInterfaceUpdate(newNetwork: Network?) {
         val listener = listener ?: return
         if (newNetwork != null) {
@@ -59,9 +76,14 @@ object DefaultNetworkMonitor {
                     Thread.sleep(100)
                     continue
                 }
+                noteNetwork(interfaceName ?: "")
                 listener.updateDefaultInterface(interfaceName, interfaceIndex, false, false)
+                // 穿云: report once. Without this break the same change was sent to the core ten
+                // times in a row (upstream sing-box-for-android breaks here too).
+                break
             }
         } else {
+            noteNetwork("")
             listener.updateDefaultInterface("", -1, false, false)
         }
     }

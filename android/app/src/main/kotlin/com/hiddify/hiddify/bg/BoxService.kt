@@ -42,7 +42,9 @@ import com.hiddify.hiddify.constant.Bugs
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -84,6 +86,7 @@ class BoxService(
 //                it.fixAndroidStack = Bugs.fixAndroidStack
 //
 //            })
+            DisconnectLog.preserveCrashTraces()
             Libbox.redirectStderr(File(Settings.workingDir, "stderr.log").path)
             initializeOnce = true
             return
@@ -98,7 +101,12 @@ class BoxService(
             ContextCompat.startForegroundService(Application.application, intent)
         }
 
-        fun stop() {
+        /** Why the next stop happens, for the disconnect log (set by whoever asks for it). */
+        @Volatile
+        var pendingStopReason: String? = null
+
+        fun stop(reason: String? = null) {
+            if (reason != null) pendingStopReason = reason
             Application.application.sendBroadcast(
                     Intent(Action.SERVICE_CLOSE).setPackage(
                             Application.application.packageName
@@ -121,6 +129,9 @@ class BoxService(
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Action.SERVICE_CLOSE -> {
+                    val reason = pendingStopReason ?: "用户在通知栏点了断开"
+                    pendingStopReason = null
+                    DisconnectLog.record(reason)
                     stopService()
                 }
 
@@ -161,6 +172,7 @@ class BoxService(
 
             DefaultNetworkMonitor.start()
             Libbox.setMemoryLimit(!Settings.disableMemoryLimit)
+            DisconnectLog.preserveCrashTraces()
             val newService = try {
                 Mobile.setup(
                     SetupOptions().also {
@@ -182,6 +194,7 @@ class BoxService(
                 return
             }
             status.postValue(Status.Started)
+            DisconnectLog.record("VPN 服务已启动")
             // 穿云: real connect time for the 首页 timer (survives app/engine restarts)
             Settings.connectedSince = System.currentTimeMillis()
             // 穿云: a (re)connect ends any 按网络自动开关 pause
@@ -204,9 +217,84 @@ class BoxService(
                 notification.show(activeProfileName, R.string.status_started)
             }
             notification.start()
+            startWatchdog()
         } catch (e: Exception) {
             stopAndAlert(Alert.StartService, e.message)
             return
+        }
+    }
+
+    // ------------------------------------------------------------------------------------
+    // 穿云: watchdog — when the core stops by itself while the user still wants the tunnel,
+    // start it again with backoff (2 s, 5 s, 10 s, 30 s, 60 s), waiting for a usable network.
+    // A stop the user asked for never reaches here (normal stops carry an EMPTY message type).
+
+    private var watchdogJob: Job? = null
+    @Volatile
+    private var reconnectAttempts = 0
+    @Volatile
+    private var lastStartedAt = 0L
+    private val backoffMillis = longArrayOf(2_000, 5_000, 10_000, 30_000, 60_000)
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun startWatchdog() {
+        watchdogJob?.cancel()
+        watchdogJob = GlobalScope.launch(Dispatchers.IO) {
+            while (isActive && serviceWanted()) {
+                val stopped = try {
+                    CoreWatch.awaitUnexpectedStop {
+                        lastStartedAt = System.currentTimeMillis()
+                    }
+                } catch (e: Exception) {
+                    // the stream broke (e.g. core restarting); look again shortly
+                    null
+                }
+                if (!isActive || !serviceWanted()) break
+                if (stopped == null) {
+                    delay(2_000)
+                    continue
+                }
+                // a long healthy run resets the backoff
+                if (System.currentTimeMillis() - lastStartedAt > 120_000) reconnectAttempts = 0
+                DisconnectLog.record("内核意外停止: ${stopped.message_type} ${stopped.message}".trim())
+                if (!Settings.startedByUser) break
+                var recovered = false
+                while (!recovered && reconnectAttempts < backoffMillis.size) {
+                    val wait = backoffMillis[reconnectAttempts++]
+                    delay(wait)
+                    waitForNetwork(30_000)
+                    if (!isActive || !serviceWanted() || !Settings.startedByUser) return@launch
+                    DisconnectLog.record("自动重连（第 $reconnectAttempts 次，等待 ${wait / 1000} 秒后）")
+                    recovered = try {
+                        Mobile.start(Settings.activeConfigPath, "")
+                        true
+                    } catch (e: Exception) {
+                        DisconnectLog.record("自动重连失败: ${e.message}")
+                        false
+                    }
+                }
+                if (!recovered) {
+                    DisconnectLog.record("自动重连 ${backoffMillis.size} 次都失败，已断开")
+                    withContext(Dispatchers.Main) { stopService() }
+                    break
+                }
+                DisconnectLog.record("自动重连成功")
+            }
+        }
+    }
+
+    /** The service is up (or coming up) and nobody asked it to stop. */
+    private fun serviceWanted(): Boolean = status.value == Status.Started || status.value == Status.Starting
+
+    private fun stopWatchdog() {
+        watchdogJob?.cancel()
+        watchdogJob = null
+    }
+
+    private suspend fun waitForNetwork(maxMillis: Long) {
+        val until = System.currentTimeMillis() + maxMillis
+        while (System.currentTimeMillis() < until && !NetworkAuto.hasUsableNetworkNow()) {
+            delay(1_000)
         }
     }
 
@@ -272,6 +360,7 @@ class BoxService(
         if (!byNetworkAuto) Settings.netAutoPaused = false
         if (status.value == Status.Stopped) return
         status.value = Status.Stopping
+        stopWatchdog()
         if (receiverRegistered) {
             service.unregisterReceiver(receiver)
             receiverRegistered = false
@@ -314,6 +403,8 @@ class BoxService(
     }
 
     private suspend fun stopAndAlert(type: Alert, message: String? = null) {
+        DisconnectLog.record("启动失败: ${type.name} ${message ?: ""}".trim())
+        stopWatchdog()
         Settings.startedByUser = false
         withContext(Dispatchers.Main) {
             if (receiverRegistered) {
@@ -331,9 +422,21 @@ class BoxService(
 
     @OptIn(DelicateCoroutinesApi::class)
     @Suppress("SameReturnValue")
-    internal fun onStartCommand(): Int {
-        if (status.value != Status.Stopped) return Service.START_NOT_STICKY
+    internal fun onStartCommand(intent: Intent?): Int {
+        if (status.value != Status.Stopped) return Service.START_STICKY
+        if (intent == null) {
+            // 穿云: the system re-created the service after killing the process (START_STICKY).
+            // Bring the tunnel back only if the user still wants it; the core is started here
+            // because no app UI is around to do it.
+            if (!Settings.startedByUser || Settings.activeConfigPath.isBlank()) {
+                service.stopSelf()
+                return Service.START_NOT_STICKY
+            }
+            DisconnectLog.record("穿云进程曾被系统结束，服务已被系统重新拉起，自动恢复连接")
+            Settings.startCoreAfterStartingService = true
+        }
         status.value = Status.Starting
+        pendingStopReason = null
 
         if (!receiverRegistered) {
             ContextCompat.registerReceiver(service, receiver, IntentFilter().apply {
@@ -356,7 +459,8 @@ class BoxService(
 //            }
             startService()
         }
-        return Service.START_NOT_STICKY
+        // 穿云: sticky, so the system restarts the tunnel after killing the process
+        return Service.START_STICKY
     }
 
     fun onBind(intent: Intent): IBinder {
@@ -364,10 +468,15 @@ class BoxService(
     }
 
     fun onDestroy() {
+        if (status.value == Status.Started || status.value == Status.Starting) {
+            DisconnectLog.record("服务被系统销毁（未经用户断开）")
+        }
+        stopWatchdog()
         binder.close()
     }
 
     fun onRevoke() {
+        DisconnectLog.record("VPN 权限被收回（其他 VPN 应用启动，或系统收回了权限）")
         stopService()
     }
 

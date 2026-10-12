@@ -15,7 +15,9 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.location.LocationManagerCompat
+import com.hiddify.hiddify.bg.DisconnectLog
 import com.hiddify.hiddify.bg.NetworkAuto
+import android.os.PowerManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -155,6 +157,32 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
                 }
 
                 "get_connected_since" -> result.success(Settings.connectedSince)
+
+                // 穿云: 关于 › 导出诊断 — disconnect reasons, core crash traces, device facts
+                "diagnostics_native" -> {
+                    val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                    val batteryIgnored = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                        pm?.isIgnoringBatteryOptimizations(context.packageName) == true
+                    val device = buildString {
+                        append("设备: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})\n")
+                        append("Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}), 系统版本: ${Build.DISPLAY}\n")
+                        append("已关闭电池优化: $batteryIgnored\n")
+                        append("用户希望保持连接: ${Settings.startedByUser}\n")
+                        append("本次连接开始: ${Settings.connectedSince}\n")
+                    }
+                    result.success(
+                        mapOf(
+                            "device" to device,
+                            "disconnects" to DisconnectLog.read(),
+                            "crash" to DisconnectLog.readCrashTraces(),
+                        )
+                    )
+                }
+
+                "record_disconnect" -> {
+                    DisconnectLog.record(call.argument<String>("reason") ?: "")
+                    result.success(true)
+                }
 
                 "get_wifi_ssid" -> result.success(NetworkAuto.currentSsid(context))
 
