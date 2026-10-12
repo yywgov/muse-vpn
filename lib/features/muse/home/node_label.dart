@@ -52,11 +52,73 @@ final _byKeyword = <(RegExp, String)>[
   (RegExp(r'阿根廷|\bAR\b|Argentina', caseSensitive: false), '阿'),
 ];
 
+/// Strategy names the core reports for a load balancer (shown instead of a node).
+const _balanceStrategies = <String, String>{
+  'round-robin': '轮询',
+  'consistent-hashing': '一致性哈希',
+  'consistent-hash': '一致性哈希',
+  'sticky-sessions': '粘性会话',
+  'sticky-session': '粘性会话',
+  'random': '随机',
+};
+
+String _bareType(String type) => type.split('→').first.trim().toLowerCase();
+
+/// Chinese name for a common English group/outbound name ("lowest" -> 自动最快), or null.
+String? museKnownGroupName(String name) {
+  final n = name.trim().toLowerCase();
+  return switch (n) {
+    'lowest' || 'lowest-delay' || 'auto' || 'fastest' || 'urltest' || 'url-test' || 'best' => '自动最快',
+    'balance' || 'balancer' || 'loadbalance' || 'load-balance' || 'round-robin' => '负载均衡',
+    'select' || 'selector' || 'proxy' || 'proxies' || 'manual' => '手动选择',
+    'fallback' || 'failover' => '故障切换',
+    'direct' => '直连',
+    'block' || 'reject' => '拦截',
+    _ => null,
+  };
+}
+
+/// How a group behaves, in plain Chinese: 自动最快 / 负载均衡 / 手动选择 / 故障切换 (null for non-groups).
+///
+/// The core reports a load balancer as type "Balancer"; with the lowest-delay strategy it
+/// picks the fastest node (and reports that node), otherwise it reports the strategy name.
+String? museGroupKind({required String type, required String name, String? selectedDisplay}) {
+  final t = _bareType(type);
+  final sel = selectedDisplay?.trim().toLowerCase() ?? '';
+  switch (t) {
+    case 'urltest' || 'url-test':
+      return '自动最快';
+    case 'selector' || 'select':
+      return '手动选择';
+    case 'fallback':
+      return '故障切换';
+    case 'balancer' || 'loadbalance' || 'load-balance' || 'round-robin':
+      if (sel == 'lowest-delay') return '自动最快';
+      if (_balanceStrategies.containsKey(sel)) return '负载均衡';
+      if (sel.isNotEmpty) return '自动最快'; // lowest-delay balancer reports the node it picked
+      return museKnownGroupName(name) == '自动最快' ? '自动最快' : '负载均衡';
+  }
+  return null;
+}
+
+/// Display name for a group row/title: common English names become Chinese, user names stay.
+String museGroupName(String name) => museKnownGroupName(name) ?? name;
+
+/// Subtitle of a group row: 「自动最快 → 节点」, 「负载均衡 · 轮询」, 「手动选择 → 节点」.
+String museGroupSubtitle({required String type, required String name, String? selectedDisplay}) {
+  final kind = museGroupKind(type: type, name: name, selectedDisplay: selectedDisplay) ?? '分组';
+  final sel = selectedDisplay?.trim() ?? '';
+  final strategy = _balanceStrategies[sel.toLowerCase()];
+  if (kind == '负载均衡') return strategy != null ? '负载均衡 · $strategy' : '负载均衡';
+  if (sel.isEmpty || sel.toLowerCase() == 'lowest-delay') return kind;
+  return '$kind → ${museKnownGroupName(sel) ?? sel}';
+}
+
 /// Readable name of a proxy group type.
-String? museGroupTypeLabel(String type) => switch (type.toLowerCase()) {
+String? museGroupTypeLabel(String type) => switch (_bareType(type)) {
   'urltest' || 'url-test' => '自动最快',
   'selector' || 'select' => '手动选择',
   'loadbalance' || 'load-balance' || 'balancer' || 'round-robin' => '负载均衡',
-  'fallback' => '故障转移',
+  'fallback' => '故障切换',
   _ => null,
 };

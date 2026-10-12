@@ -18,7 +18,7 @@
     "auto": "自动",
     "manually": "手动",
     "name": "名称",
-    "url": "URL",
+    "url": "链接",
     "add": "添加",
     "clipboard": "剪贴板",
     "addToClipboard": "复制到剪贴板",
@@ -141,7 +141,7 @@
       "failedToLoad": "加载失败",
       "updateSubscriptions": "更新订阅",
       "share": {
-        "urlToClipboard": "复制 URL",
+        "urlToClipboard": "复制链接",
         "showUrlQr": "显示二维码",
         "jsonToClipboard": "复制 JSON"
       },
@@ -149,7 +149,7 @@
         "save": {
           "success": "配置文件已保存"
         },
-        "invalidUrl": "无效的 URL",
+        "invalidUrl": "无效的链接",
         "add": {
           "failure": "添加配置文件失败"
         },
@@ -173,8 +173,8 @@
       "form": {
         "nameHint": "配置文件名称",
         "emptyName": "名称为必填项",
-        "invalidUrl": "无效的 URL",
-        "urlHint": "完整的配置 URL",
+        "invalidUrl": "无效的链接",
+        "urlHint": "完整的订阅链接",
         "disableAutoUpdate": "关闭自动更新",
         "autoUpdateInterval": "自动更新间隔",
         "loading": "正在添加配置文件…"
@@ -248,9 +248,9 @@
         "ignoreBatteryOptimizationsMsg": "移除限制以获得最佳 VPN 性能",
         "memoryLimit": "内存限制",
         "memoryLimitMsg": "如果您遇到内存不足错误或应用频繁崩溃，请开启此选项",
-        "connectionTestUrl": "连接测试 URL",
-        "urlTestInterval": "URL 测试间隔",
-        "clashApiPort": "Clash API 端口",
+        "connectionTestUrl": "连接测试地址",
+        "urlTestInterval": "自动测速间隔",
+        "clashApiPort": "Clash 控制端口",
         "useXrayCoreWhenPossible": "尽可能使用 xray-core",
         "useXrayCoreWhenPossibleMsg": "解析订阅链接时使用 xray-core。重新导入订阅即可开启此选项。"
       },
@@ -423,7 +423,7 @@
           "other": "其他"
         },
         "balancerStrategy": {
-          "title": "Balancer 策略",
+          "title": "负载均衡策略",
           "roundRobin": "轮询",
           "consistentHash": "一致性哈希",
           "stickySession": "粘性会话"
@@ -466,7 +466,7 @@
           "tun": "VPN"
         },
         "strictRoute": "严格路由",
-        "tunImplementation": "TUN 实现",
+        "tunImplementation": "虚拟网卡实现",
         "tunImplementations": {
           "mixed": "混合",
           "system": "系统",
@@ -739,7 +739,7 @@
       "unexpected": "意外错误",
       "notFound": "未找到配置文件",
       "invalidConfig": "配置无效",
-      "invalidUrl": "URL 无效",
+      "invalidUrl": "链接无效",
       "canceledByUser": "用户已取消"
     },
     "connectivity": {

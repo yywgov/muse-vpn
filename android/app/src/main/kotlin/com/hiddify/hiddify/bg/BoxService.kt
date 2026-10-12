@@ -325,7 +325,7 @@ class BoxService(
                 callback.onServiceAlert(type.ordinal, message)
             }
             Settings.connectedSince = 0L
-                status.value = Status.Stopped
+            status.value = Status.Stopped
         }
     }
 
