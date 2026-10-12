@@ -11,10 +11,26 @@ abstract final class MuseColors {
 
   static bool _dark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
 
-  /// Flat page colour (the top of the gradient), for app bars and system bars.
-  static Color background(BuildContext context) => _dark(context) ? const Color(0xFF0E1A3A) : const Color(0xFFF3F6FB);
+  /// True-black (纯黑 / OLED) mode: the theme paints a pure black scaffold.
+  static bool isTrueBlack(BuildContext context) {
+    final theme = Theme.of(context);
+    return theme.brightness == Brightness.dark && theme.scaffoldBackgroundColor == Colors.black;
+  }
 
-  static LinearGradient pageGradient(BuildContext context) => _dark(context)
+  /// Flat page colour (the top of the gradient), for app bars and system bars.
+  static Color background(BuildContext context) => isTrueBlack(context)
+      ? Colors.black
+      : _dark(context)
+          ? const Color(0xFF0E1A3A)
+          : const Color(0xFFF3F6FB);
+
+  static LinearGradient pageGradient(BuildContext context) => isTrueBlack(context)
+      ? const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black, Colors.black],
+        )
+      : _dark(context)
       ? const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
@@ -26,9 +42,24 @@ abstract final class MuseColors {
           colors: [Color(0xFFF3F6FB), Color(0xFFEAF0FA)],
         );
 
-  static Color card(BuildContext context) => _dark(context) ? const Color(0xFF16213F) : Colors.white;
+  static Color card(BuildContext context) => isTrueBlack(context)
+      ? const Color(0xFF151515)
+      : _dark(context)
+          ? const Color(0xFF16213F)
+          : Colors.white;
 
-  static Color selectedCard(BuildContext context) => _dark(context) ? const Color(0xFF1B2E63) : const Color(0xFFEAF1FF);
+  static Color selectedCard(BuildContext context) => isTrueBlack(context)
+      ? const Color(0xFF1A2238)
+      : _dark(context)
+          ? const Color(0xFF1B2E63)
+          : const Color(0xFFEAF1FF);
+
+  /// Subtle filled surface inside a card (chips, inner tiles).
+  static Color innerSurface(BuildContext context) => isTrueBlack(context)
+      ? const Color(0xFF1F1F1F)
+      : _dark(context)
+          ? const Color(0xFF1E2A4D)
+          : const Color(0xFFEEF2F8);
 
   static Color secondaryText(BuildContext context) =>
       _dark(context) ? const Color(0xFF8A94B3) : const Color(0xFF6B7280);

@@ -154,6 +154,8 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
                     result.success(startFirst(intents))
                 }
 
+                "get_connected_since" -> result.success(Settings.connectedSince)
+
                 "get_wifi_ssid" -> result.success(NetworkAuto.currentSsid(context))
 
                 "location_status" -> {

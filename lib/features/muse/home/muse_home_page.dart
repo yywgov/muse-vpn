@@ -115,7 +115,7 @@ class _ConnectSection extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final connection = ref.watch(connectionNotifierProvider);
-    final since = ref.watch(museConnectedSinceProvider);
+    final since = ref.watch(museConnectedSinceProvider).valueOrNull;
     final stats = ref.watch(statsNotifierProvider).asData?.value ?? SystemInfo.create();
     final secondary = MuseColors.secondaryText(context);
 
@@ -212,7 +212,7 @@ class _ConnectButton extends HookWidget {
 
     const size = 168.0;
     final active = connected || busy;
-    final off = dark ? const Color(0xFF1E2A4D) : const Color(0xFFDDE5F4);
+    final off = MuseColors.isTrueBlack(context) ? const Color(0xFF1C1C1C) : (dark ? const Color(0xFF1E2A4D) : const Color(0xFFDDE5F4));
     final glyphColor = active ? Colors.white : (dark ? const Color(0xFF8A94B3) : const Color(0xFF7B8AA8));
 
     return Semantics(
@@ -394,10 +394,19 @@ class _NodesSection extends HookConsumerWidget {
       }
     }
 
-    final typeLabel = group == null ? null : museGroupTypeLabel(group.type);
     final selectedItem = group?.items.where((e) => e.tag == group.selected).firstOrNull;
-    final selectedGroupLabel = selectedItem != null && selectedItem.isGroup ? museGroupTypeLabel(selectedItem.type) : null;
-    final title = ['节点', ?(selectedGroupLabel ?? typeLabel)].join(' · ');
+    final String? groupName;
+    if (group == null) {
+      groupName = null;
+    } else if (selectedItem != null && selectedItem.isGroup) {
+      final n = selectedItem.tagDisplay.isNotEmpty ? selectedItem.tagDisplay : selectedItem.tag;
+      groupName = museKnownGroupName(n) ??
+          museGroupKind(type: selectedItem.type, name: n, selectedDisplay: selectedItem.groupSelectedTagDisplay) ??
+          n;
+    } else {
+      groupName = museKnownGroupName(group.tag) ?? museGroupTypeLabel(group.type) ?? group.tag;
+    }
+    final title = ['节点', ?groupName].join(' · ');
 
     final testButton = TextButton(
       onPressed: group == null || testing.value ? null : urlTest,
@@ -484,11 +493,13 @@ class _NodeCard extends StatelessWidget {
       delayText = '超时';
       delayColor = MuseColors.delay(context, 99999);
     }
-    final name = proxy.tagDisplay.isNotEmpty ? proxy.tagDisplay : proxy.tag;
-    final groupLabel = proxy.isGroup ? museGroupTypeLabel(proxy.type) : null;
-    final groupSelected = proxy.isGroup ? proxy.groupSelectedTagDisplay.trim() : '';
+    final fullName = proxy.tagDisplay.isNotEmpty ? proxy.tagDisplay : proxy.tag;
+    final rawName = proxy.isGroup ? fullName.split(' → ').first.trim() : fullName;
+    final name = proxy.isGroup || proxy.type.toLowerCase() == 'direct' || proxy.type.toLowerCase() == 'block'
+        ? museGroupName(rawName)
+        : rawName;
     final subtitle = proxy.isGroup
-        ? [?groupLabel, if (groupSelected.isNotEmpty) '→ $groupSelected'].join('  ')
+        ? museGroupSubtitle(type: proxy.type, name: rawName, selectedDisplay: proxy.groupSelectedTagDisplay)
         : museProtocolName(proxy.type);
     final badge = proxy.isGroup ? null : museRegionBadge(name);
 

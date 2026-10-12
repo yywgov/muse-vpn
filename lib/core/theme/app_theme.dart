@@ -35,7 +35,11 @@ class AppTheme {
       primary: brand,
       onPrimary: Colors.white,
       surface: mode.trueBlack ? Colors.black : const Color(0xFF0E1A3A),
-      surfaceContainerHighest: const Color(0xFF1B2747),
+      surfaceContainerHighest: mode.trueBlack ? const Color(0xFF1C1C1C) : const Color(0xFF1B2747),
+      surfaceContainerHigh: mode.trueBlack ? const Color(0xFF151515) : null,
+      surfaceContainer: mode.trueBlack ? const Color(0xFF101010) : null,
+      surfaceContainerLow: mode.trueBlack ? const Color(0xFF0A0A0A) : null,
+      surfaceContainerLowest: mode.trueBlack ? Colors.black : null,
     );
     return ThemeData(
       useMaterial3: true,

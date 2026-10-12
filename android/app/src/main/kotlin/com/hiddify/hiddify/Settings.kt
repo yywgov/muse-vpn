@@ -104,6 +104,11 @@ object Settings {
         get() = (preferences.getString(SettingsKey.NET_TRUSTED_SSIDS, "") ?: "")
             .split('\n').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
+    /** 穿云: wall-clock millis when the tunnel last came up; 0 while stopped. */
+    var connectedSince: Long
+        get() = preferences.getLong(SettingsKey.CONNECTED_SINCE, 0L)
+        set(value) = preferences.edit().putLong(SettingsKey.CONNECTED_SINCE, value).apply()
+
     /** Set when 穿云 disconnected by itself on a trusted Wi-Fi, so it may reconnect later. */
     var netAutoPaused: Boolean
         get() = preferences.getBoolean(SettingsKey.NET_AUTO_PAUSED, false)

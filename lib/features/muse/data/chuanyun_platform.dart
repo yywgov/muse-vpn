@@ -36,6 +36,9 @@ abstract final class ChuanyunPlatform {
 
   static Future<bool> openLocationSettings() async => await _call<bool>('open_location_settings') ?? false;
 
+  /// Epoch millis when the VPN service last came up (0/null when stopped or not Android).
+  static Future<int?> connectedSince() => _call<int>('get_connected_since');
+
   static Future<String?> wifiSsid() => _call<String>('get_wifi_ssid');
 
   static Future<LocationStatus> locationStatus() async {
