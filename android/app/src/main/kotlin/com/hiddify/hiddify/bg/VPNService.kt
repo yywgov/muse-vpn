@@ -21,12 +21,21 @@ class VPNService : VpnService(), PlatformInterfaceWrapper {
 
     companion object {
         private const val TAG = "A/VPNService"
+
+        /** 穿云: the live VPN service in this process, or null. */
+        @Volatile
+        var running: VPNService? = null
     }
 
     private val service = BoxService(this, this)
 
+    override fun onCreate() {
+        super.onCreate()
+        running = this
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) =
-        service.onStartCommand()
+        service.onStartCommand(intent)
 
     override fun onBind(intent: Intent): IBinder {
         val binder = super.onBind(intent)
@@ -37,6 +46,7 @@ class VPNService : VpnService(), PlatformInterfaceWrapper {
     }
 
     override fun onDestroy() {
+        if (running === this) running = null
         service.onDestroy()
     }
 

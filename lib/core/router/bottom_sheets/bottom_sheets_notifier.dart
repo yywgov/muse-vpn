@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
-import 'package:hiddify/core/router/bottom_sheets/widgets/quick_settings_modal.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
 import 'package:hiddify/features/app_based_routing/model/app_package_info.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_share_modal.dart';
-import 'package:hiddify/features/log/overview/logs_modals.dart';
 import 'package:hiddify/features/profile/add/add_profile_modal.dart';
 import 'package:hiddify/features/profile/overview/profiles_modal.dart';
 import 'package:hiddify/utils/link_parsers.dart';
@@ -74,12 +72,6 @@ class BottomSheetsNotifier extends _$BottomSheetsNotifier {
   }
 
   Future<void> showProfilesOverview() async => await _show(isScrollControlled: true, child: const ProfilesModal());
-
-  Future<void> showQuickSettings() async => await _show(isScrollControlled: false, child: const QuickSettingsModal());
-
-  Future<void> showLogsShare() async => await _show(isScrollControlled: false, child: const LogsShareModal());
-
-  Future<void> showLogsRecent() async => await _show(isScrollControlled: false, child: const LogsRecentModal());
 
   Future<void> showAppListShare({
     required List<String> added,

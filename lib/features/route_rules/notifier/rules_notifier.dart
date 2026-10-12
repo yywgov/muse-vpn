@@ -2,8 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartx/dartx_io.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/services.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/region.dart';
@@ -157,41 +155,6 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
   }
 
   //export Clipboard
-  Future<bool> exportJsonToClipboard() async {
-    final t = ref.read(translationsProvider).requireValue;
-    try {
-      final routeRules = RouteRule(rules: state);
-      final base64Data = base64.encode(utf8.encode(jsonEncode(routeRules.writeToJson())));
-      await Clipboard.setData(ClipboardData(text: 'chuanyun:///config/routing-options?routeRule=$base64Data'));
-      ref.read(inAppNotificationControllerProvider).showSuccessToast(t.common.msg.export.clipboard.success);
-      return true;
-    } on PlatformException {
-      ref.read(inAppNotificationControllerProvider).showInfoToast(t.common.msg.export.clipboard.contentTooLarge);
-      return false;
-    } catch (e, st) {
-      loggy.warning("error exporting route rules to clipboard", e, st);
-      ref.read(inAppNotificationControllerProvider).showErrorToast(t.common.msg.export.clipboard.failure);
-      return false;
-    }
-  }
-
-  //import clipboard
-  Future<bool> importRulesFromClipboard() async {
-    final t = ref.read(translationsProvider).requireValue;
-    try {
-      final clipboardData = await Clipboard.getData(Clipboard.kTextPlain).then((value) => value?.text);
-      if (clipboardData == null) return false;
-      final encodedBase64 = Uri.parse(clipboardData).queryParameters['routeRule'];
-      if (encodedBase64 == null) return false;
-      return await importRules(encodedBase64);
-    } catch (e, st) {
-      loggy.warning("error importing route rules from clipboard", e, st);
-      ref.read(inAppNotificationControllerProvider).showErrorToast(t.common.msg.import.failure);
-      return false;
-    }
-  }
-
-  //import deep link
   Future<bool> importRulesFromDeepLink(String encodedBase64) async {
     final t = ref.read(translationsProvider).requireValue;
     try {
@@ -224,53 +187,6 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
   }
 
   //export JSON
-  Future<bool> saveRulesAsJsonFile() async {
-    final t = ref.read(translationsProvider).requireValue;
-    try {
-      final bytes = utf8.encode(RouteRule(rules: state).writeToJson());
-      final outputFile = await FilePicker.platform.saveFile(
-        fileName: 'route_rules.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        bytes: bytes,
-      );
-      if (outputFile == null) return false;
-      if (PlatformUtils.isDesktop) {
-        final file = File(outputFile);
-        if (file.extension != '.json') return false;
-        if (!await file.exists()) await file.parent.create(recursive: true);
-        await file.writeAsBytes(bytes);
-      }
-      ref.read(inAppNotificationControllerProvider).showSuccessToast(t.common.msg.export.file.success);
-      return true;
-    } catch (e, st) {
-      loggy.warning("error exporting route rules to json file", e, st);
-      ref.read(inAppNotificationControllerProvider).showErrorToast(t.common.msg.export.file.failure);
-      return false;
-    }
-  }
-
-  //import JSON
-  Future<bool> importRulesFromJsonFile() async {
-    final t = ref.read(translationsProvider).requireValue;
-    try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json']);
-      if (result == null) return false;
-      final file = File(result.files.single.path!);
-      if (!await file.exists()) return false;
-      final bytes = await file.readAsBytes();
-      final routeRules = RouteRule.fromJson(utf8.decode(bytes));
-      state = _withBuiltins(routeRules.rules);
-      await _updateFile();
-      ref.read(inAppNotificationControllerProvider).showSuccessToast(t.common.msg.import.success);
-      return true;
-    } catch (e, st) {
-      loggy.warning("error importing route rules from json file", e, st);
-      ref.read(inAppNotificationControllerProvider).showErrorToast(t.common.msg.import.failure);
-      return false;
-    }
-  }
-
   Future<void> resetRules() async {
     if (await file.exists()) {
       await file.delete(recursive: true);

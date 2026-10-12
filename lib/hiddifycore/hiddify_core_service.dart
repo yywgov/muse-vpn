@@ -37,6 +37,21 @@ class HiddifyCoreService with InfraLogger {
   final Map<String, StreamSubscription?> subscriptions = {};
   List<OutboundGroup> latest = [];
 
+  /// Whether [setup] has succeeded once in this engine; the core's gRPC servers then stay up.
+  bool _ready = false;
+
+  /// 穿云: the app came back to the foreground. On Android the core (and the VPN service)
+  /// keeps running in the background, so nothing is set up again and no restart signal is
+  /// sent: only a status listener that was lost is re-armed. Re-running setup used to replay
+  /// the connection status (Disconnected → Connected), which vibrated and re-ran the connect
+  /// animation, and set the core up again next to the running VPN service.
+  Future<void> resume() async {
+    if (!_ready || !PlatformUtils.isAndroid) return init();
+    if (!subscriptions.containsKey("bgStatusListener")) {
+      await startListeningStatus("bg", core.bgClient);
+    }
+  }
+
   Future<void> init() async {
     await setup()
         .mapLeft((e) {
@@ -96,8 +111,10 @@ class HiddifyCoreService with InfraLogger {
         if (!core.isSingleChannel()) {
           await startListeningLogs("bg", core.bgClient);
         }
-        statusController.add(currentState);
+        // only the first value: a later setup must not replay a stale status
+        if (!statusController.hasValue) statusController.add(currentState);
         await startListeningStatus("bg", core.bgClient);
+        _ready = true;
         // ref.read(coreRestartSignalProvider.notifier).restart();
         return right(unit);
       } catch (e) {
@@ -419,36 +436,55 @@ class HiddifyCoreService with InfraLogger {
   Future<void> startListeningStatus(String key, CoreClient cc) async {
     await listenSingle<CoreStatus>(
       "${key}StatusListener",
-      () => cc
-          .coreInfoListener(Empty(), options: grpcOptions)
-          .doOnCancel(() {
-            loggy.error("status", "Canceld");
-            if (currentState == const CoreStatus.started()) currentState = const CoreStatus.stopped();
-          })
-          .doOnData((event) {
-            loggy.debug("status", event);
-            if (currentState == const CoreStatus.started()) currentState = const CoreStatus.stopped();
-          })
-          .doOnDone(() {
-            loggy.error("status", "done");
-            if (currentState == const CoreStatus.started()) currentState = const CoreStatus.stopped();
-          })
-          .endWith(CoreInfoResponse(coreState: CoreStates.STOPPED))
-          .map((event) {
-            currentState = CoreStatus.fromCoreInfo(event);
-            statusController.add(currentState);
-            return currentState;
-          }),
-      // .endWith(const CoreStatus.stopped())
+      () => cc.coreInfoListener(Empty(), options: grpcOptions).map((event) {
+        currentState = CoreStatus.fromCoreInfo(event);
+        statusController.add(currentState);
+        return currentState;
+      }),
+      // 穿云: the end of the status stream is not a disconnect. The stream also ends or
+      // errors when the gRPC connection is reset (engine paused, HTTP/2 GOAWAY, ...), and
+      // reporting "stopped" then showed 已断开 while the tunnel was still up. Re-subscribe
+      // while the core's server is alive; report stopped only once it is really gone.
       onError: (error) {
-        loggy.error("Stream error in ${key}StatusListener: $error");
-
-        // currentState = const CoreStatus.stopped();
-        // statusController.add(currentState);
-
-        // startListeningStatus(key, cc);
+        loggy.warning("status stream error in ${key}StatusListener: $error");
+        _recoverStatus(key);
+      },
+      onDone: () {
+        loggy.info("status stream ended in ${key}StatusListener");
+        _recoverStatus(key);
       },
     );
+  }
+
+  bool _statusRecovering = false;
+
+  Future<void> _recoverStatus(String key) async {
+    if (_statusRecovering) return;
+    _statusRecovering = true;
+    try {
+      for (var attempt = 1; attempt <= 5; attempt++) {
+        await Future<void>.delayed(Duration(milliseconds: 300 * attempt));
+        // re-armed meanwhile (connect, resume)
+        if (subscriptions.containsKey("${key}StatusListener")) return;
+        final alive = PlatformUtils.isAndroid ? await core.isActiveBg() : false;
+        if (!alive) break;
+        try {
+          // the core sends its current state first, so the UI is right again at once
+          await startListeningStatus(key, key == "fg" ? core.fgClient : core.bgClient);
+          return;
+        } catch (e) {
+          loggy.warning("re-subscribing status failed: $e");
+        }
+      }
+      if (subscriptions.containsKey("${key}StatusListener")) return;
+      if (currentState is! CoreStopped) {
+        loggy.info("core gRPC server is gone, reporting stopped");
+        currentState = const CoreStatus.stopped();
+        statusController.add(currentState);
+      }
+    } finally {
+      _statusRecovering = false;
+    }
   }
 
   Future<void> startListeningLogs(String key, CoreClient cc) async {
@@ -488,24 +524,30 @@ class HiddifyCoreService with InfraLogger {
     String key,
     Stream<T> Function() stream, {
     Function(dynamic error)? onError,
+    void Function()? onDone,
   }) async {
     if (subscriptions.containsKey(key)) {
       // return subscriptions[key] as StreamSubscription<T>?;
       await stopListenSingle(key);
     }
-    subscriptions[key] = null;
-    subscriptions[key] = stream().listen(
-      (event) {
-        // loggy.debug(event);
-      },
+    late final StreamSubscription<T> sub;
+    sub = stream().listen(
+      (event) {},
       cancelOnError: true,
       onError: (error) {
+        // a listener that was replaced meanwhile must not touch its successor
+        if (!identical(subscriptions[key], sub)) return;
         loggy.error('Stream error: $error');
-        onError?.call(error);
-        subscriptions[key]?.cancel();
         subscriptions.remove(key);
+        onError?.call(error);
+      },
+      onDone: () {
+        if (!identical(subscriptions[key], sub)) return;
+        subscriptions.remove(key);
+        onDone?.call();
       },
     );
+    subscriptions[key] = sub;
     return subscriptions[key] as StreamSubscription<T>?;
   }
 

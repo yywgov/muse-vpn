@@ -192,22 +192,29 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
 
             val coreClient = GrpcClientProvider.grpcClient.create(CoreClient::class)
 
-            try {
-                var previous = coreClient.GetSystemInfo().executeBlocking(Empty())
-
-                while (isActive) {
-                    delay(1_000) // ✅ coroutine-friendly
+            // 穿云: this used to cancel the notification when polling stopped (screen off) or
+            // one poll failed. That notification belongs to the foreground service: removing it
+            // (some ROMs honour the cancel) leaves the VPN service looking like a background
+            // app that ColorOS freezes or kills. Now a failed poll is just retried, and the
+            // notification keeps its last text when polling stops.
+            var failures = 0
+            var previous: SystemInfo? = null
+            while (isActive) {
+                try {
                     val current = coreClient.GetSystemInfo().executeBlocking(Empty())
-                    updateStatus(previous,current)
+                    previous?.let { updateStatus(it, current) }
                     previous = current
+                    failures = 0
+                    delay(1_000)
+                } catch (e: CancellationException) {
+                    Log.d("notification", "SystemInfo polling cancelled")
+                    break
+                } catch (e: Exception) {
+                    failures++
+                    previous = null
+                    Log.w("notification", "SystemInfo poll failed ($failures)", e)
+                    delay(if (failures < 5) 2_000L else 10_000L)
                 }
-            } catch (e: CancellationException) {
-                // coroutine cancelled normally
-                Log.d("notification", "SystemInfo polling cancelled")
-                notification.cancel(notificationId)
-            } catch (e: Exception) {
-                Log.e("notification", "SystemInfo polling failed", e)
-                notification.cancel(notificationId)
             }
         }
     }

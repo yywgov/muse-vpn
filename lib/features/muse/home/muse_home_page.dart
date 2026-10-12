@@ -1,4 +1,4 @@
-// 穿云 - 首页: big connect button, route mode, speed card and node cards (style B).
+// 穿云 - 首页: big connect button, route mode and node cards (style B).
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'dart:async';
@@ -11,7 +11,6 @@ import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
-import 'package:hiddify/features/muse/home/speed_test.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
@@ -35,11 +34,6 @@ class MuseHomePage extends HookConsumerWidget {
       titleWidget: const _Header(),
       actions: [
         IconButton(
-          tooltip: '快速设置',
-          icon: const Icon(Icons.tune_rounded),
-          onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showQuickSettings(),
-        ),
-        IconButton(
           key: const ValueKey("profile_add_button"),
           tooltip: '添加订阅/配置',
           icon: const Icon(Icons.add_rounded),
@@ -52,7 +46,7 @@ class MuseHomePage extends HookConsumerWidget {
         children: [
           const _ConnectSection(),
           const _RouteModeSelector(),
-          if (hasProfile) ...[const MuseSpeedCard(), const _NodesSection()] else const _EmptyProfileSection(),
+          if (hasProfile) const _NodesSection() else const _EmptyProfileSection(),
         ],
       ),
     );
@@ -378,6 +372,8 @@ class _NodesSection extends HookConsumerWidget {
 
     final proxies = ref.watch(proxiesOverviewNotifierProvider);
     final group = proxies.valueOrNull;
+    // results older than this connection are a previous session's: shown as 测速中
+    final since = ref.watch(museConnectedSinceProvider).valueOrNull;
 
     Future<void> urlTest() async {
       if (group == null || testing.value) return;
@@ -435,6 +431,7 @@ class _NodesSection extends HookConsumerWidget {
           _NodeCard(
             key: ValueKey(proxy.tag),
             proxy: proxy,
+            since: since,
             selected: group.selected == proxy.tag,
             onTap: () async {
               try {
@@ -466,12 +463,14 @@ class _NodeCard extends StatelessWidget {
   const _NodeCard({
     super.key,
     required this.proxy,
+    required this.since,
     required this.selected,
     required this.onTap,
     required this.onLongPress,
   });
 
   final OutboundInfo proxy;
+  final DateTime? since;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -481,10 +480,14 @@ class _NodeCard extends StatelessWidget {
     final theme = Theme.of(context);
     final secondary = MuseColors.secondaryText(context);
     final delay = proxy.urlTestDelay;
+    final testedAt = proxy.hasUrlTestTime() ? proxy.urlTestTime.toDateTime() : null;
+    // tested before this connection started (or not yet): the first test is still running
+    final stale = delay == 0 ||
+        (since != null && testedAt != null && testedAt.isBefore(since!.subtract(const Duration(seconds: 2))));
     final String delayText;
     final Color delayColor;
-    if (delay == 0) {
-      delayText = '--';
+    if (stale) {
+      delayText = '测速中';
       delayColor = secondary;
     } else if (ConnectionConst.isValidDelay(delay)) {
       delayText = '$delay ms';

@@ -9,7 +9,6 @@ import 'package:hiddify/core/router/go_router/helper/custom_transition.dart';
 import 'package:hiddify/core/router/go_router/refresh_listenable.dart';
 import 'package:hiddify/features/about/widget/about_page.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
-import 'package:hiddify/features/log/overview/logs_page.dart';
 import 'package:hiddify/features/muse/config/muse_config_page.dart';
 import 'package:hiddify/features/muse/data/muse_data_page.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart';
@@ -24,8 +23,6 @@ import 'package:hiddify/features/route_rules/notifier/rule_notifier.dart';
 import 'package:hiddify/features/route_rules/overview/generic_list_page.dart';
 import 'package:hiddify/features/route_rules/overview/package_names_page.dart';
 import 'package:hiddify/features/route_rules/overview/rule_page.dart';
-import 'package:hiddify/features/settings/overview/sections/dns_options_page.dart';
-import 'package:hiddify/features/settings/overview/sections/inbound_options_page.dart';
 import 'package:hiddify/features/settings/overview/sections/routing_options_page.dart';
 import 'package:hiddify/features/settings/overview/sections/tls_tricks_page.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart';
@@ -184,7 +181,6 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       ],
                     ),
                     _slide('ruleSets', 'rule-sets', (_) => const RuleSetsPage()),
-                    _slide('dnsOptions', 'dns-options', (_) => const DnsOptionsPage()),
                   ],
                 ),
               ],
@@ -208,13 +204,9 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       'advanced',
                       'advanced',
                       (_) => const AdvancedPage(),
-                      routes: [
-                        _slide('inboundOptions', 'inbound-options', (_) => const InboundOptionsPage()),
-                        _slide('tlsTricks', 'tls-tricks', (_) => const TlsTricksPage()),
-                      ],
+                      routes: [_slide('tlsTricks', 'tls-tricks', (_) => const TlsTricksPage())],
                     ),
                     _slide('connections', 'connections', (_) => const MuseDataPage()),
-                    _slide('logs', 'logs', (_) => const LogsPage()),
                     _slide('about', 'about', (_) => const AboutPage()),
                   ],
                 ),

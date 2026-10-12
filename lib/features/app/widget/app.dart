@@ -15,8 +15,8 @@ import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_based_routing_notifier.dart';
 import 'package:hiddify/features/connection/widget/connection_wrapper.dart';
+import 'package:hiddify/features/muse/home/auto_fastest.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
-import 'package:hiddify/features/muse/home/speed_test.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/shortcut/shortcut_wrapper.dart';
 import 'package:hiddify/features/system_tray/notifier/system_tray_notifier.dart';
@@ -39,12 +39,16 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
   void onPause(WidgetRef ref) {
     if (PlatformUtils.isDesktop) return;
     isOnPauseCalled = true;
+    // 穿云: on Android the app's gRPC server and listeners stay up in the background.
+    // Closing them on every pause (and "inactive" fires for the notification shade too)
+    // forced a full core setup on return, next to the running VPN service.
+    if (PlatformUtils.isAndroid) return;
     ref.read(hiddifyCoreServiceProvider).closeFront();
   }
 
   void onResume(WidgetRef ref) {
-    // if (PlatformUtils.isDesktop) return;
-    ref.read(hiddifyCoreServiceProvider).init();
+    // 穿云: only re-attach to the running core; never restart or replay the connection
+    ref.read(hiddifyCoreServiceProvider).resume();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (isOnPauseCalled && PlatformUtils.isAndroid) ref.invalidate(appBasedRoutingProvider);
@@ -64,7 +68,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     ref.listen(foregroundProfilesUpdateNotifierProvider, (_, _) {});
     if (PlatformUtils.isAndroid) ref.listen(appBasedRoutingProvider, (_, _) {});
     ref.listen(museNodeFailoverProvider, (_, _) {});
-    ref.listen(museSpeedHistoryProvider, (_, _) {});
+    ref.listen(museAutoFastestProvider, (_, _) {});
     if (PlatformUtils.isDesktop) ref.listen(systemTrayNotifierProvider, (_, _) {});
 
     // updating ActiveBreakpointNotifier value

@@ -97,13 +97,6 @@ class MuseConfigPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => context.goNamed('ruleSets'),
               ),
-              MuseTile(
-                leading: const Icon(Icons.dns_rounded),
-                title: 'DNS',
-                subtitle: '域名解析服务器设置',
-                chevron: true,
-                onTap: () => context.goNamed('dnsOptions'),
-              ),
             ],
           ),
         ],

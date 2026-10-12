@@ -1,9 +1,8 @@
-// 穿云 - 设置 › 连接信息：本次流量、当前节点、出口 IP、日志入口（原「数据」页，测速与流量曲线已移到首页）。
+// 穿云 - 设置 › 连接信息：本次流量、当前节点、出口 IP、活动连接。
 // Part of 穿云 (Chuanyun), a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
@@ -78,20 +77,6 @@ class MuseDataPage extends HookConsumerWidget {
                 subtitle: '节点列表、排序和流量（连接后可用）',
                 chevron: true,
                 onTap: () => context.pushNamed('proxies'),
-              ),
-              MuseTile(
-                leading: const Icon(Icons.description_outlined),
-                title: '日志',
-                subtitle: '查看内核运行日志，排查连接问题',
-                chevron: true,
-                onTap: () => context.goNamed('logs'),
-              ),
-              MuseTile(
-                leading: const Icon(Icons.history_rounded),
-                title: '最近日志',
-                subtitle: '快速查看最近的错误',
-                chevron: true,
-                onTap: () => ref.read(bottomSheetsNotifierProvider.notifier).showLogsRecent(),
               ),
             ],
           ),

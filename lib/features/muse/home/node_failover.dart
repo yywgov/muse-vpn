@@ -31,7 +31,7 @@ final museNodeFailoverProvider = Provider<void>((ref) {
     if (auto == null) return;
     switching = true;
     try {
-      await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(group.tag, auto.tag);
+      await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(group.tag, auto.tag, haptic: false);
       ref
           .read(inAppNotificationControllerProvider)
           .showInfoToast('「${selected.tagDisplay.isNotEmpty ? selected.tagDisplay : selected.tag}」超时，已切换到自动最快');

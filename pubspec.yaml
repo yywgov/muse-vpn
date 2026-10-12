@@ -1,7 +1,7 @@
 name: hiddify
 description: 穿云 - Android proxy client (fork of Hiddify, GPLv3).
 publish_to: "none"
-version: 0.0.2+2
+version: 1.0.0+100
 
 environment:
   sdk: ^3.10.4
@@ -155,15 +155,8 @@ flutter:
     - assets/images/tray_icon_connected.png
     - assets/images/tray_icon_disconnected.ico
     - assets/images/tray_icon_disconnected.png
-    - assets/images/connect_norouz.PNG
-    - assets/images/disconnect_norouz.PNG
-    - assets/images/world_map.png
-    - assets/images/source/ic_launcher_border.png
 
   fonts:
-    - family: Shabnam
-      fonts:
-        - asset: assets/fonts/Shabnam.ttf
     # - family: Roboto
     #   fonts:
     #     - asset: assets/fonts/Roboto.ttf

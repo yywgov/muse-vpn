@@ -200,11 +200,12 @@ class ProxiesOverviewNotifier extends _$ProxiesOverviewNotifier with AppLogger {
   //   }
   // }
 
-  Future<void> changeProxy(String groupTag, String outboundTag) async {
+  /// [haptic] only for a tap by the user; automatic switches stay silent.
+  Future<void> changeProxy(String groupTag, String outboundTag, {bool haptic = true}) async {
     loggy.debug("changing proxy, group: [$groupTag] - outbound: [$outboundTag]");
     if (!state.hasValue) return;
     final outbounds = state.value!;
-    await ref.read(hapticServiceProvider.notifier).lightImpact();
+    if (haptic) await ref.read(hapticServiceProvider.notifier).lightImpact();
     await ref.read(proxyRepositoryProvider).selectProxy(groupTag, outboundTag).getOrElse((err) {
       loggy.warning("error selecting outbound", err);
       throw err;
@@ -217,10 +218,11 @@ class ProxiesOverviewNotifier extends _$ProxiesOverviewNotifier with AppLogger {
     }
   }
 
-  Future<void> urlTest(String groupTag) async {
+  /// [haptic] only for a tap by the user; the automatic test after connecting stays silent.
+  Future<void> urlTest(String groupTag, {bool haptic = true}) async {
     loggy.debug("testing group: [$groupTag]");
     if (state case AsyncData()) {
-      await ref.read(hapticServiceProvider.notifier).lightImpact();
+      if (haptic) await ref.read(hapticServiceProvider.notifier).lightImpact();
       await ref.read(proxyRepositoryProvider).urlTest(groupTag).getOrElse((err) {
         loggy.error("error testing group", err);
         throw err;
