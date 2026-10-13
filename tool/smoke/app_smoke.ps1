@@ -126,6 +126,13 @@ if ($w -ge 600 * $scale) {
     Start-Sleep -Seconds 3
     Shot $t.n
   }
+  # settings -> about (version line), 900x680 layout
+  Click ($r.L + [int](490 * $scale)) ($r.T + [int](585 * $scale))
+  Start-Sleep -Seconds 3
+  Shot "3b-about"
+  # tapping the current tab again returns to the settings root
+  Click $x ($r.T + [int]((31 + 8 + 72 * 2 + 36) * $scale))
+  Start-Sleep -Seconds 2
   $y = $r.T + [int]((31 + 8 + 36) * $scale)
   Click $x $y
   Start-Sleep -Seconds 2
