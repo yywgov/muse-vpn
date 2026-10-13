@@ -110,10 +110,14 @@ android {
                 signingConfig signingConfigs.debug
             }
             ndk {
-                //noinspection ChromeOsAbiSupport
-                abiFilters "arm64-v8a"
                 debugSymbolLevel 'FULL'
             }
+        }
+        // 穿云 1.1: arm64 only. The Flutter Gradle plugin puts all three ABIs into every build
+        // type's ndk.abiFilters; they must equal the splits list, so replace them (not add).
+        configureEach { buildType ->
+            buildType.ndk.abiFilters.clear()
+            buildType.ndk.abiFilters.add("arm64-v8a")
         }
     }
 
