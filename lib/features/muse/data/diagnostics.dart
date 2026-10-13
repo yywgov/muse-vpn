@@ -43,11 +43,18 @@ abstract final class MuseDiagnostics {
     for (final r in logRing.records) {
       b.writeln(formatRecord(r));
     }
-    final dir = await getTemporaryDirectory();
+    // 穿云 Windows: no share sheet worth using — save to 下载 and show the file in Explorer
+    final dir = Platform.isWindows
+        ? (await getDownloadsDirectory() ?? await getTemporaryDirectory())
+        : await getTemporaryDirectory();
     final stamp =
         '${now.year}${_two(now.month)}${_two(now.day)}-${_two(now.hour)}${_two(now.minute)}${_two(now.second)}';
     final file = File('${dir.path}/chuanyun-diagnostics-$stamp.txt');
     await file.writeAsString(b.toString());
+    if (Platform.isWindows) {
+      await Process.start('explorer.exe', ['/select,', file.path]);
+      return;
+    }
     // the share sheet being dismissed is not a failure
     await UriUtils.tryShareFile(Uri.file(file.path), mimeType: 'text/plain');
   }

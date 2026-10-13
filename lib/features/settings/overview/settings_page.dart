@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/settings/windows_settings.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -32,6 +33,7 @@ class SettingsPage extends HookConsumerWidget {
       body: MuseGroupedBody(
         children: [
           const MuseSection(header: '常规', children: [ThemeModePrefTile()]),
+          if (PlatformUtils.isWindows) const WindowsSettingsSection(),
           if (android)
             MuseSection(
               header: '网络',

@@ -6,6 +6,7 @@ import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/core/utils/json_converters.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/log/model/log_level.dart';
+import 'package:hiddify/features/muse/data/windows_admin.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/profile/data/profile_parser.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
@@ -21,7 +22,7 @@ abstract class ConfigOptions {
   static final serviceMode = PreferencesNotifier.create<ServiceMode, String>(
     "service-mode",
     ServiceMode.defaultMode,
-    mapFrom: (value) => ServiceMode.choices.firstWhere((e) => e.key == value),
+    mapFrom: (value) => ServiceMode.choices.firstWhere((e) => e.key == value, orElse: () => ServiceMode.defaultMode),
     mapTo: (value) => value.key,
   );
 
@@ -485,8 +486,13 @@ abstract class ConfigOptions {
     // 穿云 1.0: the run-mode, LAN-sharing, DNS and test-interval screens are gone, so on
     // Android these are fixed to the values the app is built around (a value changed in an
     // older build must not keep the tunnel in a mode the user can no longer see).
+    // 穿云 Windows: 系统代理 by default; TUN only while running as administrator (wintun),
+    // otherwise it falls back to 系统代理 instead of failing to start.
     final android = PlatformUtils.isAndroid;
-    final mode = android ? ServiceMode.tun : ref.watch(serviceMode);
+    final chosenMode = android ? ServiceMode.tun : ref.watch(serviceMode);
+    final mode = PlatformUtils.isWindows && chosenMode == ServiceMode.tun && !WindowsAdmin.isElevated
+        ? ServiceMode.systemProxy
+        : chosenMode;
     // final reg = ref.watch(Preferences.region.notifier).raw();
     return SingboxConfigOption(
       region: ref.watch(region).name,
@@ -499,7 +505,7 @@ abstract class ConfigOptions {
       ipv6Mode: ref.watch(ipv6Mode),
       remoteDnsAddress: ref.watch(remoteDnsAddress),
       remoteDnsDomainStrategy: ref.watch(remoteDnsDomainStrategy),
-      directDnsAddress: android ? 'udp://223.5.5.5' : ref.watch(directDnsAddress),
+      directDnsAddress: 'udp://223.5.5.5', // 穿云: fixed on every platform
       directDnsDomainStrategy: ref.watch(directDnsDomainStrategy),
       mixedPort: ref.watch(mixedPort),
       tproxyPort: ref.watch(tproxyPort),
@@ -514,14 +520,14 @@ abstract class ConfigOptions {
       strictRoute: ref.watch(strictRoute),
       connectionTestUrl: ref.watch(connectionTestUrl),
       // re-test every 5 minutes while in use (the core stops testing when idle)
-      urlTestInterval: android ? const Duration(minutes: 5) : ref.watch(urlTestInterval),
+      urlTestInterval: const Duration(minutes: 5),
       enableClashApi: ref.watch(enableClashApi),
       clashApiPort: ref.watch(clashApiPort),
       enableTun: mode == ServiceMode.tun,
       // enableTunService: mode == false, //ServiceMode.tunService,
       setSystemProxy: mode == ServiceMode.systemProxy,
       // bypassLan: ref.watch(bypassLan),
-      allowConnectionFromLan: !android && ref.watch(allowConnectionFromLan),
+      allowConnectionFromLan: false, // 穿云: no LAN sharing UI on any platform
       lanSharingPassword: ref.watch(lanSharingPassword),
       enableFakeDns: ref.watch(enableFakeDns),
       // enableDnsRouting: ref.watch(enableDnsRouting),

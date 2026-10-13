@@ -15,6 +15,7 @@ import 'package:hiddify/features/muse/data/diagnostics.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/gen/assets.gen.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class AboutPage extends HookConsumerWidget {
@@ -44,13 +45,13 @@ class AboutPage extends HookConsumerWidget {
           .read(dialogNotifierProvider.notifier)
           .showConfirmation(
             title: '发现新版本 ${release.version}',
-            message: '下载后打开系统安装界面，安装后设置和订阅都会保留。',
-            positiveBtnTxt: '下载并安装',
+            message: PlatformUtils.isWindows ? '将在浏览器中打开下载页面。' : '下载后打开系统安装界面，安装后设置和订阅都会保留。',
+            positiveBtnTxt: PlatformUtils.isWindows ? '打开下载页面' : '下载并安装',
           );
       if (!ok) return;
       try {
         final opened = await updater.downloadAndInstall(release);
-        if (!opened) toast.showInfoToast('请允许穿云「安装未知应用」，然后再点一次检查更新');
+        if (!opened && !PlatformUtils.isWindows) toast.showInfoToast('请允许穿云「安装未知应用」，然后再点一次检查更新');
       } catch (_) {
         toast.showErrorToast('下载失败，请稍后再试');
       }

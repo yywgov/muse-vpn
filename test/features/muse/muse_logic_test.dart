@@ -174,6 +174,22 @@ void main() {
       expect(r?.apkSize, 42);
     });
 
+    test('windows picks the zip and keeps the release page', () {
+      final json = {
+        'tag_name': 'v1.2.0',
+        'prerelease': false,
+        'html_url': 'https://github.com/yywgov/muse-vpn/releases/tag/v1.2.0',
+        'assets': [
+          {'name': 'Chuanyun-Android-arm64.apk', 'browser_download_url': 'https://x/apk', 'size': 42},
+          {'name': 'Chuanyun-Windows-x64.zip', 'browser_download_url': 'https://x/zip', 'size': 7},
+        ],
+      };
+      final r = museParseRelease(json, windows: true);
+      expect(r?.apkUrl, 'https://x/zip');
+      expect(r?.pageUrl, 'https://github.com/yywgov/muse-vpn/releases/tag/v1.2.0');
+      expect(museParseRelease({...json, 'assets': []}, windows: true), isNull);
+    });
+
     test('prereleases are skipped and versions compare', () {
       expect(museParseRelease({'tag_name': 'v1.2.0-test.1', 'prerelease': true, 'assets': []}), isNull);
       expect(museIsNewer('1.1.0', '1.0.0'), isTrue);

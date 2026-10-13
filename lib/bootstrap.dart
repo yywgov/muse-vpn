@@ -21,6 +21,7 @@ import 'package:hiddify/features/chain/notifier/chain_profile_notifier.dart';
 
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/log/data/log_data_providers.dart';
+import 'package:hiddify/features/muse/data/windows_admin.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
@@ -72,6 +73,11 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   // The log level decides this now. There is no second debug switch to keep in
   // sync, and the core reaches the same conclusion from the same value.
   final debug = kDebugMode || container.read(ConfigOptions.logLevel).isVerbose;
+
+  if (PlatformUtils.isWindows) {
+    // 穿云: TUN mode is only used while running as administrator
+    await _safeInit("windows admin", WindowsAdmin.detect, timeout: 5000);
+  }
 
   if (PlatformUtils.isDesktop) {
     await _init("window controller", () => container.read(windowNotifierProvider.future));
