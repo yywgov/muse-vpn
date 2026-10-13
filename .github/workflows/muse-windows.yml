@@ -52,7 +52,7 @@ jobs:
           done
 
       - name: Build
-        run: flutter build windows --release --target lib/main.dart
+        run: flutter build windows --release --target lib/main_prod.dart
 
       - name: Package zip
         shell: pwsh
