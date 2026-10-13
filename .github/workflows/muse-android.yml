@@ -88,7 +88,7 @@ jobs:
       - name: Collect APK
         run: |
           mkdir out
-          apk=$(ls build/app/outputs/flutter-apk/*arm64-v8a*release*.apk 2>/dev/null | head -n1)
+          apk=$(ls build/app/outputs/flutter-apk/*arm64-v8a*release*.apk build/app/outputs/flutter-apk/app-release.apk 2>/dev/null | head -n1)
           if [ -z "$apk" ]; then
             echo "arm64 APK not found"; ls -R build/app/outputs; exit 1
           fi
