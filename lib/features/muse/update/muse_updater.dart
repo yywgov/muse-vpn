@@ -8,6 +8,8 @@ import 'package:dio/dio.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
+import 'package:hiddify/utils/platform_utils.dart';
+import 'package:hiddify/utils/uri_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:version/version.dart';
@@ -17,8 +19,12 @@ const museLatestReleaseApi = 'https://api.github.com/repos/yywgov/muse-vpn/relea
 /// Release asset the app updates from (signed with the fixed 穿云 key).
 const museApkAssetName = 'Chuanyun-Android-arm64.apk';
 
-/// A release found on GitHub: its version and the arm64 APK to download.
-typedef MuseRelease = ({String version, String apkUrl, int apkSize});
+/// 穿云 Windows: the portable zip the Windows workflow publishes.
+const museWindowsAssetName = 'Chuanyun-Windows-x64.zip';
+
+/// A release found on GitHub: its version, the asset to download (arm64 APK, or the Windows zip)
+/// and the release page (Windows opens it in the browser instead of installing in-app).
+typedef MuseRelease = ({String version, String apkUrl, int apkSize, String pageUrl});
 
 sealed class MuseUpdateState {
   const MuseUpdateState();
@@ -39,12 +45,24 @@ class MuseUpdateDownloading extends MuseUpdateState {
   final double? progress;
 }
 
-/// Picks the arm64 APK out of a GitHub release (JSON of the releases API), or null.
-MuseRelease? museParseRelease(Map<String, dynamic> json) {
+/// Picks the arm64 APK (or with [windows] the Windows zip) out of a GitHub release
+/// (JSON of the releases API), or null.
+MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false}) {
   final tag = json['tag_name'] as String? ?? '';
   final version = tag.replaceFirst(RegExp('^v'), '').split('+').first;
   if (version.isEmpty || json['prerelease'] == true || json['draft'] == true) return null;
   final assets = (json['assets'] as List? ?? const []).whereType<Map<String, dynamic>>().toList();
+  final pageUrl = json['html_url'] as String? ?? 'https://github.com/yywgov/muse-vpn/releases/latest';
+  if (windows) {
+    for (final asset in assets) {
+      final name = (asset['name'] as String? ?? '').toLowerCase();
+      final url = asset['browser_download_url'] as String?;
+      if (url != null && name == museWindowsAssetName.toLowerCase()) {
+        return (version: version, apkUrl: url, apkSize: (asset['size'] as num?)?.toInt() ?? 0, pageUrl: pageUrl);
+      }
+    }
+    return null;
+  }
   // the re-signed asset the release workflow uploads is Chuanyun-Android-arm64.apk; prefer it
   assets.sort((a, b) {
     bool exact(Map<String, dynamic> e) => (e['name'] as String? ?? '').toLowerCase() == museApkAssetName.toLowerCase();
@@ -55,7 +73,7 @@ MuseRelease? museParseRelease(Map<String, dynamic> json) {
     if (name.endsWith('.apk') && name.contains('arm64')) {
       final url = asset['browser_download_url'] as String?;
       if (url == null) continue;
-      return (version: version, apkUrl: url, apkSize: (asset['size'] as num?)?.toInt() ?? 0);
+      return (version: version, apkUrl: url, apkSize: (asset['size'] as num?)?.toInt() ?? 0, pageUrl: pageUrl);
     }
   }
   return null;
@@ -92,7 +110,9 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
     state = const MuseUpdateChecking();
     try {
       final response = await _dio().get<Map<String, dynamic>>(museLatestReleaseApi);
-      final release = response.data == null ? null : museParseRelease(response.data!);
+      final release = response.data == null
+          ? null
+          : museParseRelease(response.data!, windows: PlatformUtils.isWindows);
       final current = ref.read(appInfoProvider).requireValue.version;
       if (release == null || !museIsNewer(release.version, current)) return null;
       return release;
@@ -105,6 +125,8 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
   /// (e.g. 「安装未知应用」 still needs allowing: the system page is opened for that).
   Future<bool> downloadAndInstall(MuseRelease release) async {
     if (state is! MuseUpdateIdle) return false;
+    // 穿云 Windows: no in-place installer; open the release page to download the new zip
+    if (PlatformUtils.isWindows) return UriUtils.tryLaunch(Uri.parse(release.pageUrl));
     state = const MuseUpdateDownloading(null);
     _cancel = CancelToken();
     try {

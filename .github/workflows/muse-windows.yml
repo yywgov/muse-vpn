@@ -1,0 +1,91 @@
+name: 穿云 Windows
+
+# 穿云 Windows x64 (fork of hiddify-app, GPLv3).
+# Push to main / PR -> portable zip as a workflow artifact.
+# Push a tag v* -> also attach Chuanyun-Windows-x64.zip to the GitHub Release of that tag
+# (v*-win* tags are Windows-only test prereleases; the Android workflow skips them).
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.38.5'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # codegen + slang + prebuilt core (hiddify-lib-windows-amd64.tar.gz from yywgov/muse-core)
+      - name: Prepare (codegen + prebuilt core)
+        run: make windows-prepare
+
+      - name: Core files present
+        run: |
+          ls -la hiddify-core/bin
+          for f in hiddify-core.dll libcronet.dll HiddifyCli.exe; do
+            test -f "hiddify-core/bin/$f" || { echo "missing $f"; exit 1; }
+          done
+
+      - name: Build
+        run: flutter build windows --release --target lib/main.dart
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          $rel = "build\windows\x64\runner\Release"
+          Get-ChildItem $rel | Select-Object Name, Length
+          if (-not (Test-Path "$rel\Chuanyun.exe")) { throw "Chuanyun.exe not found" }
+          if (-not (Test-Path "$rel\hiddify-core.dll")) { throw "hiddify-core.dll not bundled" }
+          New-Item -ItemType Directory -Path out -Force | Out-Null
+          New-Item -ItemType Directory -Path pkg -Force | Out-Null
+          Copy-Item -Recurse $rel pkg\Chuanyun
+          7z a -tzip out\Chuanyun-Windows-x64.zip .\pkg\Chuanyun
+          Get-ChildItem out | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chuanyun-Windows-x64
+          path: out/Chuanyun-Windows-x64.zip
+          retention-days: 14
+
+      # gh instead of action-gh-release: the Android workflow may create the same release at the
+      # same moment, so create-or-upload with a few retries
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          pre=""
+          case "$TAG" in *-*) pre="--prerelease";; esac
+          for i in 1 2 3 4 5 6; do
+            if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              gh release upload "$TAG" out/Chuanyun-Windows-x64.zip --clobber -R "$GITHUB_REPOSITORY" && exit 0
+            else
+              gh release create "$TAG" out/Chuanyun-Windows-x64.zip $pre --verify-tag --title "$TAG" -R "$GITHUB_REPOSITORY" && exit 0
+            fi
+            sleep 20
+          done
+          exit 1

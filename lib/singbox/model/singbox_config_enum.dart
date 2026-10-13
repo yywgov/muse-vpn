@@ -22,7 +22,11 @@ enum ServiceMode {
 
   /// supported service mode based on platform, use this instead of [values] in UI
   static List<ServiceMode> get choices {
-    if (Platform.isWindows || Platform.isLinux) {
+    // 穿云 Windows: 系统代理 (default) or TUN (needs administrator)
+    if (Platform.isWindows) {
+      return [systemProxy, tun];
+    }
+    if (Platform.isLinux) {
       return values;
     } else if (Platform.isMacOS) {
       return [proxy, systemProxy, tun];

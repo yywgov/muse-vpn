@@ -425,13 +425,13 @@
         "serviceMode": "服务模式",
         "serviceModes": {
           "proxy": "仅代理服务",
-          "systemProxy": "设置系统代理",
-          "tun": "VPN"
+          "systemProxy": "系统代理",
+          "tun": "TUN 模式（需管理员）"
         },
         "shortServiceModes": {
           "proxy": "代理",
           "systemProxy": "系统代理",
-          "tun": "VPN"
+          "tun": "TUN"
         },
         "strictRoute": "严格路由",
         "tunImplementation": "虚拟网卡实现",
