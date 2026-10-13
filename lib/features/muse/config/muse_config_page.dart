@@ -86,16 +86,8 @@ class MuseConfigPage extends HookConsumerWidget {
               MuseTile(
                 leading: const Icon(Icons.route_rounded),
                 title: '路由规则',
-                subtitle: '哪些网站/应用直连、走代理或拦截（首页选「配置」模式时生效）',
                 chevron: true,
                 onTap: () => context.goNamed('routingOptions'),
-              ),
-              MuseTile(
-                leading: const Icon(Icons.playlist_add_rounded),
-                title: '规则集',
-                subtitle: '一键导入常用分流规则（国外走代理、国内直连、去广告等）',
-                chevron: true,
-                onTap: () => context.goNamed('ruleSets'),
               ),
             ],
           ),

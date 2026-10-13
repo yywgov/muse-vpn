@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:fpdart/fpdart.dart';
-import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/http_client/http_client_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/failures.dart';
@@ -131,7 +130,8 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
     if (state.isLoading) return;
     _resetTimer?.cancel();
     state = const AsyncLoading();
-    if (!isBulk) await ref.read(hapticServiceProvider.notifier).lightImpact();
+    // 穿云 1.1: the config before the update; an unchanged subscription doesn't restart the tunnel
+    final before = await _profilesRepo.getRawConfig(profile.id).getOrElse((_) => '').run();
     state = await AsyncValue.guard(() async {
       return await _profilesRepo
           .upsertRemote(profile.url)
@@ -145,6 +145,11 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
 
               await ref.read(activeProfileProvider.future).then((active) async {
                 if (active != null && active.id == profile.id) {
+                  final after = await _profilesRepo.getRawConfig(profile.id).getOrElse((_) => '').run();
+                  if (before.isNotEmpty && before == after) {
+                    loggy.info('subscription unchanged, keeping the running tunnel');
+                    return;
+                  }
                   await ref.read(connectionNotifierProvider.notifier).reconnect(profile);
                 }
               });

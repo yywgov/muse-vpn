@@ -6,6 +6,7 @@ import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
@@ -20,7 +21,8 @@ const _geoUrl = 'https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set'
 /// only switch and move them, and their content comes from here, so an update can change it.
 enum BuiltinRule {
   bypassLan(enabledByDefault: true),
-  blockAds(enabledByDefault: false),
+  // 穿云 1.1: 去广告 is part of the built-in defaults (国内直连 + 国外代理 + 去广告)
+  blockAds(enabledByDefault: true),
   bypassRegion(enabledByDefault: true);
 
   const BuiltinRule({required this.enabledByDefault});
@@ -89,7 +91,18 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
       state = _withBuiltins(file.existsSync() ? state : []);
       await _updateFile();
     });
-    return _withBuiltins(file.existsSync() ? RouteRule.fromBuffer(file.readAsBytesSync()).rules : []);
+    final rules = _withBuiltins(file.existsSync() ? RouteRule.fromBuffer(file.readAsBytesSync()).rules : []);
+    if (!ref.read(Preferences.adsDefaultMigrated)) {
+      // 穿云 1.1: lists saved by older builds get 去广告 turned on once (the user can still turn it off)
+      for (final rule in rules) {
+        if (BuiltinRule.of(rule) == BuiltinRule.blockAds) rule.enabled = true;
+      }
+      Future.microtask(() async {
+        await ref.read(Preferences.adsDefaultMigrated.notifier).update(true);
+        if (file.existsSync()) await _updateFile();
+      });
+    }
+    return rules;
   }
 
   /// Every built-in rule once, with the app's content and the user's switch and place; the ones missing go

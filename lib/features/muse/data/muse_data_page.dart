@@ -2,8 +2,8 @@
 // Part of 穿云 (Chuanyun), a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
@@ -50,7 +50,9 @@ class MuseDataPage extends HookConsumerWidget {
                   child: Text(
                     activeProxy == null
                         ? '--'
-                        : (activeProxy.tagDisplay.isNotEmpty ? activeProxy.tagDisplay : activeProxy.tag),
+                        : museCurrentOutboundLabel(
+                            activeProxy.tagDisplay.isNotEmpty ? activeProxy.tagDisplay : activeProxy.tag,
+                          ),
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
                   ),
@@ -66,18 +68,6 @@ class MuseDataPage extends HookConsumerWidget {
               ),
               MuseTile(title: '活动连接', trailing: value(running ? '${stats.connectionsOut}' : '--')),
               MuseTile(title: '内核内存', trailing: value(running ? stats.memory.toInt().size() : '--')),
-            ],
-          ),
-          MuseSection(
-            header: '更多',
-            children: [
-              MuseTile(
-                leading: const Icon(Icons.dns_outlined),
-                title: '全部节点',
-                subtitle: '节点列表、排序和流量（连接后可用）',
-                chevron: true,
-                onTap: () => context.pushNamed('proxies'),
-              ),
             ],
           ),
         ],

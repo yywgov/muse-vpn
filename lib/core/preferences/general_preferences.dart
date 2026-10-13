@@ -20,8 +20,22 @@ abstract class Preferences {
   static final netAutoEnabled = PreferencesNotifier.create<bool, bool>("net_auto_enabled", false);
   static final netTrustedSsids = PreferencesNotifier.create<String, String>("net_trusted_ssids", "");
 
-  // 穿云: switch the main group to 自动最快 when the hand-picked node stops answering
-  static final nodeFailover = PreferencesNotifier.create<bool, bool>("node_failover", true);
+  // 穿云: switch the main group to 自动最快 when the hand-picked node stops answering (always on since 1.1)
+  static final nodeFailover = PreferencesNotifier.create<bool, bool>("node_failover", true, overrideValue: true);
+
+  // 穿云 1.1: 后台运行/自启动 guide shown once on the first connect; 自启动 can't be read back from
+  // ColorOS, so having opened its settings page once counts as done
+  static final keepAliveGuideShown = PreferencesNotifier.create<bool, bool>("keep_alive_guide_shown", false);
+  static final autostartVisited = PreferencesNotifier.create<bool, bool>("autostart_visited", false);
+
+  // 穿云 1.1: 去广告 became part of the built-in default rules (turned on once for existing lists)
+  static final adsDefaultMigrated = PreferencesNotifier.create<bool, bool>("ads_default_migrated", false);
+
+  // 穿云 1.1: the last clipboard text offered for import (never offered twice)
+  static final clipboardLastOffered = PreferencesNotifier.create<String, String>("clipboard_last_offered", "");
+
+  // 穿云 1.1: subscription alerts already sent ("<profile id>:<kind>:<expire>" one per line)
+  static final subscriptionAlertsSent = PreferencesNotifier.create<String, String>("subscription_alerts_sent", "");
 
   // 穿云 1.0: 负载均衡 used to be the default pick of the main group; moved once to 自动最快
   static final autoFastestMigrated = PreferencesNotifier.create<bool, bool>("auto_fastest_migrated", false);
@@ -113,7 +127,6 @@ abstract class Preferences {
 
   static final markNewProfileActive = PreferencesNotifier.create<bool, bool>("mark_new_profile_active", true);
 
-  static final dynamicNotification = PreferencesNotifier.create<bool, bool>("dynamic_notification", true);
 
   static final autoCheckIp = PreferencesNotifier.create<bool, bool>("auto_check_ip", true);
 

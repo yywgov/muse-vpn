@@ -2,6 +2,7 @@
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -10,6 +11,8 @@ import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/muse/home/clipboard_import.dart';
+import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
@@ -44,6 +47,7 @@ class MuseHomePage extends HookConsumerWidget {
       body: MuseGroupedBody(
         padding: const EdgeInsets.only(bottom: 32),
         children: [
+          const MuseClipboardImportBanner(),
           const _ConnectSection(),
           const _RouteModeSelector(),
           if (hasProfile) const _NodesSection() else const _EmptyProfileSection(),
@@ -109,6 +113,12 @@ class _ConnectSection extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final connection = ref.watch(connectionNotifierProvider);
+    // first time connected: one-time 后台运行/自启动 guide
+    ref.listen(connectionNotifierProvider, (prev, next) {
+      if (prev?.valueOrNull is! Connected && next.valueOrNull is Connected) {
+        museMaybeShowKeepAliveGuide(context, ref);
+      }
+    });
     final since = ref.watch(museConnectedSinceProvider).valueOrNull;
     final stats = ref.watch(statsNotifierProvider).asData?.value ?? SystemInfo.create();
     final secondary = MuseColors.secondaryText(context);
@@ -149,11 +159,11 @@ class _ConnectSection extends HookConsumerWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Column(
         children: [
           _ConnectButton(connected: connected, busy: busy, onTap: busy ? null : toggle),
-          const SizedBox(height: 20),
+          const SizedBox(height: 4),
           Text.rich(
             TextSpan(
               children: [
@@ -181,7 +191,20 @@ class _ConnectSection extends HookConsumerWidget {
   }
 }
 
-/// The big round button with the 穿云 glyph; glows while connected, breathes while switching.
+/// When the user last tapped the connect button: the connect/disconnect animation plays only
+/// for a change the user asked for, never for a state restored when the app comes back.
+DateTime? _museLastToggleTap;
+
+bool _museUserToggledRecently() {
+  final tap = _museLastToggleTap;
+  return tap != null && DateTime.now().difference(tap) < const Duration(seconds: 30);
+}
+
+/// The big round button with the 穿云 glyph (1.1 animation, no haptics):
+/// - 连接中: a light arc circles the button;
+/// - 连上: the glow spreads out once, then stays lit;
+/// - 断开: the glow pulls back and the button fades to grey.
+/// A state that is already there when the page builds (e.g. returning to the app) is shown as is.
 class _ConnectButton extends HookWidget {
   const _ConnectButton({required this.connected, required this.busy, required this.onTap});
 
@@ -192,66 +215,114 @@ class _ConnectButton extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final pulse = useAnimationController(duration: const Duration(milliseconds: 1100));
+    final spin = useAnimationController(duration: const Duration(milliseconds: 1200));
+    final burst = useAnimationController(duration: const Duration(milliseconds: 750));
+    final glow = useAnimationController(duration: const Duration(milliseconds: 450), initialValue: connected ? 1 : 0);
+    final previous = usePrevious(connected);
+
     useEffect(() {
       if (busy) {
-        pulse.repeat(reverse: true);
+        spin.repeat();
       } else {
-        pulse
+        spin
           ..stop()
           ..value = 0;
       }
       return null;
     }, [busy]);
 
+    useEffect(() {
+      if (previous == null || previous == connected || !_museUserToggledRecently()) {
+        glow.value = connected ? 1 : 0;
+        return null;
+      }
+      if (connected) {
+        glow.forward(from: 0);
+        burst.forward(from: 0);
+      } else {
+        burst.value = 0;
+        glow.reverse(from: 1);
+      }
+      return null;
+    }, [connected]);
+
     const size = 168.0;
     final active = connected || busy;
     final off = MuseColors.isTrueBlack(context) ? const Color(0xFF1C1C1C) : (dark ? const Color(0xFF1E2A4D) : const Color(0xFFDDE5F4));
     final glyphColor = active ? Colors.white : (dark ? const Color(0xFF8A94B3) : const Color(0xFF7B8AA8));
 
+    void tap() {
+      _museLastToggleTap = DateTime.now();
+      onTap?.call();
+    }
+
     return Semantics(
       button: true,
       label: connected ? '断开' : '连接',
-      child: AnimatedBuilder(
-        animation: pulse,
-        builder: (context, child) {
-          final glow = connected ? 0.55 : (busy ? 0.25 + 0.3 * pulse.value : 0.0);
-          return Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: active
-                  ? const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [MuseColors.brandLight, MuseColors.brandDeep],
-                    )
-                  : null,
-              color: active ? null : off,
-              boxShadow: [
-                if (glow > 0)
-                  BoxShadow(color: MuseColors.brand.withValues(alpha: glow), blurRadius: 64, spreadRadius: 10),
-              ],
+      child: RepaintBoundary(
+        child: SizedBox(
+          width: size + 48,
+          height: size + 48,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: active ? 1 : 0),
+            duration: const Duration(milliseconds: 260),
+            builder: (context, a, child) => AnimatedBuilder(
+              animation: Listenable.merge([spin, burst, glow]),
+              builder: (context, child) {
+                final glowAlpha = busy ? 0.22 : 0.55 * glow.value;
+                return CustomPaint(
+                  painter: _ConnectRingPainter(
+                    spin: busy ? spin.value : null,
+                    burst: burst.isAnimating ? burst.value : null,
+                    radius: size / 2,
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: size,
+                      height: size,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color.lerp(off, MuseColors.brandLight, a)!,
+                            Color.lerp(off, MuseColors.brandDeep, a)!,
+                          ],
+                        ),
+                        boxShadow: [
+                          if (glowAlpha > 0.01)
+                            BoxShadow(
+                              color: MuseColors.brand.withValues(alpha: glowAlpha),
+                              blurRadius: 64,
+                              spreadRadius: 10,
+                            ),
+                        ],
+                      ),
+                      child: child,
+                    ),
+                  ),
+                );
+              },
+              child: child,
             ),
-            child: child,
-          );
-        },
-        child: Material(
-          type: MaterialType.transparency,
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            customBorder: const CircleBorder(),
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Assets.images.glyph.svg(
-                  key: ValueKey(glyphColor),
-                  width: 92,
-                  height: 92,
-                  colorFilter: ColorFilter.mode(glyphColor, BlendMode.srcIn),
+            child: Material(
+              type: MaterialType.transparency,
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onTap == null ? null : tap,
+                customBorder: const CircleBorder(),
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Assets.images.glyph.svg(
+                      key: ValueKey(glyphColor),
+                      width: 92,
+                      height: 92,
+                      colorFilter: ColorFilter.mode(glyphColor, BlendMode.srcIn),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -262,6 +333,43 @@ class _ConnectButton extends HookWidget {
   }
 }
 
+/// The rotating arc while connecting and the ring that spreads out once on connect.
+class _ConnectRingPainter extends CustomPainter {
+  _ConnectRingPainter({required this.spin, required this.burst, required this.radius});
+
+  final double? spin;
+  final double? burst;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    if (spin != null) {
+      final rect = Rect.fromCircle(center: center, radius: radius + 10);
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round
+        ..shader = SweepGradient(
+          colors: [MuseColors.brandLight.withValues(alpha: 0), MuseColors.brandLight],
+          transform: GradientRotation(spin! * 2 * math.pi),
+        ).createShader(rect);
+      canvas.drawArc(rect, spin! * 2 * math.pi, math.pi * 1.4, false, paint);
+    }
+    if (burst != null) {
+      final t = Curves.easeOut.transform(burst!);
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2 + 4 * (1 - t)
+        ..color = MuseColors.brandLight.withValues(alpha: 0.55 * (1 - t));
+      canvas.drawCircle(center, radius + 4 + 20 * t, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConnectRingPainter old) => old.spin != spin || old.burst != burst || old.radius != radius;
+}
+
 /// 配置 / 代理 / 直连 as a pill segmented control.
 class _RouteModeSelector extends ConsumerWidget {
   const _RouteModeSelector();
@@ -270,7 +378,6 @@ class _RouteModeSelector extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final mode = ref.watch(ConfigOptions.museRouteMode);
-    final secondary = MuseColors.secondaryText(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Column(
@@ -307,8 +414,6 @@ class _RouteModeSelector extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(mode.explain, style: theme.textTheme.bodySmall?.copyWith(color: secondary)),
         ],
       ),
     );
@@ -364,7 +469,7 @@ class _NodesSection extends HookConsumerWidget {
         children: [
           header('节点'),
           const MuseSection(
-            children: [MuseTile(title: '连接后显示节点', subtitle: '节点列表和延迟由内核提供，连接后即可选择节点、测试延迟。')],
+            children: [MuseTile(title: '连接后显示节点')],
           ),
         ],
       );
@@ -427,7 +532,12 @@ class _NodesSection extends HookConsumerWidget {
       ];
     } else {
       body = [
-        for (final proxy in group.items)
+        for (final proxy in museSortNodes<OutboundInfo>(
+          group.items,
+          isGroup: (e) => e.isGroup,
+          delay: (e) => _freshDelay(e, since),
+          isValidDelay: ConnectionConst.isValidDelay,
+        ))
           _NodeCard(
             key: ValueKey(proxy.tag),
             proxy: proxy,
@@ -457,6 +567,15 @@ class _NodesSection extends HookConsumerWidget {
       children: [header(title, trailing: testButton), ...body],
     );
   }
+}
+
+/// A node's delay for sorting: results from before this connection count as not tested yet.
+int _freshDelay(OutboundInfo proxy, DateTime? since) {
+  final delay = proxy.urlTestDelay;
+  if (delay == 0) return 0;
+  final testedAt = proxy.hasUrlTestTime() ? proxy.urlTestTime.toDateTime() : null;
+  if (since != null && testedAt != null && testedAt.isBefore(since.subtract(const Duration(seconds: 2)))) return 0;
+  return delay;
 }
 
 class _NodeCard extends StatelessWidget {
@@ -504,7 +623,7 @@ class _NodeCard extends StatelessWidget {
     final subtitle = proxy.isGroup
         ? museGroupSubtitle(type: proxy.type, name: rawName, selectedDisplay: proxy.groupSelectedTagDisplay)
         : museProtocolName(proxy.type);
-    final badge = proxy.isGroup ? null : museRegionBadge(name);
+    final flag = proxy.isGroup ? null : museFlagEmoji(name);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
@@ -530,14 +649,8 @@ class _NodeCard extends StatelessWidget {
                     color: MuseColors.brand.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: badge != null
-                      ? Text(
-                          badge,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: MuseColors.brandLight,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        )
+                  child: flag != null
+                      ? Text(flag, style: const TextStyle(fontSize: 20, height: 1.1))
                       : Icon(
                           proxy.isGroup ? Icons.bolt_rounded : Icons.public_rounded,
                           size: 18,

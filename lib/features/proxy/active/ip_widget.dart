@@ -2,7 +2,6 @@ import 'package:circle_flags/circle_flags.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/utils/ip_utils.dart';
 import 'package:hiddify/gen/fonts.gen.dart';
@@ -30,9 +29,6 @@ class IPText extends HookConsumerWidget {
       child: InkWell(
         onTap: () {
           isVisible.value = !isVisible.value;
-          if (isVisible.value) {
-            ref.read(hapticServiceProvider.notifier).mediumImpact();
-          }
         },
         onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(12),
