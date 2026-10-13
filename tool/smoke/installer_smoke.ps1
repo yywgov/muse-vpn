@@ -28,7 +28,9 @@ function Rec([string]$id, [string]$n, [bool]$pass, [string]$detail) {
   Write-Host "$(if ($pass) { 'PASS' } else { 'FAIL' }) [$id] $n - $detail"
 }
 function RunSetup([string]$exePath, [string[]]$a) {
-  $p = Start-Process -FilePath $exePath -ArgumentList $a -PassThru -Wait
+  # not -Wait: that also waits for every child, and /RELAUNCH leaves Chuanyun.exe running
+  $p = Start-Process -FilePath $exePath -ArgumentList $a -PassThru
+  if (-not $p.WaitForExit(300000)) { return -2 }
   return $p.ExitCode
 }
 

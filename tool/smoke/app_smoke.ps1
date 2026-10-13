@@ -129,6 +129,12 @@ if ($w -ge 600 * $scale) {
   $y = $r.T + [int]((31 + 8 + 36) * $scale)
   Click $x $y
   Start-Sleep -Seconds 2
+  # home, no profile yet: the add row sits under the connect button (900x680 layout)
+  Click ($r.L + [int](490 * $scale)) ($r.T + [int](493 * $scale))
+  Start-Sleep -Seconds 3
+  Shot "2b-add-profile"
+  [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+  Start-Sleep -Seconds 2
 }
 
 # ---- maximized (content should stay centered with a max width) ----

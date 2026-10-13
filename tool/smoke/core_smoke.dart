@@ -34,7 +34,8 @@ import 'package:hiddify/hiddifycore/generated/v2/hello/hello_service.pbgrpc.dart
 const _mixedPort = 12334;
 const _grpcPort = 17179; // not the app's 17078, so a running app can't interfere
 const _inetKey = r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings';
-const _probeUrl = 'https://www.gstatic.com/generate_204';
+// not gstatic: the cn rules may send www.gstatic.com direct (Google's CN-served CDN)
+const _probeUrl = 'https://www.google.com/generate_204';
 
 final _results = <Map<String, Object?>>[];
 late Directory _out;
@@ -264,7 +265,7 @@ Future<void> _runProxyMode(CoreClient core, String profile, _SocksNode node) asy
   node.targets.clear();
   final code = await _curl(['-x', 'http://127.0.0.1:$_mixedPort'], _probeUrl);
   _record('proxy-request', 'request via mixed port $_mixedPort → $_probeUrl', code.startsWith('204'), 'http $code');
-  final viaNode = node.targets.any((t) => t.contains('gstatic') || t.endsWith(':443'));
+  final viaNode = node.targets.any((t) => t.contains('google') || t.endsWith(':443'));
   _record('proxy-via-node', 'that request went through the node', viaNode, 'node saw: ${node.targets.take(8).join(', ')}');
 
   // 国内直连: a CN site must not go through the node (region cn rules)
@@ -294,7 +295,7 @@ Future<String> _tunAdapters() async {
   final r = await Process.run('powershell', [
     '-NoProfile',
     '-Command',
-    "Get-NetAdapter -IncludeHidden | Where-Object { \$_.InterfaceDescription -like '*Wintun*' -or \$_.Name -like '*tun*' } | ForEach-Object { \"\$(\$_.Name) | \$(\$_.InterfaceDescription) | \$(\$_.Status)\" }",
+    "Get-NetAdapter | Where-Object { \$_.InterfaceDescription -like '*Wintun*' -or \$_.InterfaceDescription -like '*sing-tun*' -or \$_.Name -like 'tun*' } | ForEach-Object { \"\$(\$_.Name) | \$(\$_.InterfaceDescription) | \$(\$_.Status)\" }",
   ]);
   return '${r.stdout}'.trim();
 }

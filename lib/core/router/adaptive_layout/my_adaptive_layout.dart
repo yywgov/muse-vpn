@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
@@ -110,12 +111,16 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       ),
                       // the pages are laid out for a phone-width column: keep them at a readable
                       // width, centered, on wide or maximized windows
+                      // (the page gradient continues behind the column, so it doesn't look like a panel)
                       Expanded(
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: desktopContentMaxWidth),
-                            child: navigationShell,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(gradient: MuseColors.pageGradient(context)),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: desktopContentMaxWidth),
+                              child: navigationShell,
+                            ),
                           ),
                         ),
                       ),

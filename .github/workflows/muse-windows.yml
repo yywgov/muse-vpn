@@ -71,6 +71,7 @@ jobs:
       - name: Smoke test - app (portable build)
         id: smoke_app
         continue-on-error: true
+        timeout-minutes: 10
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File tool\smoke\app_smoke.ps1 -AppDir build\windows\x64\runner\Release -Out smoke -Label portable -RepoDir .
 
@@ -102,6 +103,7 @@ jobs:
       - name: Smoke test - installer (install, run, upgrade, uninstall)
         id: smoke_installer
         continue-on-error: true
+        timeout-minutes: 15
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File tool\smoke\installer_smoke.ps1 -Setup out\Chuanyun-Windows-x64-Setup.exe -Out smoke -RepoDir .
 
