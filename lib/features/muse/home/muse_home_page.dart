@@ -6,6 +6,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
@@ -427,7 +428,8 @@ class _EmptyProfileSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return MuseSection(
       header: '节点',
-      footer: '支持订阅链接、剪贴板导入、扫描二维码。',
+      // no camera scanning on the desktop
+      footer: PlatformUtils.isDesktop ? '支持订阅链接、剪贴板导入。' : '支持订阅链接、剪贴板导入、扫描二维码。',
       children: [
         MuseTile(
           leading: const Icon(Icons.add_circle_outline_rounded),

@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
-import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
-import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+/// 穿云 desktop: widest the page column gets on a wide or maximized window.
+const desktopContentMaxWidth = 680.0;
 
 class MyAdaptiveLayout extends HookConsumerWidget {
   const MyAdaptiveLayout({
@@ -100,21 +102,28 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       FocusScope(
                         node: navScopeNode,
                         child: NavigationRail(
-                          extended: Breakpoint(context).isDesktop(),
+                          // 穿云 desktop: compact rail (icon + label), no side-bar stats
+                          labelType: NavigationRailLabelType.all,
                           destinations: _navRailDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
                           selectedIndex: navigationShell.currentIndex,
                           onDestinationSelected: (index) => _onTap(context, index),
-                          trailing: Breakpoint(context).isDesktop()
-                              ? const Expanded(
-                                  child: Align(
-                                    alignment: Alignment.bottomCenter,
-                                    child: SizedBox(width: 220, child: SideBarStatsOverview()),
-                                  ),
-                                )
-                              : null,
                         ),
                       ),
-                      Expanded(child: navigationShell),
+                      // the pages are laid out for a phone-width column: keep them at a readable
+                      // width, centered, on wide or maximized windows
+                      // (the page gradient continues behind the column, so it doesn't look like a panel)
+                      Expanded(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(gradient: MuseColors.pageGradient(context)),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: desktopContentMaxWidth),
+                              child: navigationShell,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
             bottomNavigationBar: isMobileBreakpoint

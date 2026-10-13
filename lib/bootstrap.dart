@@ -22,6 +22,7 @@ import 'package:hiddify/features/chain/notifier/chain_profile_notifier.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/log/data/log_data_providers.dart';
 import 'package:hiddify/features/muse/data/windows_admin.dart';
+import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
@@ -77,6 +78,12 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   if (PlatformUtils.isWindows) {
     // 穿云: TUN mode is only used while running as administrator
     await _safeInit("windows admin", WindowsAdmin.detect, timeout: 5000);
+    // a killed earlier run may have left 系统代理 pointing at its dead port
+    await _safeInit(
+      "stale system proxy",
+      () => WindowsProxyGuard.clearStale(container.read(ConfigOptions.mixedPort)),
+      timeout: 6000,
+    );
   }
 
   if (PlatformUtils.isDesktop) {

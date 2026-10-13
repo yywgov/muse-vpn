@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
@@ -58,7 +59,7 @@ class MuseConfigPage extends HookConsumerWidget {
                         MuseTile(
                           leading: const Icon(Icons.add_circle_outline_rounded),
                           title: '添加订阅或配置',
-                          subtitle: '订阅链接、剪贴板、二维码',
+                          subtitle: PlatformUtils.isDesktop ? '订阅链接、剪贴板' : '订阅链接、剪贴板、二维码',
                           chevron: true,
                           onTap: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
                         ),

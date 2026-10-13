@@ -6,11 +6,9 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
-import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -40,46 +38,38 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
           return OutboundInfo(urlTestDelay: 0);
         })
         .then((connection) => connection.urlTestDelay);
-    final connection = await ref
-        .watch(connectionNotifierProvider.future)
-        .catchError((e) {
-          loggy.warning("error getting connection status", e);
-          return const ConnectionStatus.disconnected();
-        })
-        .then((connection) => _modifyConnectionStatus(connection, urlTestDelay));
-    final serviceMode = ref.watch(ConfigOptions.serviceMode);
+    final connection = await ref.watch(connectionNotifierProvider.future).catchError((e) {
+      loggy.warning("error getting connection status", e);
+      return const ConnectionStatus.disconnected();
+    });
 
-    await trayManager.setIcon(_trayIconPath(connection), isTemplate: PlatformUtils.isMacOS);
+    // the icon waits for a valid delay before it turns "connected"; the menu follows the real
+    // status, so 断开 is available as soon as the tunnel is up
+    await trayManager.setIcon(
+      _trayIconPath(_modifyConnectionStatus(connection, urlTestDelay)),
+      isTemplate: PlatformUtils.isMacOS,
+    );
     if (!PlatformUtils.isLinux) await trayManager.setToolTip(_trayTooltip(connection, urlTestDelay, t));
-    await trayManager.setContextMenu(_trayMenu(connection, serviceMode, t));
+    await trayManager.setContextMenu(_trayMenu(connection));
   }
 
-  Menu _trayMenu(ConnectionStatus connection, ServiceMode serviceMode, Translations t) => Menu(
+  // 穿云: 显示 / 连接|断开 / 退出 — nothing else
+  Menu _trayMenu(ConnectionStatus connection) => Menu(
     items: [
-      if (PlatformUtils.isLinux) ...[MenuItem(key: 'dashboard', label: t.common.dashboard), MenuItem.separator()],
+      MenuItem(key: 'dashboard', label: '显示'),
+      MenuItem.separator(),
       MenuItem(
         key: 'connection',
         label: switch (connection) {
-          Disconnected() => t.connection.connect,
-          Connecting() => t.connection.connecting,
-          Connected() => t.connection.disconnect,
-          Disconnecting() => t.connection.disconnecting,
+          Disconnected() => '连接',
+          Connecting() => '连接中…',
+          Connected() => '断开',
+          Disconnecting() => '断开中…',
         },
         disabled: connection.isSwitching,
       ),
-      MenuItem.submenu(
-        label: t.pages.settings.inbound.serviceMode,
-        icon: Assets.images.trayIconIco,
-        submenu: Menu(
-          items: [
-            ...ServiceMode.choices.map(
-              (e) => MenuItem.checkbox(checked: e == serviceMode, key: e.name, label: e.present(t)),
-            ),
-          ],
-        ),
-      ),
       MenuItem.separator(),
-      MenuItem(key: 'quit', label: t.common.quit),
+      MenuItem(key: 'quit', label: '退出'),
     ],
   );
 
@@ -108,7 +98,7 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
     final r = "${Constants.appName} - ${connection.present(t)}";
     if (connection is Connected) {
       if (Platform.isMacOS) windowManager.setBadgeLabel("${urlTestDelay}ms");
-      return '$r : ${urlTestDelay}ms"';
+      return ConnectionConst.isValidDelay(urlTestDelay) ? '$r · ${urlTestDelay}ms' : r;
     } else {
       if (Platform.isMacOS) windowManager.setBadgeLabel("-ms");
       return r;
@@ -134,10 +124,6 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
       await ref.read(connectionNotifierProvider.notifier).toggleConnection();
     } else if (menuItem.key == 'quit') {
       await ref.read(windowNotifierProvider.notifier).exit();
-    } else {
-      final newMode = ServiceMode.values.byName(menuItem.key!);
-      loggy.debug("switching service mode: [$newMode]");
-      await ref.read(ConfigOptions.serviceMode.notifier).update(newMode);
     }
   }
 
@@ -148,7 +134,8 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
     // } else {
     //   await ref.read(windowNotifierProvider.notifier).hideOrShow();
     // }
-    await ref.read(windowNotifierProvider.notifier).showOrHide();
+    // 穿云: a left click on the tray icon always brings the window up (Windows convention)
+    await ref.read(windowNotifierProvider.notifier).show();
   }
 
   @override

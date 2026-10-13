@@ -41,12 +41,17 @@ class AboutPage extends HookConsumerWidget {
         toast.showSuccessToast('已是最新版本');
         return;
       }
+      final pageOnly = PlatformUtils.isWindows && !museIsWindowsInstaller(release);
       final ok = await ref
           .read(dialogNotifierProvider.notifier)
           .showConfirmation(
             title: '发现新版本 ${release.version}',
-            message: PlatformUtils.isWindows ? '将在浏览器中打开下载页面。' : '下载后打开系统安装界面，安装后设置和订阅都会保留。',
-            positiveBtnTxt: PlatformUtils.isWindows ? '打开下载页面' : '下载并安装',
+            message: pageOnly
+                ? '将在浏览器中打开下载页面。'
+                : PlatformUtils.isWindows
+                ? '下载后自动安装并重新打开穿云，设置和订阅都会保留。'
+                : '下载后打开系统安装界面，安装后设置和订阅都会保留。',
+            positiveBtnTxt: pageOnly ? '打开下载页面' : '下载并安装',
           );
       if (!ok) return;
       try {
