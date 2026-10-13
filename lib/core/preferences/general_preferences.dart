@@ -136,7 +136,7 @@ abstract class Preferences {
 
   static final actionAtClose = PreferencesNotifier.create<ActionsAtClosing, String>(
     "action_at_close",
-    ActionsAtClosing.ask,
+    ActionsAtClosing.hide, // 穿云: closing the window keeps 穿云 running in the tray
     mapFrom: ActionsAtClosing.values.byName,
     mapTo: (value) => value.name,
   );

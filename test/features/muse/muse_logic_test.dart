@@ -186,8 +186,24 @@ void main() {
       };
       final r = museParseRelease(json, windows: true);
       expect(r?.apkUrl, 'https://x/zip');
-      expect(r?.pageUrl, 'https://github.com/yywgov/muse-vpn/releases/tag/v1.2.0');
+      expect(museIsWindowsInstaller(r!), isFalse);
+      expect(r.pageUrl, 'https://github.com/yywgov/muse-vpn/releases/tag/v1.2.0');
       expect(museParseRelease({...json, 'assets': []}, windows: true), isNull);
+    });
+
+    test('windows prefers the Setup.exe installer over the zip', () {
+      final json = {
+        'tag_name': 'v1.2.0',
+        'prerelease': false,
+        'assets': [
+          {'name': 'Chuanyun-Windows-x64.zip', 'browser_download_url': 'https://x/zip', 'size': 7},
+          {'name': 'Chuanyun-Windows-x64-Setup.exe', 'browser_download_url': 'https://x/setup.exe', 'size': 9},
+        ],
+      };
+      final r = museParseRelease(json, windows: true);
+      expect(r?.apkUrl, 'https://x/setup.exe');
+      expect(r?.apkSize, 9);
+      expect(museIsWindowsInstaller(r!), isTrue);
     });
 
     test('prereleases are skipped and versions compare', () {

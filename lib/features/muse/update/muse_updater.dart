@@ -1,5 +1,7 @@
 // 穿云 1.1 - 关于 › 检查更新: reads the latest GitHub release, downloads its arm64 APK and opens
 // the system installer (the release key is fixed, so it installs over the current version).
+// Windows: downloads Chuanyun-Windows-x64-Setup.exe and runs it silently (/RELAUNCH reopens 穿云
+// after the upgrade); a release with only the portable zip opens the release page instead.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'dart:io';
@@ -7,6 +9,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/utils/uri_utils.dart';
@@ -19,8 +22,14 @@ const museLatestReleaseApi = 'https://api.github.com/repos/yywgov/muse-vpn/relea
 /// Release asset the app updates from (signed with the fixed 穿云 key).
 const museApkAssetName = 'Chuanyun-Android-arm64.apk';
 
-/// 穿云 Windows: the portable zip the Windows workflow publishes.
+/// 穿云 Windows: the installer the Windows workflow publishes (preferred) ...
+const museWindowsSetupAssetName = 'Chuanyun-Windows-x64-Setup.exe';
+
+/// ... and the portable zip (only the release page is opened for it).
 const museWindowsAssetName = 'Chuanyun-Windows-x64.zip';
+
+/// Whether a Windows release found by [museParseRelease] is the installer (vs. the portable zip).
+bool museIsWindowsInstaller(MuseRelease release) => release.apkUrl.toLowerCase().endsWith('.exe');
 
 /// A release found on GitHub: its version, the asset to download (arm64 APK, or the Windows zip)
 /// and the release page (Windows opens it in the browser instead of installing in-app).
@@ -54,11 +63,13 @@ MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false})
   final assets = (json['assets'] as List? ?? const []).whereType<Map<String, dynamic>>().toList();
   final pageUrl = json['html_url'] as String? ?? 'https://github.com/yywgov/muse-vpn/releases/latest';
   if (windows) {
-    for (final asset in assets) {
-      final name = (asset['name'] as String? ?? '').toLowerCase();
-      final url = asset['browser_download_url'] as String?;
-      if (url != null && name == museWindowsAssetName.toLowerCase()) {
-        return (version: version, apkUrl: url, apkSize: (asset['size'] as num?)?.toInt() ?? 0, pageUrl: pageUrl);
+    for (final wanted in [museWindowsSetupAssetName, museWindowsAssetName]) {
+      for (final asset in assets) {
+        final name = (asset['name'] as String? ?? '').toLowerCase();
+        final url = asset['browser_download_url'] as String?;
+        if (url != null && name == wanted.toLowerCase()) {
+          return (version: version, apkUrl: url, apkSize: (asset['size'] as num?)?.toInt() ?? 0, pageUrl: pageUrl);
+        }
       }
     }
     return null;
@@ -125,8 +136,11 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
   /// (e.g. 「安装未知应用」 still needs allowing: the system page is opened for that).
   Future<bool> downloadAndInstall(MuseRelease release) async {
     if (state is! MuseUpdateIdle) return false;
-    // 穿云 Windows: no in-place installer; open the release page to download the new zip
-    if (PlatformUtils.isWindows) return UriUtils.tryLaunch(Uri.parse(release.pageUrl));
+    // 穿云 Windows: only the portable zip in this release -> open the release page
+    if (PlatformUtils.isWindows && !museIsWindowsInstaller(release)) {
+      return UriUtils.tryLaunch(Uri.parse(release.pageUrl));
+    }
+    if (PlatformUtils.isWindows) return _downloadAndRunSetup(release);
     state = const MuseUpdateDownloading(null);
     _cancel = CancelToken();
     try {
@@ -153,6 +167,47 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
         throw const FileSystemException('incomplete download');
       }
       return await ChuanyunPlatform.installApk(path);
+    } catch (e, st) {
+      loggy.warning('update download failed', e, st);
+      rethrow;
+    } finally {
+      _cancel = null;
+      state = const MuseUpdateIdle();
+    }
+  }
+
+  /// 穿云 Windows: downloads the Setup.exe, starts it silently (UAC prompt; /RELAUNCH opens the
+  /// new version when done) and quits so the files can be replaced and 系统代理 is restored.
+  Future<bool> _downloadAndRunSetup(MuseRelease release) async {
+    state = const MuseUpdateDownloading(null);
+    _cancel = CancelToken();
+    try {
+      final dir = Directory('${(await getTemporaryDirectory()).path}\\chuanyun-update');
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+      dir.createSync(recursive: true);
+      final path = '${dir.path}\\Chuanyun-${release.version}-Setup.exe';
+      await _dio().download(
+        release.apkUrl,
+        path,
+        cancelToken: _cancel,
+        onReceiveProgress: (received, total) {
+          final size = total > 0 ? total : release.apkSize;
+          state = MuseUpdateDownloading(size > 0 ? (received / size).clamp(0, 1) : null);
+        },
+      );
+      final file = File(path);
+      if (!file.existsSync() || (release.apkSize > 0 && file.lengthSync() != release.apkSize)) {
+        throw const FileSystemException('incomplete download');
+      }
+      await Process.start(path, const [
+        '/SILENT',
+        '/SUPPRESSMSGBOXES',
+        '/NORESTART',
+        '/RELAUNCH',
+      ], mode: ProcessStartMode.detached);
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await ref.read(windowNotifierProvider.notifier).exit();
+      return true;
     } catch (e, st) {
       loggy.warning('update download failed', e, st);
       rethrow;
