@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/utils/throttler.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
@@ -66,7 +65,6 @@ class IpInfoNotifier extends _$IpInfoNotifier with AppLogger {
     if (state.isLoading) return;
     loggy.debug("refreshing");
     state = const AsyncLoading();
-    await ref.read(hapticServiceProvider.notifier).lightImpact();
     _forceCheck = true;
     ref.invalidateSelf();
   }
@@ -99,7 +97,6 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
     final groupTag = groupTag_ ?? "";
     _urlTestThrottler(() async {
       if (state case AsyncData()) {
-        await ref.read(hapticServiceProvider.notifier).lightImpact();
         await ref.read(proxyRepositoryProvider).urlTest(groupTag).getOrElse((err) {
           loggy.warning("error testing group", err);
           throw err;

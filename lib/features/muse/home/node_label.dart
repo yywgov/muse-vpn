@@ -1,14 +1,27 @@
-// 穿云 - region badge and labels for node rows.
+// 穿云 - labels for node rows: region flags, Chinese group names (the one mapping every screen
+// uses), and the node order.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
+//
+// The Android notification has a copy of the group-name table in
+// android/.../bg/ChuanyunLabels.kt (native code can't call Dart); keep the two in step.
 
-/// One-character region badge derived from a node name ("香港 01" -> 港, "🇯🇵 Tokyo" -> 日), or null.
-String? museRegionBadge(String name) {
+/// ISO 3166 code of the region a node name points at ("香港 01" -> HK, "🇯🇵 Tokyo" -> JP), or null.
+String? museRegionCode(String name) {
   final flag = _flagCode(name);
-  if (flag != null && _byCode[flag] != null) return _byCode[flag];
-  for (final (pattern, badge) in _byKeyword) {
-    if (pattern.hasMatch(name)) return badge;
+  if (flag != null) return flag == 'UK' ? 'GB' : flag;
+  for (final (pattern, code) in _byKeyword) {
+    if (pattern.hasMatch(name)) return code;
   }
   return null;
+}
+
+/// Flag emoji for a node name ("香港 01" -> 🇭🇰), or null when no region is recognised (show a globe).
+String? museFlagEmoji(String name) {
+  final code = museRegionCode(name);
+  if (code == null || code.length != 2) return null;
+  final a = code.codeUnitAt(0), b = code.codeUnitAt(1);
+  if (a < 65 || a > 90 || b < 65 || b > 90) return null;
+  return String.fromCharCodes([0x1F1E6 + a - 65, 0x1F1E6 + b - 65]);
 }
 
 String? _flagCode(String name) {
@@ -22,34 +35,55 @@ String? _flagCode(String name) {
   return null;
 }
 
-const _byCode = <String, String>{
-  'HK': '港', 'TW': '台', 'MO': '澳', 'JP': '日', 'SG': '新', 'US': '美', 'KR': '韩', 'GB': '英', 'UK': '英',
-  'DE': '德', 'FR': '法', 'RU': '俄', 'CA': '加', 'AU': '澳', 'IN': '印', 'TR': '土', 'NL': '荷', 'VN': '越',
-  'TH': '泰', 'MY': '马', 'PH': '菲', 'ID': '印', 'AR': '阿', 'BR': '巴', 'IT': '意', 'ES': '西', 'CN': '中',
-};
-
+// Order matters: more specific names first (澳门 before 澳洲, 印尼 before 印度 …).
 final _byKeyword = <(RegExp, String)>[
-  (RegExp(r'香港|港|\bHK\b|Hong ?Kong', caseSensitive: false), '港'),
-  (RegExp(r'台湾|台灣|台北|\bTW\b|Taiwan', caseSensitive: false), '台'),
-  (RegExp(r'澳门|澳門|Macao|Macau'), '澳'),
-  (RegExp(r'日本|东京|東京|大阪|\bJP\b|Japan|Tokyo|Osaka', caseSensitive: false), '日'),
-  (RegExp(r'新加坡|狮城|獅城|\bSG\b|Singapore', caseSensitive: false), '新'),
-  (RegExp(r'美国|美國|洛杉矶|硅谷|西雅图|纽约|圣何塞|\bUS\b|\bUSA\b|United States|America', caseSensitive: false), '美'),
-  (RegExp(r'韩国|韓國|首尔|\bKR\b|Korea|Seoul', caseSensitive: false), '韩'),
-  (RegExp(r'英国|英國|伦敦|\bUK\b|\bGB\b|London|United Kingdom', caseSensitive: false), '英'),
-  (RegExp(r'德国|德國|法兰克福|\bDE\b|Germany|Frankfurt', caseSensitive: false), '德'),
-  (RegExp(r'法国|法國|巴黎|\bFR\b|France|Paris', caseSensitive: false), '法'),
-  (RegExp(r'俄罗斯|俄羅斯|莫斯科|\bRU\b|Russia', caseSensitive: false), '俄'),
-  (RegExp(r'加拿大|\bCA\b|Canada', caseSensitive: false), '加'),
-  (RegExp(r'澳大利亚|澳洲|悉尼|\bAU\b|Australia|Sydney', caseSensitive: false), '澳'),
-  (RegExp(r'印度|\bIN\b|India', caseSensitive: false), '印'),
-  (RegExp(r'土耳其|\bTR\b|Turkey', caseSensitive: false), '土'),
-  (RegExp(r'荷兰|荷蘭|\bNL\b|Netherlands', caseSensitive: false), '荷'),
-  (RegExp(r'越南|\bVN\b|Vietnam', caseSensitive: false), '越'),
-  (RegExp(r'泰国|泰國|\bTH\b|Thailand', caseSensitive: false), '泰'),
-  (RegExp(r'马来|馬來|\bMY\b|Malaysia', caseSensitive: false), '马'),
-  (RegExp(r'菲律宾|\bPH\b|Philippines', caseSensitive: false), '菲'),
-  (RegExp(r'阿根廷|\bAR\b|Argentina', caseSensitive: false), '阿'),
+  (RegExp(r'香港|\bHK\b|\bHKG\b|Hong ?Kong', caseSensitive: false), 'HK'),
+  (RegExp(r'台湾|台灣|台北|新北|彰化|\bTW\b|Taiwan|Taipei', caseSensitive: false), 'TW'),
+  (RegExp(r'澳门|澳門|Macao|Macau', caseSensitive: false), 'MO'),
+  (RegExp(r'日本|东京|東京|大阪|埼玉|\bJP\b|Japan|Tokyo|Osaka', caseSensitive: false), 'JP'),
+  (RegExp(r'新加坡|狮城|獅城|\bSG\b|Singapore', caseSensitive: false), 'SG'),
+  (RegExp(r'美国|美國|洛杉矶|硅谷|西雅图|纽约|圣何塞|芝加哥|达拉斯|凤凰城|\bUS\b|\bUSA\b|United States|America|Los ?Angeles|San ?Jose|Seattle', caseSensitive: false), 'US'),
+  (RegExp(r'韩国|韓國|首尔|首爾|春川|\bKR\b|Korea|Seoul', caseSensitive: false), 'KR'),
+  (RegExp(r'英国|英國|伦敦|倫敦|\bUK\b|\bGB\b|London|United Kingdom|Britain', caseSensitive: false), 'GB'),
+  (RegExp(r'德国|德國|法兰克福|\bDE\b|Germany|Frankfurt', caseSensitive: false), 'DE'),
+  (RegExp(r'法国|法國|巴黎|\bFR\b|France|Paris', caseSensitive: false), 'FR'),
+  (RegExp(r'俄罗斯|俄羅斯|莫斯科|\bRU\b|Russia|Moscow', caseSensitive: false), 'RU'),
+  (RegExp(r'加拿大|多伦多|温哥华|\bCA\b|Canada|Toronto|Vancouver', caseSensitive: false), 'CA'),
+  (RegExp(r'澳大利亚|澳洲|悉尼|墨尔本|\bAU\b|Australia|Sydney|Melbourne', caseSensitive: false), 'AU'),
+  (RegExp(r'印尼|印度尼西亚|雅加达|Indonesia|Jakarta', caseSensitive: false), 'ID'),
+  (RegExp(r'印度|孟买|India|Mumbai', caseSensitive: false), 'IN'),
+  (RegExp(r'土耳其|\bTR\b|Turkey|Türkiye|Istanbul', caseSensitive: false), 'TR'),
+  (RegExp(r'荷兰|荷蘭|阿姆斯特丹|\bNL\b|Netherlands|Amsterdam', caseSensitive: false), 'NL'),
+  (RegExp(r'越南|\bVN\b|Vietnam', caseSensitive: false), 'VN'),
+  (RegExp(r'泰国|泰國|曼谷|\bTH\b|Thailand|Bangkok', caseSensitive: false), 'TH'),
+  (RegExp(r'马来|馬來|吉隆坡|\bMY\b|Malaysia|Kuala', caseSensitive: false), 'MY'),
+  (RegExp(r'菲律宾|菲律賓|马尼拉|\bPH\b|Philippines|Manila', caseSensitive: false), 'PH'),
+  (RegExp(r'阿根廷|\bAR\b|Argentina', caseSensitive: false), 'AR'),
+  (RegExp(r'巴西|\bBR\b|Brazil', caseSensitive: false), 'BR'),
+  (RegExp(r'意大利|義大利|米兰|Italy|Milan', caseSensitive: false), 'IT'),
+  (RegExp(r'西班牙|马德里|Spain|Madrid', caseSensitive: false), 'ES'),
+  (RegExp(r'瑞士|Switzerland|Zurich', caseSensitive: false), 'CH'),
+  (RegExp(r'瑞典|Sweden|Stockholm', caseSensitive: false), 'SE'),
+  (RegExp(r'波兰|Poland|Warsaw', caseSensitive: false), 'PL'),
+  (RegExp(r'爱尔兰|愛爾蘭|Ireland|Dublin', caseSensitive: false), 'IE'),
+  (RegExp(r'阿联酋|迪拜|\bUAE\b|Dubai|Emirates', caseSensitive: false), 'AE'),
+  (RegExp(r'以色列|Israel', caseSensitive: false), 'IL'),
+  (RegExp(r'南非|South Africa', caseSensitive: false), 'ZA'),
+  (RegExp(r'墨西哥|Mexico', caseSensitive: false), 'MX'),
+  (RegExp(r'智利|Chile', caseSensitive: false), 'CL'),
+  (RegExp(r'乌克兰|烏克蘭|Ukraine', caseSensitive: false), 'UA'),
+  (RegExp(r'芬兰|Finland', caseSensitive: false), 'FI'),
+  (RegExp(r'挪威|Norway', caseSensitive: false), 'NO'),
+  (RegExp(r'丹麦|Denmark', caseSensitive: false), 'DK'),
+  (RegExp(r'奥地利|Austria|Vienna', caseSensitive: false), 'AT'),
+  (RegExp(r'柬埔寨|Cambodia', caseSensitive: false), 'KH'),
+  (RegExp(r'哈萨克|Kazakhstan', caseSensitive: false), 'KZ'),
+  (RegExp(r'蒙古|Mongolia', caseSensitive: false), 'MN'),
+  (RegExp(r'尼日利亚|Nigeria', caseSensitive: false), 'NG'),
+  (RegExp(r'埃及|Egypt', caseSensitive: false), 'EG'),
+  (RegExp(r'沙特|Saudi', caseSensitive: false), 'SA'),
+  (RegExp(r'新西兰|紐西蘭|New Zealand', caseSensitive: false), 'NZ'),
+  (RegExp(r'中国|中國|大陆|回国|China', caseSensitive: false), 'CN'),
 ];
 
 /// Strategy names the core reports for a load balancer (shown instead of a node).
@@ -78,6 +112,9 @@ String? museKnownGroupName(String name) {
   };
 }
 
+/// Chinese name of a load-balancer strategy ("round-robin" -> 轮询), or null.
+String? museBalanceStrategyName(String strategy) => _balanceStrategies[strategy.trim().toLowerCase()];
+
 /// How a group behaves, in plain Chinese: 自动最快 / 负载均衡 / 手动选择 / 故障切换 (null for non-groups).
 ///
 /// The core reports a load balancer as type "Balancer"; with the lowest-delay strategy it
@@ -104,14 +141,35 @@ String? museGroupKind({required String type, required String name, String? selec
 /// Display name for a group row/title: common English names become Chinese, user names stay.
 String museGroupName(String name) => museKnownGroupName(name) ?? name;
 
-/// Subtitle of a group row: 「自动最快 → 节点」, 「负载均衡 · 轮询」, 「手动选择 → 节点」.
+/// Subtitle of a group row on the 首页: the node 自动最快 picked (just its name), 「负载均衡 · 轮询」
+/// for a balancer, 「手动选择 → 节点」 for a selector.
 String museGroupSubtitle({required String type, required String name, String? selectedDisplay}) {
   final kind = museGroupKind(type: type, name: name, selectedDisplay: selectedDisplay) ?? '分组';
   final sel = selectedDisplay?.trim() ?? '';
-  final strategy = _balanceStrategies[sel.toLowerCase()];
+  final strategy = museBalanceStrategyName(sel);
   if (kind == '负载均衡') return strategy != null ? '负载均衡 · $strategy' : '负载均衡';
   if (sel.isEmpty || sel.toLowerCase() == 'lowest-delay') return kind;
-  return '$kind → ${museKnownGroupName(sel) ?? sel}';
+  final node = museKnownGroupName(sel) ?? sel;
+  // 1.1: 「自动最快 → 节点」 repeated the row title; only the node is shown
+  if (kind == '自动最快') return node;
+  return '$kind → $node';
+}
+
+/// The core's "current outbound" text ("lowest → 香港 01", "balance→round-robin", "香港 01")
+/// in Chinese: 「自动最快 · 香港 01」 / 「负载均衡 · 轮询」 / 「香港 01」.
+String museCurrentOutboundLabel(String raw) {
+  final parts = raw.split(RegExp(r'\s*→\s*')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  if (parts.isEmpty) return raw;
+  if (parts.length == 1) return museGroupName(parts.first);
+  final group = parts.first;
+  final selected = parts.last;
+  final strategy = museBalanceStrategyName(selected);
+  if (strategy != null) return '负载均衡 · $strategy';
+  var groupName = museGroupName(group);
+  // a lowest-delay balancer reports the node it picked, whatever the group is called
+  if (groupName == '负载均衡') groupName = '自动最快';
+  if (selected.toLowerCase() == 'lowest-delay') return groupName;
+  return '$groupName · ${museGroupName(selected)}';
 }
 
 /// Readable name of a proxy group type.
@@ -122,3 +180,33 @@ String? museGroupTypeLabel(String type) => switch (_bareType(type)) {
   'fallback' => '故障切换',
   _ => null,
 };
+
+/// 1.1 node order on the 首页: groups (自动最快, 负载均衡 …) first in their own order, then nodes by
+/// latency (fastest first); nodes not tested yet follow, timed-out nodes go to the bottom. The sort
+/// is stable, so equal nodes keep the subscription's order.
+List<T> museSortNodes<T>(
+  List<T> items, {
+  required bool Function(T) isGroup,
+  required int Function(T) delay,
+  required bool Function(int) isValidDelay,
+}) {
+  int rank(T e) {
+    if (isGroup(e)) return 0;
+    final d = delay(e);
+    if (d > 0 && isValidDelay(d)) return 1;
+    if (d == 0) return 2; // not tested yet
+    return 3; // timed out
+  }
+
+  final indexed = [for (var i = 0; i < items.length; i++) (i, items[i])];
+  indexed.sort((a, b) {
+    final ra = rank(a.$2), rb = rank(b.$2);
+    if (ra != rb) return ra.compareTo(rb);
+    if (ra == 1) {
+      final c = delay(a.$2).compareTo(delay(b.$2));
+      if (c != 0) return c;
+    }
+    return a.$1.compareTo(b.$1);
+  });
+  return [for (final e in indexed) e.$2];
+}

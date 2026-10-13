@@ -61,4 +61,11 @@ abstract final class ChuanyunPlatform {
 
   /// Adds a line to the disconnect log kept on the Android side.
   static Future<void> recordDisconnect(String reason) => _call<bool>('record_disconnect', {'reason': reason});
+
+  /// 穿云 1.1: a one-off system notification (subscription running out, 穿云已断开 …).
+  static Future<void> showAlert({required int id, required String title, required String text}) =>
+      _call<bool>('show_alert', {'id': id, 'title': title, 'text': text});
+
+  /// 穿云 1.1: hands a downloaded APK to the system installer (asks for 「安装未知应用」 first if needed).
+  static Future<bool> installApk(String path) async => await _call<bool>('install_apk', {'path': path}) ?? false;
 }

@@ -121,6 +121,8 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
                 }
             )
         }
+        activeTitle = profileName.takeIf { it.isNotBlank() }
+        lastText = null
         service.startForeground(
             notificationId, notificationBuilder
                 .setContentTitle(profileName.takeIf { it.isNotBlank() } ?: service.getString(R.string.app_name))
@@ -130,16 +132,20 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
 
 
     suspend fun start() {
-        if (Settings.dynamicNotification && checkPermission()) {
-//            commandClient.connect()
+        // 穿云: the screen receiver also drives the core's screen-off test interval, so it is
+        // registered even when notifications are not allowed
+        withContext(Dispatchers.Main) {
+            registerReceiver()
+        }
+        // the core keeps the last screen state; start from the real one
+        ChuanyunLabels.screenChanged(Application.powerManager.isInteractive)
+        if (checkPermission()) {
             startListenSystemInfo()
-            withContext(Dispatchers.Main) {
-                registerReceiver()
-            }
         }
     }
 
     private fun registerReceiver() {
+        if (receiverRegistered) return
         service.registerReceiver(this, IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
@@ -147,25 +153,32 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
         receiverRegistered = true
     }
 
-    fun updateStatus(previous:SystemInfo,status: SystemInfo) {
-        val uplink=status.uplink_total - previous.uplink_total
-        val downlink=status.downlink_total - previous.downlink_total
-        val speed = "↑ ${Libbox.formatBytes(uplink)}/s   ↓ ${Libbox.formatBytes(downlink)}/s"
-        val content = if (status.current_outbound.isBlank()) speed else "$speed   ${status.current_outbound}"
-        val title = status.current_profile.ifBlank { service.getString(R.string.app_name) }
+    private var lastText: String? = null
+
+    /** 穿云: 「已连接 · 自动最快 · 节点」 under the profile name; no speed (it was always 0 and confusing). */
+    fun updateStatus(status: SystemInfo) {
+        val content = ChuanyunLabels.notificationText(status.current_outbound)
+        val title = status.current_profile.ifBlank { activeTitle ?: service.getString(R.string.app_name) }
+        val text = "$title\n$content"
+        if (text == lastText) return
+        lastText = text
         Application.notificationManager.notify(
                 notificationId,
                 notificationBuilder.setContentTitle(title).setContentText(content).build()
         )
     }
 
+    private var activeTitle: String? = null
+
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             Intent.ACTION_SCREEN_ON -> {
-                startListenSystemInfo()
+                ChuanyunLabels.screenChanged(true)
+                if (checkPermission()) startListenSystemInfo()
             }
 
             Intent.ACTION_SCREEN_OFF -> {
+                ChuanyunLabels.screenChanged(false)
                 stopListenSystemInfo()
             }
         }
@@ -173,6 +186,7 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
 
     fun close() {
         stopListenSystemInfo()
+        lastText = null
         ServiceCompat.stopForeground(service, ServiceCompat.STOP_FOREGROUND_REMOVE)
         if (receiverRegistered) {
             service.unregisterReceiver(this)
@@ -198,20 +212,18 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
             // app that ColorOS freezes or kills. Now a failed poll is just retried, and the
             // notification keeps its last text when polling stops.
             var failures = 0
-            var previous: SystemInfo? = null
             while (isActive) {
                 try {
                     val current = coreClient.GetSystemInfo().executeBlocking(Empty())
-                    previous?.let { updateStatus(it, current) }
-                    previous = current
+                    updateStatus(current)
                     failures = 0
-                    delay(1_000)
+                    // only the node name is shown now, so a slow poll is enough
+                    delay(3_000)
                 } catch (e: CancellationException) {
                     Log.d("notification", "SystemInfo polling cancelled")
                     break
                 } catch (e: Exception) {
                     failures++
-                    previous = null
                     Log.w("notification", "SystemInfo poll failed ($failures)", e)
                     delay(if (failures < 5) 2_000L else 10_000L)
                 }

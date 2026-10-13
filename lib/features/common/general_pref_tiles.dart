@@ -31,7 +31,7 @@ class ThemeModePrefTile extends ConsumerWidget {
               title: t.pages.settings.general.themeMode,
               selected: themeMode,
               onReset: () => ref.read(themePreferencesProvider.notifier).changeThemeMode(AppThemeMode.system),
-              options: AppThemeMode.values,
+              options: AppThemeMode.choices,
               getTitle: (e) => e.present(t),
             );
         if (selectedThemeMode != null) {

@@ -21,5 +21,9 @@ enum AppThemeMode {
     black => ThemeMode.dark,
   };
 
-  bool get trueBlack => this == black;
+  // 穿云: the dark theme is always pure black (跟随系统 at night included); the old 深色模式 is gone
+  bool get trueBlack => this != light;
+
+  /// The choices offered in 设置 (深色模式 was folded into 纯黑模式).
+  static const choices = [system, light, black];
 }

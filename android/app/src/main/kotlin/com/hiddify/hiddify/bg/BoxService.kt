@@ -200,6 +200,7 @@ class BoxService(
             // 穿云: a (re)connect ends any 按网络自动开关 pause
             Settings.netAutoPaused = false
             NetworkAuto.cancelNotification()
+            ChuanyunAlerts.cancel(ChuanyunAlerts.ID_DISCONNECTED)
 
             if (Settings.startCoreAfterStartingService){
                 Mobile.start("","")
@@ -275,6 +276,13 @@ class BoxService(
                 }
                 if (!recovered) {
                     DisconnectLog.record("自动重连 ${backoffMillis.size} 次都失败，已断开")
+                    // 穿云 1.1: tell the user once; otherwise the tunnel is silently gone
+                    ChuanyunAlerts.show(
+                        service,
+                        ChuanyunAlerts.ID_DISCONNECTED,
+                        "穿云已断开",
+                        "自动重连 ${backoffMillis.size} 次都没有成功，点这里打开穿云重新连接",
+                    )
                     withContext(Dispatchers.Main) { stopService() }
                     break
                 }

@@ -26,14 +26,14 @@ final museAutoFastestProvider = Provider<void>((ref) {
       final hasAuto = group.items.any((e) => e.tag == museAutoFastestTag);
       if (group.selectable && group.selected == museLoadBalanceTag && hasAuto) {
         try {
-          await notifier.changeProxy(group.tag, museAutoFastestTag, haptic: false);
+          await notifier.changeProxy(group.tag, museAutoFastestTag);
         } catch (_) {
           // the notifier logs it
         }
       }
     }
     try {
-      await notifier.urlTest(group.tag, haptic: false);
+      await notifier.urlTest(group.tag);
     } catch (_) {
       // the notifier logs it; the core's own cycle tests the nodes anyway
     }

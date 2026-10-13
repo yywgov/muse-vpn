@@ -15,6 +15,15 @@ part 'profiles_update_notifier.g.dart';
 
 typedef ProfileUpdateStatus = ({String name, bool success});
 
+/// 穿云 1.1: subscriptions update at least every 12 hours (sooner when the provider asks for it);
+/// a failed update keeps the old nodes (the new config is validated before it replaces the old).
+const museSubscriptionUpdateInterval = Duration(hours: 12);
+
+Duration museEffectiveUpdateInterval(Duration? fromProvider) =>
+    fromProvider == null || fromProvider <= Duration.zero || fromProvider > museSubscriptionUpdateInterval
+    ? museSubscriptionUpdateInterval
+    : fromProvider;
+
 @Riverpod(keepAlive: true)
 class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifier with AppLogger {
   static const prefKey = "profiles_update_check";
@@ -86,9 +95,8 @@ class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifie
           .first;
 
       final toUpdate = remoteProfiles.where((profile) {
-        final updateInterval = profile.options?.updateInterval;
-        final shouldUpdate =
-            force || updateInterval != null && updateInterval <= DateTime.now().difference(profile.lastUpdate);
+        final updateInterval = museEffectiveUpdateInterval(profile.options?.updateInterval);
+        final shouldUpdate = force || updateInterval <= DateTime.now().difference(profile.lastUpdate);
         if (!shouldUpdate) {
           loggy.debug(
             "skipping profile [${profile.id}] update. last successful update: [${profile.lastUpdate}] - interval: [${profile.options?.updateInterval}]",

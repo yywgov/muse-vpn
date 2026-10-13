@@ -15,7 +15,10 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.location.LocationManagerCompat
+import com.hiddify.hiddify.bg.ChuanyunAlerts
 import com.hiddify.hiddify.bg.DisconnectLog
+import androidx.core.content.FileProvider
+import java.io.File
 import com.hiddify.hiddify.bg.NetworkAuto
 import android.os.PowerManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -223,6 +226,45 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
                     NetworkAuto.apply(context.applicationContext)
                     NetworkAuto.evaluate(context.applicationContext)
                     result.success(true)
+                }
+
+                "show_alert" -> {
+                    ChuanyunAlerts.show(
+                        context.applicationContext,
+                        call.argument<Int>("id") ?: ChuanyunAlerts.ID_SUBSCRIPTION,
+                        call.argument<String>("title") ?: "穿云",
+                        call.argument<String>("text") ?: "",
+                    )
+                    result.success(true)
+                }
+
+                // 穿云 1.1: in-app update — install the APK the app downloaded into its cache
+                "install_apk" -> {
+                    val path = call.argument<String>("path")
+                    if (path.isNullOrBlank() || !File(path).exists()) {
+                        result.success(false)
+                        return
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                        !context.packageManager.canRequestPackageInstalls()
+                    ) {
+                        // ask for 「安装未知应用」 first; the user taps 更新 again afterwards
+                        startFirst(
+                            listOf(
+                                Intent(
+                                    android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                            )
+                        )
+                        result.success(false)
+                        return
+                    }
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(path))
+                    val intent = Intent(Intent.ACTION_VIEW)
+                        .setDataAndType(uri, "application/vnd.android.package-archive")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    result.success(startFirst(listOf(intent)))
                 }
 
                 else -> result.notImplemented()

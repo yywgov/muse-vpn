@@ -17,6 +17,7 @@ import 'package:hiddify/features/app_based_routing/overview/app_based_routing_no
 import 'package:hiddify/features/connection/widget/connection_wrapper.dart';
 import 'package:hiddify/features/muse/home/auto_fastest.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
+import 'package:hiddify/features/muse/home/subscription_alert.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/shortcut/shortcut_wrapper.dart';
 import 'package:hiddify/features/system_tray/notifier/system_tray_notifier.dart';
@@ -69,6 +70,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     if (PlatformUtils.isAndroid) ref.listen(appBasedRoutingProvider, (_, _) {});
     ref.listen(museNodeFailoverProvider, (_, _) {});
     ref.listen(museAutoFastestProvider, (_, _) {});
+    if (PlatformUtils.isAndroid) ref.listen(museSubscriptionAlertProvider, (_, _) {});
     if (PlatformUtils.isDesktop) ref.listen(systemTrayNotifierProvider, (_, _) {});
 
     // updating ActiveBreakpointNotifier value

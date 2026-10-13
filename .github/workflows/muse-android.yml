@@ -75,17 +75,24 @@ jobs:
       - name: Prepare (codegen + prebuilt core)
         run: make android-prepare
 
+      # 穿云 1.1: no warnings in lib, and the unit tests for the 穿云 logic must pass
+      - name: Analyze + unit tests
+        run: |
+          flutter analyze --no-fatal-infos lib test/features/muse
+          flutter test test/features/muse
+
       - name: Build APKs
         run: make android-apk-release
 
-      - name: Collect APKs
+      # 穿云 1.1: arm64 only; the fastforge copy in dist/ (hiddify-*.apk) is not published
+      - name: Collect APK
         run: |
           mkdir out
-          cp build/app/outputs/flutter-apk/*arm64-v8a*.apk   out/Chuanyun-Android-arm64.apk   || true
-          cp build/app/outputs/flutter-apk/*armeabi-v7a*.apk out/Chuanyun-Android-arm7.apk    || true
-          cp build/app/outputs/flutter-apk/*x86_64*.apk      out/Chuanyun-Android-x86_64.apk  || true
-          cp build/app/outputs/flutter-apk/app-release.apk   out/Chuanyun-Android-universal.apk || true
-          find dist -name '*.apk' -exec cp {} out/ \; 2>/dev/null || true
+          apk=$(ls build/app/outputs/flutter-apk/*arm64-v8a*release*.apk build/app/outputs/flutter-apk/app-release.apk 2>/dev/null | head -n1)
+          if [ -z "$apk" ]; then
+            echo "arm64 APK not found"; ls -R build/app/outputs; exit 1
+          fi
+          cp "$apk" out/Chuanyun-Android-arm64.apk
           ls -la out
 
       - uses: actions/upload-artifact@v4
@@ -98,5 +105,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: out/*.apk
+          files: out/Chuanyun-Android-arm64.apk
           prerelease: ${{ contains(github.ref, '-') }}

@@ -48,19 +48,16 @@ class PrivacyPage extends HookConsumerWidget {
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            footer: '桌面图标隐藏后，从快捷开关长按即可回到穿云。',
             children: [
               MuseSwitchTile(
                 leading: const Icon(Icons.visibility_off_rounded),
                 title: '隐藏桌面图标',
-                subtitle: '不在桌面和应用列表中显示穿云',
                 value: iconHidden.value ?? false,
                 onChanged: iconHidden.value == null ? null : toggleIcon,
               ),
               MuseSwitchTile(
                 leading: const Icon(Icons.layers_clear_rounded),
                 title: '不在最近任务显示',
-                subtitle: '切到后台后，多任务界面里看不到穿云',
                 value: excludeRecents,
                 onChanged: (value) async {
                   await ref.read(Preferences.excludeFromRecents.notifier).update(value);
@@ -71,25 +68,16 @@ class PrivacyPage extends HookConsumerWidget {
           ),
           MuseSection(
             header: '通知',
-            footer:
-                '「隐藏通知」把穿云的常驻通知降到最低级别：状态栏不显示图标，只折叠在通知栏底部，下次连接时生效。'
-                '想完全不显示，可以在系统通知设置里关闭穿云的通知，连接不受影响。\n'
-                '系统自带的「已激活 VPN」提示和状态栏钥匙图标由 Android 显示，任何应用都无法隐藏。',
             children: [
               MuseSwitchTile(
                 leading: const Icon(Icons.notifications_off_rounded),
                 title: '隐藏通知',
-                subtitle: '常驻通知降为最低级别',
                 value: hideNotification,
-                onChanged: (value) async {
-                  await ref.read(Preferences.hideNotification.notifier).update(value);
-                  if (value) await ref.read(Preferences.dynamicNotification.notifier).update(false);
-                },
+                onChanged: ref.read(Preferences.hideNotification.notifier).update,
               ),
               MuseTile(
                 leading: const Icon(Icons.tune_rounded),
                 title: '系统通知设置',
-                subtitle: '在这里可以完全关闭穿云的通知',
                 chevron: true,
                 onTap: ChuanyunPlatform.openNotificationSettings,
               ),

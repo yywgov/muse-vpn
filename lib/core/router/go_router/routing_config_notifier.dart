@@ -8,6 +8,7 @@ import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.
 import 'package:hiddify/core/router/go_router/helper/custom_transition.dart';
 import 'package:hiddify/core/router/go_router/refresh_listenable.dart';
 import 'package:hiddify/features/about/widget/about_page.dart';
+import 'package:hiddify/features/about/widget/open_source_page.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
 import 'package:hiddify/features/muse/config/muse_config_page.dart';
 import 'package:hiddify/features/muse/data/muse_data_page.dart';
@@ -16,9 +17,7 @@ import 'package:hiddify/features/muse/settings/advanced_page.dart';
 import 'package:hiddify/features/muse/settings/network_auto_page.dart';
 import 'package:hiddify/features/muse/settings/per_app_proxy_page.dart';
 import 'package:hiddify/features/muse/settings/privacy_page.dart';
-import 'package:hiddify/features/muse/config/rule_sets_page.dart';
 import 'package:hiddify/features/profile/details/profile_details_page.dart';
-import 'package:hiddify/features/proxy/overview/proxies_overview_page.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_notifier.dart';
 import 'package:hiddify/features/route_rules/overview/generic_list_page.dart';
 import 'package:hiddify/features/route_rules/overview/package_names_page.dart';
@@ -106,14 +105,6 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                   name: 'home',
                   path: '/home',
                   builder: (_, _) => FocusScope(node: branchesScope['home'], child: const MuseHomePage()),
-                  routes: <GoRoute>[
-                    GoRoute(
-                      name: 'proxies',
-                      path: 'proxies',
-                      pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const ProxiesOverviewPage()),
-                    ),
-                  ],
                 ),
               ],
             ),
@@ -180,7 +171,6 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                         ),
                       ],
                     ),
-                    _slide('ruleSets', 'rule-sets', (_) => const RuleSetsPage()),
                   ],
                 ),
               ],
@@ -207,7 +197,12 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       routes: [_slide('tlsTricks', 'tls-tricks', (_) => const TlsTricksPage())],
                     ),
                     _slide('connections', 'connections', (_) => const MuseDataPage()),
-                    _slide('about', 'about', (_) => const AboutPage()),
+                    _slide(
+                      'about',
+                      'about',
+                      (_) => const AboutPage(),
+                      routes: [_slide('openSource', 'open-source', (_) => const OpenSourcePage())],
+                    ),
                   ],
                 ),
               ],

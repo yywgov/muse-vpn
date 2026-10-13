@@ -1,9 +1,11 @@
 // 穿云 - 设置 tab.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
+//
+// 1.1: no explanatory small text; state is shown with icons (a green dot when a feature is on,
+// an orange warning icon on 后台运行 / 自启动 only while they still need doing).
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
@@ -19,95 +21,62 @@ class SettingsPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final android = PlatformUtils.isAndroid;
     final batteryIgnored = android ? ref.watch(batteryOptimizationNotifierProvider).valueOrNull : null;
-    final perAppMode = ref.watch(Preferences.perAppProxyModeInUse);
+    final autostartVisited = ref.watch(Preferences.autostartVisited);
+    final perAppOn = ref.watch(Preferences.perAppProxyModeInUse) != null;
+    final netAutoOn = ref.watch(Preferences.netAutoEnabled);
+    final needsBattery = android && batteryIgnored == false;
+    final needsAutostart = android && !autostartVisited;
 
     return MuseScaffold(
       title: '设置',
       body: MuseGroupedBody(
         children: [
-          MuseSection(
-            header: '常规',
-            children: [
-              const ThemeModePrefTile(),
-              if (android) ...[
-                MuseSwitchTile(
-                  leading: const Icon(Icons.speed_rounded),
-                  title: '通知栏显示网速',
-                  value: ref.watch(Preferences.dynamicNotification),
-                  onChanged: ref.read(Preferences.dynamicNotification.notifier).update,
-                ),
-                MuseSwitchTile(
-                  leading: const Icon(Icons.vibration_rounded),
-                  title: '触感反馈',
-                  value: ref.watch(hapticServiceProvider),
-                  onChanged: ref.read(hapticServiceProvider.notifier).updatePreference,
-                ),
-              ],
-            ],
-          ),
-          MuseSection(
-            header: '网络',
-            children: [
-              if (android)
+          const MuseSection(header: '常规', children: [ThemeModePrefTile()]),
+          if (android)
+            MuseSection(
+              header: '网络',
+              children: [
                 MuseTile(
                   leading: const Icon(Icons.apps_rounded),
                   title: '分应用代理',
-                  subtitle: switch (perAppMode) {
-                    null => '已关闭：所有 App 都经过穿云',
-                    _ => perAppMode.name == 'exclude' ? '列表里的 App 不走代理' : '仅列表里的 App 走代理',
-                  },
-                  chevron: true,
+                  trailing: MuseStatusTrailing(on: perAppOn),
                   onTap: () => context.goNamed('perAppProxy'),
                 ),
-              if (android)
                 MuseTile(
                   leading: const Icon(Icons.wifi_rounded),
                   title: '按网络自动开关',
-                  subtitle: ref.watch(Preferences.netAutoEnabled) ? '已开启：可信 Wi-Fi 自动断开' : '连上家里/公司 Wi-Fi 时自动断开',
-                  chevron: true,
+                  trailing: MuseStatusTrailing(on: netAutoOn),
                   onTap: () => context.goNamed('networkAuto'),
                 ),
-              MuseSwitchTile(
-                leading: const Icon(Icons.swap_horiz_rounded),
-                title: '节点失效自动切换',
-                subtitle: '手动选的节点测速超时后，自动改用「自动最快」',
-                value: ref.watch(Preferences.nodeFailover),
-                onChanged: ref.read(Preferences.nodeFailover.notifier).update,
-              ),
-            ],
-          ),
+              ],
+            ),
           if (android)
             MuseSection(
               header: '隐私与后台',
-              footer: 'ColorOS 等系统会清理后台应用。建议允许穿云后台运行和自启动，避免连接被系统断开。',
               children: [
                 MuseTile(
                   leading: const Icon(Icons.shield_moon_rounded),
                   title: '隐私',
-                  subtitle: '隐藏桌面图标、不在最近任务显示、隐藏通知',
                   chevron: true,
                   onTap: () => context.goNamed('privacy'),
                 ),
-                MuseTile(
-                  leading: Icon(
-                    batteryIgnored == true ? Icons.battery_full_rounded : Icons.battery_alert_rounded,
-                    color: batteryIgnored == false ? Colors.orange : null,
+                if (needsBattery)
+                  MuseTile(
+                    leading: const Icon(Icons.battery_alert_rounded, color: Colors.orange),
+                    title: '允许后台运行',
+                    trailing: const MuseStatusTrailing(warning: true),
+                    onTap: () => ref.read(batteryOptimizationNotifierProvider.notifier).requestToIgnore(),
                   ),
-                  title: '允许后台运行',
-                  subtitle: batteryIgnored == true ? '已关闭电池优化' : '关闭电池优化，锁屏后也保持连接',
-                  trailing: batteryIgnored == true ? const Icon(Icons.check_rounded, color: Colors.green) : null,
-                  chevron: batteryIgnored != true,
-                  onTap: batteryIgnored == true
-                      ? ChuanyunPlatform.openAppDetails
-                      : () => ref.read(batteryOptimizationNotifierProvider.notifier).requestToIgnore(),
-                ),
-                const MuseTile(
-                  leading: Icon(Icons.rocket_launch_rounded),
-                  title: '自启动',
-                  subtitle: 'ColorOS：在「自启动管理」里打开穿云，开机后可自动恢复连接',
-                  chevron: true,
-                  onTap: ChuanyunPlatform.openAutostartSettings,
-                ),
+                if (needsAutostart)
+                  MuseTile(
+                    leading: const Icon(Icons.rocket_launch_rounded, color: Colors.orange),
+                    title: '自启动',
+                    trailing: const MuseStatusTrailing(warning: true),
+                    onTap: () async {
+                      await ChuanyunPlatform.openAutostartSettings();
+                      await ref.read(Preferences.autostartVisited.notifier).update(true);
+                    },
+                  ),
               ],
             ),
           MuseSection(
@@ -116,14 +85,12 @@ class SettingsPage extends HookConsumerWidget {
               MuseTile(
                 leading: const Icon(Icons.insights_rounded),
                 title: '连接信息',
-                subtitle: '本次流量、出口 IP、活动连接',
                 chevron: true,
                 onTap: () => context.goNamed('connections'),
               ),
               MuseTile(
                 leading: const Icon(Icons.tune_rounded),
                 title: '高级',
-                subtitle: 'TLS 分片（个别网络才需要）',
                 chevron: true,
                 onTap: () => context.goNamed('advanced'),
               ),
@@ -137,6 +104,34 @@ class SettingsPage extends HookConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Status at the end of a settings row: a green dot when on, an orange warning icon when
+/// something still needs doing, then the chevron.
+class MuseStatusTrailing extends StatelessWidget {
+  const MuseStatusTrailing({super.key, this.on = false, this.warning = false});
+
+  final bool on;
+  final bool warning;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (warning)
+          const Icon(Icons.error_rounded, color: Colors.orange, size: 20)
+        else if (on)
+          Container(
+            width: 9,
+            height: 9,
+            decoration: const BoxDecoration(color: Color(0xFF34C759), shape: BoxShape.circle),
+          ),
+        const SizedBox(width: 6),
+        Icon(Icons.chevron_right_rounded, color: MuseColors.secondaryText(context)),
+      ],
     );
   }
 }

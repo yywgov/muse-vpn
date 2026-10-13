@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:fpdart/fpdart.dart';
-import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -54,7 +53,6 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
 
   Future<Unit> selectActiveProfile(String id) async {
     loggy.debug('changing active profile to: [$id]');
-    await ref.read(hapticServiceProvider.notifier).lightImpact();
     return _profilesRepo.setAsActive(id).getOrElse((err) {
       loggy.warning('failed to set [$id] as active profile', err);
       throw err;

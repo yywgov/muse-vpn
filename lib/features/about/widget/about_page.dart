@@ -1,16 +1,20 @@
 // 穿云 - 设置 > 关于.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
+//
+// 1.1: 检查更新 downloads and installs the new version in the app; 复制版本信息 and the
+// Hiddify/GPL note are gone from here (the credit lives on the 开源许可 page).
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/diagnostics.dart';
+import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/gen/assets.gen.dart';
-import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class AboutPage extends HookConsumerWidget {
@@ -20,6 +24,44 @@ class AboutPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appInfo = ref.watch(appInfoProvider).requireValue;
     final theme = Theme.of(context);
+    final update = ref.watch(museUpdaterProvider);
+    final toast = ref.read(inAppNotificationControllerProvider);
+
+    Future<void> checkUpdate() async {
+      final updater = ref.read(museUpdaterProvider.notifier);
+      final MuseRelease? release;
+      try {
+        release = await updater.check();
+      } catch (_) {
+        toast.showErrorToast('检查更新失败，请稍后再试');
+        return;
+      }
+      if (release == null) {
+        toast.showSuccessToast('已是最新版本');
+        return;
+      }
+      final ok = await ref
+          .read(dialogNotifierProvider.notifier)
+          .showConfirmation(
+            title: '发现新版本 ${release.version}',
+            message: '下载后打开系统安装界面，安装后设置和订阅都会保留。',
+            positiveBtnTxt: '下载并安装',
+          );
+      if (!ok) return;
+      try {
+        final opened = await updater.downloadAndInstall(release);
+        if (!opened) toast.showInfoToast('请允许穿云「安装未知应用」，然后再点一次检查更新');
+      } catch (_) {
+        toast.showErrorToast('下载失败，请稍后再试');
+      }
+    }
+
+    final String? updateStatus = switch (update) {
+      MuseUpdateChecking() => '正在检查…',
+      MuseUpdateDownloading(:final progress) =>
+        progress == null ? '正在下载…' : '正在下载 ${(progress * 100).toStringAsFixed(0)}%',
+      MuseUpdateIdle() => null,
+    };
 
     return MuseScaffold(
       title: '关于',
@@ -44,28 +86,22 @@ class AboutPage extends HookConsumerWidget {
             ),
           ),
           MuseSection(
-            footer: '穿云基于开源项目 Hiddify 修改，以 GPLv3 许可发布，仅供学习交流，不得用于商业用途。',
             children: [
               MuseTile(
                 leading: const Icon(Icons.system_update_rounded),
                 title: '检查更新',
-                subtitle: '在 GitHub 发布页查看最新版本',
-                chevron: true,
-                onTap: () => UriUtils.tryLaunch(Uri.parse(Constants.githubReleasesUrl)),
+                subtitle: updateStatus,
+                trailing: update is MuseUpdateIdle
+                    ? null
+                    : const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                chevron: update is MuseUpdateIdle,
+                onTap: update is MuseUpdateIdle ? checkUpdate : null,
               ),
               MuseTile(
                 leading: const Icon(Icons.code_rounded),
                 title: '开源许可 · 源代码',
                 chevron: true,
-                onTap: () => UriUtils.tryLaunch(Uri.parse(Constants.githubUrl)),
-              ),
-              MuseTile(
-                leading: const Icon(Icons.copy_rounded),
-                title: '复制版本信息',
-                onTap: () async {
-                  await Clipboard.setData(ClipboardData(text: appInfo.format()));
-                  ref.read(inAppNotificationControllerProvider).showSuccessToast('已复制');
-                },
+                onTap: () => context.goNamed('openSource'),
               ),
             ],
           ),
