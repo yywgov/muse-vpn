@@ -9,6 +9,7 @@ import 'package:hiddify/core/logger/core_logger.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/log/model/log_level.dart' as config_log_level;
+import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper_stub.dart'
     if (dart.library.io) 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper.dart';
@@ -39,33 +40,101 @@ class HiddifyCoreService with InfraLogger {
 
   /// Whether [setup] has succeeded once in this engine; the core's gRPC servers then stay up.
   bool _ready = false;
+  bool get isReady => _ready;
 
   /// 穿云: the app came back to the foreground. On Android the core (and the VPN service)
   /// keeps running in the background, so nothing is set up again and no restart signal is
   /// sent: only a status listener that was lost is re-armed. Re-running setup used to replay
   /// the connection status (Disconnected → Connected), which vibrated and re-ran the connect
   /// animation, and set the core up again next to the running VPN service.
+  ///
+  /// 穿云 Windows 1.2.1: the same on desktop. The core runs inside this process and its gRPC
+  /// server stays up while the window is hidden/minimised, so restoring the window used to run
+  /// a full setup() (a new gRPC channel each time, a restart signal, and on any setup error a
+  /// pushed 未连接). Now: re-arm a lost status listener and re-sync the state once.
   Future<void> resume() async {
-    if (!_ready || !PlatformUtils.isAndroid) return init();
+    if (!_ready) return init();
+    if (!PlatformUtils.isAndroid && !PlatformUtils.isDesktop) return init();
     if (!subscriptions.containsKey("bgStatusListener")) {
       _statusRecoveries = 0;
       await startListeningStatus("bg", core.bgClient);
     }
+    if (PlatformUtils.isDesktop) await resyncStatus();
   }
 
   Future<void> init() async {
-    await setup()
-        .mapLeft((e) {
-          loggy.error(e);
-          if (PlatformUtils.isIOS) return;
-          statusController.add(const CoreStatus.stopped());
-          ref.read(inAppNotificationControllerProvider).showErrorToast(e);
-        })
-        .map((_) {
-          loggy.info("Hiddify-core setup done");
-          ref.read(coreRestartSignalProvider.notifier).restart();
-        })
-        .run();
+    final result = await setup().run();
+    await result.match(
+      (e) async {
+        loggy.error(e);
+        if (PlatformUtils.isIOS) return;
+        // 穿云: a setup error while the core still answers is not a disconnect
+        if (PlatformUtils.isDesktop && _ready && await ping()) {
+          loggy.warning("setup failed but the core answers, keeping the current state: $e");
+          return;
+        }
+        statusController.add(const CoreStatus.stopped());
+        ref.read(inAppNotificationControllerProvider).showErrorToast(e);
+      },
+      (_) async {
+        loggy.info("Hiddify-core setup done");
+        ref.read(coreRestartSignalProvider.notifier).restart();
+      },
+    );
+  }
+
+  /// 穿云 1.2.1: the core's own state, asked directly (the status listener sends the current
+  /// state first). Null when the core does not answer.
+  Future<CoreStatus?> queryCoreState({Duration timeout = const Duration(seconds: 3)}) async {
+    if (!core.isInitialized()) return null;
+    try {
+      final event = await core.bgClient
+          .coreInfoListener(Empty(), options: CallOptions(timeout: timeout))
+          .first
+          .timeout(timeout);
+      return CoreStatus.fromCoreInfo(event);
+    } catch (e) {
+      loggy.debug("core state query failed: $e");
+      return null;
+    }
+  }
+
+  /// 穿云 1.2.1: puts the core's real state on the status stream when the app shows another one
+  /// (a lost or late event). Returns the core's state, null when it does not answer.
+  Future<CoreStatus?> resyncStatus() async {
+    final real = await queryCoreState();
+    if (real == null) return null;
+    if (real.runtimeType != currentState.runtimeType) {
+      loggy.info("status re-sync: app showed ${currentState.runtimeType}, core is ${real.runtimeType}");
+      currentState = real;
+      statusController.add(real);
+    }
+    return real;
+  }
+
+  /// 穿云 1.2.1: re-arms the status listener when it was lost.
+  Future<void> ensureStatusListener() async {
+    if (!_ready || subscriptions.containsKey("bgStatusListener")) return;
+    _statusRecoveries = 0;
+    try {
+      await startListeningStatus("bg", core.bgClient);
+    } catch (e) {
+      loggy.warning("re-arming the status listener failed: $e");
+    }
+  }
+
+  /// Smoke tests only (CHUANYUN_SMOKE_CONTROL): the status stream breaks while the core runs.
+  Future<void> debugBreakStatusStream() async {
+    final sub = subscriptions.remove("bgStatusListener");
+    await sub?.cancel();
+    loggy.warning("smoke: status stream broken on purpose");
+    unawaited(_recoverStatus("bg"));
+  }
+
+  /// Smoke tests only (CHUANYUN_SMOKE_CONTROL): the core stops without the app asking for it.
+  Future<void> debugStopCoreBehindTheApp() async {
+    loggy.warning("smoke: stopping the core behind the app's back");
+    await core.bgClient.stop(Empty());
   }
 
   /// validates config by path and save it
@@ -152,6 +221,8 @@ class HiddifyCoreService with InfraLogger {
     return TaskEither(() async {
       statusController.add(currentState = const CoreStatus.starting());
       loggy.debug("starting");
+      // 穿云 Windows: remember the user's own proxy settings before sing-box replaces them
+      if (PlatformUtils.isWindows) await WindowsProxyGuard.saveBeforeConnect(ref.read(ConfigOptions.mixedPort));
       final background = await core.setupBackground(path, name);
       if (background != const CoreStatus.started()) {
         statusController.add(currentState = const CoreStatus.stopped());
@@ -194,6 +265,7 @@ class HiddifyCoreService with InfraLogger {
           );
 
           statusController.add(currentState);
+          if (PlatformUtils.isWindows) await WindowsProxyGuard.restore("连接失败");
 
           return left(
             currentState.getCoreAlert() ??
@@ -237,6 +309,8 @@ class HiddifyCoreService with InfraLogger {
       }
       if (!await core.stop()) {}
       statusController.add(currentState = const CoreStatus.stopped());
+      // 穿云 Windows: sing-box only blanks the system proxy; put the user's own settings back
+      if (PlatformUtils.isWindows) await WindowsProxyGuard.restore("断开");
       if (errMsg.isNotEmpty) return left(errMsg);
       return right(unit);
     });
@@ -257,7 +331,15 @@ class HiddifyCoreService with InfraLogger {
       } on GrpcError catch (e) {
         loggy.warning("hot reload failed, restarting: $e");
       }
-      return restart(path, name, disableMemoryLimit).run();
+      final restarted = await restart(path, name, disableMemoryLimit).run();
+      if (restarted.isRight() || !PlatformUtils.isDesktop) return restarted;
+      // 穿云 Windows 1.2.1: a restart right after the stop can lose the race for the mixed port
+      // (12334) or a rule-set download; one more try before giving up
+      loggy.warning("restart failed, retrying once in 2 s: ${restarted.getLeft().toNullable()}");
+      await Future<void>.delayed(const Duration(seconds: 2));
+      final again = await restart(path, name, disableMemoryLimit).run();
+      if (again.isLeft() && PlatformUtils.isWindows) await WindowsProxyGuard.restore("重启失败");
+      return again;
     });
   }
 
@@ -483,11 +565,15 @@ class HiddifyCoreService with InfraLogger {
     }
     _statusRecovering = true;
     try {
-      for (var attempt = 1; attempt <= 5; attempt++) {
+      // 穿云 Windows 1.2.1: on desktop the core runs in this process; whether it is alive is
+      // asked over gRPC (it used to be "false" here, so every end of the status stream turned
+      // into 未连接 after 300 ms while the tunnel kept running).
+      final attempts = PlatformUtils.isDesktop ? 8 : 5;
+      for (var attempt = 1; attempt <= attempts; attempt++) {
         await Future<void>.delayed(Duration(milliseconds: 300 * attempt));
         // re-armed meanwhile (connect, resume)
         if (subscriptions.containsKey("${key}StatusListener")) return;
-        final alive = PlatformUtils.isAndroid ? await core.isActiveBg() : false;
+        final alive = PlatformUtils.isAndroid ? await core.isActiveBg() : await ping(timeout: const Duration(seconds: 3));
         if (!alive) break;
         try {
           // the core sends its current state first, so the UI is right again at once
@@ -498,6 +584,18 @@ class HiddifyCoreService with InfraLogger {
         }
       }
       if (subscriptions.containsKey("${key}StatusListener")) return;
+      // desktop: only a core that really stopped (or stopped answering) is shown as 未连接
+      if (PlatformUtils.isDesktop) {
+        final real = await queryCoreState();
+        if (real != null && real is! CoreStopped) {
+          loggy.info("status stream lost but the core is ${real.runtimeType}; keeping it");
+          if (real.runtimeType != currentState.runtimeType) {
+            currentState = real;
+            statusController.add(real);
+          }
+          return;
+        }
+      }
       if (currentState is! CoreStopped) {
         loggy.info("core gRPC server is gone, reporting stopped");
         currentState = const CoreStatus.stopped();

@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/muse/desktop/connection_keeper.dart';
+import 'package:hiddify/features/muse/desktop/recovery.dart';
+import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:screen_retriever/screen_retriever.dart';
@@ -52,7 +56,7 @@ class WindowNotifier extends _$WindowNotifier with AppLogger {
     final position = ref.read(Preferences.windowPosition);
     final isWindowVisible = position != null && await checkWindowVisivility(position, size);
     loggy.debug("window state. position: ${isWindowVisible ? position : "centered"}");
-    final silentStart = ref.read(Preferences.silentStart);
+    final silentStart = ref.read(Preferences.silentStart) || MuseRecovery.relaunchedAfterCrash;
     loggy.debug("window state. silent start: ${silentStart ? "Enabled" : "Disabled"}");
 
     await windowManager.waitUntilReadyToShow(
@@ -99,6 +103,11 @@ class WindowNotifier extends _$WindowNotifier with AppLogger {
   Future<void> show({bool focus = true}) async {
     await windowManager.show();
     if (focus) await windowManager.focus();
+    // 穿云 1.2.1: the window coming back from the tray re-syncs the connection state (no setup)
+    if (Platform.isWindows) {
+      unawaited(ref.read(hiddifyCoreServiceProvider).resume().catchError((_) {}));
+      ref.read(museConnectionKeeperProvider)?.poke('window shown');
+    }
     if (Platform.isMacOS) {
       await windowManager.setSkipTaskbar(false);
     }

@@ -19,6 +19,9 @@ final museWatchdogRecoveringProvider = StateProvider<bool>((ref) => false);
 const museWatchdogInterval = Duration(seconds: 15);
 
 final museCoreWatchdogProvider = Provider<void>((ref) {
+  // Windows: the connection keeper (desktop/connection_keeper.dart) does this, keyed on the
+  // user's intent instead of the UI status
+  if (PlatformUtils.isWindows) return;
   if (!ref.watch(serviceRunningProvider)) return;
   final counter = MuseWatchdogCounter();
   var busy = false;

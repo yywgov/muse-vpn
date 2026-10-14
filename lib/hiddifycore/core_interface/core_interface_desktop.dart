@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:math';
@@ -54,6 +55,9 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
   }
 
   final port = 17078;
+
+  /// the one channel to the in-process core, kept for the life of the app
+  ClientChannel? _channel;
   static String generateRandomPassword(int length) {
     const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random();
@@ -69,51 +73,59 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
     // final err = errPtr2.cast<Utf8>().toDartString();
     // throw Exception('stop: $err');
     const channelOption = ChannelCredentials.insecure();
-    final helloClient = HelloClient(
-      ClientChannel(
-        '127.0.0.1',
-        port: port,
-        options: const ChannelOptions(credentials: channelOption),
-      ),
-      options: CallOptions(metadata: {"x-muse-token": secret}),
+    // 穿云 1.2.1: the hello channel is shut down after use, and a client that already talks to
+    // the running core is kept: setup() used to open a new ClientChannel on every call (every
+    // window restore) and never closed the old ones.
+    final helloChannel = ClientChannel(
+      '127.0.0.1',
+      port: port,
+      options: const ChannelOptions(credentials: channelOption),
     );
+    final helloClient = HelloClient(helloChannel, options: CallOptions(metadata: {"x-muse-token": secret}));
 
     try {
-      await helloClient.sayHello(HelloRequest(name: "test"));
-      loggy.info("core is already started!");
-    } catch (e) {
-      //core is not started yet
+      try {
+        await helloClient.sayHello(HelloRequest(name: "test"), options: CallOptions(timeout: const Duration(seconds: 3)));
+        loggy.info("core is already started!");
+      } catch (e) {
+        //core is not started yet
 
-      final errPtr = _box.setup(
-        directories.baseDir.path.toNativeUtf8().cast(),
-        directories.workingDir.path.toNativeUtf8().cast(),
-        directories.tempDir.path.toNativeUtf8().cast(),
-        SetupMode.GRPC_NORMAL_INSECURE.value,
-        "127.0.0.1:$port".toNativeUtf8().cast(),
-        secret.toNativeUtf8().cast(),
-        0,
-        debug ? 1 : 0,
-      );
-      final err = errPtr.cast<Utf8>().toDartString();
+        final errPtr = _box.setup(
+          directories.baseDir.path.toNativeUtf8().cast(),
+          directories.workingDir.path.toNativeUtf8().cast(),
+          directories.tempDir.path.toNativeUtf8().cast(),
+          SetupMode.GRPC_NORMAL_INSECURE.value,
+          "127.0.0.1:$port".toNativeUtf8().cast(),
+          secret.toNativeUtf8().cast(),
+          0,
+          debug ? 1 : 0,
+        );
+        final err = errPtr.cast<Utf8>().toDartString();
 
-      if (err.isNotEmpty) {
-        return err;
+        if (err.isNotEmpty) {
+          return err;
+        }
+        final res = await helloClient.sayHello(HelloRequest(name: "test"));
+        loggy.info(res.toString());
       }
-      final res = await helloClient.sayHello(HelloRequest(name: "test"));
-      loggy.info(res.toString());
+    } finally {
+      unawaited(helloChannel.shutdown().catchError((_) {}));
     }
-    bgClient = fgClient = CoreClient(
-      ClientChannel(
-        'localhost',
-        port: port,
-        options: const ChannelOptions(
-          credentials: ChannelCredentials.insecure(),
-          // credentials: ChannelCredentials.secure(
-          //   password: secret,
-          //   onBadCertificate: (certificate, host) => true,
-          // ),
-        ),
+    if (_channel != null) return "";
+    _channel = ClientChannel(
+      // 127.0.0.1, not localhost: the server listens on IPv4 loopback only
+      '127.0.0.1',
+      port: port,
+      options: const ChannelOptions(
+        credentials: ChannelCredentials.insecure(),
+        // credentials: ChannelCredentials.secure(
+        //   password: secret,
+        //   onBadCertificate: (certificate, host) => true,
+        // ),
       ),
+    );
+    bgClient = fgClient = CoreClient(
+      _channel!,
       options: CallOptions(metadata: {"x-muse-token": secret}),
     );
 

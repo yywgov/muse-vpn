@@ -76,6 +76,7 @@ jobs:
           Get-ChildItem $rel | Select-Object Name, Length
           if (-not (Test-Path "$rel\Chuanyun.exe")) { throw "Chuanyun.exe not found" }
           if (-not (Test-Path "$rel\hiddify-core.dll")) { throw "hiddify-core.dll not bundled" }
+          if (-not (Test-Path "$rel\ChuanyunGuard.exe")) { throw "ChuanyunGuard.exe not bundled" }
           New-Item -ItemType Directory -Path out -Force | Out-Null
           New-Item -ItemType Directory -Path pkg -Force | Out-Null
           Copy-Item -Recurse $rel pkg\Chuanyun
@@ -122,6 +123,16 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File tool\smoke\installer_smoke.ps1 -Setup out\Chuanyun-Windows-x64-Setup.exe -Out smoke -RepoDir .
 
+      # 1.2.1: connected in 系统代理 mode, then status stream lost / core stopped behind the app /
+      # process suspended (sleep) / tray hide+restore / killed / crash exit / killed with its guard
+      # -> reconnected, or the user's own proxy settings back and the internet working
+      - name: Smoke test - recovery (never leave the PC offline)
+        id: smoke_recovery
+        continue-on-error: true
+        timeout-minutes: 20
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tool\smoke\recovery_smoke.ps1 -AppDir build\windows\x64\runner\Release -Out smoke -RepoDir .
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -139,7 +150,8 @@ jobs:
 
       - name: Smoke gate
         run: |
-          echo "app=${{ steps.smoke_app.outcome }} core=${{ steps.smoke_core.outcome }} installer=${{ steps.smoke_installer.outcome }}"
+          echo "app=${{ steps.smoke_app.outcome }} core=${{ steps.smoke_core.outcome }} installer=${{ steps.smoke_installer.outcome }} recovery=${{ steps.smoke_recovery.outcome }}"
+          test "${{ steps.smoke_recovery.outcome }}" = success
           test "${{ steps.smoke_app.outcome }}" = success
           test "${{ steps.smoke_core.outcome }}" = success
           test "${{ steps.smoke_installer.outcome }}" = success

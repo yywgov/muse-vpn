@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +21,10 @@ import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/log/data/log_data_providers.dart';
 import 'package:hiddify/features/muse/data/windows_admin.dart';
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
+import 'package:hiddify/features/muse/desktop/recovery.dart';
+import 'package:hiddify/features/muse/desktop/smoke_control.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
@@ -31,6 +35,7 @@ import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hiddify/riverpod_observer.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async {
   if (!kIsWeb) {
@@ -124,18 +129,25 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
   if (PlatformUtils.isWindows) {
     // 穿云: TUN mode is only used while running as administrator
     await _safeInit("windows admin", WindowsAdmin.detect, timeout: 5000);
-    // a killed earlier run may have left 系统代理 pointing at its dead port
-    await _safeInit(
-      "stale system proxy",
-      () => WindowsProxyGuard.clearStale(container.read(ConfigOptions.mixedPort)),
-      timeout: 6000,
-    );
+    // 穿云 1.2.1: a killed earlier run may have left 系统代理 pointing at its dead port: the
+    // user's own settings are restored, then ChuanyunGuard.exe watches this process
+    await _safeInit("stale system proxy", () async {
+      final dirs = container.read(appDirectoriesProvider).requireValue;
+      final dataDir = p.join(dirs.workingDir.absolute.path, 'data');
+      await Directory(dataDir).create(recursive: true);
+      ChuanyunPlatform.desktopDataDir = dataDir;
+      if (MuseRecovery.relaunchedAfterCrash) {
+        await ChuanyunPlatform.recordDisconnect('穿云异常退出后由守护进程自动重启，恢复连接');
+      }
+      await WindowsProxyGuard.startUp(dataDir: dataDir, mixedPort: container.read(ConfigOptions.mixedPort));
+    }, timeout: 12000);
   }
 
   if (PlatformUtils.isDesktop) {
     await _safeInit("window controller", () => container.read(windowNotifierProvider.future));
 
-    final silentStart = container.read(Preferences.silentStart);
+    // relaunched by the guard after a crash: back into the tray, reconnect quietly
+    final silentStart = container.read(Preferences.silentStart) || MuseRecovery.relaunchedAfterCrash;
     Logger.bootstrap.debug("silent start [${silentStart ? "Enabled" : "Disabled"}]");
     if (!silentStart) {
       await _safeInit("show window", () => container.read(windowNotifierProvider.notifier).show(focus: false));
@@ -176,6 +188,9 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
         timeout: 5000,
       );
       await _safeInit("system tray", () => container.read(systemTrayNotifierProvider.future), timeout: 1000);
+      if (PlatformUtils.isWindows) {
+        await _safeInit("smoke control", () => MuseSmokeControl.startIfRequested(container));
+      }
     }
 
     if (PlatformUtils.isAndroid) {

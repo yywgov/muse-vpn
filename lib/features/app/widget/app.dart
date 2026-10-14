@@ -15,6 +15,7 @@ import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_based_routing_notifier.dart';
 import 'package:hiddify/features/connection/widget/connection_wrapper.dart';
 import 'package:hiddify/features/muse/home/auto_fastest.dart';
+import 'package:hiddify/features/muse/desktop/connection_keeper.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/subscription_alert.dart';
@@ -50,6 +51,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
   void onResume(WidgetRef ref) {
     // 穿云: only re-attach to the running core; never restart or replay the connection
     ref.read(hiddifyCoreServiceProvider).resume();
+    if (PlatformUtils.isWindows) ref.read(museConnectionKeeperProvider)?.poke('app resumed');
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (isOnPauseCalled && PlatformUtils.isAndroid) ref.invalidate(appBasedRoutingProvider);
@@ -71,6 +73,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     ref.listen(museNodeFailoverProvider, (_, _) {});
     ref.listen(museAutoFastestProvider, (_, _) {});
     ref.listen(museCoreWatchdogProvider, (_, _) {});
+    // 穿云 Windows 1.2.1: 连接守护 (auto-recovery, system proxy restore, wake from sleep)
+    ref.listen(museConnectionKeeperProvider, (_, _) {});
     if (PlatformUtils.isAndroid) ref.listen(museSubscriptionAlertProvider, (_, _) {});
     if (PlatformUtils.isDesktop) ref.listen(systemTrayNotifierProvider, (_, _) {});
 

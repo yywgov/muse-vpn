@@ -39,7 +39,9 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     ref.watch(coreRestartSignalProvider);
 
     yield* _connectionRepo.watchConnectionStatus().doOnData((event) {
-      if (event case Disconnected(connectionFailure: final _?) when PlatformUtils.isDesktop) {
+      // 穿云 Windows 1.2.1: a failure no longer drops the user's intent on Windows; the connection
+      // keeper retries with backoff and gives up (startedByUser = false) itself.
+      if (event case Disconnected(connectionFailure: final _?) when PlatformUtils.isDesktop && !PlatformUtils.isWindows) {
         Future.microtask(() => ref.read(Preferences.startedByUser.notifier).update(false));
       }
       // One call for every status buried failures at info, next to the ordinary
@@ -119,6 +121,39 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     }
   }
 
+  /// 穿云 1.2.1: when the app itself last stopped the core on purpose (button, tray, quit, a
+  /// profile removed, a run-mode switch). A stop shortly after that is not unexpected.
+  DateTime? lastIntentionalStopAt;
+
+  /// 穿云 Windows 1.2.1: the connection keeper's recovery: stop whatever is left of the core and
+  /// connect again with the active profile. True when the core reports started afterwards.
+  Future<bool> recoverConnection() async {
+    final profile = await ref.read(activeProfileProvider.future);
+    if (profile == null) return false;
+    await _connectionRepo.disconnect().run();
+    final res = await _connectionRepo.connect(profile, ref.read(Preferences.disableMemoryLimit)).run();
+    return res.match((err) {
+      loggy.warning("recovery connect failed", err);
+      return false;
+    }, (_) => true);
+  }
+
+  /// 穿云 1.2.1: 系统代理 ↔ TUN needs a real restart. It used to call toggleConnection twice; the
+  /// second call landed while the status was still 断开中 and was ignored ("debounce"), so
+  /// switching the run mode left 穿云 disconnected.
+  Future<void> restartForModeChange() async {
+    if (state case AsyncData(value: Connected())) {
+      lastIntentionalStopAt = DateTime.now();
+      await _connectionRepo.disconnect().run();
+      final deadline = DateTime.now().add(const Duration(seconds: 10));
+      while (DateTime.now().isBefore(deadline)) {
+        if (state case AsyncData(value: Disconnected())) break;
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
+      await _connect();
+    }
+  }
+
   /// 穿云 1.2 watchdog: the core stopped answering while connected. Restart it in place
   /// (reconnect); when that fails too, stop and start again.
   Future<void> restartAfterWatchdog() async {
@@ -182,6 +217,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   }
 
   Future<void> _disconnect() async {
+    lastIntentionalStopAt = DateTime.now();
     await _connectionRepo.disconnect().mapLeft((err) {
       loggy.warning("error disconnecting", err);
       ref
