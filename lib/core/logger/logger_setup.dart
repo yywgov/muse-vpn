@@ -171,6 +171,14 @@ void logMarkRun(String appVersion) {
   writeLogLine('---- run started $now  ·  $appVersion ${'-' * 20}');
 }
 
+/// A rare one-off marker that must reach app.log whatever the file threshold
+/// (e.g. the tray menu the Windows smoke test checks). Not for routine logging.
+void logMarkLine(String message) {
+  if (!isLogFileOpen) return;
+  final time = DateTime.now().toIso8601String().split('T')[1];
+  writeLogLine('$time [MARK] $message');
+}
+
 bool get fileEnabled => _fileSub != null;
 
 /// Detaches or reattaches the file sink without closing the file, so it can be

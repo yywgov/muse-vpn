@@ -290,6 +290,9 @@ class ProfileParser {
   /// throwing and failing the whole profile parse. Values may be decimals and
   /// are truncated to int. `upload` and `download` are required; a missing or
   /// `0` `total`/`expire` is treated as "unlimited".
+  @visibleForTesting
+  static SubscriptionInfo? parseSubscriptionInfo(String subInfoStr) => _parseSubscriptionInfo(subInfoStr);
+
   static SubscriptionInfo? _parseSubscriptionInfo(String subInfoStr) {
     final map = <String, int?>{};
     for (final segment in subInfoStr.split(';')) {

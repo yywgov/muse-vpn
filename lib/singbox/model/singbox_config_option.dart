@@ -47,6 +47,9 @@ class SingboxConfigOption with _$SingboxConfigOption {
     required bool setSystemProxy,
     // required bool bypassLan,
     required bool allowConnectionFromLan,
+    // 穿云 1.2 「我的宽带」: Hysteria2 up/down Mbps, 0 = automatic (BBR)
+    @Default(0) int hysteria2UpMbps,
+    @Default(0) int hysteria2DownMbps,
     required String lanSharingPassword,
     required bool enableFakeDns,
     // required bool enableDnsRouting,

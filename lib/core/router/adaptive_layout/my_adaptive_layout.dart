@@ -115,11 +115,15 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       Expanded(
                         child: DecoratedBox(
                           decoration: BoxDecoration(gradient: MuseColors.pageGradient(context)),
-                          child: Align(
-                            alignment: Alignment.topCenter,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: desktopContentMaxWidth),
-                              child: navigationShell,
+                          // 穿云 1.2: one thin scrollbar at the window's right edge, shown while
+                          // scrolling, instead of a thick always-on bar inside the page column
+                          child: MuseEdgeScrollbar(
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: desktopContentMaxWidth),
+                                child: navigationShell,
+                              ),
                             ),
                           ),
                         ),
@@ -162,4 +166,39 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       actions.map((e) => NavigationDestination(icon: Icon(e.icon), label: e.title)).toList();
   List<NavigationRailDestination> _navRailDests(List<ShellRouteAction> actions) =>
       actions.map((e) => NavigationRailDestination(icon: Icon(e.icon), label: Text(e.title))).toList();
+}
+
+/// 穿云 desktop: the scrollbar of whatever page is showing, drawn at the window's right edge.
+/// The pages' own scrollbars (which sat inside the centered column) are switched off; this one
+/// follows the page's vertical scroll notifications, is thin, and fades out when idle.
+class MuseEdgeScrollbar extends StatelessWidget {
+  const MuseEdgeScrollbar({super.key, required this.child});
+
+  final Widget child;
+
+  static const thickness = 4.0;
+
+  static bool _isPageScroll(ScrollNotification n) => n.depth == 0 && n.metrics.axis == Axis.vertical;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35);
+    return RawScrollbar(
+      thumbVisibility: false,
+      trackVisibility: false,
+      interactive: false,
+      thickness: thickness,
+      radius: const Radius.circular(thickness),
+      thumbColor: color,
+      crossAxisMargin: 2,
+      mainAxisMargin: 4,
+      fadeDuration: const Duration(milliseconds: 250),
+      timeToFade: const Duration(milliseconds: 900),
+      notificationPredicate: _isPageScroll,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: child,
+      ),
+    );
+  }
 }

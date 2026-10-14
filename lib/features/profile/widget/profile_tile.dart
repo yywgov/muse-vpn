@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/logic/subscription_bar.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
@@ -99,13 +100,20 @@ class ProfileTile extends HookConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _title(t, theme),
-              if (subInfo != null) ...[
-                const Gap(4),
-                RemainingTrafficIndicator(subInfo.ratio),
-                const Gap(4),
-                ProfileSubscriptionInfo(subInfo),
-                const Gap(4),
-              ],
+              // 穿云 1.2: remaining traffic / time as a thin bar, red when low or expiring — no text
+              if (subInfo != null)
+                if (museSubscriptionBar(subInfo) case final bar?) ...[
+                  const Gap(6),
+                  LinearProgressIndicator(
+                    key: const ValueKey('subscription_bar'),
+                    value: bar.remaining,
+                    minHeight: 4,
+                    borderRadius: BorderRadius.circular(4),
+                    color: bar.warn ? theme.colorScheme.error : theme.colorScheme.primary,
+                    backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                  ),
+                  const Gap(4),
+                ],
             ],
           ),
         ),
