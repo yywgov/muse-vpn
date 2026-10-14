@@ -2,6 +2,7 @@
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -145,12 +146,8 @@ class _AppListRow extends ConsumerWidget {
             },
         ],
       ),
-      // the logos stand for the first apps, so the text counts only the rest
-      title: Text(
-        apps.length > logoApps.length
-            ? appBasedRouting.moreApps(n: apps.length - logoApps.length)
-            : appBasedRouting.apps(n: apps.length),
-      ),
+      // 穿云 1.2.1: the total, not "另外 N 个" next to the logos
+      title: Text(museAppCountLabel(apps.length)),
     );
   }
 }
@@ -190,7 +187,10 @@ class _LogoStack extends StatelessWidget {
   }
 }
 
-class _AutoSelection extends ConsumerWidget {
+/// 「共 N 个 App」 under the per-app list.
+String museAppCountLabel(int n) => '共 $n 个 App';
+
+class _AutoSelection extends HookConsumerWidget {
   const _AutoSelection({required this.mode});
 
   final AppProxyMode mode;
@@ -205,6 +205,11 @@ class _AutoSelection extends ConsumerWidget {
     final isOn = ref.watch(Preferences.autoAppsSelectionRegion) != null;
     final lastUpdate = ref.watch(Preferences.autoAppsSelectionLastUpdate);
     final issue = ref.watch(autoSelectionIssueProvider);
+    // 穿云 1.2.1: no refresh button — opening the page brings a list older than a day up to date
+    useEffect(() {
+      Future.microtask(service.refreshIfStale);
+      return null;
+    }, const []);
 
     final Widget? status = switch (issue) {
       AutoSelectionResult.notFound => _AutoSelectionIssue(
@@ -226,7 +231,7 @@ class _AutoSelection extends ConsumerWidget {
       _ => null,
     };
 
-    // the switch already spaces the row, so the status is its subtitle and refresh sits beside it;
+    // the switch already spaces the row, so the status is its subtitle;
     // smaller text and padding keep the row 48 dp with or without the status, so turning it on moves nothing
     return ListTile(
       minTileHeight: 48,
@@ -238,12 +243,6 @@ class _AutoSelection extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (isOn)
-            IconButton(
-              tooltip: autoSelection.performNow,
-              onPressed: loading ? null : service.updateAutoSelection,
-              icon: const Icon(Icons.sync_rounded),
-            ),
           // the bar takes the switch's place and keeps its space, so nothing moves
           Stack(
             alignment: Alignment.center,

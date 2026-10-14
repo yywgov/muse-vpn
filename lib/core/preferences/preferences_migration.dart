@@ -16,6 +16,7 @@ class PreferencesMigration with InfraLogger {
       PreferencesVersion2Migration(sharedPreferences),
       MuseDefaultsV1Migration(sharedPreferences),
       MuseDefaultsV2Migration(sharedPreferences),
+      MuseRemovedFeaturesV121Migration(sharedPreferences),
     ];
 
     if (currentVersion == migrationSteps.length) {
@@ -156,5 +157,30 @@ class MuseDefaultsV2Migration extends PreferencesMigrationStep with InfraLogger 
   Future<void> migrate() async {
     loggy.debug("applying Muse VPN defaults v2 (gvisor)");
     await sharedPreferences.setString("tun-implementation", "gvisor");
+  }
+}
+
+/// 穿云 1.2.1: two features are gone. Their stored values must never act again after the update:
+/// - 「按网络自动开关」 (trusted Wi-Fi auto disconnect / reconnect): enabled flag, trusted Wi-Fi
+///   names and the "paused by 穿云" flag (the Android side also clears its copies and the
+///   system network watcher at start-up, see Application.kt);
+/// - 「我的宽带」 (Hysteria2 up/down Mbps from 1.2.0): Hysteria2 is automatic again.
+class MuseRemovedFeaturesV121Migration extends PreferencesMigrationStep with InfraLogger {
+  MuseRemovedFeaturesV121Migration(super.sharedPreferences);
+
+  static const removedKeys = [
+    "net_auto_enabled",
+    "net_trusted_ssids",
+    "net_auto_paused",
+    "hysteria2-up-mbps",
+    "hysteria2-down-mbps",
+  ];
+
+  @override
+  Future<void> migrate() async {
+    loggy.debug("removing the 1.2.0 按网络自动开关 / 我的宽带 preferences");
+    for (final key in removedKeys) {
+      await sharedPreferences.remove(key);
+    }
   }
 }

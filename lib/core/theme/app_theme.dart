@@ -1,7 +1,26 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+
+/// 穿云 1.2.1: status / navigation bar icons that contrast with the page: dark icons on the light
+/// theme, light icons on the dark and true-black themes. Every app bar (AppBarTheme) and the app
+/// root use it, so it follows a theme change at once and no page falls back to the AppBar's
+/// guess from a transparent background (which picked white icons on the light theme).
+SystemUiOverlayStyle museSystemOverlayStyle(Brightness themeBrightness) {
+  final dark = themeBrightness == Brightness.dark;
+  return SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: dark ? Brightness.light : Brightness.dark, // Android
+    statusBarBrightness: dark ? Brightness.dark : Brightness.light, // iOS
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarContrastEnforced: false,
+    systemStatusBarContrastEnforced: false,
+    systemNavigationBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+  );
+}
 
 class AppTheme {
   AppTheme(this.mode, this.fontFamily);
@@ -24,6 +43,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: const Color(0xFFF3F6FB),
+      appBarTheme: AppBarTheme(systemOverlayStyle: museSystemOverlayStyle(Brightness.light)),
       fontFamily: fontFamily,
       pageTransitionsTheme: _transitions,
       extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
@@ -45,6 +65,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: mode.trueBlack ? Colors.black : const Color(0xFF0E1A3A),
+      appBarTheme: AppBarTheme(systemOverlayStyle: museSystemOverlayStyle(Brightness.dark)),
       fontFamily: fontFamily,
       pageTransitionsTheme: _transitions,
       extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},

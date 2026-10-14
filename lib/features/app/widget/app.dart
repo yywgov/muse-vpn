@@ -102,18 +102,9 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                   return AccessibilityTools(checkFontOverflows: true, child: child);
                 }
                 return AnnotatedRegion<SystemUiOverlayStyle>(
-                  // 穿云: edge-to-edge, the pages draw behind transparent system bars
-                  value: SystemUiOverlayStyle(
-                    statusBarColor: Colors.transparent,
-                    statusBarIconBrightness: theme.brightness == Brightness.dark
-                        ? Brightness.light
-                        : Brightness.dark,
-                    systemNavigationBarColor: Colors.transparent,
-                    systemNavigationBarContrastEnforced: false,
-                    systemNavigationBarIconBrightness: theme.brightness == Brightness.dark
-                        ? Brightness.light
-                        : Brightness.dark,
-                  ),
+                  // 穿云: edge-to-edge, the pages draw behind transparent system bars; icons follow
+                  // the theme (1.2.1: also set on every app bar, see museSystemOverlayStyle)
+                  value: museSystemOverlayStyle(theme.brightness),
                   child: child,
                 );
               },

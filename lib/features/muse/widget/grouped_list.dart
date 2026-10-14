@@ -2,6 +2,8 @@
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/theme/app_theme.dart';
+import 'package:hiddify/features/muse/logic/latency.dart';
 
 /// Brand colours, adapted for light and dark.
 abstract final class MuseColors {
@@ -67,13 +69,14 @@ abstract final class MuseColors {
   static Color separator(BuildContext context) =>
       _dark(context) ? const Color(0x14FFFFFF) : const Color(0xFFE5E7EB);
 
-  /// Latency colour: green under 100 ms, yellow under 200 ms, red above (grey when unknown).
-  static Color delay(BuildContext context, int delay) {
-    if (delay <= 0) return secondaryText(context);
-    if (delay < 100) return const Color(0xFF22C55E);
-    if (delay < 200) return const Color(0xFFEAB308);
-    return const Color(0xFFEF4444);
-  }
+  /// Latency colour (穿云 1.2.1, see museLatencyLevel): green < 300 ms, yellow 300–600 ms,
+  /// red > 600 ms or timeout, grey while not tested yet.
+  static Color delay(BuildContext context, int delay) => switch (museLatencyLevel(delay)) {
+    MuseLatencyLevel.good => const Color(0xFF22C55E),
+    MuseLatencyLevel.fair => const Color(0xFFEAB308),
+    MuseLatencyLevel.bad => const Color(0xFFEF4444),
+    MuseLatencyLevel.unknown => secondaryText(context),
+  };
 }
 
 /// A page with the brand gradient behind a transparent app bar.
@@ -96,6 +99,8 @@ class MuseScaffold extends StatelessWidget {
           backgroundColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
           scrolledUnderElevation: 0,
+          // 1.2.1: never guess the status bar icons from the transparent background
+          systemOverlayStyle: museSystemOverlayStyle(Theme.of(context).brightness),
           leading: leading,
           title: titleWidget ?? (title == null ? null : Text(title!)),
           actions: actions,
