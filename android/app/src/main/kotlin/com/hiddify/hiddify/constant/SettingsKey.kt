@@ -20,6 +20,7 @@ object SettingsKey {
     // 穿云 privacy / automation (written by the Flutter side, read here)
     const val HIDE_NOTIFICATION = "${KEY_PREFIX}hide_notification"
     const val EXCLUDE_FROM_RECENTS = "${KEY_PREFIX}exclude_from_recents"
+    // 穿云 1.2.1: 按网络自动开关 removed; these keys are only deleted (RemovedFeatures)
     const val NET_AUTO_ENABLED = "${KEY_PREFIX}net_auto_enabled"
     const val NET_TRUSTED_SSIDS = "${KEY_PREFIX}net_trusted_ssids"
     const val NET_AUTO_PAUSED = "${KEY_PREFIX}net_auto_paused"

@@ -1,0 +1,114 @@
+name: 穿云 Android e2e
+
+# 穿云 1.2.1: the real app on an Android 15 emulator — real core, real VPN service (gVisor TUN),
+# SOCKS test nodes on the runner. Screenshots of every main page in the light and true-black
+# themes (status bar included) are checked for visible status bar icons, and the speeds shown
+# while another app's traffic goes through the tunnel must not stay 0. Artifact: Chuanyun-e2e.
+on:
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.38.5'
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo apt-get clean
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: subosito/flutter-action@v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-e2e-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      - name: Install deps
+        run: |
+          make android-install-deps
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+
+      - name: Prepare (codegen + prebuilt core)
+        run: make android-prepare
+
+      - name: Build e2e APK (debug, x86_64, driver target)
+        env:
+          MUSE_E2E_ABI: x86_64
+        run: flutter build apk --debug --target test_driver/muse_e2e.dart --target-platform android-x64
+
+      # the emulator runner downloads the image once; Google's mirror sometimes hands out a
+      # broken zip ("unknown archive"), so fetch it here with retries
+      - name: System image (with retries)
+        run: |
+          for i in 1 2 3 4; do
+            yes | sdkmanager --install "system-images;android-35;google_apis;x86_64" "emulator" > /tmp/sdk.log 2>&1 && break
+            tail -3 /tmp/sdk.log; echo "retry $i"; sleep 20
+          done
+          ls $ANDROID_SDK_ROOT/system-images/android-35/google_apis/x86_64 | head
+
+      - name: SOCKS test nodes
+        run: |
+          pip install --quiet pillow
+          nohup python3 tool/emulator/socks_nodes.py > socks.log 2>&1 &
+          sleep 2; cat socks.log
+
+      - name: Emulator run
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6000M
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          disable-animations: true
+          script: bash tool/emulator/run_e2e.sh
+
+      - name: Collect
+        if: always()
+        run: |
+          mkdir -p out/e2e; cp socks.log out/e2e/ 2>/dev/null || true
+          cat out/e2e/results.json 2>/dev/null || true
+          cat out/e2e/status_bar_check.txt 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Chuanyun-e2e
+          path: out/e2e
+          retention-days: 14

@@ -74,7 +74,8 @@ void main() {
       expect(museGroupKind(type: 'Balancer', name: 'lowest', selectedDisplay: 'PPFlight-Direct'), '自动最快');
       expect(museGroupKind(type: 'Balancer', name: 'balance', selectedDisplay: 'round-robin'), '负载均衡');
       expect(museGroupSubtitle(type: 'Balancer', name: 'lowest', selectedDisplay: 'PPFlight-Direct'), 'PPFlight-Direct');
-      expect(museGroupSubtitle(type: 'Balancer', name: 'balance', selectedDisplay: 'round-robin'), '负载均衡 · 轮询');
+      expect(museGroupSubtitle(type: 'Balancer', name: 'balance', selectedDisplay: 'round-robin'), '');
+      expect(museGroupSubtitle(type: 'Balancer', name: 'balance', selectedDisplay: 'round-robin', nodeCount: 12), '12 个节点');
       expect(museGroupSubtitle(type: 'Selector', name: 'select', selectedDisplay: '香港 01'), '手动选择 → 香港 01');
     });
 

@@ -46,14 +46,39 @@ class MuseHomePage extends HookConsumerWidget {
         ),
         const SizedBox(width: 4),
       ],
-      body: MuseGroupedBody(
-        padding: const EdgeInsets.only(bottom: 32),
-        children: [
-          const MuseClipboardImportBanner(),
-          const _ConnectSection(),
-          const _RouteModeSelector(),
-          if (hasProfile) const _NodesSection() else const _EmptyProfileSection(),
-        ],
+      // 1.2.1: the connect button and its status stay put above the list, so scrolling the
+      // nodes never slides 「已连接 · 计时」 under the title bar and cuts it in half; the list
+      // fades out at its top edge instead of ending in a hard line.
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Column(
+            children: [
+              const _ConnectSection(),
+              Expanded(
+                child: ShaderMask(
+                  key: const ValueKey('home_node_list'),
+                  shaderCallback: (rect) => const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black],
+                    stops: [0, 0.03],
+                  ).createShader(rect),
+                  blendMode: BlendMode.dstIn,
+                  child: ListView(
+                    padding: const EdgeInsets.only(top: 4, bottom: 24),
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                    children: [
+                      const MuseClipboardImportBanner(),
+                      const _RouteModeSelector(),
+                      if (hasProfile) const _NodesSection() else const _EmptyProfileSection(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -160,11 +185,11 @@ class _ConnectSection extends HookConsumerWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      key: const ValueKey('home_connect_section'),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Column(
         children: [
           _ConnectButton(connected: connected, busy: busy, onTap: busy ? null : toggle),
-          const SizedBox(height: 4),
           Text.rich(
             TextSpan(
               children: [
@@ -195,8 +220,8 @@ class _ConnectSection extends HookConsumerWidget {
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: 4),
           Text(
+            key: const ValueKey('home_speed_text'),
             // empty while disconnected: keeps the button from jumping when the speeds appear
             connected ? '↑ ${stats.uplink.toInt().speed()}   ↓ ${stats.downlink.toInt().speed()}' : '',
             style: theme.textTheme.bodyMedium?.copyWith(
@@ -265,7 +290,9 @@ class _ConnectButton extends HookWidget {
       return null;
     }, [connected]);
 
-    const size = 168.0;
+    // 1.2.1: 112 dp (was 168): two to three more node rows fit on the first screen, and the
+    // button is still a large, easy target
+    const size = 112.0;
     final active = connected || busy;
     final off = MuseColors.isTrueBlack(context) ? const Color(0xFF1C1C1C) : (dark ? const Color(0xFF1E2A4D) : const Color(0xFFDDE5F4));
     final glyphColor = active ? Colors.white : (dark ? const Color(0xFF8A94B3) : const Color(0xFF7B8AA8));
@@ -280,8 +307,8 @@ class _ConnectButton extends HookWidget {
       label: connected ? '断开' : '连接',
       child: RepaintBoundary(
         child: SizedBox(
-          width: size + 48,
-          height: size + 48,
+          width: size + 32,
+          height: size + 32,
           child: TweenAnimationBuilder<double>(
             tween: Tween(end: active ? 1 : 0),
             duration: const Duration(milliseconds: 260),
@@ -313,8 +340,8 @@ class _ConnectButton extends HookWidget {
                           if (glowAlpha > 0.01)
                             BoxShadow(
                               color: MuseColors.brand.withValues(alpha: glowAlpha),
-                              blurRadius: 64,
-                              spreadRadius: 10,
+                              blurRadius: 40,
+                              spreadRadius: 6,
                             ),
                         ],
                       ),
@@ -337,8 +364,8 @@ class _ConnectButton extends HookWidget {
                     duration: const Duration(milliseconds: 200),
                     child: Assets.images.glyph.svg(
                       key: ValueKey(glyphColor),
-                      width: 92,
-                      height: 92,
+                      width: 62,
+                      height: 62,
                       colorFilter: ColorFilter.mode(glyphColor, BlendMode.srcIn),
                     ),
                   ),
@@ -364,7 +391,7 @@ class _ConnectRingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     if (spin != null) {
-      final rect = Rect.fromCircle(center: center, radius: radius + 10);
+      final rect = Rect.fromCircle(center: center, radius: radius + 8);
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3
@@ -381,7 +408,7 @@ class _ConnectRingPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2 + 4 * (1 - t)
         ..color = MuseColors.brandLight.withValues(alpha: 0.55 * (1 - t));
-      canvas.drawCircle(center, radius + 4 + 20 * t, paint);
+      canvas.drawCircle(center, radius + 3 + 12 * t, paint);
     }
   }
 
@@ -398,11 +425,11 @@ class _RouteModeSelector extends ConsumerWidget {
     final theme = Theme.of(context);
     final mode = ref.watch(ConfigOptions.museRouteMode);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 2),
       child: Column(
         children: [
           Container(
-            height: 48,
+            height: 42,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(color: MuseColors.card(context), borderRadius: BorderRadius.circular(24)),
             child: Row(
@@ -471,7 +498,7 @@ class _NodesSection extends HookConsumerWidget {
     final testing = useState(false);
 
     Widget header(String text, {Widget? trailing}) => Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 12, 4),
+      padding: const EdgeInsets.fromLTRB(24, 6, 12, 0),
       child: Row(
         children: [
           Expanded(
@@ -561,6 +588,7 @@ class _NodesSection extends HookConsumerWidget {
             key: ValueKey(proxy.tag),
             proxy: proxy,
             since: since,
+            nodeCount: group.items.where((e) => !e.isGroup).length,
             selected: group.selected == proxy.tag,
             onTap: () async {
               try {
@@ -594,12 +622,16 @@ class _NodeCard extends StatelessWidget {
     super.key,
     required this.proxy,
     required this.since,
+    required this.nodeCount,
     required this.selected,
     required this.onTap,
   });
 
   final OutboundInfo proxy;
   final DateTime? since;
+
+  /// nodes (not groups) in the main group: a 负载均衡 group spreads over these
+  final int nodeCount;
   final bool selected;
   final VoidCallback onTap;
 
@@ -622,7 +654,7 @@ class _NodeCard extends StatelessWidget {
       delayColor = MuseColors.delay(context, delay);
     } else {
       delayText = '超时';
-      delayColor = MuseColors.delay(context, 99999);
+      delayColor = MuseColors.delay(context, ConnectionConst.maxDelay);
     }
     final fullName = proxy.tagDisplay.isNotEmpty ? proxy.tagDisplay : proxy.tag;
     final rawName = proxy.isGroup ? fullName.split(' → ').first.trim() : fullName;
@@ -630,12 +662,26 @@ class _NodeCard extends StatelessWidget {
         ? museGroupName(rawName)
         : rawName;
     final subtitle = proxy.isGroup
-        ? museGroupSubtitle(type: proxy.type, name: rawName, selectedDisplay: proxy.groupSelectedTagDisplay)
-        : museProtocolName(proxy.type);
+        ? museGroupSubtitle(
+            type: proxy.type,
+            name: rawName,
+            selectedDisplay: proxy.groupSelectedTagDisplay,
+            nodeCount: nodeCount,
+          )
+        : museProtocolName(proxy.type); // protocol names stay (user wants them)
+    final groupIcon = proxy.isGroup
+        ? switch (museGroupIconKind(type: proxy.type, name: rawName, selectedDisplay: proxy.groupSelectedTagDisplay)) {
+            MuseGroupIcon.autoFastest => Icons.bolt_rounded,
+            MuseGroupIcon.loadBalance => Icons.balance_rounded,
+            MuseGroupIcon.manual => Icons.touch_app_rounded,
+            MuseGroupIcon.fallback => Icons.alt_route_rounded,
+            MuseGroupIcon.other => Icons.folder_rounded,
+          }
+        : Icons.public_rounded;
     final flag = proxy.isGroup ? null : museFlagEmoji(name);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       child: Material(
         color: selected ? MuseColors.selectedCard(context) : MuseColors.card(context),
         shape: RoundedRectangleBorder(
@@ -646,12 +692,12 @@ class _NodeCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             child: Row(
               children: [
                 Container(
-                  width: 34,
-                  height: 34,
+                  width: 32,
+                  height: 32,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: MuseColors.brand.withValues(alpha: 0.14),
@@ -660,7 +706,8 @@ class _NodeCard extends StatelessWidget {
                   child: flag != null
                       ? Text(flag, style: const TextStyle(fontSize: 20, height: 1.1))
                       : Icon(
-                          proxy.isGroup ? Icons.bolt_rounded : Icons.public_rounded,
+                          groupIcon,
+                          key: ValueKey('group_icon_${groupIcon.codePoint}'),
                           size: 18,
                           color: MuseColors.brandLight,
                         ),

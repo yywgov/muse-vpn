@@ -29,11 +29,9 @@ class Application : Application() {
             addDataScheme("package")
         })
 
-        // 穿云: keep the 按网络自动开关 watcher registered (no-op when the feature is off)
-        try {
-            com.hiddify.hiddify.bg.NetworkAuto.apply(this)
-        } catch (_: Exception) {
-        }
+        // 穿云 1.2.1: 按网络自动开关 was removed — clear what 1.2.0 left behind (prefs, the system
+        // network watcher, its notification) so an update can never disconnect anyone by itself.
+        com.hiddify.hiddify.bg.RemovedFeatures.cleanUp(this)
     }
 
     companion object {

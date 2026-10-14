@@ -24,7 +24,6 @@ class SettingsPage extends HookConsumerWidget {
     final batteryIgnored = android ? ref.watch(batteryOptimizationNotifierProvider).valueOrNull : null;
     final autostartVisited = ref.watch(Preferences.autostartVisited);
     final perAppOn = ref.watch(Preferences.perAppProxyModeInUse) != null;
-    final netAutoOn = ref.watch(Preferences.netAutoEnabled);
     final needsBattery = android && batteryIgnored == false;
     final needsAutostart = android && !autostartVisited;
 
@@ -43,12 +42,6 @@ class SettingsPage extends HookConsumerWidget {
                   title: '分应用代理',
                   trailing: MuseStatusTrailing(on: perAppOn),
                   onTap: () => context.goNamed('perAppProxy'),
-                ),
-                MuseTile(
-                  leading: const Icon(Icons.wifi_rounded),
-                  title: '按网络自动开关',
-                  trailing: MuseStatusTrailing(on: netAutoOn),
-                  onTap: () => context.goNamed('networkAuto'),
                 ),
               ],
             ),

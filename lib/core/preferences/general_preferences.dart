@@ -16,9 +16,7 @@ abstract class Preferences {
   static final hideNotification = PreferencesNotifier.create<bool, bool>("hide_notification", false);
   static final excludeFromRecents = PreferencesNotifier.create<bool, bool>("exclude_from_recents", false);
 
-  // 穿云 按网络自动开关: trusted Wi-Fi names are kept one per line (read by the Android side)
-  static final netAutoEnabled = PreferencesNotifier.create<bool, bool>("net_auto_enabled", false);
-  static final netTrustedSsids = PreferencesNotifier.create<String, String>("net_trusted_ssids", "");
+  // 穿云 1.2.1: 按网络自动开关 removed (its keys are deleted by MuseRemovedFeaturesV121Migration)
 
   // 穿云: switch the main group to 自动最快 when the hand-picked node stops answering (always on since 1.1)
   static final nodeFailover = PreferencesNotifier.create<bool, bool>("node_failover", true, overrideValue: true);

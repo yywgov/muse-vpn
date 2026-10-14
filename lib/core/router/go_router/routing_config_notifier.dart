@@ -14,7 +14,6 @@ import 'package:hiddify/features/muse/config/muse_config_page.dart';
 import 'package:hiddify/features/muse/data/muse_data_page.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart';
 import 'package:hiddify/features/muse/settings/advanced_page.dart';
-import 'package:hiddify/features/muse/settings/network_auto_page.dart';
 import 'package:hiddify/features/muse/settings/per_app_proxy_page.dart';
 import 'package:hiddify/features/muse/settings/privacy_page.dart';
 import 'package:hiddify/features/profile/details/profile_details_page.dart';
@@ -188,7 +187,6 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       (_) => const PerAppProxyPage(),
                       routes: [_slide('appList', 'app-list', (_) => const AppListPage())],
                     ),
-                    _slide('networkAuto', 'network-auto', (_) => const NetworkAutoPage()),
                     _slide('privacy', 'privacy', (_) => const PrivacyPage()),
                     _slide(
                       'advanced',

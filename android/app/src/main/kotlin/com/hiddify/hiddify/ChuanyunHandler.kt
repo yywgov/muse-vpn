@@ -1,25 +1,20 @@
 package com.hiddify.hiddify
 
-// 穿云: platform bits for the privacy, keep-alive and 按网络自动开关 settings.
+// 穿云: platform bits for the privacy and keep-alive settings (1.2.1: 按网络自动开关 removed).
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
-import android.Manifest
 import android.app.Activity
 import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
-import androidx.core.app.ActivityCompat
-import androidx.core.location.LocationManagerCompat
 import com.hiddify.hiddify.bg.ChuanyunAlerts
 import com.hiddify.hiddify.bg.DisconnectLog
 import androidx.core.content.FileProvider
 import java.io.File
-import com.hiddify.hiddify.bg.NetworkAuto
 import android.os.PowerManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -33,7 +28,6 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
 
     companion object {
         const val channelName = "com.chuanyun.app/system"
-        private const val LOCATION_REQUEST = 4711
 
         fun launcherAlias(context: Context) = ComponentName(context.packageName, "com.hiddify.hiddify.LauncherAlias")
 
@@ -54,7 +48,6 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
     private var channel: MethodChannel? = null
     private var activity: Activity? = null
     private var binding: ActivityPluginBinding? = null
-    private var permissionResult: MethodChannel.Result? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, channelName)
@@ -87,13 +80,7 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
-    ): Boolean {
-        if (requestCode != LOCATION_REQUEST) return false
-        val granted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-        permissionResult?.success(granted)
-        permissionResult = null
-        return true
-    }
+    ): Boolean = false
 
     private val context: Context get() = activity ?: Application.application
 
@@ -184,47 +171,6 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
 
                 "record_disconnect" -> {
                     DisconnectLog.record(call.argument<String>("reason") ?: "")
-                    result.success(true)
-                }
-
-                "get_wifi_ssid" -> result.success(NetworkAuto.currentSsid(context))
-
-                "location_status" -> {
-                    val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-                    result.success(
-                        mapOf(
-                            "granted" to NetworkAuto.hasLocationPermission(context),
-                            "background" to NetworkAuto.hasBackgroundLocationPermission(context),
-                            "enabled" to (lm != null && LocationManagerCompat.isLocationEnabled(lm)),
-                        )
-                    )
-                }
-
-                "request_location_permission" -> {
-                    val act = activity
-                    if (act == null) {
-                        result.success(false)
-                        return
-                    }
-                    if (NetworkAuto.hasLocationPermission(act)) {
-                        result.success(true)
-                        return
-                    }
-                    permissionResult?.success(false)
-                    permissionResult = result
-                    ActivityCompat.requestPermissions(
-                        act,
-                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                        LOCATION_REQUEST,
-                    )
-                }
-
-                "open_location_settings" ->
-                    result.success(startFirst(listOf(Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))))
-
-                "apply_network_auto" -> {
-                    NetworkAuto.apply(context.applicationContext)
-                    NetworkAuto.evaluate(context.applicationContext)
                     result.success(true)
                 }
 

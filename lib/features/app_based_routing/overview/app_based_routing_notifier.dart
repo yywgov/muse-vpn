@@ -98,6 +98,10 @@ class AppBasedRouting extends _$AppBasedRouting with AppLogger {
     if (mode != null) await _loading(() => _applyAutoSelection(mode));
   }
 
+  /// 穿云 1.2.1: the list updates by itself (daily, at start-up, and when the page opens and the
+  /// last update is older than a day); there is no manual refresh button any more.
+  Future<void> refreshIfStale() => _autoSelectionUpdate();
+
   /// The new region's list isn't applied by itself: auto selection turns off, as with its switch.
   Future<void> _onRegionChanged() async {
     ref.read(autoSelectionIssueProvider.notifier).update(null);

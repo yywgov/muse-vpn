@@ -197,9 +197,6 @@ class BoxService(
             DisconnectLog.record("VPN 服务已启动")
             // 穿云: real connect time for the 首页 timer (survives app/engine restarts)
             Settings.connectedSince = System.currentTimeMillis()
-            // 穿云: a (re)connect ends any 按网络自动开关 pause
-            Settings.netAutoPaused = false
-            NetworkAuto.cancelNotification()
             ChuanyunAlerts.cancel(ChuanyunAlerts.ID_DISCONNECTED)
 
             if (Settings.startCoreAfterStartingService){
@@ -299,9 +296,22 @@ class BoxService(
         watchdogJob = null
     }
 
+    /** Whether a non-VPN network with internet access is up right now. */
+    private fun hasUsableNetwork(): Boolean {
+        val cm = Application.connectivity
+        @Suppress("DEPRECATION")
+        for (network in cm.allNetworks) {
+            val caps = cm.getNetworkCapabilities(network) ?: continue
+            if (caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)
+            ) return true
+        }
+        return false
+    }
+
     private suspend fun waitForNetwork(maxMillis: Long) {
         val until = System.currentTimeMillis() + maxMillis
-        while (System.currentTimeMillis() < until && !NetworkAuto.hasUsableNetworkNow()) {
+        while (System.currentTimeMillis() < until && !hasUsableNetwork()) {
             delay(1_000)
         }
     }
@@ -362,10 +372,6 @@ class BoxService(
     }
 
     private fun stopService() {
-        // 穿云: a stop the user asked for cancels the 按网络自动开关 pause (no auto reconnect)
-        val byNetworkAuto = NetworkAuto.autoStopping
-        NetworkAuto.autoStopping = false
-        if (!byNetworkAuto) Settings.netAutoPaused = false
         if (status.value == Status.Stopped) return
         status.value = Status.Stopping
         stopWatchdog()

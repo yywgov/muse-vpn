@@ -9,10 +9,8 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/muse/logic/failover_tracker.dart';
 import 'package:hiddify/features/muse/logic/subscription_bar.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
-import 'package:hiddify/features/muse/settings/advanced_page.dart';
 import 'package:hiddify/features/profile/data/profile_parser.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/system_tray/notifier/system_tray_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -92,22 +90,6 @@ void main() {
     });
     test('direct DNS stays 223.5.5.5', () {
       expect(src, contains("directDnsAddress: 'udp://223.5.5.5'"));
-    });
-  });
-
-  group('hysteria2 bandwidth', () {
-    test('blank or invalid = automatic', () {
-      expect(museParseBandwidth(''), 0);
-      expect(museParseBandwidth('abc'), 0);
-      expect(museParseBandwidth('0'), 0);
-      expect(museParseBandwidth('999999'), 0);
-      expect(museParseBandwidth(' 100 '), 100);
-      expect(ConfigOptions.museBandwidth(-5), 0);
-    });
-    test('label', () {
-      expect(museBandwidthLabel(0, 0), '自动');
-      expect(museBandwidthLabel(30, 200), '↑30 ↓200');
-      expect(museBandwidthLabel(0, 200), '↑自动 ↓200');
     });
   });
 

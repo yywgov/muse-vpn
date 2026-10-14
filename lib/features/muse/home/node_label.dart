@@ -141,19 +141,31 @@ String? museGroupKind({required String type, required String name, String? selec
 /// Display name for a group row/title: common English names become Chinese, user names stay.
 String museGroupName(String name) => museKnownGroupName(name) ?? name;
 
-/// Subtitle of a group row on the 首页: the node 自动最快 picked (just its name), 「负载均衡 · 轮询」
-/// for a balancer, 「手动选择 → 节点」 for a selector.
-String museGroupSubtitle({required String type, required String name, String? selectedDisplay}) {
+/// Subtitle of a group row on the 首页: the node 自动最快 picked (just its name), the node count
+/// for a balancer (1.2.1: 「负载均衡 · 轮询」 only repeated the row title), 「手动选择 → 节点」
+/// for a selector.
+String museGroupSubtitle({required String type, required String name, String? selectedDisplay, int? nodeCount}) {
   final kind = museGroupKind(type: type, name: name, selectedDisplay: selectedDisplay) ?? '分组';
   final sel = selectedDisplay?.trim() ?? '';
-  final strategy = museBalanceStrategyName(sel);
-  if (kind == '负载均衡') return strategy != null ? '负载均衡 · $strategy' : '负载均衡';
+  if (kind == '负载均衡') return nodeCount != null && nodeCount > 0 ? '$nodeCount 个节点' : '';
   if (sel.isEmpty || sel.toLowerCase() == 'lowest-delay') return kind;
   final node = museKnownGroupName(sel) ?? sel;
   // 1.1: 「自动最快 → 节点」 repeated the row title; only the node is shown
   if (kind == '自动最快') return node;
   return '$kind → $node';
 }
+
+/// 1.2.1: each group kind has its own icon (负载均衡 used to share 自动最快's lightning).
+enum MuseGroupIcon { autoFastest, loadBalance, manual, fallback, other }
+
+MuseGroupIcon museGroupIconKind({required String type, required String name, String? selectedDisplay}) =>
+    switch (museGroupKind(type: type, name: name, selectedDisplay: selectedDisplay)) {
+      '自动最快' => MuseGroupIcon.autoFastest,
+      '负载均衡' => MuseGroupIcon.loadBalance,
+      '手动选择' => MuseGroupIcon.manual,
+      '故障切换' => MuseGroupIcon.fallback,
+      _ => MuseGroupIcon.other,
+    };
 
 /// The core's "current outbound" text ("lowest → 香港 01", "balance→round-robin", "香港 01")
 /// in Chinese: 「自动最快 · 香港 01」 / 「负载均衡 · 轮询」 / 「香港 01」.
