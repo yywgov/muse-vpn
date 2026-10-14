@@ -126,7 +126,11 @@ void main() {
       addTearDown(c.dispose);
       await c.read(sharedPreferencesProvider.future);
       await c.read(appDirectoriesProvider.future);
-      final json = jsonEncode(c.read(ConfigOptions.singboxConfigOptions).toJson());
+      // keep the providers alive until their start-up microtasks (rules list) are done
+      final sub = c.listen(ConfigOptions.singboxConfigOptions, (_, _) {});
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      final json = jsonEncode(sub.read().toJson());
+      await Future<void>.delayed(const Duration(milliseconds: 300));
       expect(json, contains('direct-dns-address')); // it is the real config
       expect(json, isNot(contains('hysteria2')));
       expect(json, isNot(contains('mbps')));
