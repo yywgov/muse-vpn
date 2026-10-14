@@ -1,7 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/model/directories.dart';
-import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
@@ -111,35 +110,11 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
           .mapLeft((l) => ConnectionFailure.invalidConfigOption(null, l))
           .flatMap(
             (overridedOptions) => TaskEither.tryCatch(() async {
-              if (!overridedOptions.chainStatus.isOff()) {
-                final isWarpLicenseAgreed = ref.read(Preferences.warpConsentGiven) == true;
-                final isWarpEnabled =
-                    overridedOptions.unblocker.mode.isWarp() || overridedOptions.extraSecurity.mode.isWarp();
-                if (!isWarpLicenseAgreed && isWarpEnabled) {
-                  final isAgreed = await ref.read(dialogNotifierProvider.notifier).showWarpLicense();
-                  if (isAgreed == true) {
-                    await ref.read(Preferences.warpConsentGiven.notifier).update(true);
-                    // return (await applyConfigOption(prof).run()).match((l) => throw l, (_) => unit);
-                  } else {
-                    throw const MissingWarpLicense();
-                  }
-                }
-
-                final isPsiphonLicenseAgreed = ref.read(Preferences.psiphonConsentGiven) == true;
-                final isPsiphonEnabled =
-                    overridedOptions.unblocker.mode.isPsiphon() || overridedOptions.extraSecurity.mode.isPsiphon();
-                if (!isPsiphonLicenseAgreed && isPsiphonEnabled) {
-                  final isAgreed = await ref.read(dialogNotifierProvider.notifier).showPsiphonLicense();
-                  if (isAgreed == true) {
-                    await ref.read(Preferences.psiphonConsentGiven.notifier).update(true);
-                  } else {
-                    throw const MissingPsiphonLicense();
-                  }
-                }
-              }
-
-              _configOptionsSnapshot = overridedOptions;
-              await singbox.changeOptions(overridedOptions).run();
+              // 穿云 1.1.1: never chain through WARP / Psiphon, whatever a profile or an old
+              // preference says (the chain path, its licence dialogs and consent prefs are gone).
+              final options = overridedOptions.copyWith(chainStatus: ChainStatus.off);
+              _configOptionsSnapshot = options;
+              await singbox.changeOptions(options).run();
               return unit;
             }, (err, st) => err is ConnectionFailure ? err : ConnectionFailure.unexpected(err, st)),
           );

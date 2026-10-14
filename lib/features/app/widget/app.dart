@@ -1,5 +1,4 @@
 import 'package:accessibility_tools/accessibility_tools.dart';
-import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -84,40 +83,36 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
       ShortcutWrapper(
         ToastificationWrapper(
           child: ConnectionWrapper(
-            DynamicColorBuilder(
-              builder: (ColorScheme? lightColorScheme, ColorScheme? darkColorScheme) {
-                return MaterialApp.router(
-                  routerConfig: router,
-                  locale: locale.flutterLocale,
-                  supportedLocales: AppLocaleUtils.supportedLocales,
-                  localizationsDelegates: GlobalMaterialLocalizations.delegates,
-                  debugShowCheckedModeBanner: false,
-                  themeMode: themeMode.flutterThemeMode,
-                  theme: theme.lightTheme(lightColorScheme),
-                  darkTheme: theme.darkTheme(darkColorScheme),
-                  title: Constants.appName,
-                  builder: (context, child) {
-                    final theme = Theme.of(context);
-                    child = child ?? const SizedBox();
-                    if (kDebugMode && _debugAccessibility) {
-                      return AccessibilityTools(checkFontOverflows: true, child: child);
-                    }
-                    return AnnotatedRegion<SystemUiOverlayStyle>(
-                      // 穿云: edge-to-edge, the pages draw behind transparent system bars
-                      value: SystemUiOverlayStyle(
-                        statusBarColor: Colors.transparent,
-                        statusBarIconBrightness: theme.brightness == Brightness.dark
-                            ? Brightness.light
-                            : Brightness.dark,
-                        systemNavigationBarColor: Colors.transparent,
-                        systemNavigationBarContrastEnforced: false,
-                        systemNavigationBarIconBrightness: theme.brightness == Brightness.dark
-                            ? Brightness.light
-                            : Brightness.dark,
-                      ),
-                      child: child,
-                    );
-                  },
+            MaterialApp.router(
+              routerConfig: router,
+              locale: locale.flutterLocale,
+              supportedLocales: AppLocaleUtils.supportedLocales,
+              localizationsDelegates: GlobalMaterialLocalizations.delegates,
+              debugShowCheckedModeBanner: false,
+              themeMode: themeMode.flutterThemeMode,
+              theme: theme.lightTheme(null),
+              darkTheme: theme.darkTheme(null),
+              title: Constants.appName,
+              builder: (context, child) {
+                final theme = Theme.of(context);
+                child = child ?? const SizedBox();
+                if (kDebugMode && _debugAccessibility) {
+                  return AccessibilityTools(checkFontOverflows: true, child: child);
+                }
+                return AnnotatedRegion<SystemUiOverlayStyle>(
+                  // 穿云: edge-to-edge, the pages draw behind transparent system bars
+                  value: SystemUiOverlayStyle(
+                    statusBarColor: Colors.transparent,
+                    statusBarIconBrightness: theme.brightness == Brightness.dark
+                        ? Brightness.light
+                        : Brightness.dark,
+                    systemNavigationBarColor: Colors.transparent,
+                    systemNavigationBarContrastEnforced: false,
+                    systemNavigationBarIconBrightness: theme.brightness == Brightness.dark
+                        ? Brightness.light
+                        : Brightness.dark,
+                  ),
+                  child: child,
                 );
               },
             ),

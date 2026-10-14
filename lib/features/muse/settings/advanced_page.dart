@@ -17,11 +17,9 @@ class AdvancedPage extends HookConsumerWidget {
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            footer: '一般不需要改动。只有个别网络会屏蔽 SNI，这时才打开 TLS 分片。',
             children: [
               MuseTile(
                 title: 'TLS 分片 / 技巧',
-                subtitle: '默认关闭',
                 chevron: true,
                 onTap: () => context.goNamed('tlsTricks'),
               ),

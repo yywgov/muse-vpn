@@ -6,7 +6,6 @@ import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/app_based_routing/data/selected_data_provider.dart';
 import 'package:hiddify/features/app_based_routing/model/app_package_info.dart';
 import 'package:hiddify/features/app_based_routing/model/pkg_flag.dart';
@@ -215,49 +214,6 @@ class AppListPage extends HookConsumerWidget with PresLogger {
                 ),
                 MenuAnchor(
                   menuChildren: <Widget>[
-                    SubmenuButton(
-                      menuChildren: <Widget>[
-                        MenuItemButton(
-                          child: Text(t.pages.settings.routing.appBasedRouting.options.import.clipboard),
-                          onPressed: () async => await ref
-                              .read(dialogNotifierProvider.notifier)
-                              .showConfirmation(
-                                title: t.common.msg.import.confirm,
-                                message: t.dialogs.confirmation.appList.import.msg,
-                              )
-                              .then((shouldImport) async {
-                                if (shouldImport) await ref.read(AppListProvider(mode).notifier).importClipboard();
-                              }),
-                        ),
-                        MenuItemButton(
-                          child: Text(t.pages.settings.routing.appBasedRouting.options.import.file),
-                          onPressed: () async => await ref
-                              .read(dialogNotifierProvider.notifier)
-                              .showConfirmation(
-                                title: t.pages.settings.routing.appBasedRouting.options.import.file,
-                                message: t.pages.settings.routing.appBasedRouting.options.import.msg,
-                              )
-                              .then((shouldImport) async {
-                                if (shouldImport) await ref.read(AppListProvider(mode).notifier).importFile();
-                              }),
-                        ),
-                      ],
-                      child: Text(t.common.import),
-                    ),
-                    SubmenuButton(
-                      menuChildren: <Widget>[
-                        MenuItemButton(
-                          child: Text(t.pages.settings.routing.appBasedRouting.options.export.clipboard),
-                          onPressed: () async => await ref.read(AppListProvider(mode).notifier).exportClipboard(),
-                        ),
-                        MenuItemButton(
-                          child: Text(t.pages.settings.routing.appBasedRouting.options.export.file),
-                          onPressed: () async => await ref.read(AppListProvider(mode).notifier).exportFile(),
-                        ),
-                      ],
-                      child: Text(t.common.export),
-                    ),
-                    const PopupMenuDivider(),
                     MenuItemButton(
                       child: Text(t.pages.settings.routing.appBasedRouting.options.clearAllSelections),
                       onPressed: () => ref.read(AppListProvider(mode).notifier).clearAll(),

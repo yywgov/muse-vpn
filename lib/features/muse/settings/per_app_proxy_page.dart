@@ -30,9 +30,6 @@ class PerAppProxyPage extends ConsumerWidget {
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            footer:
-                '分应用代理决定哪些 App 经过穿云。不经过穿云的 App 直接用手机网络：速度最快，'
-                '银行、国家反诈中心等 App 也看不到 VPN（推荐保持开启并使用「常用国内 App 不走代理」）。',
             children: [
               MuseSwitchTile(
                 leading: const Icon(Icons.apps_rounded),
@@ -62,9 +59,6 @@ class PerAppProxyPage extends ConsumerWidget {
             ),
             MuseSection(
               header: mode.listTitle(ref.watch(translationsProvider).requireValue),
-              footer: mode == AppProxyMode.exclude
-                  ? '「常用国内 App 不走代理」内置微信、QQ、支付宝、淘宝、京东、拼多多、美团、抖音、快手、哔哩哔哩、小红书、百度、高德、滴滴、12306、各大银行、国家反诈中心、云闪付和运营商等，未安装的会自动忽略；可在列表里逐个取消。'
-                  : '在线列表来自 GitHub，需要能访问时才会更新。',
               children: [_AppListRow(mode: mode), _AutoSelection(mode: mode)],
             ),
           ],

@@ -33,7 +33,6 @@ class MuseDataPage extends HookConsumerWidget {
         children: [
           MuseSection(
             header: '本次连接流量',
-            footer: running ? null : '未连接，连接后开始统计。',
             children: [
               MuseTile(title: '已上传', trailing: value(stats.uplinkTotal.toInt().size())),
               MuseTile(title: '已下载', trailing: value(stats.downlinkTotal.toInt().size())),

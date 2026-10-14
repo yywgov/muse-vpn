@@ -90,8 +90,7 @@ COMPONENT Runtime RENAME hiddify-core.dll)
 install(FILES "../hiddify-core/bin/libcronet.dll" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
 COMPONENT Runtime RENAME libcronet.dll)
 
-install(FILES "../hiddify-core/bin/HiddifyCli.exe" DESTINATION "${CMAKE_INSTALL_PREFIX}"
-COMPONENT Runtime RENAME HiddifyCli.exe)
+# 穿云 1.1.1: HiddifyCli.exe is not shipped (nothing launches it; the app loads hiddify-core.dll)
 
 
 if(PLUGIN_BUNDLED_LIBRARIES)

@@ -9,7 +9,6 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
-import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
@@ -150,13 +149,10 @@ class _ConnectSection extends HookConsumerWidget {
         return;
       }
       if (ref.read(activeProfileProvider).valueOrNull == null) {
-        await ref.read(dialogNotifierProvider.notifier).showNoActiveProfile();
         await ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile();
         return;
       }
-      if (await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
-        await ref.read(connectionNotifierProvider.notifier).toggleConnection();
-      }
+      await ref.read(connectionNotifierProvider.notifier).toggleConnection();
     }
 
     return Padding(
@@ -180,7 +176,8 @@ class _ConnectSection extends HookConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            connected ? '↑ ${stats.uplink.toInt().speed()}   ↓ ${stats.downlink.toInt().speed()}' : '点击按钮连接',
+            // empty while disconnected: keeps the button from jumping when the speeds appear
+            connected ? '↑ ${stats.uplink.toInt().speed()}   ↓ ${stats.downlink.toInt().speed()}' : '',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: secondary,
               fontFeatures: const [FontFeature.tabularFigures()],
@@ -451,7 +448,6 @@ class _NodesSection extends HookConsumerWidget {
     final theme = Theme.of(context);
     final running = ref.watch(serviceRunningProvider);
     final testing = useState(false);
-    final secondary = MuseColors.secondaryText(context);
 
     Widget header(String text, {Widget? trailing}) => Padding(
       padding: const EdgeInsets.fromLTRB(24, 12, 12, 4),
@@ -552,15 +548,7 @@ class _NodesSection extends HookConsumerWidget {
                 // the notifier already logs the failure
               }
             },
-            onLongPress: () => ref.read(dialogNotifierProvider.notifier).showProxyInfo(outboundInfo: proxy),
           ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
-          child: Text(
-            '共 ${group.items.length} 个，长按查看详情',
-            style: theme.textTheme.bodySmall?.copyWith(color: secondary),
-          ),
-        ),
       ];
     }
 
@@ -587,14 +575,12 @@ class _NodeCard extends StatelessWidget {
     required this.since,
     required this.selected,
     required this.onTap,
-    required this.onLongPress,
   });
 
   final OutboundInfo proxy;
   final DateTime? since;
   final bool selected;
   final VoidCallback onTap;
-  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -638,7 +624,6 @@ class _NodeCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          onLongPress: onLongPress,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(

@@ -141,10 +141,6 @@ abstract class Preferences {
     mapTo: (value) => value.name,
   );
 
-  static final warpConsentGiven = PreferencesNotifier.create<bool, bool>("warp-consent-given", false);
-
-  static final psiphonConsentGiven = PreferencesNotifier.create<bool, bool>("psiphon-consent-given", false);
-
   /// How many records the in-memory log ring keeps. Saved, so a size picked
   /// once while chasing a bug is still there on the next run.
   static final logBufferSize = PreferencesNotifier.create<int, int>("log-buffer-size", 1000);

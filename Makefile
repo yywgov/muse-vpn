@@ -479,7 +479,8 @@ android-libs:
 android-apk-libs: android-libs
 android-aab-libs: android-libs
 
-# 穿云: the Windows core (hiddify-core.dll + libcronet.dll + HiddifyCli.exe) also comes from yywgov/muse-core
+# 穿云: the Windows core (hiddify-core.dll + libcronet.dll) also comes from yywgov/muse-core (the
+# tarball also carries HiddifyCli.exe, which is not bundled)
 windows-libs:
 	$(MKDIR) $(DESKTOP_OUT) || echo Folder already exists. Skipping...
 	curl -fL $(MUSE_CORE_URL)/$(CORE_NAME)-windows-amd64.tar.gz | tar xz -C $(DESKTOP_OUT)/
