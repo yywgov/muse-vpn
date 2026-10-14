@@ -143,6 +143,13 @@ class MuseConnectionKeeper with InfraLogger {
             await _recover();
             return;
           }
+          // the guard restored the user's settings (the app hung / the PC slept with the port
+          // silent): the core runs again, so switch 系统代理 back on by reconnecting
+          if (await _systemProxyMissing()) {
+            _log('系统代理已不指向穿云（守护进程恢复过或被修改），重新连接');
+            await _recover();
+            return;
+          }
         }
         if (failedAttempts > 0) failedAttempts = 0;
       }
@@ -167,6 +174,20 @@ class MuseConnectionKeeper with InfraLogger {
     final direct = await museHttpProbe();
     if (!direct) loggy.info('keeper: proxy and direct both fail — network down, not the core');
     return !direct;
+  }
+
+  /// 系统代理 mode, core running: the system proxy no longer points at us (seen twice, 3 s apart,
+  /// so a hot reload's close/re-open of the inbound does not count).
+  Future<bool> _systemProxyMissing() async {
+    final options = ref.read(ConfigOptions.singboxConfigOptions);
+    if (!options.setSystemProxy) return false;
+    for (var i = 0; i < 2; i++) {
+      if (i > 0) await Future<void>.delayed(const Duration(seconds: 3));
+      final ours = await WindowsProxyGuard.pointsAtUsNow();
+      if (ours != false) return false;
+      if (await ref.read(hiddifyCoreServiceProvider).queryCoreState() is! CoreStarted) return false;
+    }
+    return true;
   }
 
   Future<void> _recover() async {

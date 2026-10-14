@@ -193,11 +193,13 @@ Shot "3-after-core-stop"
 $h = (Get-Process -Id $p.Id).Handle
 [R]::NtSuspendProcess($h) | Out-Null
 Start-Sleep -Seconds 45
+$during = GuardStatus
 [R]::NtResumeProcess($h) | Out-Null
 Start-Sleep -Seconds 3
-$c = WaitConnected 40
+$c = WaitConnected 70
 $vp = ViaProxy
-Rec "suspend" "after a 45 s suspend (sleep): connected and forwarding" ($c[0] -and $vp -eq "204") ((StateText $c[1]) + "; via proxy $vp")
+Rec "suspend-guard" "while the app was frozen the guard put the user's settings back (port silent)" ($during -match "ours=0") $during
+Rec "suspend" "after a 45 s suspend (sleep): connected and forwarding again" ($c[0] -and $vp -eq "204") ((StateText $c[1]) + "; via proxy $vp")
 Ctl "/resume" | Out-Null
 Start-Sleep -Seconds 4
 $s = Ctl "/state"
