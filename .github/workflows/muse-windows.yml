@@ -51,8 +51,23 @@ jobs:
             test -f "hiddify-core/bin/$f" || { echo "missing $f"; exit 1; }
           done
 
+      # Flutter 3.38's tool_backend.dart passes -dTreeShakeIcons="true" with literal quotes; on
+      # Windows the quotes survive (flutter.bat -> dart), the define is not 'true' and the icon
+      # fonts ship unshaken (~6 MB). Drop the quotes so release builds shake them like Android.
+      - name: Enable icon tree shaking (Flutter tool_backend quoting bug)
+        run: |
+          fr="$(dirname "$(dirname "$(command -v flutter)")")"
+          tb="$fr/packages/flutter_tools/bin/tool_backend.dart"
+          sed -i 's/-dTreeShakeIcons="\$treeShakeIcons"/-dTreeShakeIcons=$treeShakeIcons/' "$tb"
+          grep -n "dTreeShakeIcons" "$tb"
+
       - name: Build
         run: flutter build windows --release --target lib/main_prod.dart
+
+      - name: Icon fonts shaken
+        run: |
+          ls -la build/windows/x64/runner/Release/data/flutter_assets/fonts/ || true
+          find build/windows/x64/runner/Release/data/flutter_assets -name "*.ttf" -o -name "*.otf" | xargs ls -la
 
       - name: Package zip
         shell: pwsh

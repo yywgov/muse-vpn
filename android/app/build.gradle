@@ -115,12 +115,6 @@ android {
         aidl true
     }
 
-    androidResources {
-        // 穿云 1.1.1: Emoji.ttf is the global font on Windows only (flag emojis); keep it out of
-        // the APK. The defaults of aapt's ignore pattern are repeated, then the font is added.
-        ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!Emoji.ttf'
-    }
-
     packaging {
         jniLibs {
             // store native libs (mainly the Go core) compressed in the APK; Android extracts them
@@ -129,6 +123,14 @@ android {
         }
     }
 
+}
+
+// 穿云 1.1.1: Emoji.ttf is the global font on Windows only (flag emojis); keep it out of the APK.
+// Flutter registers fonts lazily and Android never asks for the "Emoji" family.
+tasks.withType(Copy).configureEach { task ->
+    if (task.name.startsWith("copyFlutterAssets")) {
+        task.exclude("**/Emoji.ttf")
+    }
 }
 
 android.applicationVariants.all { variant ->
