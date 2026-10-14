@@ -77,6 +77,18 @@ enum BuiltinRule {
   }..name = key;
 }
 
+/// Turns every rule routed to 「直连并分片」 into 直连. Returns whether anything changed.
+bool migrateFragmentOutbound(List<Rule> rules) {
+  var changed = false;
+  for (final rule in rules) {
+    if (rule.outbound == Outbound.direct_with_fragment) {
+      rule.outbound = Outbound.direct;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 @riverpod
 class RulesNotifier extends _$RulesNotifier with AppLogger {
   late File file;
@@ -92,6 +104,12 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
       await _updateFile();
     });
     final rules = _withBuiltins(file.existsSync() ? RouteRule.fromBuffer(file.readAsBytesSync()).rules : []);
+    // 穿云 1.1.1: 「直连并分片」 is no longer offered; rules saved with it become plain 直连
+    if (migrateFragmentOutbound(rules)) {
+      Future.microtask(() async {
+        if (file.existsSync()) await _updateFile();
+      });
+    }
     if (!ref.read(Preferences.adsDefaultMigrated)) {
       // 穿云 1.1: lists saved by older builds get 去广告 turned on once (the user can still turn it off)
       for (final rule in rules) {

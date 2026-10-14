@@ -52,7 +52,8 @@ class RulePage extends HookConsumerWidget {
             ),
             SettingRadio<Outbound>(
               title: RuleEnum.outbound.present(t),
-              values: Outbound.values,
+              // 「直连并分片」 is gone (TLS 分片 lives in 高级); older rules were migrated to 直连
+              values: Outbound.values.where((o) => o != Outbound.direct_with_fragment).toList(),
               value: ref.watch(ruleNotifierProvider(ruleListOrder).select((value) => value.outbound)),
               setValue: (value) =>
                   ref.read(ruleNotifierProvider(ruleListOrder).notifier).update<Outbound>(RuleEnum.outbound, value),
@@ -69,41 +70,36 @@ class RulePage extends HookConsumerWidget {
                 pathParameters: {'orderId': ruleListOrder?.toString() ?? 'new', 'ruleEnum': RuleEnum.ruleSet.name},
               ),
             ),
-            SettingDivider(title: t.pages.settings.routing.routeRule.rule.onlyTunMode),
-            SettingGenericList<String>(
-              title: RuleEnum.packageName.present(t),
-              values: ref.watch(ruleNotifierProvider(ruleListOrder).select((value) => value.packageNames)),
-              // other platforms can't list the installed apps, so they edit the names as text
-              onTap: () => PlatformUtils.isAndroid
-                  ? context.pushNamed('packageNames', pathParameters: {'orderId': ruleListOrder?.toString() ?? 'new'})
-                  : context.pushNamed(
-                      'genericList',
-                      pathParameters: {
-                        'orderId': ruleListOrder?.toString() ?? 'new',
-                        'ruleEnum': RuleEnum.packageName.name,
-                      },
-                    ),
-              isPackageName: true,
-              showPlatformWarning: !PlatformUtils.isAndroid,
-            ),
-            SettingGenericList<String>(
-              title: RuleEnum.processName.present(t),
-              values: ref.watch(ruleNotifierProvider(ruleListOrder).select((value) => value.processNames)),
-              showPlatformWarning: !PlatformUtils.isDesktop,
-              onTap: () => context.pushNamed(
-                'genericList',
-                pathParameters: {'orderId': ruleListOrder?.toString() ?? 'new', 'ruleEnum': RuleEnum.processName.name},
+            // 穿云 1.1.1: only the app matcher that works on this platform (包名 on Android,
+            // 进程名 / 进程路径 on the desktop)
+            const SettingDivider(),
+            if (PlatformUtils.isAndroid) ...[
+              SettingGenericList<String>(
+                title: RuleEnum.packageName.present(t),
+                values: ref.watch(ruleNotifierProvider(ruleListOrder).select((value) => value.packageNames)),
+                onTap: () =>
+                    context.pushNamed('packageNames', pathParameters: {'orderId': ruleListOrder?.toString() ?? 'new'}),
+                isPackageName: true,
               ),
-            ),
-            SettingGenericList<String>(
-              title: RuleEnum.processPath.present(t),
-              values: ref.watch(ruleNotifierProvider(ruleListOrder).select((value) => value.processPaths)),
-              onTap: () => context.pushNamed(
-                'genericList',
-                pathParameters: {'orderId': ruleListOrder?.toString() ?? 'new', 'ruleEnum': RuleEnum.processPath.name},
+            ],
+            if (PlatformUtils.isDesktop) ...[
+              SettingGenericList<String>(
+                title: RuleEnum.processName.present(t),
+                values: ref.watch(ruleNotifierProvider(ruleListOrder).select((value) => value.processNames)),
+                onTap: () => context.pushNamed(
+                  'genericList',
+                  pathParameters: {'orderId': ruleListOrder?.toString() ?? 'new', 'ruleEnum': RuleEnum.processName.name},
+                ),
               ),
-              showPlatformWarning: !PlatformUtils.isDesktop,
-            ),
+              SettingGenericList<String>(
+                title: RuleEnum.processPath.present(t),
+                values: ref.watch(ruleNotifierProvider(ruleListOrder).select((value) => value.processPaths)),
+                onTap: () => context.pushNamed(
+                  'genericList',
+                  pathParameters: {'orderId': ruleListOrder?.toString() ?? 'new', 'ruleEnum': RuleEnum.processPath.name},
+                ),
+              ),
+            ],
             const SettingDivider(),
             SettingRadio<Network>(
               title: RuleEnum.network.present(t),

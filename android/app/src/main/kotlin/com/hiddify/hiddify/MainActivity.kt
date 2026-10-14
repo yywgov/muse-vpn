@@ -22,7 +22,6 @@ import io.flutter.embedding.engine.FlutterEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.LinkedList
 
 
 class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
@@ -36,8 +35,6 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
 
     private val connection = ServiceConnection(this, this)
 
-    val logList = LinkedList<String>()
-    var logCallback: ((Boolean) -> Unit)? = null
     val serviceStatus = MutableLiveData(Status.Stopped)
     val serviceAlerts = MutableLiveData<ServiceEvent?>(null)
 
@@ -48,11 +45,7 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
         flutterEngine.plugins.add(MethodHandler(lifecycleScope))
         flutterEngine.plugins.add(PlatformSettingsHandler())
         flutterEngine.plugins.add(EventHandler())
-        flutterEngine.plugins.add(LogHandler())
         flutterEngine.plugins.add(ChuanyunHandler())
-//        flutterEngine.plugins.add(GroupsChannel(lifecycleScope))
-//        flutterEngine.plugins.add(ActiveGroupsChannel(lifecycleScope))
-//        flutterEngine.plugins.add(StatsChannel(lifecycleScope))
     }
 
     fun reconnect() {

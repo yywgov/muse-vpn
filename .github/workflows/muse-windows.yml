@@ -47,7 +47,7 @@ jobs:
       - name: Core files present
         run: |
           ls -la hiddify-core/bin
-          for f in hiddify-core.dll libcronet.dll HiddifyCli.exe; do
+          for f in hiddify-core.dll libcronet.dll; do
             test -f "hiddify-core/bin/$f" || { echo "missing $f"; exit 1; }
           done
 

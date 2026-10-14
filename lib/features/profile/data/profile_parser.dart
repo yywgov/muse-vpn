@@ -6,12 +6,10 @@ import 'package:dio/dio.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/db/db.dart';
 import 'package:hiddify/core/http_client/dio_http_client.dart';
-import 'package:hiddify/core/model/optional_range.dart';
 import 'package:hiddify/features/profile/data/profile_data_mapper.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/model/profile_failure.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
-import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/singbox/model/singbox_proxy_type.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -41,14 +39,9 @@ class ProfileParser {
   // See https://github.com/hiddify/hiddify-app/issues/1974 . 1000 TiB.
   static const infiniteTrafficThreshold = 1_099_511_627_776_000;
   static const infiniteTimeThreshold = 92_233_720_368;
-  static const allowedOverrideConfigs = [
-    'connection-test-url',
-    'direct-dns-address',
-    'remote-dns-address',
-    'tls-tricks',
-    'chain-status',
-    'extra-security',
-  ];
+  /// 穿云 1.1.1: a subscription may name itself and report its traffic and update interval,
+  /// nothing more. It can no longer replace the direct DNS (udp://223.5.5.5), the node test
+  /// URL, turn on TLS fragmentation or chain the tunnel through WARP / Psiphon.
   static const allowedProfileHeaders = [
     'profile-title',
     'content-disposition',
@@ -56,8 +49,6 @@ class ProfileParser {
     'profile-update-interval',
     'support-url',
     'profile-web-page-url',
-    'extra-security',
-    'fragment',
   ];
 
   final Ref _ref;
@@ -471,92 +462,15 @@ class ProfileParser {
     return base[0].toUpperCase() + base.substring(1);
   }
 
-  static String profileOverrideHelper({required ProfileEntriesCompanion profile}) {
-    final populatedHeaders = profile.populatedHeaders.value;
+  static String profileOverrideHelper({required ProfileEntriesCompanion profile}) => '{}';
 
-    Map<String, dynamic>? mPopulatedHeaders;
-    if (populatedHeaders != null) {
-      final m = jsonDecode(populatedHeaders) as Map;
-      mPopulatedHeaders = m.cast<String, dynamic>();
-    }
-
-    return ProfileParser.profileOverride(
-      populatedHeaders: mPopulatedHeaders,
-      userOverride: UserOverride.fromStr(profile.userOverride.value),
-    );
-  }
-
-  /// Resolve an `extra-security` value to a chain mode.
-  ///
-  /// Strict on purpose: the value must equal a documented mode key exactly, or
-  /// it is ignored. `profile` is not accepted — chaining to another profile is a
-  /// user choice, not something a subscription may impose.
-  @visibleForTesting
-  static ChainMode? extraSecurityMode(String? value) {
-    if (value == null) return null;
-    final trimmed = value.trim();
-    for (final mode in ChainMode.values) {
-      if (mode.isProfile()) continue;
-      if (mode.key == trimmed) return mode;
-    }
-    return null;
-  }
-
-  /// Build the `tls-tricks` map from a subscription `fragment` header.
-  ///
-  /// Mirrors the per-proxy `fragment` parameter, which needs a full triplet —
-  /// `size,sleep,method` or `tlshello,size,sleep`. Anything shorter, or a size
-  /// or sleep that isn't a valid range, is incomplete and turns fragmentation
-  /// off entirely rather than enabling it with half the values. Returns null
-  /// when the header can't be used.
-  @visibleForTesting
-  static Map<String, dynamic>? fragmentTricks(String? value) {
-    if (value == null) return null;
-    final parts = value.split(',').map((e) => e.trim()).toList();
-    if (parts.length < 3) return null;
-    final leadingMethod = parts.first.toLowerCase() == 'tlshello';
-    final size = leadingMethod ? parts[1] : parts[0];
-    final sleep = leadingMethod ? parts[2] : parts[1];
-    if (OptionalRange.tryParse(size) == null || OptionalRange.tryParse(sleep) == null) return null;
-    return {'enable-fragment': true, 'fragment-size': size, 'fragment-sleep': sleep};
-  }
-
+  /// The per-profile override of the app's config options. Always empty since 穿云 1.1.1:
+  /// stored headers of older subscriptions (`extra-security`, `fragment`, DNS / test-url
+  /// overrides) are ignored on every connect, so an already-imported profile is cut too.
   static String profileOverride({
     required Map<String, dynamic>? populatedHeaders,
     required UserOverride? userOverride,
-  }) {
-    final headers = Map<String, dynamic>.from(populatedHeaders ?? {});
-
-    // Consume the raw subscription inputs; the output config uses structured
-    // keys, so these string values must not leak through unchanged.
-    final fragmentInput = headers.remove('fragment')?.toString();
-    final extraSecurityInput = headers.remove('extra-security')?.toString();
-
-    // extra-security: exactly one documented mode. The app's own setting takes
-    // precedence over the subscription; an unrecognised value is ignored.
-    final mode = extraSecurityMode(userOverride?.extraSecurity) ?? extraSecurityMode(extraSecurityInput);
-    if (mode != null) {
-      headers['chain-status'] = ChainStatus.extraSecurity.key;
-      headers['extra-security'] = {'mode': mode.key};
-    }
-
-    // fragment: the app's own setting wins and enables fragmentation with the
-    // user's configured size/sleep. Otherwise the subscription header is read
-    // exactly like a proxy link's `fragment` parameter — a complete triplet or
-    // nothing at all.
-    if (userOverride?.enableFragment == true) {
-      headers['tls-tricks'] = {'enable-fragment': true};
-    } else if (fragmentTricks(fragmentInput) case final tricks?) {
-      headers['tls-tricks'] = tricks;
-    }
-
-    headers.removeWhere(
-      (key, value) => !allowedOverrideConfigs.contains(key) || value == null || value.toString().isEmpty,
-    );
-
-    final profileOverrideStr = jsonEncode({for (final key in headers.keys) key: headers[key]});
-    return profileOverrideStr;
-  }
+  }) => '{}';
 
   static Map<String, dynamic> applyProfileOverride(Map<String, dynamic> main, String? profileOverride) {
     if (profileOverride == null) return main;

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
-import 'package:hiddify/features/settings/widget/preference_tile.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -9,7 +8,6 @@ class SettingPickerDialog<T> extends HookConsumerWidget with PresLogger {
   const SettingPickerDialog({
     super.key,
     required this.title,
-    this.showFlag = false,
     required this.selected,
     required this.options,
     required this.getTitle,
@@ -17,7 +15,6 @@ class SettingPickerDialog<T> extends HookConsumerWidget with PresLogger {
   });
 
   final String title;
-  final bool showFlag;
   final T selected;
   final List<T> options;
   final String Function(T e) getTitle;
@@ -39,7 +36,6 @@ class SettingPickerDialog<T> extends HookConsumerWidget with PresLogger {
               final title = getTitle(e);
               return RadioListTile<T>(
                 title: Text(title),
-                secondary: showFlag ? ChoicePreferenceWidget.flagByTitle(title) : null,
                 value: e,
               );
             }).toList(),

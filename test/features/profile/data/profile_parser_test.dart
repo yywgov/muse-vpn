@@ -440,143 +440,66 @@ void main() {
     });
   });
 
-  group("profileOverride - extra-security header", () {
-    test("warp header sets extra_security + warp mode", () {
-      final o = decodeOverride(headers: {"extra-security": "warp"});
-      expect(o["chain-status"], equals("extra_security"));
-      expect((o["extra-security"] as Map)["mode"], equals("warp"));
+  // 穿云 1.1.1: a subscription can no longer override any config option
+  group("profileOverride - subscriptions override nothing", () {
+    test("extra-security header no longer chains through WARP / Psiphon", () {
+      for (final mode in ["warp", "psiphon"]) {
+        final o = decodeOverride(headers: {"extra-security": mode});
+        expect(o.containsKey("chain-status"), isFalse);
+        expect(o.containsKey("extra-security"), isFalse);
+      }
     });
 
-    test("psiphon header sets psiphon mode", () {
-      final o = decodeOverride(headers: {"extra-security": "psiphon"});
-      expect((o["extra-security"] as Map)["mode"], equals("psiphon"));
+    test("an old UserOverride with extraSecurity / enableFragment is ignored", () {
+      final o = decodeOverride(userOverride: const UserOverride(extraSecurity: "warp", enableFragment: true));
+      expect(o, isEmpty);
     });
 
-    test("a list of modes is not the documented format, so it is ignored", () {
-      final o = decodeOverride(headers: {"extra-security": "warp,psiphon"});
-      expect(o.containsKey("chain-status"), isFalse);
-      expect(o.containsKey("extra-security"), isFalse);
+    test("fragment header no longer turns on TLS fragmentation", () {
+      expect(decodeOverride(headers: {"fragment": "2-4,10-20,tlshello"}).containsKey("tls-tricks"), isFalse);
     });
 
-    test("wrong case is not the documented format, so it is ignored", () {
-      expect(decodeOverride(headers: {"extra-security": "WARP"}).containsKey("extra-security"), isFalse);
-    });
-
-    test("profile mode is never accepted from a subscription", () {
-      expect(decodeOverride(headers: {"extra-security": "profile"}).containsKey("extra-security"), isFalse);
-    });
-
-    test("invalid value is ignored (no chain-status, no raw leak)", () {
-      final o = decodeOverride(headers: {"extra-security": "garbage"});
-      expect(o.containsKey("chain-status"), isFalse);
-      expect(o.containsKey("extra-security"), isFalse);
-    });
-
-    test("UserOverride enables warp without a header", () {
-      final o = decodeOverride(userOverride: const UserOverride(extraSecurity: "warp"));
-      expect((o["extra-security"] as Map)["mode"], equals("warp"));
-    });
-
-    test("UserOverride takes precedence over the header", () {
+    test("direct DNS, remote DNS and the test URL cannot be replaced", () {
       final o = decodeOverride(
-        headers: {"extra-security": "warp"},
-        userOverride: const UserOverride(extraSecurity: "psiphon"),
+        headers: {
+          "direct-dns-address": "udp://8.8.8.8",
+          "remote-dns-address": "udp://1.1.1.1",
+          "connection-test-url": "http://example.com",
+          "tls-tricks": "{}",
+          "chain-status": "extra_security",
+        },
       );
-      expect((o["extra-security"] as Map)["mode"], equals("psiphon"));
-    });
-
-    test("invalid UserOverride value falls back to the header", () {
-      final o = decodeOverride(
-        headers: {"extra-security": "warp"},
-        userOverride: const UserOverride(extraSecurity: "garbage"),
-      );
-      expect((o["extra-security"] as Map)["mode"], equals("warp"));
+      expect(o, isEmpty);
     });
   });
 
-  group("profileOverride - fragment header", () {
-    test("empty fragment does not enable fragmentation", () {
-      expect(decodeOverride(headers: {"fragment": ""}).containsKey("tls-tricks"), isFalse);
-    });
-
-    test("a full size,sleep,method triplet is applied", () {
-      final tls = decodeOverride(headers: {"fragment": "2-4,10-20,tlshello"})["tls-tricks"] as Map;
-      expect(tls["enable-fragment"], isTrue);
-      expect(tls["fragment-size"], equals("2-4"));
-      expect(tls["fragment-sleep"], equals("10-20"));
-    });
-
-    test("a leading tlshello token shifts size and sleep", () {
-      final tls = decodeOverride(headers: {"fragment": "tlshello,2-4,10-20"})["tls-tricks"] as Map;
-      expect(tls["fragment-size"], equals("2-4"));
-      expect(tls["fragment-sleep"], equals("10-20"));
-    });
-
-    test("an incomplete value is ignored, exactly like a proxy link", () {
-      // size and sleep only — the proxy parser needs a third part too.
-      expect(decodeOverride(headers: {"fragment": "2-4,10-20"}).containsKey("tls-tricks"), isFalse);
-      // size only
-      expect(decodeOverride(headers: {"fragment": "2-4"}).containsKey("tls-tricks"), isFalse);
-    });
-
-    test("a malformed size or sleep is ignored", () {
-      expect(decodeOverride(headers: {"fragment": "abc,def,tlshello"}).containsKey("tls-tricks"), isFalse);
-      expect(decodeOverride(headers: {"fragment": "2-4,def,tlshello"}).containsKey("tls-tricks"), isFalse);
-    });
-
-    test("UserOverride enables fragmentation with the user's own settings", () {
-      final tls = decodeOverride(userOverride: const UserOverride(enableFragment: true))["tls-tricks"] as Map;
-      expect(tls["enable-fragment"], isTrue);
-      // no size/sleep: the user's configured values apply
-      expect(tls.containsKey("fragment-size"), isFalse);
-      expect(tls.containsKey("fragment-sleep"), isFalse);
-    });
-
-    test("UserOverride takes precedence over the header", () {
-      final tls =
-          decodeOverride(
-                headers: {"fragment": "2-4,10-20,tlshello"},
-                userOverride: const UserOverride(enableFragment: true),
-              )["tls-tricks"]
-              as Map;
-      expect(tls["enable-fragment"], isTrue);
-      expect(tls.containsKey("fragment-size"), isFalse);
-    });
-
-    test("no fragment source leaves tls-tricks unset", () {
-      expect(decodeOverride(headers: {}).containsKey("tls-tricks"), isFalse);
-    });
-  });
-
-  group("profileOverride - old boolean headers are dropped", () {
-    test("enable-warp is ignored", () {
-      expect(decodeOverride(headers: {"enable-warp": "true"}).containsKey("chain-status"), isFalse);
-    });
-
-    test("enable-fragment is ignored", () {
-      expect(decodeOverride(headers: {"enable-fragment": "true"}).containsKey("tls-tricks"), isFalse);
-    });
-  });
-
-  group("populateHeaders - fragment/extra-security intake", () {
+  group("populateHeaders - only harmless headers are kept", () {
     Map<String, dynamic> populate(Map<String, dynamic> remoteHeaders) => ProfileParser.populateHeaders(
       content: '',
       remoteHeaders: remoteHeaders,
     ).getOrElse((_) => <String, dynamic>{});
 
-    test("empty fragment header is dropped", () {
-      expect(populate({"fragment": ""}).containsKey("fragment"), isFalse);
+    test("extra-security, fragment and option overrides are dropped", () {
+      final h = populate({
+        "extra-security": "warp",
+        "fragment": "2-4,10-20,tlshello",
+        "direct-dns-address": "udp://8.8.8.8",
+        "connection-test-url": "http://example.com",
+        "enable-warp": "true",
+      });
+      expect(h, isEmpty);
     });
 
-    test("extra-security header is kept", () {
-      expect(populate({"extra-security": "warp"})["extra-security"], equals("warp"));
+    test("title, traffic info and update interval are kept", () {
+      final h = populate({
+        "profile-title": "穿云",
+        "subscription-userinfo": "upload=0; download=1; total=2; expire=0",
+        "profile-update-interval": "12",
+      });
+      expect(h.keys, containsAll(["profile-title", "subscription-userinfo", "profile-update-interval"]));
     });
 
-    test("old enable-warp header is not kept", () {
-      expect(populate({"enable-warp": "true"}).containsKey("enable-warp"), isFalse);
-    });
-
-    test("empty non-fragment header is dropped", () {
+    test("empty headers are dropped", () {
       expect(populate({"profile-title": ""}).containsKey("profile-title"), isFalse);
     });
   });

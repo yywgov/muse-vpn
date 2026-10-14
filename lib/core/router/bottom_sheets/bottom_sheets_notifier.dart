@@ -3,10 +3,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
-import 'package:hiddify/features/app_based_routing/model/app_package_info.dart';
-import 'package:hiddify/features/app_based_routing/overview/app_list_share_modal.dart';
 import 'package:hiddify/features/profile/add/add_profile_modal.dart';
-import 'package:hiddify/features/profile/overview/profiles_modal.dart';
 import 'package:hiddify/utils/link_parsers.dart';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -70,15 +67,4 @@ class BottomSheetsNotifier extends _$BottomSheetsNotifier {
       await _show(isScrollControlled: true, child: AddProfileModal(url: url));
     }
   }
-
-  Future<void> showProfilesOverview() async => await _show(isScrollControlled: true, child: const ProfilesModal());
-
-  Future<void> showAppListShare({
-    required List<String> added,
-    required List<String> removed,
-    required Map<String, AppPackageInfo> apps,
-  }) async => await _show(
-    isScrollControlled: true,
-    child: AppListShareModal(added: added, removed: removed, apps: apps),
-  );
 }

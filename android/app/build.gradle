@@ -77,6 +77,8 @@ android {
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
+        // 穿云 1.1.1: the UI is Chinese only; keep just zh + en of the AndroidX/AppCompat strings
+        resourceConfigurations += ["zh", "en"]
     }
 
     // 穿云 1.1: arm64 only through ndk.abiFilters (below); AGP rejects ABI splits next to them
@@ -99,9 +101,6 @@ android {
             } else {
                 signingConfig signingConfigs.debug
             }
-            ndk {
-                debugSymbolLevel 'FULL'
-            }
         }
         // 穿云 1.1: arm64 only. The Flutter Gradle plugin puts all three ABIs into every build
         // type's ndk.abiFilters; replace them (not add).
@@ -114,6 +113,12 @@ android {
     buildFeatures {
         viewBinding true
         aidl true
+    }
+
+    androidResources {
+        // 穿云 1.1.1: Emoji.ttf is the global font on Windows only (flag emojis); keep it out of
+        // the APK. The defaults of aapt's ignore pattern are repeated, then the font is added.
+        ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!Emoji.ttf'
     }
 
     packaging {
@@ -143,7 +148,6 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.16.0'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.8.7'
-    implementation "androidx.compose.ui:ui:1.7.8"
     implementation("com.squareup.wire:wire-grpc-client:5.3.1")
 
     implementation 'io.grpc:grpc-okhttp:1.64.0'

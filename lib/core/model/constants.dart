@@ -9,10 +9,7 @@ abstract class Constants {
   static const licenseUrl = "https://github.com/yywgov/muse-vpn/blob/main/LICENSE.md";
   static const githubReleasesApiUrl = "https://api.github.com/repos/yywgov/muse-vpn/releases";
   static const githubLatestReleaseUrl = "https://github.com/yywgov/muse-vpn/releases/latest";
-  static const appCastUrl = "https://raw.githubusercontent.com/yywgov/muse-vpn/main/appcast.xml";
   static const termsAndConditionsUrl = "https://github.com/yywgov/muse-vpn/blob/main/LICENSE.md";
-  static const cfWarpPrivacyPolicy = "https://www.cloudflare.com/application/privacypolicy/";
-  static const cfWarpTermsOfService = "https://www.cloudflare.com/application/terms/";
 }
 
 const kAnimationDuration = Duration(milliseconds: 250);
@@ -47,7 +44,6 @@ abstract class ProfileTileConst {
   /// `support-url`) below the main profile card, pending a decision from the
   /// project manager. Set back to `true` to restore them — the chip, its
   /// carousel and the trusted-link warning are all still in place.
-  static const showProviderLinks = false;
 
   static const radius = Radius.circular(16);
   static const cardBorderRadius = BorderRadius.all(radius);
@@ -81,26 +77,6 @@ abstract class IntroConst {
     IntroConst.termsAndConditionsKey: Constants.termsAndConditionsUrl,
     IntroConst.githubKey: Constants.githubUrl,
     IntroConst.licenseKey: Constants.licenseUrl,
-  };
-}
-
-abstract class WarpConst {
-  static const warpConsentGiven = "warp-consent-given";
-  static const warpTermsOfServiceKey = 'warp-terms-of-service';
-  static const warpPrivacyPolicyKey = 'warp-privacy-policy';
-  static const url = <String, String>{
-    WarpConst.warpTermsOfServiceKey: Constants.cfWarpTermsOfService,
-    WarpConst.warpPrivacyPolicyKey: Constants.cfWarpPrivacyPolicy,
-  };
-}
-
-abstract class PsiphonConst {
-  static const psiphonConsentGiven = "psiphon-consent-given";
-  static const psiphonTermsOfServiceKey = 'psiphon-terms-of-service';
-  static const psiphonPrivacyPolicyKey = 'psiphon-privacy-policy';
-  static const url = <String, String>{
-    PsiphonConst.psiphonTermsOfServiceKey: "https://psiphon.ca/en/license.html",
-    PsiphonConst.psiphonPrivacyPolicyKey: "https://psiphon.ca/en/privacy.html",
   };
 }
 

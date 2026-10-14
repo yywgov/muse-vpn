@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
-import 'package:hiddify/features/proxy/active/ip_widget.dart';
 import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -92,7 +91,6 @@ class ChoicePreferenceWidget<T> extends HookConsumerWidget {
     this.enabled = true,
     required this.choices,
     required this.title,
-    this.showFlag = false,
     this.icon,
     required this.presentChoice,
     this.validateInput,
@@ -105,7 +103,6 @@ class ChoicePreferenceWidget<T> extends HookConsumerWidget {
   final bool enabled;
   final List<T> choices;
   final String title;
-  final bool showFlag;
   final IconData? icon;
   final String Function(T value) presentChoice;
   final bool Function(String value)? validateInput;
@@ -117,14 +114,12 @@ class ChoicePreferenceWidget<T> extends HookConsumerWidget {
       title: Text(title),
       subtitle: Text(presentChoice(selected)),
       leading: icon != null ? Icon(icon) : null,
-      trailing: showFlag ? flagByTitle(presentChoice(selected), size: 40) : null,
       enabled: enabled,
       onTap: () async {
         final selection = await ref
             .read(dialogNotifierProvider.notifier)
             .showSettingPicker<T>(
               title: title,
-              showFlag: showFlag,
               selected: selected,
               options: choices,
               getTitle: (e) => presentChoice(e),
@@ -138,18 +133,6 @@ class ChoicePreferenceWidget<T> extends HookConsumerWidget {
         onChanged?.call(selection);
       },
     );
-  }
-
-  static Widget? flagByTitle(String title, {double size = 32}) {
-    if (title.isEmpty) return null;
-    try {
-      final match = RegExp(r'\(([^)]+)\)$').firstMatch(title);
-      final countryCode = match?.group(1);
-      if (countryCode == null) return null;
-      return IPCountryFlag(countryCode: countryCode, size: size);
-    } catch (e) {
-      return null;
-    }
   }
 }
 

@@ -59,6 +59,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[InstallDelete]
+; 1.1.0 test builds shipped the unused CLI core
+Type: files; Name: "{app}\HiddifyCli.exe"
+
 [Icons]
 Name: "{autoprograms}\穿云"; Filename: "{app}\Chuanyun.exe"
 Name: "{autodesktop}\穿云"; Filename: "{app}\Chuanyun.exe"; Tasks: desktopicon
