@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/core/logger/logger_setup.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
@@ -21,6 +22,7 @@ part 'system_tray_notifier.g.dart';
 @Riverpod(keepAlive: true)
 class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogger {
   bool listenerAdded = false;
+  String? _lastMenuLine;
   @override
   Future<void> build() async {
     assert(PlatformUtils.isDesktop);
@@ -59,7 +61,13 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
   Menu _trayMenu(ConnectionStatus connection, MuseRouteMode mode) {
     final spec = museTrayMenuSpec(connection, mode);
     // 穿云 1.2: one line in app.log, checked by the Windows smoke test
-    loggy.info("tray menu: ${spec.map((e) => e.key == '-' ? '|' : '${e.label}${e.checked ? '*' : ''}').join(' ')}");
+    // (app.log keeps errors only, so the line goes in as a marker, once per distinct menu)
+    final line = "tray menu: ${spec.map((e) => e.key == '-' ? '|' : '${e.label}${e.checked ? '*' : ''}').join(' ')}";
+    loggy.info(line);
+    if (line != _lastMenuLine) {
+      _lastMenuLine = line;
+      logMarkLine(line);
+    }
     return Menu(
       items: [
         for (final e in spec)
