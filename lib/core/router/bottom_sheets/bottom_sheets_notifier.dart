@@ -3,6 +3,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
+import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/features/profile/add/add_profile_modal.dart';
 import 'package:hiddify/utils/link_parsers.dart';
 
@@ -19,9 +20,15 @@ class BottomSheetsNotifier extends _$BottomSheetsNotifier {
     final context = rootNavKey.currentContext;
     if (context == null) return null;
     // ref.read(popupCountNotifierProvider.notifier).increase();
+    // 穿云 1.2.1: ModalBottomSheetRoute ignores the theme's scrim (defaults to black54, which
+    // hides the dark status bar icons of the light theme) - pass the theme's own colour.
+    final theme = Theme.of(context);
+    final barrier =
+        theme.bottomSheetTheme.modalBarrierColor ?? (theme.brightness == Brightness.light ? museLightScrim : Colors.black54);
     return await Navigator.of(context)
         .push<T>(
           ModalBottomSheetRoute(
+            modalBarrierColor: barrier,
             constraints: BottomSheetConst.boxConstraints,
             isScrollControlled: isScrollControlled,
             builder: (context) => ClipRRect(

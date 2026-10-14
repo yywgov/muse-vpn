@@ -1,8 +1,10 @@
 // 穿云 1.2.1 - host side of the emulator end-to-end run (see test_driver/muse_e2e.dart).
 // Takes real device screenshots (adb screencap, status bar included) of every main page in the
 // light and true-black themes, connects the real VPN with SOCKS test nodes served by the CI host,
-// drives traffic from another app uid (adb shell) through the tunnel to a direct (CN rule) and a
-// proxied destination, records the speeds the app shows, and times a full manual node test.
+// drives traffic from another app uid (adb shell) through the tunnel (served by the SOCKS nodes
+// themselves, see tool/emulator/socks_nodes.py), compares the speeds and totals the app shows
+// with the nodes' byte counters per phase (connected, reconnect, node switch, background/resume),
+// and times a full manual node test.
 // Writes out/e2e/results.json and out/e2e/*.png. Exit code != 0 when connecting fails or the
 // speeds stay 0 while traffic flows.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
@@ -29,8 +31,22 @@ Future<String> cmd(String c) async {
   return r;
 }
 
+/// System "isn't responding" dialogs of other apps (the emulator's launcher) would cover the
+/// screenshot: dismiss them first.
+Future<void> dismissSystemDialogs() async {
+  for (var i = 0; i < 3; i++) {
+    final w = await adb(['shell', 'dumpsys window | grep -E "mCurrentFocus|Application Not Responding|isn.t responding"']);
+    final text = '${w.stdout}';
+    if (!text.contains('Not Responding') && !text.contains('responding')) return;
+    stdout.writeln('[e2e] dismissing system dialog: ${text.trim()}');
+    await adb(['shell', 'input', 'keyevent', 'KEYCODE_BACK']);
+    await sleep(800);
+  }
+}
+
 Future<void> shot(String name, {int settleMs = 1600}) async {
   await sleep(settleMs);
+  await dismissSystemDialogs();
   final r = await Process.run('adb', ['exec-out', 'screencap', '-p'], stdoutEncoding: null);
   File('${out.path}/$name.png').writeAsBytesSync(r.stdout as List<int>);
   stdout.writeln('[e2e] shot $name');
@@ -69,12 +85,57 @@ Future<bool> waitRunning(bool want, {int seconds = 60}) async {
   return false;
 }
 
-/// Runs [shellLoop] in the emulator shell (uid 2000, so it goes through the VPN) while sampling
-/// the app's stats once a second for [seconds]. Returns the max speeds the app reported.
-Future<Map<String, int>> trafficPhase(String name, String shellLoop, int seconds) async {
+/// Byte counters of the SOCKS test nodes (tool/emulator/socks_nodes.py control port).
+Future<Map<String, dynamic>> nodeCounters({bool stop = false}) async {
+  final client = HttpClient()..findProxy = (_) => 'DIRECT';
+  try {
+    final req = await client.getUrl(Uri.parse('http://127.0.0.1:11990/${stop ? 'stop' : 'counters'}'));
+    final res = await req.close();
+    return jsonDecode(await res.transform(utf8.decoder).join()) as Map<String, dynamic>;
+  } finally {
+    client.close(force: true);
+  }
+}
+
+Map<String, int> portBytes(Map<String, dynamic> c) =>
+    (c['ports'] as Map<String, dynamic>).map((k, v) => MapEntry(k, v as int));
+
+const stopFile = '/data/local/tmp/e2e_stop';
+
+/// Test traffic that needs no outside host: a CONNECT to 203.0.113.7 (TEST-NET-3, not CN, so the
+/// rules send it through the node) is answered by the SOCKS node itself at ~1 MiB/s.
+const sinkIp = '203.0.113.7';
+
+String loopFor(String host, {String path = '/stream'}) =>
+    'rm -f $stopFile; while [ ! -f $stopFile ]; do printf "GET $path HTTP/1.1\\r\\nHost: $host\\r\\nUser-Agent: curl/8\\r\\nConnection: close\\r\\n\\r\\n" | toybox nc -w 10 $host 80 > /dev/null 2>&1; sleep 1; done';
+
+Future<void> stopTraffic(Process proc) async {
+  await adb(['shell', 'touch $stopFile; pkill -f "toybox nc" ; pkill nc ; true']);
+  if (await nodeCountersSafe(stop: true) == null) stdout.writeln('[e2e] control port not reachable');
+  proc.kill();
+  await sleep(2500); // let the last samples drain
+}
+
+Future<Map<String, dynamic>?> nodeCountersSafe({bool stop = false}) async {
+  try {
+    return await nodeCounters(stop: stop);
+  } catch (e) {
+    stdout.writeln('[e2e] node counters: $e');
+    return null;
+  }
+}
+
+/// One traffic phase: runs [shellLoop] in the emulator shell (uid 2000, so it goes through the
+/// VPN), samples the speeds the app shows once a second for [seconds], then stops the loop and
+/// compares what the app counted with what the SOCKS nodes carried in the same window.
+/// [proxied] phases must show speed on (almost) every sample once the traffic is flowing.
+Future<Map<String, Object?>> trafficPhase(String name, String shellLoop, int seconds,
+    {bool proxied = true, String? shotName, String? expectPort, Future<void> Function()? afterStart}) async {
   final before = jsonDecode(await cmd('stats')) as Map<String, dynamic>;
+  final nodesBefore = await nodeCountersSafe();
   final proc = await Process.start('adb', ['shell', shellLoop]);
-  var maxUp = 0, maxDown = 0;
+  if (afterStart != null) await afterStart();
+  var maxUp = 0, maxDown = 0, zeroDown = 0;
   final samples = <String>[];
   for (var i = 0; i < seconds; i++) {
     await sleep(1000);
@@ -83,26 +144,52 @@ Future<Map<String, int>> trafficPhase(String name, String shellLoop, int seconds
     samples.add('$up/$down');
     if (up > maxUp) maxUp = up;
     if (down > maxDown) maxDown = down;
+    if (i >= 3 && down <= 0) zeroDown++; // the first seconds are connection set-up
+    if (shotName != null && i == seconds ~/ 2) await shot(shotName, settleMs: 0);
   }
-  proc.kill();
+  await stopTraffic(proc);
   final after = jsonDecode(await cmd('stats')) as Map<String, dynamic>;
-  final r = {
+  final nodesAfter = await nodeCountersSafe();
+  final perPort = <String, int>{};
+  var nodeDelta = 0;
+  if (nodesBefore != null && nodesAfter != null) {
+    final b = portBytes(nodesBefore), a = portBytes(nodesAfter);
+    for (final k in a.keys) {
+      final d = a[k]! - (b[k] ?? 0);
+      if (d > 0) perPort[k] = d;
+      nodeDelta += d;
+    }
+  }
+  final appDown = (after['downTotal'] as int) - (before['downTotal'] as int);
+  final r = <String, Object?>{
     'maxUp': maxUp,
     'maxDown': maxDown,
-    'totalDownDelta': (after['downTotal'] as int) - (before['downTotal'] as int),
-    'totalUpDelta': (after['upTotal'] as int) - (before['upTotal'] as int),
+    'zeroDownSamples': zeroDown,
+    'appDownDelta': appDown,
+    'appUpDelta': (after['upTotal'] as int) - (before['upTotal'] as int),
+    'nodeDelta': nodeDelta,
+    'nodePerPort': perPort,
+    'current': after['current'],
   };
-  results['traffic_$name'] = {...r, 'samples': samples, 'current': after['current']};
+  results['traffic_$name'] = {...r, 'samples': samples};
   stdout.writeln('[e2e] traffic $name: $r');
+  if (proxied) {
+    if (nodeDelta < 2 * 1024 * 1024) {
+      failures.add('$name: test traffic did not flow through the nodes (node bytes $nodeDelta) - test setup, not the app');
+    } else {
+      if (maxDown <= 0) failures.add('$name: app showed ↓0B/s the whole time while the node carried $nodeDelta B');
+      if (zeroDown > 1) failures.add('$name: app showed ↓0B/s on $zeroDown samples while traffic flowed');
+      // the app's own total must roughly match what the node carried (other traffic is small)
+      if (appDown < nodeDelta * 0.5 || appDown > nodeDelta * 2 + 4 * 1024 * 1024) {
+        failures.add('$name: app counted $appDown B down, node carried $nodeDelta B');
+      }
+      if (expectPort != null && (perPort[expectPort] ?? 0) < nodeDelta * 0.8) {
+        failures.add('$name: traffic was expected on node port $expectPort, got $perPort');
+      }
+    }
+  }
   return r;
 }
-
-// a large file on a CDN (not on the CN direct list, so it goes through the node)
-const proxiedHost = 'cachefly.cachefly.net';
-const proxiedPath = '/10mb.test';
-
-String httpLoop(String host, {String path = '/'}) =>
-    'i=0; while [ \$i -lt 400 ]; do printf "GET $path HTTP/1.1\\r\\nHost: $host\\r\\nUser-Agent: curl/8\\r\\nConnection: close\\r\\n\\r\\n" | toybox nc -w 5 $host 80 > /dev/null 2>&1; i=\$((i+1)); done';
 
 Future<void> pages(String theme) async {
   await cmd('go:home');
@@ -168,18 +255,10 @@ Future<void> main() async {
     // 2: speeds while another app's traffic goes through the tunnel
     final nc = await adb(['shell', 'toybox nc --help 2>&1 | head -1; which toybox nc']);
     results['nc'] = '${nc.stdout}'.trim();
-    final direct = await trafficPhase('direct_cn', httpLoop('www.baidu.com'), 15);
-    final proxied = await trafficPhase('proxied', httpLoop(proxiedHost, path: proxiedPath), 15);
+    // CN site, direct by rule: recorded only (depends on the runner reaching www.baidu.com)
+    await trafficPhase('direct_cn', loopFor('www.baidu.com', path: '/'), 10, proxied: false);
     await cmd('go:home');
-    final bg = await Process.start('adb', ['shell', httpLoop(proxiedHost, path: proxiedPath)]);
-    await shot('light-home-speed-during-traffic', settleMs: 4000);
-    bg.kill();
-    void need(String phase, Map<String, int> r) {
-      if (r['maxDown']! <= 0 && r['maxUp']! <= 0) failures.add('speed stayed 0 for $phase traffic');
-    }
-
-    need('direct (CN)', direct);
-    need('proxied', proxied);
+    await trafficPhase('proxied', loopFor(sinkIp), 15, shotName: 'light-home-speed-during-traffic');
 
     // the paths the user takes on a phone: reconnect, switch node, app to background and back
     await cmd('disconnect');
@@ -187,19 +266,28 @@ Future<void> main() async {
     await cmd('connect');
     if (await waitRunning(true, seconds: 60)) {
       await sleep(4000);
-      need('after reconnect', await trafficPhase('after_reconnect', httpLoop(proxiedHost, path: proxiedPath), 10));
+      await trafficPhase('after_reconnect', loopFor(sinkIp), 12, shotName: 'light-home-speed-after-reconnect');
     } else {
       failures.add('reconnect failed');
     }
     results['selectNode'] = await cmd('select:🇭🇰 香港 01');
     await sleep(2000);
-    need('after node switch', await trafficPhase('after_node_switch', httpLoop(proxiedHost, path: proxiedPath), 10));
+    await trafficPhase('after_node_switch', loopFor(sinkIp), 12, expectPort: '11080', shotName: 'light-home-speed-after-node-switch');
     await cmd('select:lowest');
+    await sleep(1000);
     await adb(['shell', 'input', 'keyevent', 'KEYCODE_HOME']);
-    await sleep(20000);
+    await sleep(30000);
     await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.MainActivity']);
     await sleep(3000);
-    need('after background/resume', await trafficPhase('after_resume', httpLoop(proxiedHost, path: proxiedPath), 10));
+    await trafficPhase('after_resume', loopFor(sinkIp), 12, shotName: 'light-home-speed-after-resume');
+    // traffic that started while the app was in the background, then the app comes back
+    await trafficPhase('after_resume_2', loopFor(sinkIp), 10, shotName: 'light-home-speed-after-resume-2', afterStart: () async {
+      await sleep(1500);
+      await adb(['shell', 'input', 'keyevent', 'KEYCODE_HOME']);
+      await sleep(15000);
+      await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.MainActivity']);
+      await sleep(2000);
+    });
 
     // 11: how long a full manual node test takes (3 samples + warm-up per node in 1.2.1)
     final timings = <Object?>[];

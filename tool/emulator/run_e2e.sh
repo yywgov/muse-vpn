@@ -8,6 +8,11 @@ adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
 adb shell settings put system screen_off_timeout 1800000
 adb shell svc power stayon true
+# no "app isn't responding" dialogs of other apps (the emulator's launcher) over the screenshots
+adb shell settings put global hide_error_dialogs 1
+adb shell settings put global anr_show_background 0
+adb shell cmd uimode night yes; sleep 2; adb shell cmd uimode night no
+sleep 15
 adb shell wm density | tee out/e2e/density.txt
 density=$(adb shell wm density | grep -oE '[0-9]+' | tail -n1)
 adb shell getprop ro.build.version.release | tee out/e2e/android.txt

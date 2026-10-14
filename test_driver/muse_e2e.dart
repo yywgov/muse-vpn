@@ -27,6 +27,7 @@ import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 ProviderContainer? _container;
+ProviderSubscription<Object?>? _statsSub;
 
 ProviderContainer _c() {
   if (_container != null) return _container!;
@@ -101,6 +102,8 @@ Future<String> _handler(String? message) async {
         final s = _c().read(connectionNotifierProvider);
         return jsonEncode({'status': '${s.valueOrNull}', 'running': _c().read(serviceRunningProvider), 'error': '${s.error ?? ''}'});
       case 'stats':
+        // keep the provider alive the way the home page does (it is auto-dispose)
+        _statsSub ??= _c().listen(statsNotifierProvider, (_, __) {});
         final st = _c().read(statsNotifierProvider).valueOrNull;
         return jsonEncode({
           'up': st?.uplink.toInt() ?? -1,
