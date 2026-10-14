@@ -52,6 +52,14 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
+# 穿云: ChuanyunGuard.exe, the small system-proxy guardian (windows/guard/guard.cpp). Built
+# next to Chuanyun.exe; restores the user's proxy settings when the app dies while 系统代理 is on.
+add_executable(ChuanyunGuard WIN32 "guard/guard.cpp")
+target_compile_features(ChuanyunGuard PUBLIC cxx_std_17)
+target_compile_definitions(ChuanyunGuard PRIVATE UNICODE _UNICODE NOMINMAX)
+target_compile_options(ChuanyunGuard PRIVATE /utf-8 /W3)
+target_link_libraries(ChuanyunGuard PRIVATE wininet ws2_32 shell32)
+
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
@@ -71,6 +79,9 @@ endif()
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
+
+install(TARGETS ChuanyunGuard RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
+  COMPONENT Runtime)
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)

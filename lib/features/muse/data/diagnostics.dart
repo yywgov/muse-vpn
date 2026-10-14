@@ -25,7 +25,7 @@ abstract final class MuseDiagnostics {
 
   static Future<void> _export(WidgetRef ref) async {
     final appInfo = ref.read(appInfoProvider).valueOrNull;
-    final native = await ChuanyunPlatform.nativeDiagnostics();
+    final native = Platform.isAndroid ? await ChuanyunPlatform.nativeDiagnostics() : await _desktopDiagnostics();
     final now = DateTime.now();
     final b = StringBuffer()
       ..writeln('穿云 诊断信息  ${now.toIso8601String()}')
@@ -57,6 +57,41 @@ abstract final class MuseDiagnostics {
     }
     // the share sheet being dismissed is not a failure
     await UriUtils.tryShareFile(Uri.file(file.path), mimeType: 'text/plain');
+  }
+
+  /// 穿云 Windows 1.2.1: the same sections from <working dir>/data — disconnect.log (why the
+  /// connection dropped / recovered), guard.log (the system-proxy guard) and the core's
+  /// stderr*.log (Go panics / fatal errors; *.old.log is the run before).
+  static Future<Map<Object?, Object?>> _desktopDiagnostics() async {
+    final dir = ChuanyunPlatform.desktopDataDir;
+    String read(List<String> names) {
+      if (dir == null) return '';
+      final b = StringBuffer();
+      for (final n in names) {
+        final f = File('$dir${Platform.pathSeparator}$n');
+        if (!f.existsSync() || f.lengthSync() == 0) continue;
+        var text = f.readAsStringSync();
+        if (text.length > 64 * 1024) text = text.substring(text.length - 64 * 1024);
+        b
+          ..writeln('--- $n ---')
+          ..writeln(text.trim());
+      }
+      return b.toString();
+    }
+
+    final stderrNames = <String>[];
+    if (dir != null && Directory(dir).existsSync()) {
+      for (final e in Directory(dir).listSync()) {
+        final n = e.uri.pathSegments.last;
+        if (n.startsWith('stderr') && n.endsWith('.log')) stderrNames.add(n);
+      }
+      stderrNames.sort();
+    }
+    return {
+      'device': '${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+      'disconnects': read(['disconnect.old.log', 'disconnect.log', 'guard.old.log', 'guard.log']),
+      'crash': read(stderrNames),
+    };
   }
 
   static String _two(int n) => n.toString().padLeft(2, '0');

@@ -1,6 +1,8 @@
 // 穿云 - Android bits for the privacy and keep-alive settings.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 
@@ -38,8 +40,29 @@ abstract final class ChuanyunPlatform {
   /// 穿云: what the Android side keeps for 导出诊断 (device facts, disconnect reasons, crash traces).
   static Future<Map<Object?, Object?>?> nativeDiagnostics() => _call<Map<Object?, Object?>>('diagnostics_native');
 
-  /// Adds a line to the disconnect log kept on the Android side.
-  static Future<void> recordDisconnect(String reason) => _call<bool>('record_disconnect', {'reason': reason});
+  /// Adds a line to the disconnect log: kept by the VPN service on Android, in
+  /// <working dir>/data/disconnect.log on Windows (穿云 1.2.1; 导出诊断 includes it).
+  static Future<void> recordDisconnect(String reason) async {
+    if (PlatformUtils.isAndroid) {
+      await _call<bool>('record_disconnect', {'reason': reason});
+      return;
+    }
+    final dir = desktopDataDir;
+    if (dir == null) return;
+    try {
+      final f = File('$dir${Platform.pathSeparator}disconnect.log');
+      if (f.existsSync() && f.lengthSync() > 256 * 1024) {
+        f.renameSync('$dir${Platform.pathSeparator}disconnect.old.log');
+      }
+      final now = DateTime.now().toIso8601String().substring(0, 19).replaceFirst('T', ' ');
+      await f.writeAsString('$now $reason\n', mode: FileMode.append, flush: true);
+    } catch (_) {
+      // diagnostics only
+    }
+  }
+
+  /// Desktop: <working dir>/data, set at start-up.
+  static String? desktopDataDir;
 
   /// 穿云 1.1: a one-off system notification (subscription running out, 穿云已断开 …).
   static Future<void> showAlert({required int id, required String title, required String text}) =>

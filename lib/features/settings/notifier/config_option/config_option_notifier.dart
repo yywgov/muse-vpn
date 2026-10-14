@@ -22,8 +22,7 @@ class ConfigOptionNotifier extends _$ConfigOptionNotifier with AppLogger {
           _lastUpdate = DateTime.now();
           if (serviceSingboxOptions?.enableTun != next.enableTun) {
             loggy.debug("tun option changed, reconnecting");
-            await ref.read(connectionNotifierProvider.notifier).toggleConnection();
-            await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+            await ref.read(connectionNotifierProvider.notifier).restartForModeChange();
           } else {
             final activeProfile = await ref.read(activeProfileProvider.future);
             return await ref.read(connectionNotifierProvider.notifier).reconnect(activeProfile);

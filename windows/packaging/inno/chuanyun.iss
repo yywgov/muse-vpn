@@ -103,13 +103,18 @@ begin
     RegWriteDWordValue(HKCU, InetKey, 'ProxyEnable', 0);
 end;
 
-{ Closes a running 穿云 (and the CLI core) so its files can be replaced. }
+{ Closes a running 穿云 (and the CLI core) so its files can be replaced. Not /T: the proxy guard
+  (a child of Chuanyun.exe) must outlive it to put the user's proxy settings back. }
 procedure CloseChuanyun;
 var
   Code: Integer;
 begin
-  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM Chuanyun.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM Chuanyun.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM HiddifyCli.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  { the proxy guard restores the user's proxy settings when Chuanyun.exe goes away; give it a
+    moment, then close it too so its exe can be replaced }
+  Sleep(800);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM ChuanyunGuard.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
   Sleep(800);
   ClearStaleProxy;
 end;
