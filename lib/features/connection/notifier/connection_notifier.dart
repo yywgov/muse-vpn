@@ -119,6 +119,24 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     }
   }
 
+  /// 穿云 1.2 watchdog: the core stopped answering while connected. Restart it in place
+  /// (reconnect); when that fails too, stop and start again.
+  Future<void> restartAfterWatchdog() async {
+    final profile = await ref.read(activeProfileProvider.future);
+    if (profile == null) return;
+    loggy.warning("core watchdog: core not answering, restarting");
+    final ok = await _connectionRepo
+        .reconnect(profile, ref.read(Preferences.disableMemoryLimit))
+        .match((err) {
+          loggy.warning("watchdog reconnect failed", err);
+          return false;
+        }, (_) => true)
+        .run();
+    if (ok) return;
+    await _connectionRepo.disconnect().run();
+    await _connectionRepo.connect(profile, ref.read(Preferences.disableMemoryLimit)).run();
+  }
+
   Future<void> abortConnection() async {
     if (state case AsyncData(:final value)) {
       switch (value) {

@@ -32,6 +32,8 @@ import 'package:hiddify/hiddifycore/generated/v2/hello/hello.pb.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hello/hello_service.pbgrpc.dart';
 
 const _mixedPort = 12334;
+// a few MB through the proxy for the speed check (Cloudflare's speed test endpoint)
+const _downloadUrl = 'https://speed.cloudflare.com/__down?bytes=8000000';
 const _grpcPort = 17179; // not the app's 17078, so a running app can't interfere
 const _inetKey = r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings';
 // not gstatic: the cn rules may send www.gstatic.com direct (Google's CN-served CDN)
@@ -157,15 +159,19 @@ Future<void> main(List<String> args) async {
     return _finish();
   }
 
+  // ---- speed stats (one stream for the whole run: it must survive stop → start) ----
+  final stats = _StatsWatch(core)..start();
+
   // ---- 系统代理 ----
   await _setOptions(core, tun: false);
-  await _runProxyMode(core, profile, node);
+  await _runProxyMode(core, profile, node, stats);
 
   // ---- TUN (gVisor + wintun) ----
   if (!skipTun) {
     await _setOptions(core, tun: true);
-    await _runTunMode(core, profile, node);
+    await _runTunMode(core, profile, node, stats);
   }
+  await stats.stop();
   await node.close();
   return _finish();
 }
@@ -248,7 +254,7 @@ Future<String> _curl(List<String> extra, String url) async {
   return '${r.stdout}'.trim() + ('${r.stderr}'.trim().isEmpty ? '' : ' ${'${r.stderr}'.trim()}');
 }
 
-Future<void> _runProxyMode(CoreClient core, String profile, _SocksNode node) async {
+Future<void> _runProxyMode(CoreClient core, String profile, _SocksNode node, _StatsWatch stats) async {
   final before = await _readProxy();
   print('proxy before start: $before');
   if (!await _start(core, profile, 'proxy')) return;
@@ -267,6 +273,34 @@ Future<void> _runProxyMode(CoreClient core, String profile, _SocksNode node) asy
   _record('proxy-request', 'request via mixed port $_mixedPort → $_probeUrl', code.startsWith('204'), 'http $code');
   final viaNode = node.targets.any((t) => t.contains('google') || t.endsWith(':443'));
   _record('proxy-via-node', 'that request went through the node', viaNode, 'node saw: ${node.targets.take(8).join(', ')}');
+
+  // 穿云 1.2: the mixed port listens on loopback only (no LAN access)
+  final listen = await Process.run('powershell', [
+    '-NoProfile',
+    '-Command',
+    "Get-NetTCPConnection -State Listen -LocalPort $_mixedPort -ErrorAction SilentlyContinue | ForEach-Object { \$_.LocalAddress }",
+  ]);
+  final addrs = '${listen.stdout}'.split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
+  _record(
+    'proxy-loopback-only',
+    'mixed port $_mixedPort listens on 127.0.0.1/::1 only',
+    addrs.isNotEmpty && addrs.every((a) => a == '127.0.0.1' || a == '::1'),
+    'listening on: ${addrs.join(', ')}',
+  );
+
+  // 穿云 1.2: real traffic shows up as non-zero speeds in the stats stream
+  final mark = stats.samples.length;
+  final dl = await _curl(['-x', 'http://127.0.0.1:$_mixedPort'], _downloadUrl);
+  await Future<void>.delayed(const Duration(seconds: 3));
+  final seen = stats.samples.skip(mark).toList();
+  final maxDown = seen.fold<int>(0, (m, e) => e.downlink.toInt() > m ? e.downlink.toInt() : m);
+  final maxUp = seen.fold<int>(0, (m, e) => e.uplink.toInt() > m ? e.uplink.toInt() : m);
+  _record(
+    'stats-speed',
+    'speeds are non-zero while downloading through the proxy',
+    maxDown > 0 && maxUp > 0,
+    'download http $dl; ${seen.length} samples; max ↓$maxDown B/s ↑$maxUp B/s; stream errors: ${stats.errors}',
+  );
 
   // 国内直连: a CN site must not go through the node (region cn rules)
   node.targets.clear();
@@ -300,10 +334,11 @@ Future<String> _tunAdapters() async {
   return '${r.stdout}'.trim();
 }
 
-Future<void> _runTunMode(CoreClient core, String profile, _SocksNode node) async {
+Future<void> _runTunMode(CoreClient core, String profile, _SocksNode node, _StatsWatch stats) async {
   node.allowUpstream = false;
   final admin = (await Process.run('whoami', ['/groups'])).stdout.toString().contains('S-1-16-12288');
   print('elevated: $admin');
+  stats.tunStart = DateTime.now();
   if (!await _start(core, profile, 'tun')) return;
   await Future<void>.delayed(const Duration(seconds: 5));
   final adapters = await _tunAdapters();
@@ -320,6 +355,15 @@ Future<void> _runTunMode(CoreClient core, String profile, _SocksNode node) async
     'request without proxy goes through TUN → core → node ($tunProbe)',
     code.startsWith('204') && viaNode,
     'http $code; node saw: ${node.targets.take(8).join(', ')}',
+  );
+  await Future<void>.delayed(const Duration(seconds: 2));
+  final afterRestart = stats.since(stats.tunStart);
+  final counted = afterRestart.where((e) => e.downlinkTotal.toInt() > 0).length;
+  _record(
+    'stats-after-restart',
+    'the same stats stream still reports traffic after stop → start (TUN)',
+    counted > 0,
+    'samples since TUN start: ${afterRestart.length}, with traffic: $counted; last ↓total ${stats.lastTotalDown}; errors: ${stats.errors}',
   );
   await _stop(core, 'tun');
   await Future<void>.delayed(const Duration(seconds: 3));
@@ -459,4 +503,46 @@ class _SocksNode {
       onError: (_) => upstream?.destroy(),
     );
   }
+}
+
+/// Listens to the core's speed stream (GetSystemInfoStream) and re-opens it if it ends.
+class _StatsWatch {
+  _StatsWatch(this.core);
+
+  final CoreClient core;
+  final samples = <SystemInfo>[];
+  final _times = <DateTime>[];
+  var errors = 0;
+  var _running = false;
+  DateTime tunStart = DateTime(2100);
+
+  int get lastTotalDown => samples.isEmpty ? 0 : samples.last.downlinkTotal.toInt();
+
+  List<SystemInfo> since(DateTime t) => [
+    for (var i = 0; i < samples.length; i++)
+      if (_times[i].isAfter(t)) samples[i],
+  ];
+
+  void start() {
+    _running = true;
+    unawaited(_loop());
+  }
+
+  Future<void> _loop() async {
+    while (_running) {
+      try {
+        await for (final s in core.getSystemInfoStream(Empty())) {
+          samples.add(s);
+          _times.add(DateTime.now());
+          if (!_running) return;
+        }
+      } catch (e) {
+        errors++;
+        print('stats stream error: $e');
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+  }
+
+  Future<void> stop() async => _running = false;
 }

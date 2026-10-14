@@ -355,6 +355,17 @@ class HiddifyCoreService with InfraLogger {
   //
   // Stream<SingboxStatus> watchStatus() => _status;
 
+  /// 穿云 1.2 watchdog: whether the core answers a gRPC call within [timeout].
+  Future<bool> ping({Duration timeout = const Duration(seconds: 4)}) async {
+    try {
+      await core.bgClient.getSystemInfo(Empty(), options: CallOptions(timeout: timeout));
+      return true;
+    } catch (e) {
+      loggy.warning("core health ping failed: $e");
+      return false;
+    }
+  }
+
   ResponseStream<SystemInfo> watchStats() {
     loggy.debug("watching stats");
     try {

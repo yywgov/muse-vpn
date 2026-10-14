@@ -199,6 +199,10 @@ abstract class ConfigOptions {
 
   static final allowConnectionFromLan = PreferencesNotifier.create<bool, bool>("allow-connection-from-lan", false);
 
+  /// 穿云 1.2 「我的宽带」 for Hysteria2 nodes, Mbps; 0 = automatic (BBR)
+  static final hysteria2UpMbps = PreferencesNotifier.create<int, int>("hysteria2-up-mbps", 0);
+  static final hysteria2DownMbps = PreferencesNotifier.create<int, int>("hysteria2-down-mbps", 0);
+
   static final lanSharingPassword = PreferencesNotifier.create<String, String>("lan_sharing_password", "");
 
   static final enableFakeDns = PreferencesNotifier.create<bool, bool>("enable-fake-dns", false);
@@ -429,6 +433,9 @@ abstract class ConfigOptions {
     "unblocker.profile.id": unblockerProfileId,
   };
 
+  /// a bandwidth value the core accepts: 1–100000 Mbps, anything else = automatic (0)
+  static int museBandwidth(int mbps) => mbps > 0 && mbps <= 100000 ? mbps : 0;
+
   static final singboxConfigOptions = Provider<SingboxConfigOption>((ref) {
     // final region = ref.watch(Preferences.region);
     // final rules = <SingboxRule>[];
@@ -515,7 +522,9 @@ abstract class ConfigOptions {
       // enableTunService: mode == false, //ServiceMode.tunService,
       setSystemProxy: mode == ServiceMode.systemProxy,
       // bypassLan: ref.watch(bypassLan),
-      allowConnectionFromLan: false, // 穿云: no LAN sharing UI on any platform
+      allowConnectionFromLan: false, // 穿云: loopback only on every platform (no LAN access to the proxy port)
+      hysteria2UpMbps: museBandwidth(ref.watch(hysteria2UpMbps)),
+      hysteria2DownMbps: museBandwidth(ref.watch(hysteria2DownMbps)),
       lanSharingPassword: ref.watch(lanSharingPassword),
       enableFakeDns: ref.watch(enableFakeDns),
       // enableDnsRouting: ref.watch(enableDnsRouting),

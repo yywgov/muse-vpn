@@ -15,6 +15,7 @@ import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_based_routing_notifier.dart';
 import 'package:hiddify/features/connection/widget/connection_wrapper.dart';
 import 'package:hiddify/features/muse/home/auto_fastest.dart';
+import 'package:hiddify/features/muse/home/core_watchdog.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/subscription_alert.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
@@ -69,6 +70,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     if (PlatformUtils.isAndroid) ref.listen(appBasedRoutingProvider, (_, _) {});
     ref.listen(museNodeFailoverProvider, (_, _) {});
     ref.listen(museAutoFastestProvider, (_, _) {});
+    ref.listen(museCoreWatchdogProvider, (_, _) {});
     if (PlatformUtils.isAndroid) ref.listen(museSubscriptionAlertProvider, (_, _) {});
     if (PlatformUtils.isDesktop) ref.listen(systemTrayNotifierProvider, (_, _) {});
 

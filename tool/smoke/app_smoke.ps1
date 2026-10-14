@@ -186,6 +186,24 @@ foreach ($root in @($env:APPDATA, $env:LOCALAPPDATA)) {
     ForEach-Object { $dest = Join-Path $logs (($_.FullName -replace "[:\\]", "_")); Copy-Item $_.FullName $dest -ErrorAction SilentlyContinue; Write-Host "log: $($_.FullName) ($($_.Length) B)" }
 }
 
+# ---- tray right-click menu (1.2): the app logs the menu it hands to the tray ----
+function Cn([int[]]$cps) { [string]::new([char[]]$cps) }
+$expect = @((Cn 0x8FDE,0x63A5), (Cn 0x914D,0x7F6E), (Cn 0x4EE3,0x7406), (Cn 0x76F4,0x8FDE), (Cn 0x663E,0x793A,0x7A97,0x53E3), (Cn 0x9000,0x51FA))
+$menuLine = ""
+Get-ChildItem -Path $logs -Filter "*app.log" -ErrorAction SilentlyContinue | ForEach-Object {
+  $l = Get-Content -Path $_.FullName -Encoding UTF8 -ErrorAction SilentlyContinue | Where-Object { $_ -match "tray menu: " } | Select-Object -Last 1
+  if ($l) { $menuLine = $l }
+}
+$menuOk = $menuLine -ne ""
+$pos = 0
+foreach ($e in $expect) {
+  $i = $menuLine.IndexOf($e, $pos)
+  if ($i -lt 0) { $menuOk = $false; break }
+  $pos = $i + $e.Length
+}
+$menuDetail = if ($menuLine) { ($menuLine -replace "^.*tray menu: ", "") } else { "no 'tray menu:' line in app.log" }
+Rec "tray-menu" "tray menu: connect / rule-proxy-direct / show window / quit" $menuOk $menuDetail
+
 $failed = @($results | Where-Object { -not $_.pass -and -not $_.optional }).Count
 $md = "# Chuanyun app smoke test ($Label)`n`n| | check | detail |`n|---|---|---|`n"
 foreach ($x in $results) {

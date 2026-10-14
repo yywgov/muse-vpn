@@ -12,6 +12,8 @@ import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
+import 'package:hiddify/features/muse/home/core_watchdog.dart';
+import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
@@ -122,6 +124,8 @@ class _ConnectSection extends HookConsumerWidget {
     final since = ref.watch(museConnectedSinceProvider).valueOrNull;
     final stats = ref.watch(statsNotifierProvider).asData?.value ?? SystemInfo.create();
     final secondary = MuseColors.secondaryText(context);
+    final recovering = ref.watch(museWatchdogRecoveringProvider);
+    final failoverFrom = ref.watch(museFailoverFromProvider);
 
     // tick every second while connected, for the timer
     final tick = useState(0);
@@ -166,6 +170,23 @@ class _ConnectSection extends HookConsumerWidget {
               children: [
                 TextSpan(text: label),
                 if (since != null) TextSpan(text: '  ·  ${museFormatDuration(DateTime.now().difference(since))}'),
+                // 穿云 1.2: state as icons, no text — core restarting / standing in for a dead node
+                if (connected && recovering)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Icon(Icons.autorenew_rounded, key: const ValueKey('watchdog_icon'), size: 18, color: theme.colorScheme.tertiary),
+                    ),
+                  ),
+                if (connected && failoverFrom != null)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Icon(Icons.swap_horiz_rounded, key: const ValueKey('failover_icon'), size: 18, color: theme.colorScheme.tertiary),
+                    ),
+                  ),
               ],
             ),
             style: theme.textTheme.titleMedium?.copyWith(

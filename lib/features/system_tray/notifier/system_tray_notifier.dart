@@ -5,6 +5,8 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/muse/model/route_mode.dart';
+import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/gen/assets.gen.dart';
@@ -50,28 +52,26 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
       isTemplate: PlatformUtils.isMacOS,
     );
     if (!PlatformUtils.isLinux) await trayManager.setToolTip(_trayTooltip(connection, urlTestDelay, t));
-    await trayManager.setContextMenu(_trayMenu(connection));
+    await trayManager.setContextMenu(_trayMenu(connection, ref.watch(ConfigOptions.museRouteMode)));
   }
 
   // 穿云: 显示 / 连接|断开 / 退出 — nothing else
-  Menu _trayMenu(ConnectionStatus connection) => Menu(
-    items: [
-      MenuItem(key: 'dashboard', label: '显示'),
-      MenuItem.separator(),
-      MenuItem(
-        key: 'connection',
-        label: switch (connection) {
-          Disconnected() => '连接',
-          Connecting() => '连接中…',
-          Connected() => '断开',
-          Disconnecting() => '断开中…',
-        },
-        disabled: connection.isSwitching,
-      ),
-      MenuItem.separator(),
-      MenuItem(key: 'quit', label: '退出'),
-    ],
-  );
+  Menu _trayMenu(ConnectionStatus connection, MuseRouteMode mode) {
+    final spec = museTrayMenuSpec(connection, mode);
+    // 穿云 1.2: one line in app.log, checked by the Windows smoke test
+    loggy.info("tray menu: ${spec.map((e) => e.key == '-' ? '|' : '${e.label}${e.checked ? '*' : ''}').join(' ')}");
+    return Menu(
+      items: [
+        for (final e in spec)
+          if (e.key == '-')
+            MenuItem.separator()
+          else if (e.checkable)
+            MenuItem.checkbox(key: e.key, label: e.label, checked: e.checked, disabled: e.disabled)
+          else
+            MenuItem(key: e.key, label: e.label, disabled: e.disabled),
+      ],
+    );
+  }
 
   String _trayIconPath(ConnectionStatus status) {
     final isDarkMode = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
@@ -122,6 +122,8 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
       await ref.read(windowNotifierProvider.notifier).show();
     } else if (menuItem.key == 'connection') {
       await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+    } else if (menuItem.key?.startsWith('mode:') ?? false) {
+      await ref.read(ConfigOptions.museRouteMode.notifier).update(MuseRouteMode.fromKey(menuItem.key!.substring(5)));
     } else if (menuItem.key == 'quit') {
       await ref.read(windowNotifierProvider.notifier).exit();
     }
@@ -316,3 +318,33 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
 //     // return Assets.images.trayIconPng.path;
 //   }
 // }
+
+/// One entry of the tray menu ('-' = separator).
+class MuseTrayItem {
+  const MuseTrayItem(this.key, this.label, {this.checkable = false, this.checked = false, this.disabled = false});
+
+  final String key;
+  final String label;
+  final bool checkable;
+  final bool checked;
+  final bool disabled;
+}
+
+/// 穿云 1.2 tray right-click menu: 连接/断开 · 配置/代理/直连 · 显示窗口 · 退出.
+List<MuseTrayItem> museTrayMenuSpec(ConnectionStatus connection, MuseRouteMode mode) => [
+  MuseTrayItem(
+    'connection',
+    switch (connection) {
+      Disconnected() => '连接',
+      Connecting() => '连接中…',
+      Connected() => '断开',
+      Disconnecting() => '断开中…',
+    },
+    disabled: connection.isSwitching,
+  ),
+  const MuseTrayItem('-', ''),
+  for (final m in MuseRouteMode.values) MuseTrayItem('mode:${m.key}', m.title, checkable: true, checked: m == mode),
+  const MuseTrayItem('-', ''),
+  const MuseTrayItem('dashboard', '显示窗口'),
+  const MuseTrayItem('quit', '退出'),
+];
