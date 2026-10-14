@@ -4,7 +4,10 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/core/theme/app_theme.dart';
+import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/model/directories.dart';
 import 'package:hiddify/core/preferences/preferences_migration.dart';
@@ -60,6 +63,25 @@ void main() {
     test('node subtitles keep the protocol name', () {
       final home = File('lib/features/muse/home/muse_home_page.dart').readAsStringSync();
       expect(home, contains(': museProtocolName(proxy.type)'));
+    });
+  });
+
+  group('status / navigation bar icons', () {
+    test('dark icons on the light theme, light icons on dark / true black', () {
+      final light = museSystemOverlayStyle(Brightness.light);
+      expect(light.statusBarIconBrightness, Brightness.dark);
+      expect(light.systemNavigationBarIconBrightness, Brightness.dark);
+      final dark = museSystemOverlayStyle(Brightness.dark);
+      expect(dark.statusBarIconBrightness, Brightness.light);
+      expect(dark.systemNavigationBarIconBrightness, Brightness.light);
+    });
+    test('every app bar uses it (no guess from a transparent background)', () {
+      final theme = AppTheme(AppThemeMode.light, '');
+      expect(theme.lightTheme(null).appBarTheme.systemOverlayStyle?.statusBarIconBrightness, Brightness.dark);
+      expect(AppTheme(AppThemeMode.black, '').darkTheme(null).appBarTheme.systemOverlayStyle?.statusBarIconBrightness, Brightness.light);
+      expect(theme.lightTheme(null).dialogTheme.barrierColor, museLightScrim);
+      final scaffold = File('lib/features/muse/widget/grouped_list.dart').readAsStringSync();
+      expect(scaffold, contains('systemOverlayStyle: museSystemOverlayStyle(Theme.of(context).brightness)'));
     });
   });
 

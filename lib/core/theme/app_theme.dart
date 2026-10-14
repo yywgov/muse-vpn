@@ -22,6 +22,9 @@ SystemUiOverlayStyle museSystemOverlayStyle(Brightness themeBrightness) {
   );
 }
 
+/// 32 % black: dims the page behind a dialog / bottom sheet on the light theme.
+const museLightScrim = Color(0x52000000);
+
 class AppTheme {
   AppTheme(this.mode, this.fontFamily);
 
@@ -44,6 +47,10 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: const Color(0xFFF3F6FB),
       appBarTheme: AppBarTheme(systemOverlayStyle: museSystemOverlayStyle(Brightness.light)),
+      // 1.2.1: a lighter scrim behind dialogs and bottom sheets, so the dark status bar icons
+      // stay readable on the light theme while one is open (the default black54 hid them)
+      dialogTheme: const DialogThemeData(barrierColor: museLightScrim),
+      bottomSheetTheme: const BottomSheetThemeData(modalBarrierColor: museLightScrim),
       fontFamily: fontFamily,
       pageTransitionsTheme: _transitions,
       extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},

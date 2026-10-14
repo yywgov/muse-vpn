@@ -73,9 +73,18 @@ Future<String> _handler(String? message) async {
         _c().read(goRouterNotiferProvider).goNamed(arg);
         return 'ok';
       case 'back':
-        final ctx = _navigatorContext();
-        if (ctx != null) Navigator.of(ctx).maybePop();
-        return 'ok';
+        // closes every open dialog / bottom sheet (on any navigator)
+        final navs = <NavigatorState>[];
+        void visit(Element e) {
+          if (e is StatefulElement && e.state is NavigatorState) navs.add(e.state as NavigatorState);
+          e.visitChildElements(visit);
+        }
+
+        WidgetsBinding.instance.rootElement?.visitChildElements(visit);
+        for (final nav in navs.reversed) {
+          nav.popUntil((route) => route is! PopupRoute);
+        }
+        return 'ok:${navs.length}';
       case 'prefs':
         await _c().read(Preferences.keepAliveGuideShown.notifier).update(true);
         return 'ok';
@@ -133,6 +142,11 @@ Future<String> _handler(String? message) async {
           }
         }
         return jsonEncode({'ms': -1});
+      case 'select':
+        final g = _c().read(proxiesOverviewNotifierProvider).valueOrNull;
+        if (g == null) return 'no-group';
+        await _c().read(proxiesOverviewNotifierProvider.notifier).changeProxy(g.tag, arg);
+        return 'ok';
       case 'sheet':
         unawaited(_c().read(bottomSheetsNotifierProvider.notifier).showAddProfile());
         return 'ok';

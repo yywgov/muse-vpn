@@ -97,6 +97,10 @@ Future<Map<String, int>> trafficPhase(String name, String shellLoop, int seconds
   return r;
 }
 
+// a large file on a CDN (not on the CN direct list, so it goes through the node)
+const proxiedHost = 'cachefly.cachefly.net';
+const proxiedPath = '/10mb.test';
+
 String httpLoop(String host, {String path = '/'}) =>
     'i=0; while [ \$i -lt 400 ]; do printf "GET $path HTTP/1.1\\r\\nHost: $host\\r\\nUser-Agent: curl/8\\r\\nConnection: close\\r\\n\\r\\n" | toybox nc -w 5 $host 80 > /dev/null 2>&1; i=\$((i+1)); done';
 
@@ -165,13 +169,37 @@ Future<void> main() async {
     final nc = await adb(['shell', 'toybox nc --help 2>&1 | head -1; which toybox nc']);
     results['nc'] = '${nc.stdout}'.trim();
     final direct = await trafficPhase('direct_cn', httpLoop('www.baidu.com'), 15);
-    final proxied = await trafficPhase('proxied', httpLoop('www.google.com'), 15);
+    final proxied = await trafficPhase('proxied', httpLoop(proxiedHost, path: proxiedPath), 15);
     await cmd('go:home');
-    final bg = await Process.start('adb', ['shell', httpLoop('www.google.com')]);
-    await shot('light-home-speed-during-traffic', settleMs: 3500);
+    final bg = await Process.start('adb', ['shell', httpLoop(proxiedHost, path: proxiedPath)]);
+    await shot('light-home-speed-during-traffic', settleMs: 4000);
     bg.kill();
-    if (proxied['maxDown']! <= 0 && proxied['maxUp']! <= 0) failures.add('speed stayed 0 for proxied traffic');
-    if (direct['maxDown']! <= 0 && direct['maxUp']! <= 0) failures.add('speed stayed 0 for direct (CN) traffic');
+    void need(String phase, Map<String, int> r) {
+      if (r['maxDown']! <= 0 && r['maxUp']! <= 0) failures.add('speed stayed 0 for $phase traffic');
+    }
+
+    need('direct (CN)', direct);
+    need('proxied', proxied);
+
+    // the paths the user takes on a phone: reconnect, switch node, app to background and back
+    await cmd('disconnect');
+    await waitRunning(false, seconds: 30);
+    await cmd('connect');
+    if (await waitRunning(true, seconds: 60)) {
+      await sleep(4000);
+      need('after reconnect', await trafficPhase('after_reconnect', httpLoop(proxiedHost, path: proxiedPath), 10));
+    } else {
+      failures.add('reconnect failed');
+    }
+    results['selectNode'] = await cmd('select:🇭🇰 香港 01');
+    await sleep(2000);
+    need('after node switch', await trafficPhase('after_node_switch', httpLoop(proxiedHost, path: proxiedPath), 10));
+    await cmd('select:lowest');
+    await adb(['shell', 'input', 'keyevent', 'KEYCODE_HOME']);
+    await sleep(20000);
+    await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.MainActivity']);
+    await sleep(3000);
+    need('after background/resume', await trafficPhase('after_resume', httpLoop(proxiedHost, path: proxiedPath), 10));
 
     // 11: how long a full manual node test takes (3 samples + warm-up per node in 1.2.1)
     final timings = <Object?>[];
