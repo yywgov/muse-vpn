@@ -70,6 +70,16 @@ jobs:
           MUSE_E2E_ABI: x86_64
         run: flutter build apk --debug --target test_driver/muse_e2e.dart --target-platform android-x64
 
+      # the emulator runner downloads the image once; Google's mirror sometimes hands out a
+      # broken zip ("unknown archive"), so fetch it here with retries
+      - name: System image (with retries)
+        run: |
+          for i in 1 2 3 4; do
+            yes | sdkmanager --install "system-images;android-35;google_apis;x86_64" "emulator" > /tmp/sdk.log 2>&1 && break
+            tail -3 /tmp/sdk.log; echo "retry $i"; sleep 20
+          done
+          ls $ANDROID_SDK_ROOT/system-images/android-35/google_apis/x86_64 | head
+
       - name: SOCKS test nodes
         run: |
           pip install --quiet pillow
