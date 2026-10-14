@@ -24,6 +24,7 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
+import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hiddify/singbox/model/core_status.dart';
@@ -76,6 +77,11 @@ class MuseConnectionKeeper with InfraLogger {
   static const probeEvery = Duration(seconds: 30);
 
   Timer? _timer;
+  final DateTime _createdAt = DateTime.now();
+
+  /// The first 20 s after start-up belong to restoreConnectionOnStartup: no recovery then
+  /// (the core may not even be set up yet).
+  static const startupGrace = Duration(seconds: 20);
   DateTime _lastTick = DateTime.now();
   DateTime _lastProbe = DateTime.fromMillisecondsSinceEpoch(0);
   bool _busy = false;
@@ -112,6 +118,7 @@ class MuseConnectionKeeper with InfraLogger {
     _busy = true;
     try {
       final service = ref.read(hiddifyCoreServiceProvider);
+      if (!service.isReady || now.difference(_createdAt) < startupGrace) return;
       final want = ref.read(Preferences.startedByUser);
       final ui = ref.read(connectionNotifierProvider).valueOrNull;
       final stoppedAt = ref.read(connectionNotifierProvider.notifier).lastIntentionalStopAt;
@@ -127,7 +134,7 @@ class MuseConnectionKeeper with InfraLogger {
       );
       switch (action) {
         case KeeperAction.fixUi:
-          _log('界面显示 ${ui.runtimeType}，内核实际为 ${core.runtimeType}：修正界面状态');
+          _log('界面显示 ${museConnectionName(ui)}，内核实际为 ${museCoreName(core)}：修正界面状态');
           await service.resyncStatus();
         case KeeperAction.recover:
           _log(core == null ? '内核无响应（非用户操作），开始恢复' : '内核已停止（非用户操作），开始恢复');
@@ -211,6 +218,7 @@ class MuseConnectionKeeper with InfraLogger {
         if (ok) {
           failedAttempts = 0;
           _log('第 ${i + 1} 次恢复成功，已重新连接');
+          unawaited(_retestNodes());
           return;
         }
         failedAttempts = i + 1;
@@ -235,6 +243,18 @@ class MuseConnectionKeeper with InfraLogger {
     }
   }
 
+  /// After a reconnect the node list could still show the previous core's results (a test cut
+  /// short by the stop reads as 超时): test the current group again.
+  Future<void> _retestNodes() async {
+    await Future<void>.delayed(const Duration(seconds: 3));
+    try {
+      final group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
+      if (group != null) await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest(group.tag);
+    } catch (_) {
+      // the core's own cycle tests the nodes anyway
+    }
+  }
+
   /// After a recovery connect: the core says started and, in 系统代理 mode, the port answers.
   Future<bool> _confirmUp() async {
     final service = ref.read(hiddifyCoreServiceProvider);
@@ -252,6 +272,24 @@ class MuseConnectionKeeper with InfraLogger {
     return false;
   }
 }
+
+/// Stable names (release builds minify runtimeType).
+String museConnectionName(ConnectionStatus? s) => switch (s) {
+  Connected() => '已连接',
+  Connecting() => '连接中',
+  Disconnecting() => '断开中',
+  Disconnected() => '未连接',
+  null => '无',
+};
+
+String museCoreName(CoreStatus? s) => switch (s) {
+  CoreStarted() => 'started',
+  CoreStarting() => 'starting',
+  CoreStopping() => 'stopping',
+  CoreStopped() => 'stopped',
+  CoreHotReloading() => 'hot-reloading',
+  null => 'no-answer',
+};
 
 /// HEAD http://www.baidu.com/ (then www.qq.com) — through 127.0.0.1:[viaPort] as an HTTP proxy,
 /// or directly. True when any answers with an HTTP status line within 8 s.

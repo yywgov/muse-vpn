@@ -61,9 +61,9 @@ abstract final class MuseSmokeControl {
         final ui = c.read(connectionNotifierProvider).valueOrNull;
         final core = await service.queryCoreState();
         return {
-          'ui': ui?.runtimeType.toString() ?? 'none',
+          'ui': museConnectionName(ui),
           'uiConnected': ui is Connected,
-          'core': core?.runtimeType.toString() ?? 'no-answer',
+          'core': museCoreName(core),
           'startedByUser': c.read(Preferences.startedByUser),
           'proxyOurs': await WindowsProxyGuard.pointsAtUsNow(),
           'recoveries': c.read(museConnectionKeeperProvider)?.failedAttempts,

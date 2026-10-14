@@ -74,15 +74,26 @@ function WaitConnected([int]$seconds) {
   $s = $null
   while ((Get-Date) -lt $deadline) {
     $s = Ctl "/state"
-    if ($s -and $s.uiConnected -and $s.core -eq "CoreStarted" -and $s.proxyOurs) { return @($true, $s) }
+    if ($s -and $s.uiConnected -and $s.core -eq "started" -and $s.proxyOurs) { return @($true, $s) }
     Start-Sleep -Seconds 1
   }
   return @($false, $s)
 }
-function GuardStatus {
-  $o = & $guard status $env:TEMP $Port
-  return ($o | Out-String).Trim()
+# ChuanyunGuard.exe is a GUI-subsystem exe: PowerShell neither waits for it nor captures its
+# output, so run it through System.Diagnostics.Process
+function RunGuard([string[]]$guardArgs) {
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $guard
+  $psi.Arguments = (($guardArgs | ForEach-Object { '"' + $_ + '"' }) -join " ")
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardOutput = $true
+  $psi.CreateNoWindow = $true
+  $pr = [System.Diagnostics.Process]::Start($psi)
+  $o = $pr.StandardOutput.ReadToEnd()
+  $pr.WaitForExit(15000) | Out-Null
+  return $o.Trim()
 }
+function GuardStatus { return (RunGuard @("status", $env:TEMP, "$Port")) }
 # a request through 127.0.0.1:<mixed port> (proves the core forwards)
 function ViaProxy {
   $code = & curl.exe -s -o NUL -w "%{http_code}" --max-time 15 -x "http://127.0.0.1:$Port" "https://www.google.com/generate_204"
@@ -135,7 +146,8 @@ Start-Sleep -Seconds 1
 # ---- the user's own proxy settings: off, but with a server and bypass list filled in ----
 # (restoring must bring these back, not just blank everything)
 $origServer = "original.example:8080"
-& $guard apply $env:TEMP $Port 0x1 $origServer "<local>" | Out-Null
+$applied = RunGuard @("apply", $env:TEMP, "$Port", "0x1", $origServer, "<local>")
+Write-Host "apply: $applied"
 $st0 = GuardStatus
 Rec "orig" "user's own proxy settings in place (direct, server original.example:8080)" ($st0 -match "ours=0" -and $st0 -match "original.example:8080") $st0
 
@@ -177,7 +189,7 @@ Write-Host "data dir: $dataDir"
 Ctl "/break-status" | Out-Null
 Start-Sleep -Seconds 6
 $s = Ctl "/state"
-Rec "status-break" "status stream lost while the core runs: UI stays connected" ($s -and $s.uiConnected -and $s.core -eq "CoreStarted") (StateText $s)
+Rec "status-break" "status stream lost while the core runs: UI stays connected" ($s -and $s.uiConnected -and $s.core -eq "started") (StateText $s)
 Shot "2-after-status-break"
 
 # ---- (1) the core stops without the app asking (not the user) ----
@@ -187,6 +199,7 @@ $mid = GuardStatus
 $c = WaitConnected 45
 $vp = ViaProxy
 Rec "core-stop" "core stopped behind the app's back: reconnected automatically" ($c[0] -and $vp -eq "204") ((StateText $c[1]) + "; via proxy $vp; right after stop: $mid")
+Start-Sleep -Seconds 8
 Shot "3-after-core-stop"
 
 # ---- (c) sleep: the whole process is suspended for 45 s, then resumed ----
@@ -203,7 +216,7 @@ Rec "suspend" "after a 45 s suspend (sleep): connected and forwarding again" ($c
 Ctl "/resume" | Out-Null
 Start-Sleep -Seconds 4
 $s = Ctl "/state"
-Rec "resume-path" "resume path (window restore / wake) keeps it connected, no reconnect" ($s -and $s.uiConnected -and $s.core -eq "CoreStarted") (StateText $s)
+Rec "resume-path" "resume path (window restore / wake) keeps it connected, no reconnect" ($s -and $s.uiConnected -and $s.core -eq "started") (StateText $s)
 Shot "4-after-suspend"
 
 # ---- window to the tray and back ----
@@ -211,7 +224,7 @@ Shot "4-after-suspend"
 Start-Sleep -Seconds 20
 $s = Ctl "/state"
 $hidden = -not [R]::IsWindowVisible((Win))
-Rec "tray-hidden" "hidden in the tray for 20 s: still connected" ($hidden -and $s -and $s.uiConnected -and $s.core -eq "CoreStarted") ("hidden $hidden; " + (StateText $s))
+Rec "tray-hidden" "hidden in the tray for 20 s: still connected" ($hidden -and $s -and $s.uiConnected -and $s.core -eq "started") ("hidden $hidden; " + (StateText $s))
 Shot "5-tray"
 Start-Process -FilePath $exe -WorkingDirectory $AppDir | Out-Null   # second launch = show window
 Start-Sleep -Seconds 6
@@ -288,7 +301,7 @@ Shot "9-user-disconnected"
 # ---- logs ----
 Get-Process -Name Chuanyun, ChuanyunGuard -ErrorAction SilentlyContinue | Stop-Process -Force
 Stop-Process -Id $node.Id -Force -ErrorAction SilentlyContinue
-& $guard apply $env:TEMP $Port 0x1 | Out-Null
+RunGuard @("apply", $env:TEMP, "$Port", "0x1") | Out-Null
 $logs = Join-Path $Out "recovery-logs"
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
 if ($dataDir) {

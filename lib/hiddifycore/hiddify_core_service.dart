@@ -40,6 +40,7 @@ class HiddifyCoreService with InfraLogger {
 
   /// Whether [setup] has succeeded once in this engine; the core's gRPC servers then stay up.
   bool _ready = false;
+  bool get isReady => _ready;
 
   /// 穿云: the app came back to the foreground. On Android the core (and the VPN service)
   /// keeps running in the background, so nothing is set up again and no restart signal is
