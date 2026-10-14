@@ -17,6 +17,7 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
+import 'package:hiddify/features/app_based_routing/overview/app_list_notifier.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
@@ -150,6 +151,15 @@ Future<String> _handler(String? message) async {
         if (g == null) return 'no-group';
         await _c().read(proxiesOverviewNotifierProvider.notifier).changeProxy(g.tag, arg);
         return 'ok';
+      case 'pickApps':
+        // pick a few installed apps for the per-app list (the 「共 N 个 App」 row)
+        final mode = _c().read(Preferences.perAppProxyMode);
+        final notifier = _c().read(AppListProvider(mode).notifier);
+        for (final pkg in arg.split(',')) {
+          await notifier.updatePkg(pkg);
+        }
+        final flags = await _c().read(AppListProvider(mode).future);
+        return 'ok:${flags.length}';
       case 'sheet':
         unawaited(_c().read(bottomSheetsNotifierProvider.notifier).showAddProfile());
         return 'ok';

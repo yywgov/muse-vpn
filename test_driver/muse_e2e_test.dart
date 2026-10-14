@@ -199,7 +199,8 @@ Future<void> pages(String theme) async {
   await driver.scroll(find.byValueKey('home_node_list'), 0, 900, const Duration(milliseconds: 300));
   for (final (i, page) in ['config', 'settings', 'perAppProxy', 'appList', 'privacy', 'advanced', 'tlsTricks', 'connections', 'about', 'openSource'].indexed) {
     await cmd('go:$page');
-    await shot('$theme-${(i + 3).toString().padLeft(2, '0')}-$page');
+    // the installed-app list loads from the system first
+    await shot('$theme-${(i + 3).toString().padLeft(2, '0')}-$page', settleMs: page == 'appList' ? 6000 : 1600);
   }
   await cmd('go:home');
   await sleep(800);
@@ -299,6 +300,8 @@ Future<void> main() async {
     results['nodes'] = jsonDecode(await cmd('nodes'));
   }
 
+  results['pickApps'] = await cmd('pickApps:com.android.chrome,com.google.android.youtube,com.google.android.apps.maps,'
+      'com.android.settings,com.android.contacts,com.google.android.calendar,com.android.camera2,com.google.android.deskclock');
   await pages('light');
   await nightMode(true);
   await cmd('theme:black');
