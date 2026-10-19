@@ -15,9 +15,11 @@ import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
+import 'package:hiddify/features/muse/home/exit_card.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
+import 'package:hiddify/features/muse/logic/exit_check.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
@@ -73,6 +75,8 @@ class MuseHomePage extends HookConsumerWidget {
                     children: [
                       const MuseClipboardImportBanner(),
                       const _RouteModeSelector(),
+                      // 1.2.3: exit IP / region and Google · ChatGPT · Netflix
+                      const MuseExitCard(),
                       if (hasProfile) const _NodesSection() else const _EmptyProfileSection(),
                     ],
                   ),
@@ -421,7 +425,7 @@ class _ConnectRingPainter extends CustomPainter {
   bool shouldRepaint(_ConnectRingPainter old) => old.spin != spin || old.burst != burst || old.radius != radius;
 }
 
-/// 配置 / 代理 / 直连 as a pill segmented control.
+/// 规则 / 全局 as a pill segmented control.
 class _RouteModeSelector extends ConsumerWidget {
   const _RouteModeSelector();
 
@@ -507,6 +511,10 @@ class _NodesSection extends HookConsumerWidget {
     final frozenOrder = useRef<List<String>>(const []);
     final showHidden = useState(false);
     final hidden = ref.watch(museHiddenNodesProvider);
+    // 1.2.3: 搜索节点 (shown once the list is long enough to need it)
+    final searching = useState(false);
+    final query = useState('');
+    final searchController = useTextEditingController();
 
     Widget header(String text, {Widget? trailing}) => Padding(
       padding: const EdgeInsets.fromLTRB(24, 6, 12, 0),
@@ -583,6 +591,29 @@ class _NodesSection extends HookConsumerWidget {
     }
     final title = ['节点', ?groupName].join(' · ');
 
+    final nodeTotal = group?.items.where((e) => !e.isGroup).length ?? 0;
+    final searchButton = nodeTotal > 6
+        ? IconButton(
+            key: const ValueKey('node_search_button'),
+            tooltip: searching.value ? '关闭搜索' : '搜索节点',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(searching.value ? Icons.search_off_rounded : Icons.search_rounded, size: 20),
+            onPressed: () {
+              searching.value = !searching.value;
+              if (!searching.value) {
+                searchController.clear();
+                query.value = '';
+              }
+            },
+          )
+        : null;
+    bool matches(OutboundInfo e) {
+      final q = query.value;
+      if (!searching.value || q.trim().isEmpty) return true;
+      final n = e.tagDisplay.isNotEmpty ? e.tagDisplay : e.tag;
+      return museNodeMatches(n, q, regionOf: museRegionCode);
+    }
+
     final testButton = TextButton(
       onPressed: group == null || testing.value ? null : urlTest,
       child: testing.value
@@ -624,8 +655,9 @@ class _NodesSection extends HookConsumerWidget {
         ordered = sorted;
         frozenOrder.value = [for (final e in sorted) e.tag];
       }
-      final visible = ordered.where((e) => !hidden.contains(e.tag)).toList();
-      final folded = ordered.where((e) => hidden.contains(e.tag)).toList();
+      final filtering = searching.value && query.value.trim().isNotEmpty;
+      final visible = ordered.where((e) => !hidden.contains(e.tag) && matches(e)).toList();
+      final folded = ordered.where((e) => hidden.contains(e.tag) && matches(e)).toList();
       final nodeCount = group.items.where((e) => !e.isGroup).length;
       // a node shows 测速中 only while a test can actually be running
       final recentlyConnected = since != null && DateTime.now().difference(since) < const Duration(seconds: 30);
@@ -652,6 +684,11 @@ class _NodesSection extends HookConsumerWidget {
       );
 
       body = [
+        if (filtering && visible.isEmpty && folded.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Text('没有匹配的节点', style: theme.textTheme.bodyMedium?.copyWith(color: MuseColors.secondaryText(context))),
+          ),
         for (final proxy in visible) card(proxy),
         if (folded.isNotEmpty) ...[
           Padding(
@@ -689,7 +726,7 @@ class _NodesSection extends HookConsumerWidget {
               ),
             ),
           ),
-          if (showHidden.value)
+          if (showHidden.value || filtering)
             for (final proxy in folded) card(proxy, dimmed: true),
         ],
       ];
@@ -697,7 +734,33 @@ class _NodesSection extends HookConsumerWidget {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [header(title, trailing: testButton), ...body],
+      children: [
+        header(
+          title,
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [?searchButton, testButton]),
+        ),
+        if (searching.value && searchButton != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
+            child: TextField(
+              key: const ValueKey('node_search_field'),
+              controller: searchController,
+              autofocus: true,
+              onChanged: (v) => query.value = v,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: '搜索节点，如 日本、HK、IPLC',
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                filled: true,
+                fillColor: MuseColors.card(context),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ...body,
+      ],
     );
   }
 }

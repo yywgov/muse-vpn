@@ -24,6 +24,12 @@ abstract class Preferences {
   // 穿云 1.2.2: nodes that keep timing out fold into 「不可用」 on 首页 (and come back by themselves)
   static final hideBadNodes = PreferencesNotifier.create<bool, bool>("hide_bad_nodes", true);
 
+  // 穿云 1.2.3: 首页「出口」card (exit IP/region + Google/ChatGPT/Netflix), both platforms
+  static final museExitCheck = PreferencesNotifier.create<bool, bool>("muse_exit_check", true);
+
+  // 穿云 1.2.3 Windows: Ctrl+Alt+P connects / disconnects from anywhere
+  static final museHotkey = PreferencesNotifier.create<bool, bool>("muse_hotkey", true);
+
   // 穿云 1.1: 后台运行/自启动 guide shown once on the first connect; 自启动 can't be read back from
   // ColorOS, so having opened its settings page once counts as done
   static final keepAliveGuideShown = PreferencesNotifier.create<bool, bool>("keep_alive_guide_shown", false);

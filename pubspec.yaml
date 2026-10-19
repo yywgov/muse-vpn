@@ -1,7 +1,7 @@
 name: hiddify
 description: 穿云 - Android proxy client (fork of Hiddify, GPLv3).
 publish_to: "none"
-version: 1.2.2+122
+version: 1.2.3+123
 
 environment:
   sdk: ^3.10.4
@@ -108,6 +108,8 @@ dependencies:
   # Used for registering custom schemes in the Windows registry
   win32: ^5.12.0
   humanizer: ^3.0.1
+  # 穿云 1.2.3 Windows: Ctrl+Alt+P 连接/断开
+  hotkey_manager: ^0.2.3
 
 dev_dependencies:
   flutter_test:

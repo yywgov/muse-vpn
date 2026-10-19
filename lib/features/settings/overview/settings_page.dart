@@ -43,6 +43,14 @@ class SettingsPage extends HookConsumerWidget {
                 value: ref.watch(Preferences.hideBadNodes),
                 onChanged: (v) => ref.read(Preferences.hideBadNodes.notifier).update(v),
               ),
+              // 1.2.3
+              MuseSwitchTile(
+                leading: const Icon(Icons.travel_explore_rounded),
+                title: '出口检测',
+                subtitle: '首页显示出口 IP 和地区，以及 Google、ChatGPT、Netflix 能否使用',
+                value: ref.watch(Preferences.museExitCheck),
+                onChanged: (v) => ref.read(Preferences.museExitCheck.notifier).update(v),
+              ),
             ],
           ),
           if (PlatformUtils.isWindows) const WindowsSettingsSection(),

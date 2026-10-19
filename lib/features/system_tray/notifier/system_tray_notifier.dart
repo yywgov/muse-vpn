@@ -6,7 +6,9 @@ import 'package:hiddify/core/logger/logger_setup.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
+import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
@@ -54,12 +56,27 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
       isTemplate: PlatformUtils.isMacOS,
     );
     if (!PlatformUtils.isLinux) await trayManager.setToolTip(_trayTooltip(connection, urlTestDelay, t));
-    await trayManager.setContextMenu(_trayMenu(connection, ref.watch(ConfigOptions.museRouteMode)));
+    // 穿云 1.2.3: 节点 submenu (switch node, see delays, 测速) while connected
+    final running = ref.watch(serviceRunningProvider);
+    final group = running ? ref.watch(proxiesOverviewNotifierProvider).valueOrNull : null;
+    _groupTag = group?.tag;
+    final nodes = group == null
+        ? const <MuseTrayNode>[]
+        : museTrayNodes(
+            [
+              for (final e in group.items)
+                if (!e.isGroup) (tag: e.tag, name: e.tagDisplay.isNotEmpty ? e.tagDisplay : e.tag, delay: e.urlTestDelay),
+            ],
+            selected: group.selected,
+          );
+    await trayManager.setContextMenu(_trayMenu(connection, ref.watch(ConfigOptions.museRouteMode), nodes));
   }
 
+  String? _groupTag;
+
   // 穿云: 显示 / 连接|断开 / 退出 — nothing else
-  Menu _trayMenu(ConnectionStatus connection, MuseRouteMode mode) {
-    final spec = museTrayMenuSpec(connection, mode);
+  Menu _trayMenu(ConnectionStatus connection, MuseRouteMode mode, List<MuseTrayNode> nodes) {
+    final spec = museTrayMenuSpec(connection, mode, nodes: nodes);
     // 穿云 1.2: one line in app.log, checked by the Windows smoke test
     // (app.log keeps errors only, so the line goes in as a marker, once per distinct menu)
     final line = "tray menu: ${spec.map((e) => e.key == '-' ? '|' : '${e.label}${e.checked ? '*' : ''}').join(' ')}";
@@ -68,18 +85,22 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
       _lastMenuLine = line;
       logMarkLine(line);
     }
-    return Menu(
-      items: [
-        for (final e in spec)
-          if (e.key == '-')
-            MenuItem.separator()
-          else if (e.checkable)
-            MenuItem.checkbox(key: e.key, label: e.label, checked: e.checked, disabled: e.disabled)
-          else
-            MenuItem(key: e.key, label: e.label, disabled: e.disabled),
-      ],
-    );
+    return _menuOf(spec);
   }
+
+  Menu _menuOf(List<MuseTrayItem> spec) => Menu(
+    items: [
+      for (final e in spec)
+        if (e.key == '-')
+          MenuItem.separator()
+        else if (e.children.isNotEmpty)
+          MenuItem.submenu(key: e.key, label: e.label, disabled: e.disabled, submenu: _menuOf(e.children))
+        else if (e.checkable)
+          MenuItem.checkbox(key: e.key, label: e.label, checked: e.checked, disabled: e.disabled)
+        else
+          MenuItem(key: e.key, label: e.label, disabled: e.disabled),
+    ],
+  );
 
   String _trayIconPath(ConnectionStatus status) {
     final isDarkMode = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
@@ -132,6 +153,22 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
       await ref.read(connectionNotifierProvider.notifier).toggleConnection();
     } else if (menuItem.key?.startsWith('mode:') ?? false) {
       await ref.read(ConfigOptions.museRouteMode.notifier).update(MuseRouteMode.fromKey(menuItem.key!.substring(5)));
+    } else if (menuItem.key?.startsWith('node:') ?? false) {
+      final group = _groupTag;
+      if (group == null) return;
+      try {
+        await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(group, menuItem.key!.substring(5));
+      } catch (e) {
+        loggy.warning('tray: switching node failed', e);
+      }
+    } else if (menuItem.key == 'urltest') {
+      final group = _groupTag;
+      if (group == null) return;
+      try {
+        await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest(group);
+      } catch (e) {
+        loggy.warning('tray: url test failed', e);
+      }
     } else if (menuItem.key == 'quit') {
       await ref.read(windowNotifierProvider.notifier).exit();
     }
@@ -329,7 +366,17 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
 
 /// One entry of the tray menu ('-' = separator).
 class MuseTrayItem {
-  const MuseTrayItem(this.key, this.label, {this.checkable = false, this.checked = false, this.disabled = false});
+  const MuseTrayItem(
+    this.key,
+    this.label, {
+    this.checkable = false,
+    this.checked = false,
+    this.disabled = false,
+    this.children = const [],
+  });
+
+  /// a submenu when not empty
+  final List<MuseTrayItem> children;
 
   final String key;
   final String label;
@@ -338,8 +385,38 @@ class MuseTrayItem {
   final bool disabled;
 }
 
-/// 穿云 1.2 tray right-click menu: 连接/断开 · 规则/全局 · 显示窗口 · 退出.
-List<MuseTrayItem> museTrayMenuSpec(ConnectionStatus connection, MuseRouteMode mode) => [
+/// One node in the tray's 节点 submenu.
+class MuseTrayNode {
+  const MuseTrayNode(this.tag, this.label, {this.selected = false});
+
+  final String tag;
+  final String label;
+  final bool selected;
+}
+
+/// The tray lists at most this many nodes (fastest first); the window has the full list.
+const museTrayMaxNodes = 25;
+
+/// Nodes for the tray: fastest first (untested and timed-out last), the selected one always
+/// included, each labelled `name   123 ms` / `超时`.
+List<MuseTrayNode> museTrayNodes(List<({String tag, String name, int delay})> items, {required String selected}) {
+  final sorted = museSortNodes<({String tag, String name, int delay})>(
+    items,
+    isGroup: (_) => false,
+    delay: (e) => e.delay,
+    isValidDelay: ConnectionConst.isValidDelay,
+  );
+  final picked = sorted.take(museTrayMaxNodes).toList();
+  if (!picked.any((e) => e.tag == selected)) {
+    final sel = sorted.where((e) => e.tag == selected).firstOrNull;
+    if (sel != null) picked.insert(0, sel);
+  }
+  String delayText(int d) => d == 0 ? '' : (ConnectionConst.isValidDelay(d) ? '   $d ms' : '   超时');
+  return [for (final e in picked) MuseTrayNode(e.tag, '${e.name}${delayText(e.delay)}', selected: e.tag == selected)];
+}
+
+/// 穿云 tray right-click menu: 连接/断开 · 规则/全局 · 节点 ▸ (1.2.3, while connected) · 显示窗口 · 退出.
+List<MuseTrayItem> museTrayMenuSpec(ConnectionStatus connection, MuseRouteMode mode, {List<MuseTrayNode> nodes = const []}) => [
   MuseTrayItem(
     'connection',
     switch (connection) {
@@ -353,6 +430,16 @@ List<MuseTrayItem> museTrayMenuSpec(ConnectionStatus connection, MuseRouteMode m
   const MuseTrayItem('-', ''),
   for (final m in MuseRouteMode.values) MuseTrayItem('mode:${m.key}', m.title, checkable: true, checked: m == mode),
   const MuseTrayItem('-', ''),
+  if (connection is Connected && nodes.isNotEmpty)
+    MuseTrayItem(
+      'nodes',
+      '节点',
+      children: [
+        for (final n in nodes) MuseTrayItem('node:${n.tag}', n.label, checkable: true, checked: n.selected),
+        const MuseTrayItem('-', ''),
+        const MuseTrayItem('urltest', '测速'),
+      ],
+    ),
   const MuseTrayItem('dashboard', '显示窗口'),
   const MuseTrayItem('quit', '退出'),
 ];
