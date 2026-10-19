@@ -40,7 +40,16 @@ class MuseConfigPage extends HookConsumerWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: MuseGroupedBody(
+      // 1.2.5: pull down to update every subscription (FlClash / Clash Verge Rev)
+      body: RefreshIndicator(
+        key: const ValueKey('config_pull_refresh'),
+        color: MuseColors.brand,
+        onRefresh: () async {
+          try {
+            await ref.read(foregroundProfilesUpdateNotifierProvider.notifier).trigger();
+          } catch (_) {}
+        },
+        child: MuseGroupedBody(
         children: [
           MuseSection(
             header: '订阅 / 配置',
@@ -84,6 +93,7 @@ class MuseConfigPage extends HookConsumerWidget {
             ],
           ),
         ],
+        ),
       ),
     );
   }

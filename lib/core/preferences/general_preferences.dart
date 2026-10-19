@@ -30,6 +30,9 @@ abstract class Preferences {
   // 穿云 1.2.3 Windows: Ctrl+Alt+P connects / disconnects from anywhere
   static final museHotkey = PreferencesNotifier.create<bool, bool>("muse_hotkey", true);
 
+  // 穿云 1.2.5: 首页 node order — delay (按延迟) / original (订阅顺序) / region (按地区)
+  static final museNodeSort = PreferencesNotifier.create<String, String>("muse_node_sort", "delay");
+
   // 穿云 1.1: 后台运行/自启动 guide shown once on the first connect; 自启动 can't be read back from
   // ColorOS, so having opened its settings page once counts as done
   static final keepAliveGuideShown = PreferencesNotifier.create<bool, bool>("keep_alive_guide_shown", false);

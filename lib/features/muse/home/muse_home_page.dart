@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/core/model/constants.dart';
@@ -12,6 +13,7 @@ import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
@@ -20,11 +22,14 @@ import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
+import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
+import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
@@ -33,12 +38,30 @@ import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/utils/number_formatters.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+/// 1.2.5: bumped by the 首页 pull-down gesture; the node list runs 测速 when it changes.
+final museNodeTestRequestProvider = StateProvider<int>((ref) => 0);
+
 class MuseHomePage extends HookConsumerWidget {
   const MuseHomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hasProfile = ref.watch(hasAnyProfileProvider).value ?? false;
+    final running = ref.watch(serviceRunningProvider);
+
+    // 1.2.5: pull down — 测速 while connected, otherwise update the subscriptions
+    Future<void> onPull() async {
+      if (!hasProfile) return;
+      if (running) {
+        ref.read(museNodeTestRequestProvider.notifier).state++;
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+      } else {
+        try {
+          await ref.read(foregroundProfilesUpdateNotifierProvider.notifier).trigger();
+        } catch (_) {}
+      }
+    }
+
     return MuseScaffold(
       titleWidget: const _Header(),
       actions: [
@@ -69,16 +92,22 @@ class MuseHomePage extends HookConsumerWidget {
                     stops: [0, 0.03],
                   ).createShader(rect),
                   blendMode: BlendMode.dstIn,
-                  child: ListView(
-                    padding: const EdgeInsets.only(top: 4, bottom: 24),
-                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                    children: [
-                      const MuseClipboardImportBanner(),
-                      const _RouteModeSelector(),
-                      // 1.2.3: exit IP / region and Google · ChatGPT · Netflix
-                      const MuseExitCard(),
-                      if (hasProfile) const _NodesSection() else const _EmptyProfileSection(),
-                    ],
+                  child: RefreshIndicator(
+                    key: const ValueKey('home_pull_refresh'),
+                    onRefresh: onPull,
+                    color: MuseColors.brand,
+                    notificationPredicate: (n) => hasProfile && n.depth == 0,
+                    child: ListView(
+                      padding: const EdgeInsets.only(top: 4, bottom: 24),
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                      children: [
+                        const MuseClipboardImportBanner(),
+                        const _RouteModeSelector(),
+                        // 1.2.3: exit IP / region and Google · ChatGPT · Netflix
+                        const MuseExitCard(),
+                        if (hasProfile) const _NodesSection() else const _EmptyProfileSection(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -232,12 +261,74 @@ class _ConnectSection extends HookConsumerWidget {
           Text(
             key: const ValueKey('home_speed_text'),
             // empty while disconnected: keeps the button from jumping when the speeds appear
-            connected ? '↑ ${stats.uplink.toInt().speed()}   ↓ ${stats.downlink.toInt().speed()}' : '',
+            // 1.2.5: plus this connection's traffic (本次), like Shadowrocket / Stash's dashboard
+            connected
+                ? '↑ ${stats.uplink.toInt().speed()}   ↓ ${stats.downlink.toInt().speed()}'
+                      '   ·   本次 ${museBytes(stats.uplinkTotal.toInt() + stats.downlinkTotal.toInt())}'
+                : '',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: secondary,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
+          if (connected) const _CurrentNodeLine(),
+        ],
+      ),
+    );
+  }
+}
+
+/// 1.2.5: 「当前 🇯🇵 东京 02 · 86 ms」 under the speeds, so the node in use is visible however
+/// long the list is or wherever it sorted to (Shadowrocket / Stash keep it on the home card).
+class _CurrentNodeLine extends ConsumerWidget {
+  const _CurrentNodeLine();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
+    final item = group?.items.where((e) => e.tag == group.selected).firstOrNull;
+    if (item == null) return const SizedBox.shrink();
+    final full = item.tagDisplay.isNotEmpty ? item.tagDisplay : item.tag;
+    final String text;
+    if (item.isGroup) {
+      final rawName = full.split(' → ').first.trim();
+      final kind = museGroupKind(type: item.type, name: rawName, selectedDisplay: item.groupSelectedTagDisplay);
+      final sel = item.groupSelectedTagDisplay.trim();
+      final pick = kind == '负载均衡' || sel.toLowerCase() == 'lowest-delay' || museBalanceStrategyName(sel) != null ? '' : sel;
+      text = museCurrentNodeText(name: rawName, groupLabel: museGroupName(rawName), groupPick: museGroupName(pick));
+    } else {
+      text = museCurrentNodeText(name: full);
+    }
+    if (text.isEmpty) return const SizedBox.shrink();
+    final delay = item.urlTestDelay;
+    final showDelay = delay > 0 && ConnectionConst.isValidDelay(delay);
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        key: const ValueKey('home_current_node'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              '当前  $text',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(color: MuseColors.secondaryText(context)),
+            ),
+          ),
+          if (showDelay) ...[
+            const SizedBox(width: 6),
+            Container(width: 6, height: 6, decoration: BoxDecoration(color: MuseColors.delay(context, delay), shape: BoxShape.circle)),
+            const SizedBox(width: 4),
+            Text(
+              '$delay ms',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: MuseColors.secondaryText(context),
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -480,19 +571,78 @@ class _EmptyProfileSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return MuseSection(
-      header: '节点',
-      // no camera scanning on the desktop
-      footer: PlatformUtils.isDesktop ? '支持订阅链接、剪贴板导入。' : '支持订阅链接、剪贴板导入、扫描二维码。',
-      children: [
-        MuseTile(
-          leading: const Icon(Icons.add_circle_outline_rounded),
-          title: '添加订阅或配置',
-          subtitle: '还没有配置，点这里添加',
-          chevron: true,
-          onTap: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
+    final theme = Theme.of(context);
+    final secondary = MuseColors.secondaryText(context);
+    // keeps the add notifier (and its success/error toasts) alive while an import runs
+    ref.listen(addProfileNotifierProvider, (_, _) {});
+
+    // 1.2.5: one tap imports what is on the clipboard (Karing / Shadowrocket first-run style);
+    // nothing usable there opens the full 添加 sheet instead
+    Future<void> paste() async {
+      String? text;
+      try {
+        text = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim();
+      } catch (_) {}
+      if (text == null || text.isEmpty) {
+        try {
+          ref.read(inAppNotificationControllerProvider).showInfoToast('剪贴板是空的，先复制订阅链接');
+        } catch (_) {}
+        return;
+      }
+      await ref.read(addProfileNotifierProvider.notifier).addClipboard(text);
+    }
+
+    return Padding(
+      key: const ValueKey('home_empty_guide'),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+        decoration: BoxDecoration(color: MuseColors.card(context), borderRadius: BorderRadius.circular(20)),
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(color: MuseColors.brand.withValues(alpha: 0.14), shape: BoxShape.circle),
+              child: const Icon(Icons.link_rounded, color: MuseColors.brandLight, size: 28),
+            ),
+            const SizedBox(height: 12),
+            Text('还没有订阅', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Text(
+              '复制服务商给你的订阅链接，点「粘贴导入」即可',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(color: secondary),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const ValueKey('empty_paste_button'),
+                onPressed: paste,
+                icon: const Icon(Icons.content_paste_rounded, size: 18),
+                label: const Text('粘贴导入'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const ValueKey('empty_more_button'),
+                onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
+                icon: Icon(PlatformUtils.isDesktop ? Icons.edit_rounded : Icons.qr_code_scanner_rounded, size: 18),
+                // no camera scanning on the desktop
+                label: Text(PlatformUtils.isDesktop ? '手动输入链接' : '扫码或手动输入'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '导入后点上方圆形按钮连接',
+              style: theme.textTheme.bodySmall?.copyWith(color: secondary),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -509,12 +659,15 @@ class _NodesSection extends HookConsumerWidget {
     // had then (kept while results stream in, so rows don't jump under the finger)
     final testStartedAt = useRef<DateTime?>(null);
     final frozenOrder = useRef<List<String>>(const []);
+    final frozenSort = useRef<MuseNodeSort>(MuseNodeSort.delay);
     final showHidden = useState(false);
     final hidden = ref.watch(museHiddenNodesProvider);
     // 1.2.3: 搜索节点 (shown once the list is long enough to need it)
     final searching = useState(false);
     final query = useState('');
     final searchController = useTextEditingController();
+    // 1.2.5: 按延迟 / 订阅顺序 / 按地区 (Clash Verge Rev's sort switch, v2rayNG's sort by result)
+    final sortMode = MuseNodeSort.fromKey(ref.watch(Preferences.museNodeSort));
 
     Widget header(String text, {Widget? trailing}) => Padding(
       padding: const EdgeInsets.fromLTRB(24, 6, 12, 0),
@@ -562,6 +715,11 @@ class _NodesSection extends HookConsumerWidget {
         });
       }
     }
+
+    // 1.2.5: the 首页 pull-down asks for a 测速
+    ref.listen(museNodeTestRequestProvider, (prev, next) {
+      if (prev != next) urlTest();
+    });
 
     // 1.2.2: every node answered (or timed out) since 测速 was tapped: stop the spinner
     if (testing.value && group != null && testStartedAt.value != null) {
@@ -614,6 +772,26 @@ class _NodesSection extends HookConsumerWidget {
       return museNodeMatches(n, q, regionOf: museRegionCode);
     }
 
+    final sortButton = nodeTotal > 1
+        ? PopupMenuButton<MuseNodeSort>(
+            key: const ValueKey('node_sort_button'),
+            tooltip: '排序：${sortMode.title}',
+            icon: const Icon(Icons.sort_rounded, size: 20),
+            style: const ButtonStyle(visualDensity: VisualDensity.compact),
+            initialValue: sortMode,
+            onSelected: (m) => ref.read(Preferences.museNodeSort.notifier).update(m.key),
+            itemBuilder: (context) => [
+              for (final m in MuseNodeSort.values)
+                CheckedPopupMenuItem<MuseNodeSort>(
+                  key: ValueKey('node_sort_${m.key}'),
+                  value: m,
+                  checked: m == sortMode,
+                  child: Text(m.title),
+                ),
+            ],
+          )
+        : null;
+
     final testButton = TextButton(
       onPressed: group == null || testing.value ? null : urlTest,
       child: testing.value
@@ -636,14 +814,16 @@ class _NodesSection extends HookConsumerWidget {
         ),
       ];
     } else {
-      final sorted = museSortNodes<OutboundInfo>(
+      final sorted = museOrderNodes<OutboundInfo>(
         group.items,
+        sort: sortMode,
         isGroup: (e) => e.isGroup,
         delay: (e) => _freshDelay(e, since),
         isValidDelay: ConnectionConst.isValidDelay,
+        region: (e) => museRegionCode(_nodeName(e)),
       );
       final List<OutboundInfo> ordered;
-      if (testing.value && frozenOrder.value.isNotEmpty) {
+      if (testing.value && frozenOrder.value.isNotEmpty && frozenSort.value == sortMode) {
         // 1.2.2: keep the order from before 测速 while its results arrive
         final byTag = {for (final e in group.items) e.tag: e};
         final known = frozenOrder.value.toSet();
@@ -654,6 +834,7 @@ class _NodesSection extends HookConsumerWidget {
       } else {
         ordered = sorted;
         frozenOrder.value = [for (final e in sorted) e.tag];
+        frozenSort.value = sortMode;
       }
       final filtering = searching.value && query.value.trim().isNotEmpty;
       final visible = ordered.where((e) => !hidden.contains(e.tag) && matches(e)).toList();
@@ -671,6 +852,7 @@ class _NodesSection extends HookConsumerWidget {
         pending: pending,
         dimmed: dimmed,
         selected: group.selected == proxy.tag,
+        onLongPress: () => _showNodeDetails(context, ref, proxy, since: since, groupTag: group.tag),
         onTap: () async {
           try {
             await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(group.tag, proxy.tag);
@@ -689,7 +871,19 @@ class _NodesSection extends HookConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Text('没有匹配的节点', style: theme.textTheme.bodyMedium?.copyWith(color: MuseColors.secondaryText(context))),
           ),
-        for (final proxy in visible) card(proxy),
+        if (sortMode == MuseNodeSort.region) ...[
+          // groups on top, then 「🇭🇰 香港 · 5」 headers over each region
+          for (final proxy in visible.where((e) => e.isGroup)) card(proxy),
+          for (final section in museRegionSections<OutboundInfo>(
+            visible,
+            isGroup: (e) => e.isGroup,
+            region: (e) => museRegionCode(_nodeName(e)),
+          )) ...[
+            _RegionHeader(region: section.region, count: section.items.length),
+            for (final proxy in section.items) card(proxy),
+          ],
+        ] else
+          for (final proxy in visible) card(proxy),
         if (folded.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
@@ -737,7 +931,7 @@ class _NodesSection extends HookConsumerWidget {
       children: [
         header(
           title,
-          trailing: Row(mainAxisSize: MainAxisSize.min, children: [?searchButton, testButton]),
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [?searchButton, ?sortButton, testButton]),
         ),
         if (searching.value && searchButton != null)
           Padding(
@@ -765,6 +959,130 @@ class _NodesSection extends HookConsumerWidget {
   }
 }
 
+String _nodeName(OutboundInfo e) => e.tagDisplay.isNotEmpty ? e.tagDisplay : e.tag;
+
+/// 1.2.5 按地区: 「🇭🇰 香港 · 5」 above each region's nodes.
+class _RegionHeader extends StatelessWidget {
+  const _RegionHeader({required this.region, required this.count});
+
+  final String? region;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final code = region;
+    final label = code == null ? '其他' : '${museCountryFlag(code) ?? ''} ${museCountryLabel(code)}'.trim();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 10, 24, 2),
+      child: Text(
+        '$label · $count',
+        key: ValueKey('region_header_${code ?? 'other'}'),
+        style: theme.textTheme.labelMedium?.copyWith(color: MuseColors.secondaryText(context), fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+/// 1.2.5: long-press a node — full name, protocol, latency and when it was measured, with
+/// 复制名称 / 使用此节点 (v2rayNG / Shadowrocket's node detail sheet, read-only).
+Future<void> _showNodeDetails(
+  BuildContext context,
+  WidgetRef ref,
+  OutboundInfo proxy, {
+  required DateTime? since,
+  required String groupTag,
+}) async {
+  final name = _nodeName(proxy);
+  final delay = _freshDelay(proxy, since);
+  final testedAt = proxy.hasUrlTestTime() ? proxy.urlTestTime.toDateTime() : null;
+  final String delayText;
+  if (delay == 0) {
+    delayText = '未测速';
+  } else if (ConnectionConst.isValidDelay(delay)) {
+    delayText = '$delay ms';
+  } else {
+    delayText = '超时';
+  }
+  final region = museRegionCode(name);
+  final rows = <(String, String)>[
+    ('类型', proxy.isGroup ? (museGroupTypeLabel(proxy.type) ?? '分组') : museProtocolName(proxy.type)),
+    if (region != null) ('地区', '${museCountryFlag(region) ?? ''} ${museCountryLabel(region)}'.trim()),
+    ('延迟', delayText),
+    if (testedAt != null && delay != 0) ('测速时间', museUpdatedAgo(testedAt, now: DateTime.now()).replaceAll('更新', '')),
+  ];
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    backgroundColor: MuseColors.card(context),
+    builder: (sheetContext) {
+      final theme = Theme.of(sheetContext);
+      final secondary = MuseColors.secondaryText(sheetContext);
+      return SafeArea(
+        child: Padding(
+          key: const ValueKey('node_detail_sheet'),
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SelectableText(name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              for (final (k, v) in rows)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 72, child: Text(k, style: theme.textTheme.bodyMedium?.copyWith(color: secondary))),
+                      Expanded(child: Text(v, style: theme.textTheme.bodyMedium)),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('node_copy_name'),
+                      icon: const Icon(Icons.copy_rounded, size: 18),
+                      label: const Text('复制名称'),
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: name));
+                        if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                        try {
+                          ref.read(inAppNotificationControllerProvider).showSuccessToast('已复制');
+                        } catch (_) {}
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      key: const ValueKey('node_use'),
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: const Text('使用此节点'),
+                      onPressed: () async {
+                        Navigator.of(sheetContext).pop();
+                        try {
+                          await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(groupTag, proxy.tag);
+                        } catch (_) {
+                          try {
+                            ref.read(inAppNotificationControllerProvider).showErrorToast('切换节点失败，请重试');
+                          } catch (_) {}
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 /// A node's delay for sorting: results from before this connection count as not tested yet.
 int _freshDelay(OutboundInfo proxy, DateTime? since) {
   final delay = proxy.urlTestDelay;
@@ -782,6 +1100,7 @@ class _NodeCard extends StatelessWidget {
     required this.nodeCount,
     required this.selected,
     required this.onTap,
+    this.onLongPress,
     this.pending = true,
     this.dimmed = false,
   });
@@ -800,6 +1119,7 @@ class _NodeCard extends StatelessWidget {
   final int nodeCount;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -857,6 +1177,7 @@ class _NodeCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             child: Row(
@@ -896,11 +1217,22 @@ class _NodeCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(width: 8, height: 8, decoration: BoxDecoration(color: delayColor, shape: BoxShape.circle)),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(color: delayColor, shape: BoxShape.circle),
+                ),
                 const SizedBox(width: 6),
-                Text(
-                  delayText,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+                // 1.2.5: each result fades in as it arrives during 测速
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                  child: Text(
+                    delayText,
+                    key: ValueKey(delayText),
+                    style: theme.textTheme.bodyMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+                  ),
                 ),
               ],
             ),

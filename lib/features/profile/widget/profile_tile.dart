@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/subscription_bar.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gap/gap.dart';
@@ -114,6 +115,28 @@ class ProfileTile extends HookConsumerWidget {
                   ),
                   const Gap(4),
                 ],
+              // 穿云 1.2.5: 「已用 12.3 GB / 100 GB · 剩 23 天 · 3 小时前更新」 (Clash Verge Rev's card)
+              if (profile is RemoteProfileEntity)
+                Text(
+                  subInfo != null
+                      ? museSubscriptionSummary(
+                          upload: subInfo.upload,
+                          download: subInfo.download,
+                          total: subInfo.total,
+                          expire: subInfo.expire,
+                          lastUpdate: profile.lastUpdate,
+                          now: DateTime.now(),
+                        )
+                      : museUpdatedAgo(profile.lastUpdate, now: DateTime.now()),
+                  key: const ValueKey('subscription_summary'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              if (profile is RemoteProfileEntity) const Gap(2),
             ],
           ),
         ),
