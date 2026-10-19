@@ -338,7 +338,7 @@ class MuseTrayItem {
   final bool disabled;
 }
 
-/// 穿云 1.2 tray right-click menu: 连接/断开 · 配置/代理/直连 · 显示窗口 · 退出.
+/// 穿云 1.2 tray right-click menu: 连接/断开 · 规则/全局 · 显示窗口 · 退出.
 List<MuseTrayItem> museTrayMenuSpec(ConnectionStatus connection, MuseRouteMode mode) => [
   MuseTrayItem(
     'connection',
