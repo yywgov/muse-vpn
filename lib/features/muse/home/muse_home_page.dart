@@ -713,7 +713,7 @@ class _NodesSection extends HookConsumerWidget {
                         ),
                       ),
                       Text(
-                        '连续超时，恢复后自动放回',
+                        '测速超时，恢复后自动放回',
                         style: theme.textTheme.bodySmall?.copyWith(color: MuseColors.secondaryText(context)),
                       ),
                       Icon(

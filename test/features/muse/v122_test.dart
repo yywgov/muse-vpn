@@ -90,7 +90,7 @@ void main() {
     }
 
     test('hidden after 3 failed tests in a row, back after 2 good ones', () {
-      final t = MuseBadNodeTracker();
+      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
       for (var i = 0; i < 2; i++) {
         t.update(selected: 'a', items: round({'a': 100, 'b': timeout}));
       }
@@ -104,7 +104,7 @@ void main() {
     });
 
     test('a good result in between resets the count', () {
-      final t = MuseBadNodeTracker();
+      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
       t.update(selected: 'a', items: round({'a': 100, 'b': timeout}));
       t.update(selected: 'a', items: round({'a': 100, 'b': timeout}));
       t.update(selected: 'a', items: round({'a': 100, 'b': 300}));
@@ -113,7 +113,7 @@ void main() {
     });
 
     test('the same result seen again does not count twice', () {
-      final t = MuseBadNodeTracker();
+      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
       final same = round({'a': 100, 'b': timeout});
       for (var i = 0; i < 5; i++) {
         t.update(selected: 'a', items: same);
@@ -122,7 +122,7 @@ void main() {
     });
 
     test('untested nodes are not counted', () {
-      final t = MuseBadNodeTracker();
+      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
       for (var i = 0; i < 4; i++) {
         t.update(selected: 'a', items: round({'a': 100, 'b': 0}));
       }
@@ -130,7 +130,7 @@ void main() {
     });
 
     test('groups and the selected node are never hidden', () {
-      final t = MuseBadNodeTracker();
+      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
       for (var i = 0; i < 3; i++) {
         t.update(selected: 'b', items: round({'auto': timeout, 'a': 100, 'b': timeout}, groups: {'auto'}));
       }
@@ -141,7 +141,7 @@ void main() {
     });
 
     test('never hides every node', () {
-      final t = MuseBadNodeTracker();
+      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
       for (var i = 0; i < 4; i++) {
         t.update(selected: 'auto', items: round({'auto': 0, 'a': timeout, 'b': timeout}, groups: {'auto'}));
       }
@@ -149,7 +149,7 @@ void main() {
     });
 
     test('nodes that left the profile are forgotten', () {
-      final t = MuseBadNodeTracker();
+      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
       for (var i = 0; i < 3; i++) {
         t.update(selected: 'a', items: round({'a': 100, 'b': timeout}));
       }

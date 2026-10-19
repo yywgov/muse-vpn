@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:hiddify/features/muse/data/bundled_rule_sets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -169,6 +170,10 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
     Logger.bootstrap.info(appInfo.format());
   }
 
+  await _safeInit("bundled rule-sets", () async {
+    final dirs = container.read(appDirectoriesProvider).requireValue;
+    await museInstallBundledRuleSets(dirs.baseDir.absolute.path);
+  }, timeout: 5000);
   await _safeInit("profile repository", () => container.read(profileRepositoryProvider.future));
 
   await _safeInit("translations", () => container.read(translationsProvider.future));

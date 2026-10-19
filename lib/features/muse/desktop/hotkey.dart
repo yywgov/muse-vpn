@@ -13,6 +13,9 @@ import 'package:hotkey_manager/hotkey_manager.dart';
 /// Shown next to the switch in 设置.
 const museHotkeyLabel = 'Ctrl + Alt + P';
 
+/// Whether Ctrl+Alt+P is registered with the plugin right now.
+bool _museHotkeyRegistered = false;
+
 final museHotkeyProvider = Provider<void>((ref) {
   if (!PlatformUtils.isWindows) return;
   final on = ref.watch(Preferences.museHotkey);
@@ -24,9 +27,14 @@ final museHotkeyProvider = Provider<void>((ref) {
   );
   var busy = false;
   Future<void> register() async {
-    try {
-      await hotKeyManager.unregister(hotKey);
-    } catch (_) {}
+    // 1.2.4: never unregister a key that is not registered: the Windows plugin looks it up with
+    // std::map::at and an unknown id takes the whole app down (1.2.3 crashed at start-up)
+    if (_museHotkeyRegistered) {
+      try {
+        await hotKeyManager.unregister(hotKey);
+      } catch (_) {}
+      _museHotkeyRegistered = false;
+    }
     if (!on) return;
     try {
       await hotKeyManager.register(
@@ -43,6 +51,7 @@ final museHotkeyProvider = Provider<void>((ref) {
           }
         },
       );
+      _museHotkeyRegistered = true;
     } catch (_) {
       // taken by another app: no shortcut, nothing else changes
     }
@@ -50,6 +59,8 @@ final museHotkeyProvider = Provider<void>((ref) {
 
   register();
   ref.onDispose(() {
+    if (!_museHotkeyRegistered) return;
+    _museHotkeyRegistered = false;
     hotKeyManager.unregister(hotKey).catchError((_) {});
   });
 });

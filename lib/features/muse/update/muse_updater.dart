@@ -2,15 +2,17 @@
 // the system installer (the release key is fixed, so it installs over the current version).
 // Windows: downloads Chuanyun-Windows-x64-Setup.exe and runs it silently (/RELAUNCH reopens 穿云
 // after the upgrade); a release with only the portable zip opens the release page instead.
-// Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
+// Part of 穿云 (GPLv3).
 
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -50,6 +52,13 @@ String? museAssetSha256(Map<String, dynamic> asset) {
 
 /// SHA-256 (lower case hex) of a file, read in chunks.
 Future<String> museFileSha256(File file) async => (await sha256.bind(file.openRead()).first).toString();
+
+/// 1.2.4: the new APK is signed with another key than the installed app (builds before 1.2.4 had
+/// a different throw-away key each), so Android would refuse it: uninstall once, then install.
+class MuseSignatureChanged implements Exception {
+  const MuseSignatureChanged(this.path);
+  final String path;
+}
 
 sealed class MuseUpdateState {
   const MuseUpdateState();
@@ -118,6 +127,30 @@ MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false})
   return null;
 }
 
+/// 1.2.4: GitHub download accelerators tried (after the user's own node) when github.com is slow
+/// or blocked. The file is checked against the release's SHA-256 (and on Android the system
+/// installer checks the signing key), so a mirror cannot slip in a different file.
+const museDownloadMirrors = ['https://ghfast.top/', 'https://gh-proxy.com/'];
+
+/// Where an update is downloaded from, in order: through the running 穿云 connection (local
+/// mixed port), then the mirrors, then github.com directly.
+List<({String url, int? proxyPort})> museDownloadSources(String url, {int? proxyPort, bool mirrors = true}) => [
+  if (proxyPort != null) (url: url, proxyPort: proxyPort),
+  if (mirrors && url.startsWith('https://github.com/'))
+    for (final m in museDownloadMirrors) (url: '$m$url', proxyPort: null),
+  (url: url, proxyPort: null),
+];
+
+/// Splits [size] bytes into [parts] inclusive byte ranges for a parallel download.
+List<(int, int)> museByteRanges(int size, int parts) {
+  if (size <= 0) return const [];
+  final n = parts.clamp(1, size);
+  final chunk = (size / n).ceil();
+  return [
+    for (var start = 0; start < size; start += chunk) (start, (start + chunk > size ? size : start + chunk) - 1),
+  ];
+}
+
 /// Whether [remote] is newer than [current] ("1.1.0" vs "1.0.0"); unparsable versions are not.
 bool museIsNewer(String remote, String current) {
   try {
@@ -135,20 +168,128 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
   @override
   MuseUpdateState build() => const MuseUpdateIdle();
 
-  Dio _dio() => Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 30),
-      headers: {'Accept': 'application/vnd.github+json', 'User-Agent': 'Chuanyun'},
-    ),
-  );
+  Dio _dio({int? proxyPort}) {
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 20),
+        headers: {'Accept': 'application/vnd.github+json', 'User-Agent': 'Chuanyun'},
+      ),
+    );
+    dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        client.findProxy = (_) => proxyPort == null ? 'DIRECT' : 'PROXY 127.0.0.1:$proxyPort';
+        return client;
+      },
+    );
+    return dio;
+  }
+
+  /// The local mixed port when 穿云 is connected and listening, else null.
+  Future<int?> _proxyPort() async {
+    try {
+      final port = ref.read(ConfigOptions.mixedPort);
+      final s = await Socket.connect(InternetAddress.loopbackIPv4, port, timeout: const Duration(milliseconds: 500));
+      s.destroy();
+      return port;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 1.2.4: downloads [url] to [path] from the fastest source that works (see
+  /// [museDownloadSources]), in 4 parallel ranges when the size is known.
+  Future<void> _download(String url, String path, int size, {required bool verified}) async {
+    // mirrors only for a file whose SHA-256 is checked afterwards
+    final sources = museDownloadSources(url, proxyPort: await _proxyPort(), mirrors: verified);
+    Object? lastError;
+    for (final src in sources) {
+      if (_cancel?.isCancelled ?? false) break;
+      try {
+        await _downloadFrom(src.url, path, size, src.proxyPort);
+        final f = File(path);
+        if (f.existsSync() && (size <= 0 || f.lengthSync() == size)) return;
+        lastError = const FileSystemException('incomplete download');
+      } catch (e) {
+        lastError = e;
+        loggy.warning('update download from ${src.url} failed: $e');
+        if (e is DioException && e.type == DioExceptionType.cancel) rethrow;
+      }
+    }
+    throw lastError ?? const FileSystemException('download failed');
+  }
+
+  Future<void> _downloadFrom(String url, String path, int size, int? proxyPort) async {
+    final dio = _dio(proxyPort: proxyPort);
+    void progress(int received) {
+      if (size > 0) state = MuseUpdateDownloading((received / size).clamp(0, 1));
+    }
+
+    final ranges = museByteRanges(size, 4);
+    if (ranges.length < 2) {
+      await dio.download(
+        url,
+        path,
+        cancelToken: _cancel,
+        onReceiveProgress: (received, total) {
+          final s = total > 0 ? total : size;
+          state = MuseUpdateDownloading(s > 0 ? (received / s).clamp(0, 1) : null);
+        },
+      );
+      return;
+    }
+    final got = List<int>.filled(ranges.length, 0);
+    final parts = <String>[for (var i = 0; i < ranges.length; i++) '$path.part$i'];
+    try {
+      await Future.wait([
+        for (var i = 0; i < ranges.length; i++)
+          dio
+              .download(
+                url,
+                parts[i],
+                cancelToken: _cancel,
+                options: Options(headers: {'Range': 'bytes=${ranges[i].$1}-${ranges[i].$2}'}),
+                onReceiveProgress: (received, _) {
+                  got[i] = received;
+                  progress(got.fold(0, (a, b) => a + b));
+                },
+              )
+              .then((r) {
+                // a server that ignores Range sends the whole file with 200: not usable in parts
+                if (r.statusCode != 206) throw const FileSystemException('range not supported');
+                final len = File(parts[i]).lengthSync();
+                if (len != ranges[i].$2 - ranges[i].$1 + 1) throw const FileSystemException('short range');
+              }),
+      ]);
+      final out = File(path).openWrite();
+      for (final p in parts) {
+        await out.addStream(File(p).openRead());
+      }
+      await out.close();
+    } finally {
+      for (final p in parts) {
+        try {
+          File(p).deleteSync();
+        } catch (_) {}
+      }
+    }
+  }
 
   /// The latest release when it is newer than this build, null when up to date. Throws on failure.
   Future<MuseRelease?> check() async {
     if (state is! MuseUpdateIdle) return null;
     state = const MuseUpdateChecking();
     try {
-      final response = await _dio().get<Map<String, dynamic>>(museLatestReleaseApi);
+      // 1.2.4: through the running connection when there is one, github.com directly otherwise
+      final port = await _proxyPort();
+      Response<Map<String, dynamic>> response;
+      try {
+        response = await _dio(proxyPort: port).get<Map<String, dynamic>>(museLatestReleaseApi);
+      } catch (_) {
+        if (port == null) rethrow;
+        response = await _dio().get<Map<String, dynamic>>(museLatestReleaseApi);
+      }
       final release = response.data == null
           ? null
           : museParseRelease(response.data!, windows: PlatformUtils.isWindows);
@@ -182,19 +323,12 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
           existing.existsSync() &&
           existing.lengthSync() == release.apkSize &&
           (release.sha256 == null || await museFileSha256(existing) == release.sha256)) {
+        if (await ChuanyunPlatform.apkSignatureMatches(path) == false) throw MuseSignatureChanged(path);
         return await ChuanyunPlatform.installApk(path);
       }
       if (dir.existsSync()) dir.deleteSync(recursive: true);
       dir.createSync(recursive: true);
-      await _dio().download(
-        release.apkUrl,
-        path,
-        cancelToken: _cancel,
-        onReceiveProgress: (received, total) {
-          final size = total > 0 ? total : release.apkSize;
-          state = MuseUpdateDownloading(size > 0 ? (received / size).clamp(0, 1) : null);
-        },
-      );
+      await _download(release.apkUrl, path, release.apkSize, verified: release.sha256 != null);
       final file = File(path);
       if (!file.existsSync() || (release.apkSize > 0 && file.lengthSync() != release.apkSize)) {
         throw const FileSystemException('incomplete download');
@@ -204,6 +338,7 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
         file.deleteSync();
         throw const FileSystemException('SHA-256 mismatch');
       }
+      if (await ChuanyunPlatform.apkSignatureMatches(path) == false) throw MuseSignatureChanged(path);
       return await ChuanyunPlatform.installApk(path);
     } catch (e, st) {
       loggy.warning('update download failed', e, st);
@@ -224,15 +359,7 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
       if (dir.existsSync()) dir.deleteSync(recursive: true);
       dir.createSync(recursive: true);
       final path = '${dir.path}\\Chuanyun-${release.version}-Setup.exe';
-      await _dio().download(
-        release.apkUrl,
-        path,
-        cancelToken: _cancel,
-        onReceiveProgress: (received, total) {
-          final size = total > 0 ? total : release.apkSize;
-          state = MuseUpdateDownloading(size > 0 ? (received / size).clamp(0, 1) : null);
-        },
-      );
+      await _download(release.apkUrl, path, release.apkSize, verified: release.sha256 != null);
       final file = File(path);
       if (!file.existsSync() || (release.apkSize > 0 && file.lengthSync() != release.apkSize)) {
         throw const FileSystemException('incomplete download');

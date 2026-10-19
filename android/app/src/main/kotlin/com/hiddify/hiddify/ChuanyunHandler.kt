@@ -184,6 +184,14 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
                     result.success(true)
                 }
 
+                // 穿云 1.2.4: whether a downloaded APK is signed with the same key as this app
+                // (true / false; null when it can't be read). Android refuses an update signed
+                // with another key, so the app says so instead of a failing installer.
+                "apk_signature_matches" -> {
+                    val path = call.argument<String>("path")
+                    result.success(path?.let { apkSignatureMatches(it) })
+                }
+
                 // 穿云 1.1: in-app update — install the APK the app downloaded into its cache
                 "install_apk" -> {
                     val path = call.argument<String>("path")
@@ -218,5 +226,31 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
         } catch (e: Exception) {
             result.error("chuanyun", e.message, null)
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun signerDigests(info: android.content.pm.PackageInfo?): Set<String>? {
+        info ?: return null
+        val sigs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val si = info.signingInfo ?: return null
+            if (si.hasMultipleSigners()) si.apkContentsSigners else si.signingCertificateHistory
+        } else {
+            info.signatures
+        } ?: return null
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        return sigs.map { md.digest(it.toByteArray()).joinToString("") { b -> "%02x".format(b) } }.toSet()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun apkSignatureMatches(path: String): Boolean? = try {
+        val pm = context.packageManager
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+            android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+        else android.content.pm.PackageManager.GET_SIGNATURES
+        val mine = signerDigests(pm.getPackageInfo(context.packageName, flags))
+        val theirs = signerDigests(pm.getPackageArchiveInfo(path, flags))
+        if (mine == null || theirs == null) null else mine.intersect(theirs).isNotEmpty()
+    } catch (e: Exception) {
+        null
     }
 }

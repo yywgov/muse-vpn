@@ -39,7 +39,7 @@ class SettingsPage extends HookConsumerWidget {
               MuseSwitchTile(
                 leading: const Icon(Icons.visibility_off_rounded),
                 title: '自动收起不可用节点',
-                subtitle: '连续 3 次超时的节点收进「不可用」，恢复后自动放回',
+                subtitle: '测速超时的节点收进「不可用」，恢复后自动放回',
                 value: ref.watch(Preferences.hideBadNodes),
                 onChanged: (v) => ref.read(Preferences.hideBadNodes.notifier).update(v),
               ),

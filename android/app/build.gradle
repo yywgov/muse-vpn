@@ -83,24 +83,30 @@ android {
 
     // 穿云 1.1: arm64 only through ndk.abiFilters (below); AGP rejects ABI splits next to them
 
-    if (hasKeyStore) {
-        signingConfigs {
-            release {
+    // 穿云 1.2.4: every release is signed with the same key, so 「检查更新」 can always install over
+    // the previous version. Before, CI fell back to each runner's throw-away debug key and every
+    // build had a different signature (Android refuses such an update). key.properties (from CI
+    // secrets) still wins when present; otherwise the fixed project key below is used.
+    signingConfigs {
+        release {
+            if (hasKeyStore) {
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
                 storeFile file(keystoreProperties['storeFile'])
                 storePassword keystoreProperties['storePassword']
+            } else {
+                storeFile file('chuanyun-release.p12')
+                storeType 'pkcs12'
+                storePassword 'chuanyun-release-2026'
+                keyAlias 'chuanyun'
+                keyPassword 'chuanyun-release-2026'
             }
         }
     }
 
     buildTypes {
         release {
-            if (hasKeyStore) {
-                signingConfig signingConfigs.release
-            } else {
-                signingConfig signingConfigs.debug
-            }
+            signingConfig signingConfigs.release
         }
         // 穿云 1.1: arm64 only. The Flutter Gradle plugin puts all three ABIs into every build
         // type's ndk.abiFilters; replace them (not add).

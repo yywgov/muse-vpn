@@ -12,6 +12,7 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/diagnostics.dart';
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/gen/assets.gen.dart';
@@ -57,6 +58,18 @@ class AboutPage extends HookConsumerWidget {
       try {
         final opened = await updater.downloadAndInstall(release);
         if (!opened && !PlatformUtils.isWindows) toast.showInfoToast('请允许穿云「安装未知应用」，然后再点一次检查更新');
+      } on MuseSignatureChanged catch (e) {
+        // 1.2.4: earlier builds were signed with a different key each time; from now on the key
+        // stays the same. This one switch needs the old version removed first.
+        final go = await ref
+            .read(dialogNotifierProvider.notifier)
+            .showConfirmation(
+              title: '需要先卸载旧版（仅此一次）',
+              message: '之前的版本签名不固定，系统不允许直接覆盖安装。请先在「订阅/配置」里复制好订阅链接，'
+                  '然后卸载穿云，再安装刚下载的新版。从这个版本起签名固定，以后点更新就能直接覆盖安装。',
+              positiveBtnTxt: '打开安装包',
+            );
+        if (go) await ChuanyunPlatform.installApk(e.path);
       } catch (_) {
         toast.showErrorToast('下载失败，请稍后再试');
       }

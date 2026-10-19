@@ -69,5 +69,8 @@ abstract final class ChuanyunPlatform {
       _call<bool>('show_alert', {'id': id, 'title': title, 'text': text});
 
   /// 穿云 1.1: hands a downloaded APK to the system installer (asks for 「安装未知应用」 first if needed).
+  /// 1.2.4: true / false, null when unknown (see ChuanyunHandler.apk_signature_matches).
+  static Future<bool?> apkSignatureMatches(String path) => _call<bool>('apk_signature_matches', {'path': path});
+
   static Future<bool> installApk(String path) async => await _call<bool>('install_apk', {'path': path}) ?? false;
 }

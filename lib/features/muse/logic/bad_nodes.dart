@@ -7,12 +7,14 @@
 // - the node that is selected right now is never hidden (节点失效自动切换 handles that one),
 // - at least one node always stays visible: when every node fails, nothing is hidden.
 // Shared Dart code, so the same behaviour on Windows and Android.
-// Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
+// Part of 穿云 (GPLv3).
 
 import 'package:hiddify/features/muse/logic/failover_tracker.dart';
 
 class MuseBadNodeTracker {
-  MuseBadNodeTracker({this.hideAfter = 3, this.restoreAfter = 2});
+  // 1.2.4: a node shown as 超时 goes to 「不可用」 at once and comes back on its first good test
+  // (the core already reports 超时 only after two lost probes in a row)
+  MuseBadNodeTracker({this.hideAfter = 1, this.restoreAfter = 1});
 
   final int hideAfter;
   final int restoreAfter;

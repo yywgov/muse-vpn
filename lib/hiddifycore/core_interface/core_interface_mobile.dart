@@ -118,23 +118,25 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
 
     _isBgClientAvailable = true;
     loggy.info("Waiting for starting core");
-    for (var i = 0; i < 20; i++) {
+    // 穿云 1.2.4: stop waiting as soon as the service reports started. The old loop's `break`
+    // only left the switch, so every connect sat through all 20 rounds (4 s or more).
+    waitStart:
+    for (var i = 0; i < 40; i++) {
       try {
         final res = await _status.get(timeout: const Duration(seconds: 1));
 
         switch (res) {
           case CoreStarted() || CoreHotReloading():
-            break;
+            break waitStart;
           case CoreStopped():
             if (res.alert != null) {
               return res;
             }
 
           case CoreStopping():
-          // return res;
           case CoreStarting():
         }
-        await Future.delayed(const Duration(milliseconds: 200));
+        await Future.delayed(const Duration(milliseconds: 100));
       } on TimeoutException {
         // just retry
       }
@@ -189,7 +191,7 @@ Future<bool> waitUntilPort(
   int portNumber,
   bool isOpen,
   Future Function()? callFunctionAfterEachFail, {
-  int maxTry = 10,
+  int maxTry = 20,
 }) async {
   for (var i = 0; i < maxTry; i++) {
     if (await isPortOpen("127.0.0.1", portNumber) == isOpen) {
@@ -199,7 +201,7 @@ Future<bool> waitUntilPort(
       await callFunctionAfterEachFail();
     }
 
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 100));
   }
   return false;
 }

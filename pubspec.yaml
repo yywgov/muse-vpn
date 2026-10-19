@@ -1,7 +1,7 @@
 name: hiddify
 description: 穿云 - Android proxy client (fork of Hiddify, GPLv3).
 publish_to: "none"
-version: 1.2.3+123
+version: 1.2.4+124
 
 environment:
   sdk: ^3.10.4
@@ -133,6 +133,8 @@ flutter:
   assets:
     # - assets/core/geoip.db
     # - assets/core/geosite.db
+    # 穿云 1.2.4: rule-sets the core starts from (no download wait on connect)
+    - assets/rule-sets/
     - assets/images/logo.svg
     - assets/images/glyph.svg
     - assets/images/tray_icon.ico
