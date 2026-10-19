@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
-import 'package:hiddify/features/muse/model/route_mode.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 DateTime? _connectedSince;
@@ -85,38 +83,6 @@ class MuseProtocolChip extends StatelessWidget {
         style: Theme.of(
           context,
         ).textTheme.labelSmall?.copyWith(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-}
-
-/// The 配置 / 代理 / 直连 segmented selector, bound to [ConfigOptions.museRouteMode].
-class MuseRouteModeSelector extends ConsumerWidget {
-  const MuseRouteModeSelector({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(ConfigOptions.museRouteMode);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SegmentedButton<MuseRouteMode>(
-            showSelectedIcon: false,
-            segments: [for (final m in MuseRouteMode.values) ButtonSegment(value: m, label: Text(m.title))],
-            selected: {mode},
-            onSelectionChanged: (s) => ref.read(ConfigOptions.museRouteMode.notifier).update(s.first),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              mode.explain,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).hintColor),
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -60,7 +60,8 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
   ClientChannel? _channel;
   static String generateRandomPassword(int length) {
     const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = Random();
+    // 穿云 1.2.2: cryptographic RNG (the secret guards the local gRPC control API)
+    final random = Random.secure();
     return List.generate(length, (_) => characters[random.nextInt(characters.length)]).join();
   }
 

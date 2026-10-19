@@ -97,19 +97,34 @@ abstract final class WindowsProxyGuard {
 
   /// Whether the system proxy points at 穿云 right now (null when it can't be read).
   static Future<bool?> pointsAtUsNow() async {
-    if (!PlatformUtils.isWindows) return false;
+    final s = await systemProxyNow();
+    return switch (s) {
+      MuseSystemProxy.ours => true,
+      MuseSystemProxy.unknown => null,
+      _ => false,
+    };
+  }
+
+  /// 穿云 1.2.2: what the system proxy is set to right now, as far as the keeper cares.
+  static Future<MuseSystemProxy> systemProxyNow() async {
+    if (!PlatformUtils.isWindows) return MuseSystemProxy.unknown;
     try {
       if (available) {
         final r = await _run('status');
-        return r.out.startsWith('ours=1');
+        // exit code 0 = ours, 1 = not ours, anything else (2, a crash) = could not be read
+        if (r.code != 0 && r.code != 1) return MuseSystemProxy.unknown;
+        return museParseGuardStatus(r.out);
       }
       final q = await Process.run('reg', ['query', _key]).timeout(const Duration(seconds: 5));
       final out = q.stdout.toString();
       final enabled = RegExp(r'ProxyEnable\s+REG_DWORD\s+0x0*1\b').hasMatch(out);
       final server = RegExp(r'ProxyServer\s+REG_SZ\s+(.*)').firstMatch(out)?.group(1)?.trim() ?? '';
-      return enabled && pointsAtUs(server, port);
+      if (!out.contains('ProxyEnable')) return MuseSystemProxy.unknown;
+      if (enabled && pointsAtUs(server, port)) return MuseSystemProxy.ours;
+      final pac = RegExp(r'AutoConfigURL\s+REG_SZ\s+\S').hasMatch(out);
+      return enabled || pac ? MuseSystemProxy.other : MuseSystemProxy.direct;
     } catch (_) {
-      return null;
+      return MuseSystemProxy.unknown;
     }
   }
 
@@ -139,4 +154,35 @@ abstract final class WindowsProxyGuard {
       return false;
     }
   }
+}
+
+/// 穿云 1.2.2: the system proxy as the connection keeper sees it.
+enum MuseSystemProxy {
+  /// points at 穿云's mixed port
+  ours,
+
+  /// exactly what ChuanyunGuard last put back (it restored the user's settings): reconnect
+  restoredByGuard,
+
+  /// no proxy, no PAC (sing-box blanked it, or nothing is set): reconnect
+  direct,
+
+  /// another proxy / PAC the guard did not set: the user changed it on purpose, leave it alone
+  other,
+
+  /// the guard / registry could not be read: decide nothing
+  unknown,
+}
+
+/// Parses `ChuanyunGuard status` ("ours=0 flags=0x3 server=.. bypass=.. pac=.. backup=1 restored=0").
+MuseSystemProxy museParseGuardStatus(String out) {
+  final line = out.trim();
+  final ours = RegExp(r'^ours=([01])\b').firstMatch(line)?.group(1);
+  if (ours == null) return MuseSystemProxy.unknown;
+  if (ours == '1') return MuseSystemProxy.ours;
+  if (RegExp(r'\brestored=1\b').hasMatch(line)) return MuseSystemProxy.restoredByGuard;
+  final flags = int.tryParse(RegExp(r'\bflags=(0x[0-9a-fA-F]+|\d+)').firstMatch(line)?.group(1) ?? '');
+  if (flags == null) return MuseSystemProxy.unknown;
+  // PROXY_TYPE_PROXY 0x2, PROXY_TYPE_AUTO_PROXY_URL 0x4
+  return flags & 0x6 == 0 ? MuseSystemProxy.direct : MuseSystemProxy.other;
 }

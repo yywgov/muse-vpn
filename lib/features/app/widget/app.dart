@@ -17,6 +17,7 @@ import 'package:hiddify/features/connection/widget/connection_wrapper.dart';
 import 'package:hiddify/features/muse/home/auto_fastest.dart';
 import 'package:hiddify/features/muse/desktop/connection_keeper.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
+import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/subscription_alert.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
@@ -71,6 +72,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     ref.listen(foregroundProfilesUpdateNotifierProvider, (_, _) {});
     if (PlatformUtils.isAndroid) ref.listen(appBasedRoutingProvider, (_, _) {});
     ref.listen(museNodeFailoverProvider, (_, _) {});
+    // 穿云 1.2.2: fold nodes that keep timing out into 「不可用」
+    ref.listen(museBadNodesProvider, (_, _) {});
     ref.listen(museAutoFastestProvider, (_, _) {});
     ref.listen(museCoreWatchdogProvider, (_, _) {});
     // 穿云 Windows 1.2.1: 连接守护 (auto-recovery, system proxy restore, wake from sleep)

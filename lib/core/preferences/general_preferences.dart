@@ -21,6 +21,9 @@ abstract class Preferences {
   // 穿云: switch the main group to 自动最快 when the hand-picked node stops answering (always on since 1.1)
   static final nodeFailover = PreferencesNotifier.create<bool, bool>("node_failover", true, overrideValue: true);
 
+  // 穿云 1.2.2: nodes that keep timing out fold into 「不可用」 on 首页 (and come back by themselves)
+  static final hideBadNodes = PreferencesNotifier.create<bool, bool>("hide_bad_nodes", true);
+
   // 穿云 1.1: 后台运行/自启动 guide shown once on the first connect; 自启动 can't be read back from
   // ColorOS, so having opened its settings page once counts as done
   static final keepAliveGuideShown = PreferencesNotifier.create<bool, bool>("keep_alive_guide_shown", false);

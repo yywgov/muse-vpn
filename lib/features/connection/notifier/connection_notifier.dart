@@ -81,6 +81,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       return;
     }
     loggy.info("restoring previous connection on startup");
+    intentGeneration++;
     await ref.read(Preferences.startedByUser.notifier).update(true);
     await _connect();
   }
@@ -91,10 +92,19 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     } else if (state case AsyncData(:final value)) {
       switch (value) {
         case Disconnected():
+          intentGeneration++;
           await ref.read(Preferences.startedByUser.notifier).update(true);
           await _connect();
         case Connected():
           // default:
+          intentGeneration++;
+          await ref.read(Preferences.startedByUser.notifier).update(false);
+          await _disconnect();
+        case Connecting() when _recoveryInFlight != null:
+          // 穿云 1.2.2: a tap while the connection keeper is reconnecting cancels the recovery
+          // (it used to be ignored as "debounce", and the recovery connected again anyway)
+          loggy.info("connect tapped during recovery: stopping");
+          intentGeneration++;
           await ref.read(Preferences.startedByUser.notifier).update(false);
           await _disconnect();
         default:
@@ -110,6 +120,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
         return _disconnect();
       }
       loggy.info("active profile changed, reconnecting");
+      intentGeneration++;
       await ref.read(Preferences.startedByUser.notifier).update(true);
       await _connectionRepo.reconnect(profile, ref.read(Preferences.disableMemoryLimit)).mapLeft((err) async {
         loggy.warning("error reconnecting", err);
@@ -125,17 +136,55 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   /// profile removed, a run-mode switch). A stop shortly after that is not unexpected.
   DateTime? lastIntentionalStopAt;
 
+  /// 穿云 1.2.2: bumped on every connect / disconnect the user asks for (button, tray, start-up
+  /// restore). A recovery started under an older value no longer speaks for the user: it stops,
+  /// and a connect it already made is undone when the user has asked to be disconnected since.
+  int intentGeneration = 0;
+
+  Future<bool>? _recoveryInFlight;
+
+  /// Whether a keeper recovery is running right now (its connect may outlive the keeper's wait).
+  bool get recoveryInFlight => _recoveryInFlight != null;
+
   /// 穿云 Windows 1.2.1: the connection keeper's recovery: stop whatever is left of the core and
   /// connect again with the active profile. True when the core reports started afterwards.
-  Future<bool> recoverConnection() async {
+  ///
+  /// 1.2.2: only one runs at a time. A caller that gave up waiting (timeout) and calls again
+  /// gets the attempt that is still running instead of a second disconnect/connect on top of it.
+  /// [generation] is [intentGeneration] when the recovery began.
+  Future<bool> recoverConnection({required int generation}) {
+    final running = _recoveryInFlight;
+    if (running != null) return running;
+    late final Future<bool> attempt;
+    attempt = _recoverOnce(generation).whenComplete(() {
+      if (identical(_recoveryInFlight, attempt)) _recoveryInFlight = null;
+    });
+    _recoveryInFlight = attempt;
+    return attempt;
+  }
+
+  bool _userTookOver(int generation) => generation != intentGeneration || !ref.read(Preferences.startedByUser);
+
+  Future<bool> _recoverOnce(int generation) async {
     final profile = await ref.read(activeProfileProvider.future);
-    if (profile == null) return false;
+    if (profile == null || _userTookOver(generation)) return false;
     await _connectionRepo.disconnect().run();
+    if (_userTookOver(generation)) return false;
     final res = await _connectionRepo.connect(profile, ref.read(Preferences.disableMemoryLimit)).run();
-    return res.match((err) {
+    final ok = res.match((err) {
       loggy.warning("recovery connect failed", err);
       return false;
     }, (_) => true);
+    if (_userTookOver(generation)) {
+      // the user tapped 断开 while this connect was running: honour that, not the recovery
+      if (!ref.read(Preferences.startedByUser)) {
+        loggy.info("recovery finished after the user disconnected: stopping again");
+        lastIntentionalStopAt = DateTime.now();
+        await _connectionRepo.disconnect().run();
+      }
+      return false;
+    }
+    return ok;
   }
 
   /// 穿云 1.2.1: 系统代理 ↔ TUN needs a real restart. It used to call toggleConnection twice; the

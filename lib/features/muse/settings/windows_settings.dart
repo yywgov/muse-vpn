@@ -80,9 +80,10 @@ class WindowsSettingsSection extends ConsumerWidget {
             await ref.read(ConfigOptions.serviceMode.notifier).update(picked);
           },
         ),
-        SwitchListTile(
-          secondary: const Icon(Icons.power_settings_new_rounded),
-          title: const Text('开机自启'),
+        // 1.2.2: same switch tile as every other 设置 row
+        MuseSwitchTile(
+          leading: const Icon(Icons.power_settings_new_rounded),
+          title: '开机自启',
           value: autoStart,
           onChanged: (value) async {
             final notifier = ref.read(autoStartNotifierProvider.notifier);

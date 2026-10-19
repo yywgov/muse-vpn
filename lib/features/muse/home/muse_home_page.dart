@@ -11,6 +11,8 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
@@ -163,8 +165,11 @@ class _ConnectSection extends HookConsumerWidget {
     final status = connection.valueOrNull;
     final connected = status is Connected;
     final busy = status?.isSwitching ?? false;
+    // 穿云 1.2.2 Windows: while the keeper reconnects, a tap cancels the recovery
+    final canCancelRecovery = PlatformUtils.isWindows && recovering && status is Connecting;
     final String label = switch (status) {
       Connected() => '已连接',
+      Connecting() when canCancelRecovery => '正在恢复连接…（点按取消）',
       Connecting() => '正在连接…',
       Disconnecting() => '正在断开…',
       _ when connection.hasError => '连接失败',
@@ -173,7 +178,7 @@ class _ConnectSection extends HookConsumerWidget {
 
     // same flow as the original connection button
     Future<void> toggle() async {
-      if (status is Connected) {
+      if (status is Connected || canCancelRecovery) {
         await ref.read(connectionNotifierProvider.notifier).toggleConnection();
         return;
       }
@@ -189,7 +194,7 @@ class _ConnectSection extends HookConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Column(
         children: [
-          _ConnectButton(connected: connected, busy: busy, onTap: busy ? null : toggle),
+          _ConnectButton(connected: connected, busy: busy, onTap: busy && !canCancelRecovery ? null : toggle),
           Text.rich(
             TextSpan(
               children: [
@@ -496,6 +501,12 @@ class _NodesSection extends HookConsumerWidget {
     final theme = Theme.of(context);
     final running = ref.watch(serviceRunningProvider);
     final testing = useState(false);
+    // 1.2.2: when the current 测速 started (its results end the spinner) and the order the list
+    // had then (kept while results stream in, so rows don't jump under the finger)
+    final testStartedAt = useRef<DateTime?>(null);
+    final frozenOrder = useRef<List<String>>(const []);
+    final showHidden = useState(false);
+    final hidden = ref.watch(museHiddenNodesProvider);
 
     Widget header(String text, {Widget? trailing}) => Padding(
       padding: const EdgeInsets.fromLTRB(24, 6, 12, 0),
@@ -528,14 +539,31 @@ class _NodesSection extends HookConsumerWidget {
 
     Future<void> urlTest() async {
       if (group == null || testing.value) return;
+      final started = DateTime.now();
+      testStartedAt.value = started;
       testing.value = true;
       try {
         await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest(group.tag);
       } catch (_) {
         // the notifier already logs the failure
       } finally {
-        // results stream in over the next seconds
-        Future.delayed(const Duration(seconds: 3), () {
+        // results stream in over the next seconds; the spinner stops once every node has a new
+        // result (checked on each update below), at the latest after 15 s
+        Future.delayed(const Duration(seconds: 15), () {
+          if (context.mounted && testStartedAt.value == started) testing.value = false;
+        });
+      }
+    }
+
+    // 1.2.2: every node answered (or timed out) since 测速 was tapped: stop the spinner
+    if (testing.value && group != null && testStartedAt.value != null) {
+      final started = testStartedAt.value!.subtract(const Duration(seconds: 1));
+      final nodes = group.items.where((e) => !e.isGroup);
+      final done = nodes.isNotEmpty &&
+          nodes.every((e) => e.hasUrlTestTime() && e.urlTestTime.toDateTime().isAfter(started));
+      final minShown = DateTime.now().difference(testStartedAt.value!) > const Duration(milliseconds: 800);
+      if (done && minShown) {
+        Future.microtask(() {
           if (context.mounted) testing.value = false;
         });
       }
@@ -577,27 +605,93 @@ class _NodesSection extends HookConsumerWidget {
         ),
       ];
     } else {
+      final sorted = museSortNodes<OutboundInfo>(
+        group.items,
+        isGroup: (e) => e.isGroup,
+        delay: (e) => _freshDelay(e, since),
+        isValidDelay: ConnectionConst.isValidDelay,
+      );
+      final List<OutboundInfo> ordered;
+      if (testing.value && frozenOrder.value.isNotEmpty) {
+        // 1.2.2: keep the order from before 测速 while its results arrive
+        final byTag = {for (final e in group.items) e.tag: e};
+        final known = frozenOrder.value.toSet();
+        ordered = [
+          for (final t in frozenOrder.value) ?byTag[t],
+          ...sorted.where((e) => !known.contains(e.tag)),
+        ];
+      } else {
+        ordered = sorted;
+        frozenOrder.value = [for (final e in sorted) e.tag];
+      }
+      final visible = ordered.where((e) => !hidden.contains(e.tag)).toList();
+      final folded = ordered.where((e) => hidden.contains(e.tag)).toList();
+      final nodeCount = group.items.where((e) => !e.isGroup).length;
+      // a node shows 测速中 only while a test can actually be running
+      final recentlyConnected = since != null && DateTime.now().difference(since) < const Duration(seconds: 30);
+      final pending = testing.value || recentlyConnected;
+
+      Widget card(OutboundInfo proxy, {bool dimmed = false}) => _NodeCard(
+        key: ValueKey(proxy.tag),
+        proxy: proxy,
+        since: since,
+        nodeCount: nodeCount,
+        pending: pending,
+        dimmed: dimmed,
+        selected: group.selected == proxy.tag,
+        onTap: () async {
+          try {
+            await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(group.tag, proxy.tag);
+          } catch (_) {
+            // 1.2.2: say so instead of silently staying on the old node
+            try {
+              ref.read(inAppNotificationControllerProvider).showErrorToast('切换节点失败，请重试');
+            } catch (_) {}
+          }
+        },
+      );
+
       body = [
-        for (final proxy in museSortNodes<OutboundInfo>(
-          group.items,
-          isGroup: (e) => e.isGroup,
-          delay: (e) => _freshDelay(e, since),
-          isValidDelay: ConnectionConst.isValidDelay,
-        ))
-          _NodeCard(
-            key: ValueKey(proxy.tag),
-            proxy: proxy,
-            since: since,
-            nodeCount: group.items.where((e) => !e.isGroup).length,
-            selected: group.selected == proxy.tag,
-            onTap: () async {
-              try {
-                await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(group.tag, proxy.tag);
-              } catch (_) {
-                // the notifier already logs the failure
-              }
-            },
+        for (final proxy in visible) card(proxy),
+        if (folded.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+            child: Material(
+              color: MuseColors.card(context),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                key: const ValueKey('hidden_nodes_toggle'),
+                onTap: () => showHidden.value = !showHidden.value,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.block_rounded, size: 18, color: MuseColors.secondaryText(context)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '不可用（${folded.length}）',
+                          style: theme.textTheme.bodyMedium?.copyWith(color: MuseColors.secondaryText(context)),
+                        ),
+                      ),
+                      Text(
+                        '连续超时，恢复后自动放回',
+                        style: theme.textTheme.bodySmall?.copyWith(color: MuseColors.secondaryText(context)),
+                      ),
+                      Icon(
+                        showHidden.value ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                        color: MuseColors.secondaryText(context),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
+          if (showHidden.value)
+            for (final proxy in folded) card(proxy, dimmed: true),
+        ],
       ];
     }
 
@@ -625,10 +719,19 @@ class _NodeCard extends StatelessWidget {
     required this.nodeCount,
     required this.selected,
     required this.onTap,
+    this.pending = true,
+    this.dimmed = false,
   });
 
   final OutboundInfo proxy;
   final DateTime? since;
+
+  /// a url test may be running (测速 tapped / just connected): an untested node shows 测速中,
+  /// otherwise —
+  final bool pending;
+
+  /// folded into 「不可用」 and shown expanded
+  final bool dimmed;
 
   /// nodes (not groups) in the main group: a 负载均衡 group spreads over these
   final int nodeCount;
@@ -647,7 +750,7 @@ class _NodeCard extends StatelessWidget {
     final String delayText;
     final Color delayColor;
     if (stale) {
-      delayText = '测速中';
+      delayText = pending ? '测速中' : '—';
       delayColor = secondary;
     } else if (ConnectionConst.isValidDelay(delay)) {
       delayText = '$delay ms';
@@ -680,7 +783,7 @@ class _NodeCard extends StatelessWidget {
         : Icons.public_rounded;
     final flag = proxy.isGroup ? null : museFlagEmoji(name);
 
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       child: Material(
         color: selected ? MuseColors.selectedCard(context) : MuseColors.card(context),
@@ -742,5 +845,6 @@ class _NodeCard extends StatelessWidget {
         ),
       ),
     );
+    return dimmed ? Opacity(opacity: 0.55, child: row) : row;
   }
 }

@@ -41,7 +41,7 @@ class AboutPage extends HookConsumerWidget {
         toast.showSuccessToast('已是最新版本');
         return;
       }
-      final pageOnly = PlatformUtils.isWindows && !museIsWindowsInstaller(release);
+      final pageOnly = PlatformUtils.isWindows && (!museIsWindowsInstaller(release) || release.sha256 == null);
       final ok = await ref
           .read(dialogNotifierProvider.notifier)
           .showConfirmation(

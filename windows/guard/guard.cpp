@@ -8,7 +8,7 @@
 //   ChuanyunGuard.exe save    <stateDir> <port>   remember the user's own proxy settings
 //                                                 (before 穿云 switches the system proxy on)
 //   ChuanyunGuard.exe restore <stateDir> <port> [why]  put them back when 穿云's proxy is set
-//   ChuanyunGuard.exe status  <stateDir> <port>   one line: ours=0|1 flags=.. server=..
+//   ChuanyunGuard.exe status  <stateDir> <port>   one line: ours=0|1 flags=.. server=.. backup=0|1 restored=0|1
 //   ChuanyunGuard.exe apply   <stateDir> <port> <flags> [server] [bypass]   (smoke tests)
 //   ChuanyunGuard.exe watch   <stateDir> <port> <pid> [<exe to relaunch>]
 //       waits for the app process <pid>; when it is gone and the system proxy still points at
@@ -31,6 +31,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <cwctype>
 #include <cwchar>
 #include <string>
@@ -196,8 +197,8 @@ std::string Describe(const ProxyState& s) {
 
 // ---- backup file: proxy-backup.txt, key=value lines (UTF-8) ----
 
-bool ReadBackup(ProxyState& s) {
-  std::wstring path = PathIn(L"proxy-backup.txt");
+bool ReadStateFile(const wchar_t* name, ProxyState& s) {
+  std::wstring path = PathIn(name);
   HANDLE f = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (f == INVALID_HANDLE_VALUE) return false;
@@ -233,8 +234,8 @@ bool ReadBackup(ProxyState& s) {
   return hasFlags;
 }
 
-bool WriteBackup(const ProxyState& s) {
-  std::wstring path = PathIn(L"proxy-backup.txt");
+bool WriteStateFile(const wchar_t* name, const ProxyState& s) {
+  std::wstring path = PathIn(name);
   std::wstring tmp = path + L".tmp";
   char flags[32];
   snprintf(flags, sizeof(flags), "0x%lx", s.flags);
@@ -249,6 +250,15 @@ bool WriteBackup(const ProxyState& s) {
   if (!ok) return false;
   return MoveFileExW(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
 }
+
+bool ReadBackup(ProxyState& s) { return ReadStateFile(L"proxy-backup.txt", s); }
+bool WriteBackup(const ProxyState& s) { return WriteStateFile(L"proxy-backup.txt", s); }
+
+// 穿云 1.2.2: what the guard itself last put back (proxy-restored.txt). `status` reports
+// restored=1 while the current setting is still exactly that, so the app can tell "the guard
+// restored the user's settings" (reconnect) from "the user changed the proxy" (leave it alone).
+bool ReadRestored(ProxyState& s) { return ReadStateFile(L"proxy-restored.txt", s); }
+void WriteRestored(const ProxyState& s) { WriteStateFile(L"proxy-restored.txt", s); }
 
 // ---- commands ----
 
@@ -299,6 +309,7 @@ int Restore(const char* why) {
     if (hasSaved) target = saved;
     target.valid = true;
     if (Apply(target)) {
+      WriteRestored(target);
       Log(std::string("restore(") + why + "): " + Describe(cur) + " -> " + Describe(target));
       Out("restored " + Describe(target));
       rc = 0;
@@ -309,7 +320,11 @@ int Restore(const char* why) {
   } else {
     Out("not ours " + Describe(cur));
   }
-  if (rc != 2) DeleteFileW(PathIn(L"proxy-backup.txt").c_str());
+  // 穿云 1.2.2: a restore in the middle of a recovery ("恢复失败") belongs to a session that is
+  // still going: when nothing had to be restored the backup is kept, so the reconnect that
+  // follows does not save whatever happens to be set at that moment as "the user's settings".
+  bool sessionContinues = strcmp(why, "恢复失败") == 0;
+  if (rc == 0 || (rc == 1 && !sessionContinues)) DeleteFileW(PathIn(L"proxy-backup.txt").c_str());
   return rc;
 }
 
@@ -319,7 +334,10 @@ int Status() {
   ProxyState saved;
   bool hasSaved = ReadBackup(saved);
   bool ours = PointsAtUs(cur, g_port);
-  Out(std::string("ours=") + (ours ? "1" : "0") + " " + Describe(cur) + " backup=" + (hasSaved ? "1" : "0"));
+  ProxyState restored;
+  bool byGuard = !ours && ReadRestored(restored) && Same(cur, restored);
+  Out(std::string("ours=") + (ours ? "1" : "0") + " " + Describe(cur) + " backup=" + (hasSaved ? "1" : "0") +
+      " restored=" + (byGuard ? "1" : "0"));
   return ours ? 0 : 1;
 }
 

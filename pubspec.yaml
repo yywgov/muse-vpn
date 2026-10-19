@@ -1,7 +1,7 @@
 name: hiddify
 description: 穿云 - Android proxy client (fork of Hiddify, GPLv3).
 publish_to: "none"
-version: 1.2.1+121
+version: 1.2.2+122
 
 environment:
   sdk: ^3.10.4
@@ -21,6 +21,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2
+  crypto: ^3.0.6 # 穿云 1.2.2: SHA-256 check of downloaded updates
 
   # lucy_editor: ^1.0.5
   # re_highlight: ^0.0.3

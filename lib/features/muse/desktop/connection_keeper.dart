@@ -7,6 +7,10 @@
 // - core stopped or not answering although nobody stopped it → recovery.
 // - every 30 s in 系统代理 mode: a request through the local proxy port. When that fails twice
 //   while the same request without the proxy works, the core is broken → recovery.
+//   1.2.2: in TUN mode a core whose local port stops answering at all → recovery.
+// 1.2.2: a connect / disconnect by the user ends a running recovery (it can be cancelled from the
+// connect button), attempts never overlap, and a system proxy the user switched to another
+// proxy is left alone.
 // Recovery: retry after 2 s; if that does not bring the connection back, the user's own proxy
 // settings are restored AT ONCE (the PC is never left offline because of 穿云), then retries
 // follow after 5 / 15 / 30 / 60 s. After 5 failed retries it gives up, shows 未连接 and says so.
@@ -56,6 +60,11 @@ KeeperAction museKeeperDecide({
   // stopped, or the core does not answer at all
   return KeeperAction.recover;
 }
+
+/// 1.2.2: whether a system proxy that is not 穿云's should be switched back on by reconnecting
+/// (pure, unit-tested): only after the guard restored the user's settings or a blanked setting.
+bool museShouldReclaimSystemProxy(MuseSystemProxy now) =>
+    now == MuseSystemProxy.restoredByGuard || now == MuseSystemProxy.direct;
 
 /// A wall-clock gap much longer than the tick: the PC slept / the process was suspended.
 bool museLooksLikeWake(Duration sinceLastTick, Duration interval) =>
@@ -146,14 +155,16 @@ class MuseConnectionKeeper with InfraLogger {
         if (wake || reason != 'tick' || now.difference(_lastProbe) >= probeEvery) {
           _lastProbe = now;
           if (!await _proxyPathHealthy()) {
-            _log('经本地代理端口的访问失败而直连正常：内核异常，开始恢复');
+            _log(ref.read(ConfigOptions.singboxConfigOptions).setSystemProxy
+                ? '经本地代理端口的访问失败而直连正常：内核异常，开始恢复'
+                : 'TUN 模式下内核本地端口无响应：内核异常，开始恢复');
             await _recover();
             return;
           }
           // the guard restored the user's settings (the app hung / the PC slept with the port
           // silent): the core runs again, so switch 系统代理 back on by reconnecting
           if (await _systemProxyMissing()) {
-            _log('系统代理已不指向穿云（守护进程恢复过或被修改），重新连接');
+            _log('系统代理已不指向穿云（守护进程恢复过或被清空），重新连接');
             await _recover();
             return;
           }
@@ -169,13 +180,22 @@ class MuseConnectionKeeper with InfraLogger {
 
   /// 系统代理 mode only: a plain HTTP request through 127.0.0.1:<mixed port> must work whenever
   /// the same request without the proxy works. Checked twice (3 s apart) before it counts.
+  ///
+  /// 1.2.2: TUN mode is checked too (the mixed inbound runs in both modes). There a "direct"
+  /// request goes through the tunnel as well, so only a mixed port that no longer answers at all
+  /// counts as a broken core; a port that answers while sites fail is the node's or the
+  /// network's problem (node failover handles the node).
   Future<bool> _proxyPathHealthy() async {
     final options = ref.read(ConfigOptions.singboxConfigOptions);
-    if (!options.setSystemProxy) return true;
     final port = ref.read(ConfigOptions.mixedPort);
     for (var i = 0; i < 2; i++) {
       if (i > 0) await Future<void>.delayed(const Duration(seconds: 3));
       if (await museHttpProbe(viaPort: port)) return true;
+    }
+    if (!options.setSystemProxy) {
+      final alive = await museSocksGreeting(port);
+      if (!alive) loggy.info('keeper: TUN mode, the local port of the core no longer answers');
+      return alive;
     }
     // proxy path fails: only the core's fault when the network itself works
     final direct = await museHttpProbe();
@@ -183,15 +203,30 @@ class MuseConnectionKeeper with InfraLogger {
     return !direct;
   }
 
+  /// The system proxy setting last logged as "changed by the user" (logged once, not every 30 s).
+  MuseSystemProxy? _userProxyLogged;
+
   /// 系统代理 mode, core running: the system proxy no longer points at us (seen twice, 3 s apart,
   /// so a hot reload's close/re-open of the inbound does not count).
+  ///
+  /// 1.2.2: only when the guard put the user's settings back or the setting was blanked. Another
+  /// proxy / PAC that the guard did not set was chosen by the user: 穿云 no longer takes it
+  /// back every 30 s. A status that could not be read decides nothing.
   Future<bool> _systemProxyMissing() async {
     final options = ref.read(ConfigOptions.singboxConfigOptions);
     if (!options.setSystemProxy) return false;
     for (var i = 0; i < 2; i++) {
       if (i > 0) await Future<void>.delayed(const Duration(seconds: 3));
-      final ours = await WindowsProxyGuard.pointsAtUsNow();
-      if (ours != false) return false;
+      final now = await WindowsProxyGuard.systemProxyNow();
+      if (!museShouldReclaimSystemProxy(now)) {
+        if (now == MuseSystemProxy.other && _userProxyLogged != now) {
+          _userProxyLogged = now;
+          _log('系统代理被改为其他代理（非穿云、非守护进程恢复）：视为用户操作，不抢回');
+        } else if (now == MuseSystemProxy.ours) {
+          _userProxyLogged = null;
+        }
+        return false;
+      }
       if (await ref.read(hiddifyCoreServiceProvider).queryCoreState() is! CoreStarted) return false;
     }
     return true;
@@ -203,17 +238,26 @@ class MuseConnectionKeeper with InfraLogger {
     _proxyRestoredDuringRecovery = false;
     ref.read(museWatchdogRecoveringProvider.notifier).state = true;
     final notifier = ref.read(connectionNotifierProvider.notifier);
+    // 1.2.2: the user's connect / disconnect since this recovery began ends it (a manual connect
+    // during the backoff used to be torn down by the next attempt's disconnect)
+    final generation = notifier.intentGeneration;
+    bool userTookOver() => notifier.intentGeneration != generation || !ref.read(Preferences.startedByUser);
     try {
       for (var i = 0; i < museRecoveryBackoff.length; i++) {
         await Future<void>.delayed(museRecoveryBackoff[i]);
-        if (!ref.read(Preferences.startedByUser)) {
-          _log('用户已断开，停止恢复');
+        if (userTookOver()) {
+          _log(ref.read(Preferences.startedByUser) ? '用户已手动连接，停止自动恢复' : '用户已断开，停止恢复');
           return;
         }
-        final connected = await notifier.recoverConnection().timeout(
-          const Duration(seconds: 40),
-          onTimeout: () => false,
-        );
+        // a timeout only stops waiting: the next attempt joins the connect still running
+        // instead of starting a second one on top of it
+        final connected = await notifier
+            .recoverConnection(generation: generation)
+            .timeout(const Duration(seconds: 40), onTimeout: () => false);
+        if (userTookOver()) {
+          _log(ref.read(Preferences.startedByUser) ? '用户已手动连接，停止自动恢复' : '用户在恢复过程中断开，停止恢复');
+          return;
+        }
         final ok = connected && await _confirmUp();
         if (ok) {
           failedAttempts = 0;
@@ -230,6 +274,7 @@ class MuseConnectionKeeper with InfraLogger {
           _log(restored ? '已恢复原系统代理设置，电脑可正常上网' : '系统代理未指向穿云，无需恢复');
         }
       }
+      if (userTookOver()) return;
       _log('多次恢复失败，已放弃自动重连（显示未连接）');
       await notifier.abortConnection();
       await WindowsProxyGuard.restore('放弃重连');

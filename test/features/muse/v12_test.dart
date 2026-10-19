@@ -141,9 +141,9 @@ void main() {
   });
 
   group('tray menu', () {
-    test('连接/断开 · 配置/代理/直连 · 显示窗口 · 退出', () {
+    test('连接/断开 · 规则/全局 · 显示窗口 · 退出', () {
       final spec = museTrayMenuSpec(const Disconnected(), MuseRouteMode.global);
-      expect(spec.where((e) => e.key != '-').map((e) => e.label).toList(), ['连接', '配置', '代理', '直连', '显示窗口', '退出']);
+      expect(spec.where((e) => e.key != '-').map((e) => e.label).toList(), ['连接', '规则', '全局', '显示窗口', '退出']);
       expect(spec.firstWhere((e) => e.key == 'mode:global').checked, isTrue);
       expect(spec.firstWhere((e) => e.key == 'mode:rule').checked, isFalse);
       expect(museTrayMenuSpec(const Connected(), MuseRouteMode.rule).first.label, '断开');

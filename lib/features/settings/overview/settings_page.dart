@@ -32,6 +32,19 @@ class SettingsPage extends HookConsumerWidget {
       body: MuseGroupedBody(
         children: [
           const MuseSection(header: '常规', children: [ThemeModePrefTile()]),
+          // 穿云 1.2.2: both platforms
+          MuseSection(
+            header: '节点',
+            children: [
+              MuseSwitchTile(
+                leading: const Icon(Icons.visibility_off_rounded),
+                title: '自动收起不可用节点',
+                subtitle: '连续 3 次超时的节点收进「不可用」，恢复后自动放回',
+                value: ref.watch(Preferences.hideBadNodes),
+                onChanged: (v) => ref.read(Preferences.hideBadNodes.notifier).update(v),
+              ),
+            ],
+          ),
           if (PlatformUtils.isWindows) const WindowsSettingsSection(),
           if (android)
             MuseSection(
@@ -83,11 +96,12 @@ class SettingsPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => context.goNamed('connections'),
               ),
+              // 1.2.2: was 高级 › TLS 分片 / 技巧 (a page with one row)
               MuseTile(
                 leading: const Icon(Icons.tune_rounded),
-                title: '高级',
+                title: 'TLS 分片',
                 chevron: true,
-                onTap: () => context.goNamed('advanced'),
+                onTap: () => context.goNamed('tlsTricks'),
               ),
               MuseTile(
                 leading: const Icon(Icons.info_rounded),

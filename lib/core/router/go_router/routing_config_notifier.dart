@@ -13,7 +13,6 @@ import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
 import 'package:hiddify/features/muse/config/muse_config_page.dart';
 import 'package:hiddify/features/muse/data/muse_data_page.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart';
-import 'package:hiddify/features/muse/settings/advanced_page.dart';
 import 'package:hiddify/features/muse/settings/per_app_proxy_page.dart';
 import 'package:hiddify/features/muse/settings/privacy_page.dart';
 import 'package:hiddify/features/profile/details/profile_details_page.dart';
@@ -188,12 +187,8 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       routes: [_slide('appList', 'app-list', (_) => const AppListPage())],
                     ),
                     _slide('privacy', 'privacy', (_) => const PrivacyPage()),
-                    _slide(
-                      'advanced',
-                      'advanced',
-                      (_) => const AdvancedPage(),
-                      routes: [_slide('tlsTricks', 'tls-tricks', (_) => const TlsTricksPage())],
-                    ),
+                    // 1.2.2: 高级 (a page with this one row) is gone; TLS 分片 opens from 设置 directly
+                    _slide('tlsTricks', 'tls-tricks', (_) => const TlsTricksPage()),
                     _slide('connections', 'connections', (_) => const MuseDataPage()),
                     _slide(
                       'about',
