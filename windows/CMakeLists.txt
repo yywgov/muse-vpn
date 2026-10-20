@@ -104,6 +104,16 @@ COMPONENT Runtime RENAME libcronet.dll)
 # 穿云 1.1.1: HiddifyCli.exe is not shipped (nothing launches it; the app loads hiddify-core.dll)
 
 
+# 穿云 1.2.6: ship the MSVC runtime (vcruntime140.dll, vcruntime140_1.dll, msvcp140.dll)
+# next to Chuanyun.exe, so PCs without the "VC++ Redistributable" can start the app
+# instead of failing with "找不到 VCRUNTIME140.dll".
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+set(CMAKE_INSTALL_UCRT_LIBRARIES FALSE)
+include(InstallRequiredSystemLibraries)
+install(PROGRAMS ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS}
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
+
 if(PLUGIN_BUNDLED_LIBRARIES)
   install(FILES "${PLUGIN_BUNDLED_LIBRARIES}"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
