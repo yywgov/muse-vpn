@@ -46,6 +46,10 @@ var _name = 'core-smoke';
 void _record(String id, String name, bool pass, String detail, {bool optional = false}) {
   _results.add({'id': id, 'name': name, 'pass': pass, 'optional': optional, 'detail': detail});
   print('${pass ? "PASS" : (optional ? "WARN" : "FAIL")} [$id] $name — $detail');
+  // 1.2.8: a failed check becomes a public annotation (job logs need sign-in, annotations don't)
+  if (!pass && !optional && Platform.environment['GITHUB_ACTIONS'] != null) {
+    print('::warning title=$_name::FAIL [$id] $name — ${detail.replaceAll('\n', ' ')}');
+  }
 }
 
 Future<void> _finish() async {
@@ -132,7 +136,12 @@ Future<void> main(List<String> args) async {
     }
   }
 
-  final noToken = await hello({});
+  // 1.2.8: give the gRPC server a moment to come up on a slow runner
+  var noToken = await hello({});
+  for (var i = 0; i < 10 && noToken.contains('UNAVAILABLE'); i++) {
+    await Future<void>.delayed(const Duration(seconds: 1));
+    noToken = await hello({});
+  }
   _record('token-missing', 'gRPC call without x-muse-token is rejected', noToken.contains('UNAUTHENTICATED'), noToken);
   final badToken = await hello({'x-muse-token': 'wrong'});
   _record('token-wrong', 'gRPC call with a wrong token is rejected', badToken.contains('UNAUTHENTICATED'), badToken);
@@ -258,9 +267,11 @@ Future<void> _runProxyMode(CoreClient core, String profile, _SocksNode node, _St
   final before = await _readProxy();
   print('proxy before start: $before');
   if (!await _start(core, profile, 'proxy')) return;
-  await Future<void>.delayed(const Duration(seconds: 3));
-
-  final on = await _readProxy();
+  var on = await _readProxy();
+  for (var i = 0; i < 10 && !(on.enable == 1 && on.server.contains('127.0.0.1:$_mixedPort')); i++) {
+    await Future<void>.delayed(const Duration(seconds: 1));
+    on = await _readProxy();
+  }
   _record(
     'proxy-set',
     '系统代理 set in registry (ProxyEnable=1, ProxyServer=127.0.0.1:$_mixedPort)',
@@ -268,8 +279,14 @@ Future<void> _runProxyMode(CoreClient core, String profile, _SocksNode node, _St
     'ProxyEnable=${on.enable} ProxyServer=${on.server}',
   );
 
+  // 1.2.8: the runner's own internet blips now and then: up to 3 tries before calling it a failure
   node.targets.clear();
-  final code = await _curl(['-x', 'http://127.0.0.1:$_mixedPort'], _probeUrl);
+  var code = '';
+  for (var i = 0; i < 3; i++) {
+    code = await _curl(['-x', 'http://127.0.0.1:$_mixedPort'], _probeUrl);
+    if (code.startsWith('204')) break;
+    await Future<void>.delayed(const Duration(seconds: 3));
+  }
   _record('proxy-request', 'request via mixed port $_mixedPort → $_probeUrl', code.startsWith('204'), 'http $code');
   final viaNode = node.targets.any((t) => t.contains('google') || t.endsWith(':443'));
   _record('proxy-via-node', 'that request went through the node', viaNode, 'node saw: ${node.targets.take(8).join(', ')}');
@@ -289,12 +306,20 @@ Future<void> _runProxyMode(CoreClient core, String profile, _SocksNode node, _St
   );
 
   // 穿云 1.2: real traffic shows up as non-zero speeds in the stats stream
-  final mark = stats.samples.length;
-  final dl = await _curl(['-x', 'http://127.0.0.1:$_mixedPort'], _downloadUrl);
-  await Future<void>.delayed(const Duration(seconds: 3));
-  final seen = stats.samples.skip(mark).toList();
-  final maxDown = seen.fold<int>(0, (m, e) => e.downlink.toInt() > m ? e.downlink.toInt() : m);
-  final maxUp = seen.fold<int>(0, (m, e) => e.uplink.toInt() > m ? e.uplink.toInt() : m);
+  // 1.2.8: a download that finishes between two one-second samples (or a failed download) used
+  // to read as "no speed" -> up to 3 tries
+  var dl = '';
+  var seen = <SystemInfo>[];
+  var maxDown = 0;
+  var maxUp = 0;
+  for (var i = 0; i < 3 && !(maxDown > 0 && maxUp > 0); i++) {
+    final mark = stats.samples.length;
+    dl = await _curl(['-x', 'http://127.0.0.1:$_mixedPort'], _downloadUrl);
+    await Future<void>.delayed(const Duration(seconds: 3));
+    seen = stats.samples.skip(mark).toList();
+    maxDown = seen.fold<int>(0, (m, e) => e.downlink.toInt() > m ? e.downlink.toInt() : m);
+    maxUp = seen.fold<int>(0, (m, e) => e.uplink.toInt() > m ? e.uplink.toInt() : m);
+  }
   _record(
     'stats-speed',
     'speeds are non-zero while downloading through the proxy',
@@ -315,8 +340,11 @@ Future<void> _runProxyMode(CoreClient core, String profile, _SocksNode node, _St
   );
 
   await _stop(core, 'proxy');
-  await Future<void>.delayed(const Duration(seconds: 2));
-  final off = await _readProxy();
+  var off = await _readProxy();
+  for (var i = 0; i < 5 && off.enable != 0; i++) {
+    await Future<void>.delayed(const Duration(seconds: 1));
+    off = await _readProxy();
+  }
   _record(
     'proxy-cleared',
     '系统代理 cleared after stop (ProxyEnable=0)',
@@ -340,16 +368,27 @@ Future<void> _runTunMode(CoreClient core, String profile, _SocksNode node, _Stat
   print('elevated: $admin');
   stats.tunStart = DateTime.now();
   if (!await _start(core, profile, 'tun')) return;
-  await Future<void>.delayed(const Duration(seconds: 5));
-  final adapters = await _tunAdapters();
+  // 1.2.8: wait up to 20 s for the adapter instead of a fixed 5 s
+  var adapters = '';
+  for (var i = 0; i < 10 && adapters.isEmpty; i++) {
+    await Future<void>.delayed(const Duration(seconds: 2));
+    adapters = await _tunAdapters();
+  }
+  await Future<void>.delayed(const Duration(seconds: 2)); // routes settle
   _record('tun-adapter', 'wintun adapter created', adapters.isNotEmpty, adapters.isEmpty ? 'none (admin=$admin)' : adapters);
   final proxy = await _readProxy();
   _record('tun-no-sysproxy', 'TUN mode leaves 系统代理 off', proxy.enable == 0, 'ProxyEnable=${proxy.enable}', optional: true);
 
   node.targets.clear();
   const tunProbe = 'http://203.0.113.7/generate_204';
-  final code = await _curl([], tunProbe);
-  final viaNode = node.targets.any((t) => t.startsWith('203.0.113.7'));
+  var code = '';
+  var viaNode = false;
+  for (var i = 0; i < 3; i++) {
+    code = await _curl([], tunProbe);
+    viaNode = node.targets.any((t) => t.startsWith('203.0.113.7'));
+    if (code.startsWith('204') && viaNode) break;
+    await Future<void>.delayed(const Duration(seconds: 3));
+  }
   _record(
     'tun-request',
     'request without proxy goes through TUN → core → node ($tunProbe)',

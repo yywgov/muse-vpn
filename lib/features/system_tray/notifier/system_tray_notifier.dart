@@ -9,11 +9,13 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
+import 'package:hiddify/features/muse/logic/node_order.dart';
+import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart' show Notifier, NotifierProvider;
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/gen/assets.gen.dart';
-import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -25,6 +27,8 @@ part 'system_tray_notifier.g.dart';
 class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogger {
   bool listenerAdded = false;
   String? _lastMenuLine;
+  String? _lastIcon;
+  String? _lastMenuKey;
   @override
   Future<void> build() async {
     assert(PlatformUtils.isDesktop);
@@ -37,25 +41,27 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
 
   Future<void> _initializeTray() async {
     final t = await ref.watch(translationsProvider.future);
-    final urlTestDelay = await ref
-        .watch(activeProxyNotifierProvider.future)
-        .catchError((e) {
-          loggy.warning("error getting active proxy", e);
-          return OutboundInfo(urlTestDelay: 0);
-        })
-        .then((connection) => connection.urlTestDelay);
+    // 穿云 1.2.8: the icon follows the real connection status; the delay only goes into the tooltip.
+    // Both are watched without waiting, so a missing delay (no 测速 yet) never holds the tray back
+    // and every status / delay change rebuilds it.
     final connection = await ref.watch(connectionNotifierProvider.future).catchError((e) {
       loggy.warning("error getting connection status", e);
       return const ConnectionStatus.disconnected();
     });
+    final urlTestDelay = ref.watch(activeProxyNotifierProvider).valueOrNull?.urlTestDelay ?? 0;
+    final speed = ref.watch(museTraySpeedProvider);
 
-    // the icon waits for a valid delay before it turns "connected"; the menu follows the real
-    // status, so 断开 is available as soon as the tunnel is up
-    await trayManager.setIcon(
-      _trayIconPath(_modifyConnectionStatus(connection, urlTestDelay)),
-      isTemplate: PlatformUtils.isMacOS,
-    );
-    if (!PlatformUtils.isLinux) await trayManager.setToolTip(_trayTooltip(connection, urlTestDelay, t));
+    final icon = _trayIconPath(museTrayIconStatus(connection));
+    if (icon != _lastIcon) {
+      _lastIcon = icon;
+      await trayManager.setIcon(icon, isTemplate: PlatformUtils.isMacOS);
+    }
+    if (Platform.isMacOS) {
+      windowManager.setBadgeLabel(connection is Connected && ConnectionConst.isValidDelay(urlTestDelay) ? "${urlTestDelay}ms" : "-ms");
+    }
+    if (!PlatformUtils.isLinux) {
+      await trayManager.setToolTip(museTrayTooltip(connection, urlTestDelay, connection.present(t), speed: speed));
+    }
     // 穿云 1.2.3: 节点 submenu (switch node, see delays, 测速) while connected
     final running = ref.watch(serviceRunningProvider);
     final group = running ? ref.watch(proxiesOverviewNotifierProvider).valueOrNull : null;
@@ -69,17 +75,26 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
             ],
             selected: group.selected,
           );
-    await trayManager.setContextMenu(_trayMenu(connection, ref.watch(ConfigOptions.museRouteMode), nodes));
+    final spec = museTrayMenuSpec(connection, ref.watch(ConfigOptions.museRouteMode), nodes: nodes, speed: speed);
+    final menuKey = _specKey(spec);
+    if (menuKey != _lastMenuKey) {
+      _lastMenuKey = menuKey;
+      await trayManager.setContextMenu(_trayMenu(spec));
+    }
   }
 
   String? _groupTag;
 
   // 穿云: 显示 / 连接|断开 / 退出 — nothing else
-  Menu _trayMenu(ConnectionStatus connection, MuseRouteMode mode, List<MuseTrayNode> nodes) {
-    final spec = museTrayMenuSpec(connection, mode, nodes: nodes);
+  String _specKey(List<MuseTrayItem> spec) =>
+      spec.map((e) => '${e.key}=${e.label}${e.checked}${e.disabled}[${_specKey(e.children)}]').join(';');
+
+  Menu _trayMenu(List<MuseTrayItem> spec) {
     // 穿云 1.2: one line in app.log, checked by the Windows smoke test
-    // (app.log keeps errors only, so the line goes in as a marker, once per distinct menu)
-    final line = "tray menu: ${spec.map((e) => e.key == '-' ? '|' : '${e.label}${e.checked ? '*' : ''}').join(' ')}";
+    // (app.log keeps errors only, so the line goes in as a marker, once per distinct menu;
+    // the 网速 line changes every few seconds and is left out of it)
+    final line =
+        "tray menu: ${spec.where((e) => e.key != 'speed').map((e) => e.key == '-' ? '|' : '${e.label}${e.checked ? '*' : ''}').join(' ')}";
     loggy.info(line);
     if (line != _lastMenuLine) {
       _lastMenuLine = line;
@@ -120,25 +135,6 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
             : isDarkMode
             ? images.trayIconDarkPng.path
             : images.trayIconPng.path;
-    }
-  }
-
-  String _trayTooltip(ConnectionStatus connection, int urlTestDelay, Translations t) {
-    final r = "${Constants.appName} - ${connection.present(t)}";
-    if (connection is Connected) {
-      if (Platform.isMacOS) windowManager.setBadgeLabel("${urlTestDelay}ms");
-      return ConnectionConst.isValidDelay(urlTestDelay) ? '$r · ${urlTestDelay}ms' : r;
-    } else {
-      if (Platform.isMacOS) windowManager.setBadgeLabel("-ms");
-      return r;
-    }
-  }
-
-  ConnectionStatus _modifyConnectionStatus(ConnectionStatus connection, int urlTestDelay) {
-    if (connection is Connected) {
-      return ConnectionConst.isValidDelay(urlTestDelay) ? const Connected() : const Connecting();
-    } else {
-      return connection;
     }
   }
 
@@ -416,7 +412,14 @@ List<MuseTrayNode> museTrayNodes(List<({String tag, String name, int delay})> it
 }
 
 /// 穿云 tray right-click menu: 连接/断开 · 规则/全局 · 节点 ▸ (1.2.3, while connected) · 显示窗口 · 退出.
-List<MuseTrayItem> museTrayMenuSpec(ConnectionStatus connection, MuseRouteMode mode, {List<MuseTrayNode> nodes = const []}) => [
+List<MuseTrayItem> museTrayMenuSpec(
+  ConnectionStatus connection,
+  MuseRouteMode mode, {
+  List<MuseTrayNode> nodes = const [],
+  String? speed,
+}) => [
+  // 穿云 1.2.8: current speed (read-only line) while connected
+  if (connection is Connected && speed != null && speed.isNotEmpty) MuseTrayItem('speed', speed, disabled: true),
   MuseTrayItem(
     'connection',
     switch (connection) {
@@ -443,3 +446,42 @@ List<MuseTrayItem> museTrayMenuSpec(ConnectionStatus connection, MuseRouteMode m
   const MuseTrayItem('dashboard', '显示窗口'),
   const MuseTrayItem('quit', '退出'),
 ];
+
+/// 穿云 1.2.8: the tray icon is blue as soon as the tunnel is really up (no delay needed).
+ConnectionStatus museTrayIconStatus(ConnectionStatus connection) => connection;
+
+/// Tray tooltip: `穿云 - 已连接 · 123ms · ↓1.2 MB/s ↑30 KB/s`; delay / speed only when known.
+String museTrayTooltip(ConnectionStatus connection, int urlTestDelay, String statusText, {String? speed}) {
+  final parts = ["${Constants.appName} - $statusText"];
+  if (connection is Connected) {
+    if (ConnectionConst.isValidDelay(urlTestDelay)) parts.add('${urlTestDelay}ms');
+    if (speed != null && speed.isNotEmpty) parts.add(speed);
+  }
+  return parts.join(' · ');
+}
+
+/// `↓1.2 MB/s ↑30 KB/s` for the tray.
+String museSpeedText(int uplink, int downlink) => '↓${museBytes(downlink)}/s ↑${museBytes(uplink)}/s';
+
+/// 穿云 1.2.8: the current speed for the tray, at most one change every 3 s (so the tray isn't
+/// rebuilt every second); null while disconnected.
+final museTraySpeedProvider = NotifierProvider<MuseTraySpeed, String?>(MuseTraySpeed.new);
+
+class MuseTraySpeed extends Notifier<String?> {
+  DateTime _last = DateTime.fromMillisecondsSinceEpoch(0);
+
+  @override
+  String? build() {
+    if (!ref.watch(serviceRunningProvider)) return null;
+    ref.listen(statsNotifierProvider, (_, next) {
+      final v = next.valueOrNull;
+      if (v == null) return;
+      final now = DateTime.now();
+      if (now.difference(_last) < const Duration(seconds: 3)) return;
+      _last = now;
+      final text = museSpeedText(v.uplink.toInt(), v.downlink.toInt());
+      if (text != state) state = text;
+    });
+    return null;
+  }
+}

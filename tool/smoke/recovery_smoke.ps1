@@ -46,6 +46,8 @@ function Rec([string]$id, [string]$name, [bool]$pass, [string]$detail, [bool]$op
   [void]$results.Add([pscustomobject]@{ id = $id; name = $name; pass = $pass; optional = $optional; detail = $detail })
   $tag = if ($pass) { "PASS" } elseif ($optional) { "WARN" } else { "FAIL" }
   Write-Host "$tag [$id] $name - $detail"
+  # 1.2.8: a failed check becomes a public annotation (job logs need sign-in, annotations don't)
+  if ((-not $pass) -and (-not $optional) -and $env:GITHUB_ACTIONS) { Write-Host "::warning title=recovery smoke::FAIL [$id] $name - $detail" }
 }
 function Shot([string]$name) {
   $b = [System.Windows.Forms.SystemInformation]::VirtualScreen

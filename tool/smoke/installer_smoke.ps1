@@ -26,6 +26,7 @@ $results = New-Object System.Collections.ArrayList
 function Rec([string]$id, [string]$n, [bool]$pass, [string]$detail) {
   [void]$results.Add([pscustomobject]@{ id = $id; name = $n; pass = $pass; detail = $detail })
   Write-Host "$(if ($pass) { 'PASS' } else { 'FAIL' }) [$id] $n - $detail"
+  if ((-not $pass) -and $env:GITHUB_ACTIONS) { Write-Host "::warning title=installer smoke::FAIL [$id] $n - $detail" }
 }
 function RunSetup([string]$exePath, [string[]]$a) {
   # not -Wait: that also waits for every child, and /RELAUNCH leaves Chuanyun.exe running

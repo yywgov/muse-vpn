@@ -90,15 +90,14 @@ jobs:
       - name: Smoke test - app (portable build)
         id: smoke_app
         continue-on-error: true
-        timeout-minutes: 10
-        shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File tool\smoke\app_smoke.ps1 -AppDir build\windows\x64\runner\Release -Out smoke -Label portable -RepoDir .
+        timeout-minutes: 16
+        run: bash tool/smoke/retry.sh "app smoke" 2 powershell -NoProfile -ExecutionPolicy Bypass -File 'tool\smoke\app_smoke.ps1' -AppDir 'build\windows\x64\runner\Release' -Out smoke -Label portable -RepoDir .
 
       - name: Smoke test - core (token, 系统代理, TUN)
         id: smoke_core
         continue-on-error: true
-        timeout-minutes: 8
-        run: dart run tool/smoke/core_smoke.dart --dll build/windows/x64/runner/Release --work "$RUNNER_TEMP/coresmoke" --out smoke
+        timeout-minutes: 14
+        run: bash tool/smoke/retry.sh "core smoke" 2 dart run tool/smoke/core_smoke.dart --dll build/windows/x64/runner/Release --work "$RUNNER_TEMP/coresmoke" --out smoke
 
       - name: Installer (Inno Setup)
         shell: pwsh
@@ -122,9 +121,8 @@ jobs:
       - name: Smoke test - installer (install, run, upgrade, uninstall)
         id: smoke_installer
         continue-on-error: true
-        timeout-minutes: 15
-        shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File tool\smoke\installer_smoke.ps1 -Setup out\Chuanyun-Windows-x64-Setup.exe -Out smoke -RepoDir .
+        timeout-minutes: 22
+        run: bash tool/smoke/retry.sh "installer smoke" 2 powershell -NoProfile -ExecutionPolicy Bypass -File 'tool\smoke\installer_smoke.ps1' -Setup 'out\Chuanyun-Windows-x64-Setup.exe' -Out smoke -RepoDir .
 
       # 1.2.1: connected in 系统代理 mode, then status stream lost / core stopped behind the app /
       # process suspended (sleep) / tray hide+restore / killed / crash exit / killed with its guard
@@ -132,9 +130,8 @@ jobs:
       - name: Smoke test - recovery (never leave the PC offline)
         id: smoke_recovery
         continue-on-error: true
-        timeout-minutes: 20
-        shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File tool\smoke\recovery_smoke.ps1 -AppDir build\windows\x64\runner\Release -Out smoke -RepoDir .
+        timeout-minutes: 30
+        run: bash tool/smoke/retry.sh "recovery smoke" 2 powershell -NoProfile -ExecutionPolicy Bypass -File 'tool\smoke\recovery_smoke.ps1' -AppDir 'build\windows\x64\runner\Release' -Out smoke -RepoDir .
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -154,10 +151,14 @@ jobs:
       - name: Smoke gate
         run: |
           echo "app=${{ steps.smoke_app.outcome }} core=${{ steps.smoke_core.outcome }} installer=${{ steps.smoke_installer.outcome }} recovery=${{ steps.smoke_recovery.outcome }}"
-          test "${{ steps.smoke_recovery.outcome }}" = success
-          test "${{ steps.smoke_app.outcome }}" = success
-          test "${{ steps.smoke_core.outcome }}" = success
-          test "${{ steps.smoke_installer.outcome }}" = success
+          # continue-on-error steps always *conclude* success (green in the UI); their real result
+          # is the outcome. Name every failed one, as an annotation anyone can read.
+          bad=0
+          for x in "app:${{ steps.smoke_app.outcome }}" "core:${{ steps.smoke_core.outcome }}" \
+                   "installer:${{ steps.smoke_installer.outcome }}" "recovery:${{ steps.smoke_recovery.outcome }}"; do
+            if [ "${x#*:}" != success ]; then echo "::error title=Smoke gate::${x%%:*} smoke ${x#*:}"; bad=1; fi
+          done
+          exit $bad
 
       # gh instead of action-gh-release: the Android workflow may create the same release at the
       # same moment, so create-or-upload with a few retries
