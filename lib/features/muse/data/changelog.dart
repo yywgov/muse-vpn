@@ -3,6 +3,11 @@
 
 /// version → what changed, newest first. Keep each line short.
 const museChangelog = <String, List<String>>{
+  '1.2.9': [
+    '修复 Cloudflare Workers/Pages 自建节点（edgetunnel 等）开启 ECH 后全部超时',
+    '兼容更多节点写法：未知指纹 fp、空 SNI、路径里的 ?ed=、VLESS 加密字段等',
+    '无法使用的节点显示「节点配置不兼容：原因」，长按可查看并复制完整错误',
+  ],
   '1.2.8': [
     'Windows 托盘图标连上即变蓝，右键菜单显示当前网速',
     '去广告分「温和 / 强力」两档，默认温和，避免误拦导致 App 打不开',

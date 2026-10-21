@@ -4,6 +4,13 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.2.9 - 2026-10-21
+
+- 修复 Cloudflare Workers/Pages 自建 VLESS/Trojan 节点（edgetunnel、CF-Workers-SUB 等「CF官方优选」订阅）开启 ECH 后在穿云里全部测速超时、显示「INVALID INITIALIZE OUTBOUND…」的问题：链接里的 `ech=cloudflare-ech.com+https://dns.alidns.com/dns-query` 现在按 Xray 的含义处理（向 DNS 查询 ECH 配置），查询走直连 DNS，查不到时不带 ECH 继续连接
+- 兼容更多节点写法：未知的 uTLS 指纹（fp）回退为 chrome、SNI 为空时用 Host、sing-box/Clash 配置里路径带 `?ed=` 转成 0-RTT 早期数据、VLESS 加密字段写成 aes-128-gcm 等、非法 packet_encoding
+- 已经导入的订阅无需更新即生效
+- 无法使用的节点副标题改为「节点配置不兼容：原因」，长按节点可查看并复制完整错误
+
 ### 1.2.8 - 2026-10-21
 
 - 去广告分「温和 / 强力」两档，默认温和，避免误拦导致 App 打不开

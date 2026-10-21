@@ -1081,8 +1081,16 @@ Future<void> _showNodeDetails(
     delayText = '超时';
   }
   final region = museRegionCode(name);
+  final invalidError = proxy.isGroup ? '' : museInvalidNodeError(proxy.type);
   final rows = <(String, String)>[
-    ('类型', proxy.isGroup ? (museGroupTypeLabel(proxy.type) ?? '分组') : museProtocolName(proxy.type)),
+    (
+      '类型',
+      proxy.isGroup
+          ? (museGroupTypeLabel(proxy.type) ?? '分组')
+          : invalidError.isNotEmpty
+          ? museInvalidNodeSubtitle(proxy.type)
+          : museProtocolName(proxy.type),
+    ),
     if (region != null) ('地区', '${museCountryFlag(region) ?? ''} ${museCountryLabel(region)}'.trim()),
     ('延迟', delayText),
     if (testedAt != null && delay != 0) ('测速时间', museUpdatedAgo(testedAt, now: DateTime.now()).replaceAll('更新', '')),
@@ -1114,6 +1122,33 @@ Future<void> _showNodeDetails(
                     ],
                   ),
                 ),
+              // 1.2.9: full core error of a node that could not start, selectable and copyable
+              if (invalidError.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  key: const ValueKey('node_error_box'),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(maxHeight: 140),
+                  child: SingleChildScrollView(child: SelectableText(invalidError, style: theme.textTheme.bodySmall)),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const ValueKey('node_copy_error'),
+                  icon: const Icon(Icons.copy_all_rounded, size: 18),
+                  label: const Text('复制错误详情'),
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: '$name\n$invalidError'));
+                    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                    try {
+                      ref.read(inAppNotificationControllerProvider).showSuccessToast('已复制');
+                    } catch (_) {}
+                  },
+                ),
+              ],
               const SizedBox(height: 16),
               // 1.2.8: 收藏 / 只测这个节点
               if (!proxy.isGroup) ...[
@@ -1273,7 +1308,9 @@ class _NodeCard extends StatelessWidget {
             selectedDisplay: proxy.groupSelectedTagDisplay,
             nodeCount: nodeCount,
           )
-        : museProtocolName(proxy.type); // protocol names stay (user wants them)
+        : museIsInvalidNodeType(proxy.type)
+            ? museInvalidNodeSubtitle(proxy.type) // 1.2.9: short Chinese reason; full error in the long-press sheet
+            : museProtocolName(proxy.type); // protocol names stay (user wants them)
     final groupIcon = proxy.isGroup
         ? switch (museGroupIconKind(type: proxy.type, name: rawName, selectedDisplay: proxy.groupSelectedTagDisplay)) {
             MuseGroupIcon.autoFastest => Icons.bolt_rounded,
