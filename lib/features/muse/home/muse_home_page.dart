@@ -23,6 +23,11 @@ import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
+import 'package:hiddify/features/muse/logic/node_prefs.dart';
+import 'package:hiddify/features/muse/data/changelog.dart';
+import 'package:hiddify/core/app_info/app_info_provider.dart';
+import 'package:hiddify/features/muse/home/node_memory.dart';
+import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
@@ -48,6 +53,39 @@ class MuseHomePage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hasProfile = ref.watch(hasAnyProfileProvider).value ?? false;
     final running = ref.watch(serviceRunningProvider);
+
+    // 1.2.8: 更新说明, once per new version
+    final profilesKnown = ref.watch(hasAnyProfileProvider).hasValue;
+    final appVersion = ref.watch(appInfoProvider).valueOrNull?.version;
+    useEffect(() {
+      if (!profilesKnown || appVersion == null) return null;
+      final shown = ref.read(Preferences.museChangelogShown);
+      if (shown == appVersion) return null;
+      final notes = museChangelogToShow(version: appVersion, shown: shown, introDone: hasProfile);
+      Future.microtask(() async {
+        await ref.read(Preferences.museChangelogShown.notifier).update(appVersion);
+        if (notes == null || !context.mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (c) => AlertDialog(
+            key: const ValueKey('changelog_dialog'),
+            title: Text('穿云 $appVersion 更新内容'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final n in notes)
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Text('· $n')),
+                ],
+              ),
+            ),
+            actions: [TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('知道了'))],
+          ),
+        );
+      });
+      return null;
+    }, [profilesKnown, appVersion]);
 
     // 1.2.5: pull down — 测速 while connected, otherwise update the subscriptions
     Future<void> onPull() async {
@@ -102,6 +140,8 @@ class MuseHomePage extends HookConsumerWidget {
                       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                       children: [
                         const MuseClipboardImportBanner(),
+                        // 1.2.8: 已连接但无法访问外网
+                        const MuseReachBanner(),
                         const _RouteModeSelector(),
                         // 1.2.3: exit IP / region and Google · ChatGPT · Netflix
                         const MuseExitCard(),
@@ -668,6 +708,9 @@ class _NodesSection extends HookConsumerWidget {
     final searchController = useTextEditingController();
     // 1.2.5: 按延迟 / 订阅顺序 / 按地区 (Clash Verge Rev's sort switch, v2rayNG's sort by result)
     final sortMode = MuseNodeSort.fromKey(ref.watch(Preferences.museNodeSort));
+    // 1.2.8: 收藏置顶 / 隐藏非节点条目
+    final favorites = museParseFavorites(ref.watch(Preferences.museFavoriteNodes));
+    final hideInfo = ref.watch(Preferences.museHideInfoNodes);
 
     Widget header(String text, {Widget? trailing}) => Padding(
       padding: const EdgeInsets.fromLTRB(24, 6, 12, 0),
@@ -814,13 +857,21 @@ class _NodesSection extends HookConsumerWidget {
         ),
       ];
     } else {
-      final sorted = museOrderNodes<OutboundInfo>(
-        group.items,
+      final listed = hideInfo
+          ? group.items.where((e) => e.isGroup || e.tag == group.selected || !museIsInfoNode(_nodeName(e))).toList()
+          : group.items;
+      final sorted = museFavoritesFirst<OutboundInfo>(
+        museOrderNodes<OutboundInfo>(
+        listed,
         sort: sortMode,
         isGroup: (e) => e.isGroup,
         delay: (e) => _freshDelay(e, since),
         isValidDelay: ConnectionConst.isValidDelay,
         region: (e) => museRegionCode(_nodeName(e)),
+        ),
+        isGroup: (e) => e.isGroup,
+        tag: (e) => e.tag,
+        favorites: favorites,
       );
       final List<OutboundInfo> ordered;
       if (testing.value && frozenOrder.value.isNotEmpty && frozenSort.value == sortMode) {
@@ -839,7 +890,7 @@ class _NodesSection extends HookConsumerWidget {
       final filtering = searching.value && query.value.trim().isNotEmpty;
       final visible = ordered.where((e) => !hidden.contains(e.tag) && matches(e)).toList();
       final folded = ordered.where((e) => hidden.contains(e.tag) && matches(e)).toList();
-      final nodeCount = group.items.where((e) => !e.isGroup).length;
+      final nodeCount = listed.where((e) => !e.isGroup).length;
       // a node shows 测速中 only while a test can actually be running
       final recentlyConnected = since != null && DateTime.now().difference(since) < const Duration(seconds: 30);
       final pending = testing.value || recentlyConnected;
@@ -852,10 +903,11 @@ class _NodesSection extends HookConsumerWidget {
         pending: pending,
         dimmed: dimmed,
         selected: group.selected == proxy.tag,
+        favorite: favorites.contains(proxy.tag),
         onLongPress: () => _showNodeDetails(context, ref, proxy, since: since, groupTag: group.tag),
         onTap: () async {
           try {
-            await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(group.tag, proxy.tag);
+            await museSelectNode(ref, group.tag, proxy.tag);
           } catch (_) {
             // 1.2.2: say so instead of silently staying on the old node
             try {
@@ -874,8 +926,13 @@ class _NodesSection extends HookConsumerWidget {
         if (sortMode == MuseNodeSort.region) ...[
           // groups on top, then 「🇭🇰 香港 · 5」 headers over each region
           for (final proxy in visible.where((e) => e.isGroup)) card(proxy),
+          // 1.2.8: 收藏 on top of the regions
+          if (visible.any((e) => !e.isGroup && favorites.contains(e.tag))) ...[
+            const _FavoritesHeader(),
+            for (final proxy in visible.where((e) => !e.isGroup && favorites.contains(e.tag))) card(proxy),
+          ],
           for (final section in museRegionSections<OutboundInfo>(
-            visible,
+            visible.where((e) => !favorites.contains(e.tag)).toList(),
             isGroup: (e) => e.isGroup,
             region: (e) => museRegionCode(_nodeName(e)),
           )) ...[
@@ -961,6 +1018,24 @@ class _NodesSection extends HookConsumerWidget {
 
 String _nodeName(OutboundInfo e) => e.tagDisplay.isNotEmpty ? e.tagDisplay : e.tag;
 
+/// 1.2.8: 「⭐ 收藏」 above the favourite nodes in 按地区.
+class _FavoritesHeader extends StatelessWidget {
+  const _FavoritesHeader();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 10, 24, 2),
+    child: Text(
+      '⭐ 收藏',
+      key: const ValueKey('region_header_favorites'),
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: MuseColors.secondaryText(context),
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
+}
+
 /// 1.2.5 按地区: 「🇭🇰 香港 · 5」 above each region's nodes.
 class _RegionHeader extends StatelessWidget {
   const _RegionHeader({required this.region, required this.count});
@@ -994,6 +1069,7 @@ Future<void> _showNodeDetails(
   required String groupTag,
 }) async {
   final name = _nodeName(proxy);
+  final isFavorite = museParseFavorites(ref.read(Preferences.museFavoriteNodes)).contains(proxy.tag);
   final delay = _freshDelay(proxy, since);
   final testedAt = proxy.hasUrlTestTime() ? proxy.urlTestTime.toDateTime() : null;
   final String delayText;
@@ -1039,6 +1115,45 @@ Future<void> _showNodeDetails(
                   ),
                 ),
               const SizedBox(height: 16),
+              // 1.2.8: 收藏 / 只测这个节点
+              if (!proxy.isGroup) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('node_favorite'),
+                        icon: Icon(isFavorite ? Icons.star_rounded : Icons.star_outline_rounded, size: 18),
+                        label: Text(isFavorite ? '取消收藏' : '收藏'),
+                        onPressed: () async {
+                          Navigator.of(sheetContext).pop();
+                          final raw = ref.read(Preferences.museFavoriteNodes);
+                          await ref.read(Preferences.museFavoriteNodes.notifier).update(museToggleFavorite(raw, proxy.tag));
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('node_test_one'),
+                        icon: const Icon(Icons.speed_rounded, size: 18),
+                        label: const Text('只测这个节点'),
+                        onPressed: () async {
+                          Navigator.of(sheetContext).pop();
+                          try {
+                            // the core tests a single outbound when given its tag
+                            await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest(proxy.tag);
+                          } catch (_) {
+                            try {
+                              ref.read(inAppNotificationControllerProvider).showErrorToast('测速失败，请重试');
+                            } catch (_) {}
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
               Row(
                 children: [
                   Expanded(
@@ -1064,7 +1179,7 @@ Future<void> _showNodeDetails(
                       onPressed: () async {
                         Navigator.of(sheetContext).pop();
                         try {
-                          await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(groupTag, proxy.tag);
+                          await museSelectNode(ref, groupTag, proxy.tag);
                         } catch (_) {
                           try {
                             ref.read(inAppNotificationControllerProvider).showErrorToast('切换节点失败，请重试');
@@ -1103,7 +1218,11 @@ class _NodeCard extends StatelessWidget {
     this.onLongPress,
     this.pending = true,
     this.dimmed = false,
+    this.favorite = false,
   });
+
+  /// 1.2.8: a small star before the name
+  final bool favorite;
 
   final OutboundInfo proxy;
   final DateTime? since;
@@ -1205,7 +1324,18 @@ class _NodeCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyLarge),
+                      Row(
+                        children: [
+                          if (favorite)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 4),
+                              child: Icon(Icons.star_rounded, size: 15, color: Color(0xFFFFB300), key: ValueKey('node_star')),
+                            ),
+                          Flexible(
+                            child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyLarge),
+                          ),
+                        ],
+                      ),
                       if (subtitle.isNotEmpty)
                         Text(
                           subtitle,

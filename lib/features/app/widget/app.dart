@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:hiddify/features/muse/home/node_memory.dart';
+import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/core/localization/locale_extensions.dart';
 import 'package:hiddify/core/localization/locale_preferences.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -81,7 +83,10 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     ref.listen(museConnectionKeeperProvider, (_, _) {});
     // 穿云 1.2.3 Windows: Ctrl+Alt+P 连接/断开
     if (PlatformUtils.isWindows) ref.listen(museHotkeyProvider, (_, _) {});
-    if (PlatformUtils.isAndroid) ref.listen(museSubscriptionAlertProvider, (_, _) {});
+    // 穿云 1.2.8: Windows too (toast); 每个订阅记住上次的节点; 连上后探测外网
+    ref.listen(museSubscriptionAlertProvider, (_, _) {});
+    ref.listen(museNodeMemoryProvider, (_, _) {});
+    ref.listen(museReachProvider, (_, _) {});
     if (PlatformUtils.isDesktop) ref.listen(systemTrayNotifierProvider, (_, _) {});
 
     // updating ActiveBreakpointNotifier value

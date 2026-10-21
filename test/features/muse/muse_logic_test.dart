@@ -125,10 +125,13 @@ void main() {
       now: now,
     ).map((a) => a.key.split(':')[1]).toList();
 
-    test('traffic below 10 % alerts', () {
-      expect(kinds(used: 89 * gb), isEmpty);
-      expect(kinds(used: 91 * gb), ['traffic']);
-      expect(kinds(used: 120 * gb), ['traffic']);
+    // 1.2.8: 80 % used, then used up — each its own threshold
+    test('traffic: 80 % used, then used up', () {
+      expect(kinds(used: 79 * gb), isEmpty);
+      expect(kinds(used: 80 * gb), ['traffic80']);
+      expect(kinds(used: 99 * gb), ['traffic80']);
+      expect(kinds(used: 100 * gb), ['traffic100']);
+      expect(kinds(used: 120 * gb), ['traffic100']);
     });
 
     test('unlimited traffic never alerts', () {

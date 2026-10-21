@@ -1,10 +1,11 @@
-// 穿云 1.1 - one system notification when the active subscription is running out: less than 10 %
-// of its traffic left, or 3 days or less before it expires. Each alert is sent once per billing
-// period (a renewal gives a new expiry date, so the next period alerts again).
+// 穿云 1.1 - one system notification when the active subscription is running out.
+// 1.2.8: at 80 % of the traffic used, again when it is used up, and 3 days or less before it
+// expires; each threshold once per billing period (a renewal gives a new expiry date, so the next
+// period alerts again). Android and Windows.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/data/notify.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -28,10 +29,12 @@ List<MuseSubscriptionAlert> museSubscriptionAlerts({
   final period = expire.millisecondsSinceEpoch;
   const tenTB = 10 * 1024 * 1024 * 1024 * 1024;
   if (total > 0 && total <= tenTB) {
-    final remaining = total - upload - download;
-    if (remaining < total * 0.10) {
-      final left = remaining <= 0 ? '流量已用完' : '剩余流量不足 10%（${_size(remaining)}）';
-      alerts.add((key: '$profileId:traffic:$period', text: left));
+    final used = upload + download;
+    final remaining = total - used;
+    if (remaining <= 0) {
+      alerts.add((key: '$profileId:traffic100:$period', text: '流量已用完'));
+    } else if (used >= total * 0.80) {
+      alerts.add((key: '$profileId:traffic80:$period', text: '流量已用 ${(used * 100 / total).floor()}%，剩余 ${_size(remaining)}'));
     }
   }
   final validExpiry = expire.year > 1971 && expire.year < 2100;
@@ -70,9 +73,9 @@ final museSubscriptionAlertProvider = Provider<void>((ref) {
     await ref
         .read(Preferences.subscriptionAlertsSent.notifier)
         .update(updated.skip(updated.length > 20 ? updated.length - 20 : 0).join('\n'));
-    await ChuanyunPlatform.showAlert(
+    await museNotify(
       id: museSubscriptionAlertId,
-      title: '「${profile.name}」需要续费',
+      title: '「${profile.name}」订阅提醒',
       text: fresh.map((a) => a.text).join('；'),
     );
   }, fireImmediately: true);

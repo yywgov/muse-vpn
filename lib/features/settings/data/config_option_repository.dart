@@ -1,5 +1,7 @@
 import 'package:dartx/dartx.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:hiddify/features/muse/logic/node_prefs.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/model/optional_range.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
@@ -566,7 +568,12 @@ abstract class ConfigOptions {
         profile: SingboxUnblockerProfileOption(id: ref.watch(unblockerProfileId)),
       ),
       routeRule:
-          RouteRule(rules: ref.watch(museRouteMode).applyTo(ref.watch(rulesNotifierProvider))).toProto3Json()!
+          RouteRule(
+                rules: museApplyAdBlockLevel(
+                  ref.watch(museRouteMode).applyTo(ref.watch(rulesNotifierProvider)),
+                  MuseAdBlockLevel.fromKey(ref.watch(Preferences.museAdBlockLevel)),
+                ),
+              ).toProto3Json()!
               as Map<String, dynamic>,
     );
   });

@@ -1,6 +1,7 @@
 // 穿云 - 设置 › 关于 › 导出诊断: one text file with why the connection dropped (kept by the VPN
 // service), the core's crash traces and the recent app/core log, shared through the system sheet.
 // Nothing is sent anywhere unless the user shares the file.
+// 1.2.8: 脱敏 — subscription / node links, passwords, UUIDs and server addresses are removed first.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'dart:io';
@@ -8,6 +9,7 @@ import 'dart:io';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/logger/logger_setup.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/logic/redact.dart';
 import 'package:hiddify/utils/uri_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -28,7 +30,7 @@ abstract final class MuseDiagnostics {
     final native = Platform.isAndroid ? await ChuanyunPlatform.nativeDiagnostics() : await _desktopDiagnostics();
     final now = DateTime.now();
     final b = StringBuffer()
-      ..writeln('穿云 诊断信息  ${now.toIso8601String()}')
+      ..writeln('穿云 诊断信息（已脱敏）  ${now.toIso8601String()}')
       ..writeln(appInfo?.format() ?? '')
       ..writeln()
       ..writeln('===== 设备 =====')
@@ -50,7 +52,7 @@ abstract final class MuseDiagnostics {
     final stamp =
         '${now.year}${_two(now.month)}${_two(now.day)}-${_two(now.hour)}${_two(now.minute)}${_two(now.second)}';
     final file = File('${dir.path}/chuanyun-diagnostics-$stamp.txt');
-    await file.writeAsString(b.toString());
+    await file.writeAsString(museRedact(b.toString()));
     if (Platform.isWindows) {
       await Process.start('explorer.exe', ['/select,', file.path]);
       return;

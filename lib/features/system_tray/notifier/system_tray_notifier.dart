@@ -9,6 +9,7 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
+import 'package:hiddify/features/muse/home/node_memory.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart' show Notifier, NotifierProvider;
@@ -153,7 +154,7 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
       final group = _groupTag;
       if (group == null) return;
       try {
-        await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(group, menuItem.key!.substring(5));
+        await museSelectNodeFrom(ref, group, menuItem.key!.substring(5));
       } catch (e) {
         loggy.warning('tray: switching node failed', e);
       }

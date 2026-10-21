@@ -126,11 +126,11 @@ class AboutPage extends HookConsumerWidget {
           ),
           // 穿云: deliberately low-key — only needed when reporting a connection problem
           MuseSection(
-            footer: '连接异常时可导出，内含断开原因与最近日志，仅在你主动分享时才会发出。',
+            footer: '内含断开原因与最近日志，已去掉订阅链接、密码、UUID 和服务器地址，仅在你主动分享时才会发出。',
             children: [
               MuseTile(
                 leading: const Icon(Icons.bug_report_outlined),
-                title: '导出诊断',
+                title: '导出日志（已脱敏）',
                 onTap: () async {
                   final ok = await MuseDiagnostics.export(ref);
                   if (!ok && context.mounted) {

@@ -33,6 +33,24 @@ abstract class Preferences {
   // 穿云 1.2.5: 首页 node order — delay (按延迟) / original (订阅顺序) / region (按地区)
   static final museNodeSort = PreferencesNotifier.create<String, String>("muse_node_sort", "delay");
 
+  // 穿云 1.2.8: 去广告 温和 (gentle) / 强力 (strong)
+  static final museAdBlockLevel = PreferencesNotifier.create<String, String>("muse_ad_block_level", "gentle");
+
+  // 穿云 1.2.8: hide 「剩余流量 / 到期 / 官网 / 套餐」 lines that subscriptions list as nodes
+  static final museHideInfoNodes = PreferencesNotifier.create<bool, bool>("muse_hide_info_nodes", true);
+
+  // 穿云 1.2.8: favourite nodes (one tag per line), pinned to the top
+  static final museFavoriteNodes = PreferencesNotifier.create<String, String>("muse_favorite_nodes", "");
+
+  // 穿云 1.2.8: last node picked per subscription ({profileId: tag} JSON)
+  static final museLastNodes = PreferencesNotifier.create<String, String>("muse_last_nodes", "{}");
+
+  // 穿云 1.2.8: subscriptions update on their own every N hours (0 = off)
+  static final museAutoUpdateHours = PreferencesNotifier.create<int, int>("muse_auto_update_hours", 12);
+
+  // 穿云 1.2.8: the version whose 更新说明 was shown already
+  static final museChangelogShown = PreferencesNotifier.create<String, String>("muse_changelog_shown", "");
+
   // 穿云 1.1: 后台运行/自启动 guide shown once on the first connect; 自启动 can't be read back from
   // ColorOS, so having opened its settings page once counts as done
   static final keepAliveGuideShown = PreferencesNotifier.create<bool, bool>("keep_alive_guide_shown", false);
