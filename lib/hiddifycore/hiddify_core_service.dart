@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:hiddify/features/muse/logic/core_extras.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:grpc/grpc.dart';
@@ -199,11 +200,11 @@ class HiddifyCoreService with InfraLogger {
       // latestOptions = options;
       try {
         final res = await core.fgClient.changeHiddifySettings(
-          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(options.toJson())),
+          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(museApplyCoreExtras(options.toJson()))),
         );
         if (res.messageType != MessageType.EMPTY) return left("${res.messageType} ${res.message}");
         await core.bgClient.changeHiddifySettings(
-          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(options.toJson())),
+          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(museApplyCoreExtras(options.toJson()))),
         );
       } on GrpcError catch (e) {
         if (e.code == StatusCode.unavailable) {

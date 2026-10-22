@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:hiddify/features/muse/logic/home_tiles.dart' as tiles;
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/logger/logger_setup.dart';
@@ -10,7 +11,6 @@ import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/muse/home/node_memory.dart';
-import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart' show Notifier, NotifierProvider;
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -461,8 +461,8 @@ String museTrayTooltip(ConnectionStatus connection, int urlTestDelay, String sta
   return parts.join(' · ');
 }
 
-/// `↓1.2 MB/s ↑30 KB/s` for the tray.
-String museSpeedText(int uplink, int downlink) => '↓${museBytes(downlink)}/s ↑${museBytes(uplink)}/s';
+/// `↓1.2 MB/s ↑30 KB/s` for the tray (1.4.0: KB/s at least).
+String museSpeedText(int uplink, int downlink) => '↓${tiles.museSpeedText(downlink)} ↑${tiles.museSpeedText(uplink)}';
 
 /// 穿云 1.2.8: the current speed for the tray, at most one change every 3 s (so the tray isn't
 /// rebuilt every second); null while disconnected.

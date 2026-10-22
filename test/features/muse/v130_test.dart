@@ -15,7 +15,7 @@ import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 void main() {
   group('首页 tiles', () {
     test('default order, unknown keys dropped, new tiles appended', () {
-      expect(museParseTileOrder(''), MuseHomeTile.values);
+      expect(museParseTileOrder(''), museStoredTiles);
       expect(
         museParseTileOrder('exit,bogus,speed,exit'),
         [MuseHomeTile.exit, MuseHomeTile.speed, MuseHomeTile.traffic, MuseHomeTile.remaining, MuseHomeTile.expiry, MuseHomeTile.adBlock],
@@ -24,7 +24,7 @@ void main() {
       expect(museParseTileOrder(museTileOrderToRaw(order)), order);
     });
     test('move by one and to an index, clamped at the ends', () {
-      final o = MuseHomeTile.values.toList();
+      final o = museStoredTiles.toList();
       expect(museMoveTile(o, MuseHomeTile.traffic, -1).take(2), [MuseHomeTile.traffic, MuseHomeTile.speed]);
       expect(museMoveTile(o, MuseHomeTile.speed, -1), o);
       expect(museMoveTile(o, MuseHomeTile.adBlock, 1), o);
@@ -42,7 +42,7 @@ void main() {
     });
     test('visible = not hidden and has data', () {
       final v = museVisibleTiles(
-        MuseHomeTile.values,
+        museStoredTiles,
         {MuseHomeTile.adBlock},
         hasData: (t) => t != MuseHomeTile.remaining,
       );
@@ -54,11 +54,12 @@ void main() {
       expect(museTileColumns(1100), 4);
     });
     test('speed text keeps a stable shape', () {
-      expect(museSpeedText(0), '0 B/s');
-      expect(museSpeedText(999), '999 B/s');
+      // 1.4.0: KB/s at least
+      expect(museSpeedText(0), '0 KB/s');
+      expect(museSpeedText(110), '0.1 KB/s');
       expect(museSpeedText(180 * 1024), '180 KB/s');
       expect(museSpeedText((2.4 * 1024 * 1024).round()), '2.4 MB/s');
-      expect(museSpeedText(-5), '0 B/s');
+      expect(museSpeedText(-5), '0 KB/s');
     });
     test('days left', () {
       final now = DateTime(2026, 10, 22, 12);

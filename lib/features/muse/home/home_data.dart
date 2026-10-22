@@ -4,10 +4,14 @@
 // disconnected.
 // Part of 穿云 (GPLv3).
 
+import 'dart:async';
+
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/logic/latency_cache.dart';
 import 'package:hiddify/features/muse/logic/node_cache.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
@@ -110,3 +114,39 @@ final museNodeCacheWriterProvider = Provider<void>((ref) {
 
 /// A clipboard subscription link not offered yet (badge on 添加, first row of the 添加 sheet).
 final museClipboardOfferProvider = StateProvider<String?>((ref) => null);
+
+/// 1.4.0: last delay per node of the active subscription (shown grey until a fresh result).
+final museLatencyCacheProvider = Provider<MuseLatencyCache>((ref) {
+  final id = ref.watch(museActiveProfileIdProvider);
+  return MuseLatencyCache.parse(ref.watch(MusePrefs.latencyCache)).forProfile(id);
+});
+
+/// 1.4.0: saves fresh delays into the cache (at most every 5 s).
+final museLatencyCacheWriterProvider = Provider<void>((ref) {
+  var lastWrite = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? pending;
+  ref.onDispose(() => pending?.cancel());
+  void write() {
+    final group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
+    final profileId = ref.read(museActiveProfileIdProvider);
+    if (group == null || profileId == null) return;
+    final fresh = <String, MuseCachedDelay>{
+      for (final e in group.items)
+        if (!e.isGroup && e.urlTestDelay != 0 && e.hasUrlTestTime())
+          e.tag: MuseCachedDelay(e.urlTestDelay, e.urlTestTime.toDateTime()),
+    };
+    if (fresh.isEmpty) return;
+    final cur = MuseLatencyCache.parse(ref.read(MusePrefs.latencyCache));
+    final next = cur.merge(profileId, fresh);
+    if (identical(next, cur)) return;
+    lastWrite = DateTime.now();
+    ref.read(MusePrefs.latencyCache.notifier).update(next.toRaw());
+  }
+
+  ref.listen<AsyncValue<OutboundGroup?>>(proxiesOverviewNotifierProvider, (_, next) {
+    if (next.valueOrNull == null || !ref.read(serviceRunningProvider)) return;
+    final wait = const Duration(seconds: 5) - DateTime.now().difference(lastWrite);
+    pending?.cancel();
+    pending = Timer(wait.isNegative ? Duration.zero : wait, write);
+  });
+});

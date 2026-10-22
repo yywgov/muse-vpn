@@ -29,8 +29,6 @@ abstract class Preferences {
   // 1.3.0: no toggle; follows whether the 出口 IP tile is shown
   static final museExitCheck = PreferencesNotifier.create<bool, bool>("muse_exit_check", true);
 
-  // 穿云 1.2.3 Windows: Ctrl+Alt+P connects / disconnects from anywhere
-  static final museHotkey = PreferencesNotifier.create<bool, bool>("muse_hotkey", true);
 
   // 穿云 1.2.5: 首页 node order — delay (按延迟) / original (订阅顺序) / region (按地区)
   static final museNodeSort = PreferencesNotifier.create<String, String>("muse_node_sort", "delay");

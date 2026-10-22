@@ -33,7 +33,7 @@ void main() {
       expect(on[1].label, '断开');
       final off = museTrayMenuSpec(const Disconnected(), MuseRouteMode.rule, speed: '↓2 KB/s ↑1 KB/s');
       expect(off.first.label, '连接');
-      expect(museSpeedText(1024, 2048), '↓2 KB/s ↑1 KB/s');
+      expect(museSpeedText(1024, 2048), '↓2.0 KB/s ↑1.0 KB/s');
     });
   });
   group('去广告 温和 / 强力', () {

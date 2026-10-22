@@ -36,8 +36,34 @@ abstract final class MuseMotion {
 
 /// Icon sizes (one rounded line-icon set).
 abstract final class MuseIconSize {
+  static const tiny = 16.0;
   static const small = 20.0;
   static const regular = 24.0;
+
+  /// a flag emoji in its box
+  static const flag = 18.0;
+}
+
+/// Fixed sizes of recurring layout parts (so screens never hand-write them).
+abstract final class MuseSize {
+  /// width of a key column in a details sheet («延迟», «测速时间»)
+  static const labelColumn = 72.0;
+  static const labelColumnWide = 96.0;
+
+  /// the bottom element of a 首页 tile (sparkline, bar, caption)
+  static const tileBottom = 20.0;
+
+  /// room left under a list for a floating button
+  static const fabClearance = 88.0;
+
+  /// width of a message dialog's text
+  static const dialogText = 468.0;
+
+  /// the selected-row bar of a list
+  static const selectedBar = 4.0;
+
+  /// a status dot
+  static const dot = 8.0;
 }
 
 /// Fixed palette. Brand blue only for primary actions and selected state; one value per status.
@@ -154,6 +180,15 @@ abstract final class MuseType {
 
   static TextStyle title(BuildContext context) =>
       TextStyle(fontSize: 20, height: 1.25, fontWeight: FontWeight.w600, color: MuseTheme.of(context).text1, fontFeatures: tabular);
+
+  /// 1.4.0: the big number on a 首页 tile (one weight for every value, digits tabular).
+  static TextStyle number(BuildContext context) => TextStyle(
+    fontSize: 24,
+    height: 1.2,
+    fontWeight: FontWeight.w700,
+    color: MuseTheme.of(context).text1,
+    fontFeatures: tabular,
+  );
 
   static TextStyle body(BuildContext context) =>
       TextStyle(fontSize: 15, height: 1.35, fontWeight: FontWeight.w400, color: MuseTheme.of(context).text1);

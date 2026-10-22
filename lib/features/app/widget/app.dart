@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/data/core_extras_provider.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +20,6 @@ import 'package:hiddify/features/app_based_routing/overview/app_based_routing_no
 import 'package:hiddify/features/connection/widget/connection_wrapper.dart';
 import 'package:hiddify/features/muse/home/auto_fastest.dart';
 import 'package:hiddify/features/muse/desktop/connection_keeper.dart';
-import 'package:hiddify/features/muse/desktop/hotkey.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
 import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
@@ -82,11 +82,12 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     ref.listen(museAutoFastestProvider, (_, _) {});
     ref.listen(museCoreWatchdogProvider, (_, _) {});
     ref.listen(museConnectionKeeperProvider, (_, _) {});
+    // 1.4.0: 测速 settings for the core, delay cache
+    ref.listen(museCoreExtrasProvider, (_, _) {});
+    ref.listen(museLatencyCacheWriterProvider, (_, _) {});
     // 穿云 1.3.0: node list kept for picking while disconnected; 网速 sparkline history
     ref.listen(museNodeCacheWriterProvider, (_, _) {});
     ref.listen(museSpeedHistoryProvider, (_, _) {});
-    // 穿云 1.2.3 Windows: Ctrl+Alt+P 连接/断开
-    if (PlatformUtils.isWindows) ref.listen(museHotkeyProvider, (_, _) {});
     // 穿云 1.2.8: Windows too (toast); 每个订阅记住上次的节点; 连上后探测外网
     ref.listen(museSubscriptionAlertProvider, (_, _) {});
     ref.listen(museNodeMemoryProvider, (_, _) {});

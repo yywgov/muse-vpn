@@ -1,4 +1,4 @@
-// 穿云 Windows - the desktop-only rows of 设置: 运行模式 (系统代理 / TUN), 开机自启, 快捷键, 关闭窗口时.
+// 穿云 Windows - the desktop-only rows of 设置: 运行模式 (系统代理 / TUN), 开机自启, 关闭窗口时.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
@@ -7,7 +7,6 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/muse/data/windows_admin.dart';
-import 'package:hiddify/features/muse/desktop/hotkey.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
@@ -90,13 +89,6 @@ class WindowsSettingsSection extends ConsumerWidget {
             final notifier = ref.read(autoStartNotifierProvider.notifier);
             value ? await notifier.enable() : await notifier.disable();
           },
-        ),
-        // 1.2.3
-        MuseSwitchTile(
-          leading: const Icon(Icons.keyboard_rounded),
-          title: '快捷键 $museHotkeyLabel',
-          value: ref.watch(Preferences.museHotkey),
-          onChanged: (v) => ref.read(Preferences.museHotkey.notifier).update(v),
         ),
         MuseTile(
           leading: const Icon(Icons.close_rounded),

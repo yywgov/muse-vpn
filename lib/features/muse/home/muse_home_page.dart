@@ -207,6 +207,8 @@ class MuseHeroCard extends HookConsumerWidget {
     }
 
     final onBrand = state != _HeroState.idle;
+    // 1.4.0: roomier on the desktop
+    final heroPad = MediaQuery.sizeOf(context).width >= 720 ? MuseSpace.s24 : MuseSpace.s16;
     final fg = onBrand ? MusePalette.white : mt.text1;
     final fg2 = onBrand ? MusePalette.white.withValues(alpha: 0.78) : mt.text2;
     final switchEnabled = !busy || canCancelRecovery;
@@ -244,7 +246,7 @@ class MuseHeroCard extends HookConsumerWidget {
                 // the whole card connects while disconnected
                 onTap: state == _HeroState.idle && !busy ? toggle : null,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(MuseSpace.s16, MuseSpace.s16, MuseSpace.s16, 0),
+                  padding: EdgeInsets.fromLTRB(heroPad, heroPad, heroPad, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -279,14 +281,14 @@ class MuseHeroCard extends HookConsumerWidget {
                                       ),
                                   ],
                                 ),
-                                const SizedBox(height: MuseSpace.s4),
+                                const SizedBox(height: MuseSpace.s8),
                                 Row(
                                   children: [
                                     if (since != null) ...[
                                       Text(
                                         museFormatDuration(DateTime.now().difference(since)),
                                         key: const ValueKey('home_timer'),
-                                        style: MuseType.caption(context).copyWith(color: fg2, fontSize: 13),
+                                        style: MuseType.body(context).copyWith(color: fg2, fontFeatures: MuseType.tabular),
                                       ),
                                       Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8),
@@ -308,7 +310,7 @@ class MuseHeroCard extends HookConsumerWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: MuseSpace.s16),
+                      SizedBox(height: heroPad),
                       Divider(height: 0.5, thickness: 0.5, color: onBrand ? MusePalette.white.withValues(alpha: 0.22) : mt.hairline),
                     ],
                   ),
@@ -541,17 +543,23 @@ class _HeroNodeRow extends ConsumerWidget {
 // ---------------------------------------------------------------- tiles
 
 /// The tile grid: every tile the same height, 2 columns on a phone, 3–4 on the desktop.
+/// 1.4.0: the column count follows the number of tiles so no row is left with a lone tile (the
+/// last row's tiles stretch); on Windows 网速 + 本次流量 are one 「流量」 tile.
 class MuseTileGrid extends ConsumerWidget {
-  const MuseTileGrid({super.key});
+  const MuseTileGrid({super.key, this.mergeFlow});
+
+  /// null = Windows only.
+  final bool? mergeFlow;
 
   static const tileHeight = 124.0;
+  static const tileHeightDesktop = 136.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final info = ref.watch(museSubInfoProvider);
     final order = museParseTileOrder(ref.watch(Preferences.museHomeTileOrder));
     final hidden = museParseHiddenTiles(ref.watch(Preferences.museHomeTilesHidden));
-    final tiles = museVisibleTiles(
+    var tiles = museVisibleTiles(
       order,
       hidden,
       hasData: (t) => switch (t) {
@@ -560,22 +568,23 @@ class MuseTileGrid extends ConsumerWidget {
         _ => true,
       },
     );
+    if (mergeFlow ?? PlatformUtils.isWindows) tiles = museMergeFlowTiles(tiles);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = museTileColumns(constraints.maxWidth);
+        final columns = museTileColumnsFor(constraints.maxWidth, tiles.length);
+        final height = constraints.maxWidth >= 600 ? tileHeightDesktop : tileHeight;
         final rows = <Widget>[];
-        for (var i = 0; i < tiles.length; i += columns) {
-          final slice = tiles.sublist(i, math.min(i + columns, tiles.length));
+        for (final idx in museTileRows(tiles.length, columns)) {
           if (rows.isNotEmpty) rows.add(const SizedBox(height: MuseSpace.s12));
           rows.add(
             SizedBox(
-              height: tileHeight,
+              height: height,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (var j = 0; j < columns; j++) ...[
+                  for (var j = 0; j < idx.length; j++) ...[
                     if (j > 0) const SizedBox(width: MuseSpace.s12),
-                    Expanded(child: j < slice.length ? _tile(slice[j]) : const SizedBox.shrink()),
+                    Expanded(child: _tile(tiles[idx[j]])),
                   ],
                 ],
               ),
@@ -594,6 +603,7 @@ class MuseTileGrid extends ConsumerWidget {
     MuseHomeTile.expiry => const _ExpiryTile(key: ValueKey('tile_expiry')),
     MuseHomeTile.exit => const _ExitTile(key: ValueKey('tile_exit')),
     MuseHomeTile.adBlock => const _AdBlockTile(key: ValueKey('tile_adblock')),
+    MuseHomeTile.flow => const _FlowTile(key: ValueKey('tile_flow')),
   };
 }
 
@@ -649,7 +659,7 @@ class _Tile extends ConsumerWidget {
                     key: ValueKey(value),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: MuseType.title(context).copyWith(fontSize: 22, color: valueColor),
+                    style: MuseType.number(context).copyWith(color: valueColor),
                   ),
                 ),
                 SizedBox(height: 20, child: bottom),
@@ -675,6 +685,43 @@ class _SpeedTile extends ConsumerWidget {
       value: '↓ ${museSpeedText(stats.downlink.toInt())}',
       bottom: SizedBox.expand(
         child: CustomPaint(painter: _SparklinePainter(history, MusePalette.brand, MuseTheme.of(context).hairline)),
+      ),
+      onTap: () => _showSessionSheet(context),
+    );
+  }
+}
+
+/// 1.4.0 Windows: 网速 + 本次流量 — ↓ live speed (big) with the sparkline, ↑ speed and this
+/// session's ↑ / ↓ totals as captions.
+class _FlowTile extends ConsumerWidget {
+  const _FlowTile({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(museStatsProvider);
+    final history = ref.watch(museSpeedHistoryProvider);
+    final up = stats.uplinkTotal.toInt();
+    final down = stats.downlinkTotal.toInt();
+    return _Tile(
+      title: '流量',
+      titleTrailing: Text('↑ ${museSpeedText(stats.uplink.toInt())}', style: MuseType.caption(context)),
+      value: '↓ ${museSpeedText(stats.downlink.toInt())}',
+      bottom: Row(
+        children: [
+          Expanded(
+            child: CustomPaint(
+              size: Size.infinite,
+              painter: _SparklinePainter(history, MusePalette.brand, MuseTheme.of(context).hairline),
+            ),
+          ),
+          const SizedBox(width: MuseSpace.s12),
+          Text(
+            '本次 ↑ ${museBytes(up)}  ↓ ${museBytes(down)}',
+            key: const ValueKey('flow_session'),
+            maxLines: 1,
+            style: MuseType.caption(context),
+          ),
+        ],
       ),
       onTap: () => _showSessionSheet(context),
     );

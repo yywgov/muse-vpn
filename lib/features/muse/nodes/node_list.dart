@@ -12,11 +12,13 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/home/node_memory.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
+import 'package:hiddify/features/muse/logic/latency_cache.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
@@ -43,13 +45,23 @@ Future<void> museRunNodeTest(WidgetRef ref) async {
     // the notifier already logs the failure
   }
   // results stream in over the next seconds; the list ends the test once every node answered,
-  // at the latest after 15 s
-  Timer(const Duration(seconds: 15), () {
+  // at the latest after the cap for this many nodes (1.4.0: was a fixed 15 s that left dozens of
+  // rows at 「测速中」)
+  final nodes = group.items.where((e) => !e.isGroup).length;
+  final cap = museTestCap(
+    nodes: nodes,
+    workers: ref.read(MusePrefs.testWorkers),
+    timeoutSec: ref.read(MusePrefs.testTimeoutSec),
+  );
+  Timer(cap, () {
     try {
       if (ref.read(museNodeTestStartedProvider) == started) ref.read(museNodeTestStartedProvider.notifier).state = null;
     } catch (_) {}
   });
 }
+
+/// Ends the running 测速 in the list (results that still arrive are shown as they come).
+void museStopNodeTest(WidgetRef ref) => ref.read(museNodeTestStartedProvider.notifier).state = null;
 
 /// Pull-down on 首页 / 节点: 测速 while connected, otherwise update the subscriptions.
 Future<void> museNodePull(WidgetRef ref) async {
@@ -195,9 +207,20 @@ class MuseNodeList extends HookConsumerWidget {
             ),
           TextButton(
             key: const ValueKey('node_test_button'),
-            onPressed: group == null || testing || !running ? null : () => museRunNodeTest(ref),
+            onPressed: group == null || !running ? null : () => testing ? museStopNodeTest(ref) : museRunNodeTest(ref),
             child: testing
-                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: MuseSpace.s12,
+                        height: MuseSpace.s12,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: MuseSpace.s8),
+                      Text('停止', style: MuseType.body(context).copyWith(color: MusePalette.brand)),
+                    ],
+                  )
                 : const Text('测速'),
           ),
         ],
@@ -274,15 +297,15 @@ class MuseNodeList extends HookConsumerWidget {
       final visible = ordered.where((e) => !hidden.contains(e.tag) && matches(e)).toList();
       final folded = ordered.where((e) => hidden.contains(e.tag) && matches(e)).toList();
       final nodeCount = listed.where((e) => !e.isGroup).length;
-      final recentlyConnected = since != null && DateTime.now().difference(since) < const Duration(seconds: 30);
-      final pending = running && (testing || recentlyConnected);
+      final latencyCache = ref.watch(museLatencyCacheProvider);
 
       Widget row(OutboundInfo proxy, {bool dimmed = false}) => MuseNodeRow(
         key: ValueKey(proxy.tag),
         proxy: proxy,
         since: since,
         nodeCount: nodeCount,
-        pending: pending,
+        testStarted: running ? testStarted : null,
+        cachedDelay: latencyCache.delayOf(proxy.tag),
         dimmed: dimmed,
         selected: group.selected == proxy.tag,
         favorite: favorites.contains(proxy.tag),
@@ -426,14 +449,16 @@ class MuseNodeRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.onLongPress,
-    this.pending = true,
+    this.testStarted,
+    this.cachedDelay,
     this.dimmed = false,
     this.favorite = false,
   });
 
   final OutboundInfo proxy;
   final DateTime? since;
-  final bool pending;
+  final DateTime? testStarted;
+  final int? cachedDelay;
   final bool dimmed;
   final int nodeCount;
   final bool selected;
@@ -444,21 +469,20 @@ class MuseNodeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mt = MuseTheme.of(context);
-    final delay = proxy.urlTestDelay;
-    final testedAt = proxy.hasUrlTestTime() ? proxy.urlTestTime.toDateTime() : null;
-    final stale = delay == 0 || (since != null && testedAt != null && testedAt.isBefore(since!.subtract(const Duration(seconds: 2))));
-    final String delayText;
-    final Color delayColor;
-    if (stale) {
-      delayText = pending ? '测速中' : '—';
-      delayColor = mt.text3;
-    } else if (ConnectionConst.isValidDelay(delay)) {
-      delayText = '$delay ms';
-      delayColor = MuseColors.delay(context, delay);
-    } else {
-      delayText = '超时';
-      delayColor = MusePalette.red;
-    }
+    final view = museDelayView(
+      delay: proxy.urlTestDelay,
+      testedAt: proxy.hasUrlTestTime() ? proxy.urlTestTime.toDateTime() : null,
+      since: since,
+      testStarted: proxy.isGroup ? null : testStarted,
+      cached: cachedDelay,
+    );
+    final delayText = view.text;
+    final stale = view.kind != MuseDelayKind.live && view.kind != MuseDelayKind.timeout;
+    final Color delayColor = switch (view.kind) {
+      MuseDelayKind.live => MuseColors.delay(context, view.delay),
+      MuseDelayKind.timeout => MusePalette.red,
+      _ => mt.text3,
+    };
     final fullName = museNodeName(proxy);
     final rawName = proxy.isGroup ? fullName.split(' → ').first.trim() : fullName;
     final type = proxy.type.toLowerCase();
