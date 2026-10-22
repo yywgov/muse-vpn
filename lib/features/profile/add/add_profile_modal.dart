@@ -103,7 +103,7 @@ class AddProfileOptions extends HookConsumerWidget {
     final items = <Widget>[];
     for (var i = 0; i < options.length; i++) {
       items.add(options[i]);
-      if (i != options.length - 1) items.add(Divider(height: 0.5, thickness: 0.5, indent: 56, color: mt.hairline));
+      if (i != options.length - 1) items.add(Divider(height: MuseSize.hairline, thickness: MuseSize.hairline, indent: MuseSize.heroRow, color: mt.hairline));
     }
     return Column(
       key: const ValueKey('add_profile_options'),
@@ -183,7 +183,7 @@ class AddProfileManual extends HookConsumerWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
             child: CustomTextFormField(
               maxLines: 1,
               controller: nameTextController,
@@ -194,7 +194,7 @@ class AddProfileManual extends HookConsumerWidget {
           ),
           const Gap(16),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
             child: CustomTextFormField(
               maxLines: 1,
               controller: urlTextController,
@@ -219,10 +219,10 @@ class AddProfileManual extends HookConsumerWidget {
             child: !isAutoUpdateDisable.value
                 ? Column(
                     children: [
-                      const Divider(indent: 16, endIndent: 16),
+                      const Divider(indent: MuseSpace.s16, endIndent: MuseSpace.s16),
                       const Gap(12),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
                         child: Row(
                           children: [
                             Expanded(
@@ -240,7 +240,7 @@ class AddProfileManual extends HookConsumerWidget {
                       ),
                       const Gap(4),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s12),
                         child: Slider(
                           focusNode: sliderFocusNode,
                           value: updateInterval.value,
@@ -256,7 +256,7 @@ class AddProfileManual extends HookConsumerWidget {
           ),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16).copyWith(bottom: 8),
             child: Row(
               children: [
                 Expanded(

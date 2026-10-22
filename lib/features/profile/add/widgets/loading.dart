@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
@@ -12,7 +13,7 @@ class ProfileLoading extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 64),
+      padding: const EdgeInsets.all(MuseSize.loadingInset),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

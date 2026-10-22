@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/actions_at_closing.dart';
@@ -36,8 +37,8 @@ class _WindowClosingDialogState extends ConsumerState<WindowClosingDialog> {
                 setState(() {});
               },
             ),
-            const SizedBox(width: 16),
-            Text(t.dialogs.windowClosing.remember, style: const TextStyle(fontSize: 16)),
+            const SizedBox(width: MuseSpace.s16),
+            Text(t.dialogs.windowClosing.remember),
           ],
         ),
       ),

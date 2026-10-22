@@ -1,4 +1,5 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -85,7 +86,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                     child: Column(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s8),
                           child: CustomTextFormField(
                             maxLines: 1,
                             initialValue: userOverride.name ?? data.profile.name,
@@ -100,7 +101,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                         ),
                         if (data.profile case RemoteProfileEntity(:final url))
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s8),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -140,7 +141,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                                       const Divider(indent: 16, endIndent: 16),
                                       const Gap(12),
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
                                         child: Row(
                                           children: [
                                             Expanded(
@@ -162,7 +163,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                                       ),
                                       const Gap(4),
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s12),
                                         child: Slider(
                                           focusNode: sliderFocusNode,
                                           value:
@@ -194,7 +195,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                           Align(
                             alignment: AlignmentDirectional.centerStart,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s8),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -270,7 +271,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
   InlineSpan _buildSubProp(IconData icon, String text, String semanticLabel) {
     return TextSpan(
       children: [
-        WidgetSpan(child: Icon(icon, size: 16, semanticLabel: semanticLabel)),
+        WidgetSpan(child: Icon(icon, size: MuseIconSize.tiny, semanticLabel: semanticLabel)),
         const TextSpan(text: " "),
         TextSpan(text: text),
       ],

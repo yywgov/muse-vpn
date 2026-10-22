@@ -98,7 +98,7 @@ class ProfileTile extends HookConsumerWidget {
         borderRadius: ProfileTileConst.endBorderRadius(Directionality.of(context)),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s12, vertical: MuseSpace.s4),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,7 +112,7 @@ class ProfileTile extends HookConsumerWidget {
                     key: const ValueKey('subscription_bar'),
                     value: bar.remaining,
                     minHeight: 4,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: MuseRadius.smallAll,
                     color: bar.warn ? theme.colorScheme.error : theme.colorScheme.primary,
                     backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.08),
                   ),
@@ -408,6 +408,6 @@ class RemainingTrafficIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LinearProgressIndicator(value: ratio, borderRadius: BorderRadius.circular(16), minHeight: 6);
+    return LinearProgressIndicator(value: ratio, borderRadius: MuseRadius.cardAll, minHeight: 6);
   }
 }

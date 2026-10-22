@@ -98,7 +98,7 @@ class MuseHomePage extends HookConsumerWidget {
             children: [
               Expanded(child: dashboard),
               SizedBox(
-                width: 380,
+                width: MuseSize.sideColumn,
                 child: Column(
                   key: const ValueKey('home_side_nodes'),
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -311,7 +311,7 @@ class MuseHeroCard extends HookConsumerWidget {
                         ],
                       ),
                       SizedBox(height: heroPad),
-                      Divider(height: 0.5, thickness: 0.5, color: onBrand ? MusePalette.white.withValues(alpha: 0.22) : mt.hairline),
+                      Divider(height: MuseSize.hairline, thickness: MuseSize.hairline, color: onBrand ? MusePalette.white.withValues(alpha: 0.22) : mt.hairline),
                     ],
                   ),
                 ),
@@ -362,11 +362,11 @@ class _ModePill extends ConsumerWidget {
                 child: Text(
                   '${mode.title}模式',
                   key: ValueKey(mode),
-                  style: MuseType.caption(context).copyWith(color: fg, fontSize: 13, fontWeight: FontWeight.w600),
+                  style: MuseType.caption(context).copyWith(color: fg, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(width: MuseSpace.s4),
-              Icon(Icons.swap_horiz_rounded, size: 14, color: fg.withValues(alpha: 0.8)),
+              Icon(Icons.swap_horiz_rounded, size: MuseIconSize.tiny, color: fg.withValues(alpha: 0.8)),
             ],
           ),
         ),
@@ -398,8 +398,8 @@ class _BigSwitch extends StatelessWidget {
         child: AnimatedContainer(
           duration: MuseMotion.fast,
           curve: MuseMotion.curve,
-          width: 64,
-          height: 36,
+          width: MuseSize.switchWidth,
+          height: MuseSize.switchHeight,
           padding: const EdgeInsets.all(MuseSpace.s4),
           decoration: BoxDecoration(color: track, borderRadius: MuseRadius.fullAll),
           child: AnimatedAlign(
@@ -407,8 +407,8 @@ class _BigSwitch extends StatelessWidget {
             curve: MuseMotion.curve,
             alignment: on ? Alignment.centerRight : Alignment.centerLeft,
             child: Container(
-              width: 28,
-              height: 28,
+              width: MuseSize.switchKnob,
+              height: MuseSize.switchKnob,
               decoration: BoxDecoration(
                 color: knob,
                 shape: BoxShape.circle,
@@ -510,7 +510,7 @@ class _HeroNodeRow extends ConsumerWidget {
         key: const ValueKey('home_current_node'),
         onTap: () => showMuseNodePicker(context),
         child: SizedBox(
-          height: 56,
+          height: MuseSize.heroRow,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
             child: Row(
@@ -662,7 +662,7 @@ class _Tile extends ConsumerWidget {
                     style: MuseType.number(context).copyWith(color: valueColor),
                   ),
                 ),
-                SizedBox(height: 20, child: bottom),
+                SizedBox(height: MuseSize.tileBottom, child: bottom),
               ],
             ),
           ),
@@ -811,7 +811,7 @@ class _RemainingTile extends ConsumerWidget {
                 duration: MuseMotion.fast,
                 builder: (_, v, _) => LinearProgressIndicator(
                   value: v,
-                  minHeight: 6,
+                  minHeight: MuseSize.progressBar,
                   backgroundColor: mt.inner,
                   color: low ? MusePalette.orange : MusePalette.brand,
                 ),
@@ -889,7 +889,7 @@ class _ExitTile extends ConsumerWidget {
                 ref.read(inAppNotificationControllerProvider).showSuccessToast('已复制 IP');
               } catch (_) {}
             },
-            child: Icon(Icons.copy_rounded, size: 16, color: mt.text3),
+            child: Icon(Icons.copy_rounded, size: MuseIconSize.tiny, color: mt.text3),
           ),
         ],
       );
@@ -942,7 +942,7 @@ class MuseSegmented<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final mt = MuseTheme.of(context);
     return Container(
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(MuseSpace.s4),
       decoration: BoxDecoration(color: mt.inner, borderRadius: MuseRadius.fullAll),
       child: Row(
         children: [
@@ -963,8 +963,7 @@ class MuseSegmented<T> extends StatelessWidget {
                   ),
                   child: Text(
                     label(v),
-                    style: TextStyle(
-                      fontSize: 11,
+                    style: MuseType.caption(context).copyWith(
                       height: 1.2,
                       fontWeight: v == selected ? FontWeight.w600 : FontWeight.w500,
                       color: v == selected ? (mt.dark ? MusePalette.white : MusePalette.brand) : mt.text2,
@@ -1117,14 +1116,14 @@ class _EmptyState extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: MuseSize.emptyArt,
+                  height: MuseSize.emptyArt,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(color: MusePalette.brand.withValues(alpha: 0.1), shape: BoxShape.circle),
                   child: Assets.images.glyph.svg(
-                    width: 40,
-                    height: 40,
-                    colorFilter: const ColorFilter.mode(MusePalette.brand, BlendMode.srcIn),
+                    width: MuseSize.emptyIcon,
+                    height: MuseSize.emptyIcon,
+                    colorFilter: ColorFilter.mode(MusePalette.brand, BlendMode.srcIn),
                   ),
                 ),
                 const SizedBox(height: MuseSpace.s16),
@@ -1132,7 +1131,7 @@ class _EmptyState extends ConsumerWidget {
                 const SizedBox(height: MuseSpace.s24),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: MuseSize.button,
                   child: FilledButton(
                     key: const ValueKey('empty_add_button'),
                     style: FilledButton.styleFrom(backgroundColor: MusePalette.brand, shape: const StadiumBorder()),

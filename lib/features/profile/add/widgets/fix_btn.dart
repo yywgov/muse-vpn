@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -16,7 +17,7 @@ class FixBtn extends ConsumerWidget {
     final theme = Theme.of(context);
     final isMobile = Breakpoint(context).isMobile();
     final color = theme.colorScheme.primary;
-    final borderRadius = BorderRadius.circular(18);
+    final borderRadius = MuseRadius.fullAll;
 
     return Expanded(
       child: InkWell(
@@ -25,7 +26,7 @@ class FixBtn extends ConsumerWidget {
         child: Container(
           alignment: Alignment.center,
           height: height,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: MuseSpace.s8, horizontal: MuseSpace.s4),
           decoration: BoxDecoration(
             borderRadius: borderRadius,
             border: Border.all(color: theme.colorScheme.outlineVariant),

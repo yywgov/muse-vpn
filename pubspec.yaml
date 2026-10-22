@@ -22,6 +22,8 @@ dependencies:
     sdk: flutter
   intl: ^0.20.2
   crypto: ^3.0.6 # 穿云 1.2.2: SHA-256 check of downloaded updates
+  pointycastle: ^3.9.1 # 穿云 1.4.0: AES-GCM for 同步 / 备份 files
+  qr: ^3.0.2 # 穿云 1.4.0: QR codes for sharing a subscription
 
   # lucy_editor: ^1.0.5
   # re_highlight: ^0.0.3

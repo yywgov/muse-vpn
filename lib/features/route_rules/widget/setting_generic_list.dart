@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/route_rules/widget/setting_detail_chips.dart';
@@ -39,7 +40,7 @@ class SettingGenericList<T extends Object> extends ConsumerWidget {
                       children: [
                         Row(
                           children: [
-                            const Icon(size: 16, Icons.warning_rounded, color: Colors.amber),
+                            const Icon(size: MuseIconSize.tiny, Icons.warning_rounded, color: MusePalette.orange),
                             const Gap(2),
                             Text(
                               t.pages.settings.routing.routeRule.rule.notAvailableInThisPlatform,

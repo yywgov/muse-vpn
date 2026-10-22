@@ -1,4 +1,5 @@
 import 'package:dart_mappable/dart_mappable.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:dartx/dartx.dart';
 import 'package:flutter/material.dart';
 
@@ -26,12 +27,12 @@ enum LogLevel {
   bool get isVerbose => index <= LogLevel.debug.index;
 
   Color? get color => switch (this) {
-    trace => Colors.lightBlueAccent,
-    debug => Colors.grey,
-    info => Colors.lightGreen,
-    warn => Colors.orange,
-    error => Colors.redAccent,
-    fatal => Colors.red,
-    panic => Colors.red,
+    trace => MusePalette.brandLight,
+    debug => MusePalette.lightText3,
+    info => MusePalette.green,
+    warn => MusePalette.orange,
+    error => MusePalette.red,
+    fatal => MusePalette.red,
+    panic => MusePalette.red,
   };
 }

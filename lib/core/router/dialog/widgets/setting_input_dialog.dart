@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
@@ -90,7 +91,7 @@ class SettingInputDialog<T> extends HookConsumerWidget with PresLogger {
               // Widget to build each suggestion in the list
               itemBuilder: (context, suggestion) {
                 return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(vertical: 3, horizontal: 10), // Minimize ListTile padding
+                  contentPadding: const EdgeInsets.symmetric(vertical: MuseSpace.s4, horizontal: MuseSpace.s12), // Minimize ListTile padding
                   minTileHeight: 0,
                   title: Text(
                     suggestion,

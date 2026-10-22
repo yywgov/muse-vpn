@@ -1,4 +1,6 @@
 import 'package:hiddify/features/muse/data/core_extras_provider.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -70,6 +72,9 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final router = ref.watch(goRouterNotiferProvider);
     final locale = ref.watch(localePreferencesProvider);
     final themeMode = ref.watch(themePreferencesProvider);
+    // 1.4.0: accent colour and text size (设置 › 外观)
+    museApplyAccent(MuseAccent.fromKey(ref.watch(MusePrefs.accent)));
+    final textScale = museTextScale(ref.watch(MusePrefs.textSize));
     final theme = AppTheme(themeMode, locale.preferredFontFamily);
     final activeBreakpoint = Breakpoint(context).activeBreakpoint;
 
@@ -120,6 +125,13 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                 child = child ?? const SizedBox();
                 if (kDebugMode && _debugAccessibility) {
                   return AccessibilityTools(checkFontOverflows: true, child: child);
+                }
+                if (textScale != 1.0) {
+                  final mq = MediaQuery.of(context);
+                  child = MediaQuery(
+                    data: mq.copyWith(textScaler: TextScaler.linear(mq.textScaler.scale(1) * textScale)),
+                    child: child,
+                  );
                 }
                 return AnnotatedRegion<SystemUiOverlayStyle>(
                   // 穿云: edge-to-edge, the pages draw behind transparent system bars; icons follow

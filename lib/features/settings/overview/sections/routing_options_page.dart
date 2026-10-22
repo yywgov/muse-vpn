@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
@@ -43,7 +44,7 @@ class RoutingOptionsPage extends HookConsumerWidget {
       ),
       // the built-in rules are always there, so the list is never empty
       body: ReorderableListView.builder(
-        padding: const EdgeInsets.only(bottom: 56 + 16 + 16),
+        padding: const EdgeInsets.only(bottom: MuseSize.fabClearance),
         buildDefaultDragHandles: false,
         onReorder: ref.read(rulesNotifierProvider.notifier).reorder,
         itemBuilder: (context, index) => RuleTile(key: Key('$index'), index: index, rule: rules[index]),

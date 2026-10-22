@@ -1,4 +1,5 @@
 import 'package:dartx/dartx.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -86,16 +87,16 @@ class PackageNamesPage extends HookConsumerWidget {
     final chips = PreferredSize(
       preferredSize: const Size.fromHeight(48),
       child: SizedBox(
-        height: 48,
+        height: MuseSize.button,
         child: ListView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
           // centered rather than stretched to the row: a chip squeezed or stretched draws its label off center;
           // 6 dp above and below the label makes the 32 dp chip of M3, where Flutter's 8 dp gives about 37
           children: [
             Center(
               child: ChoiceChip(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s8),
                 label: Text(appBasedRouting.hideSysApps),
                 selected: hideSystemApps.value,
                 onSelected: (value) => hideSystemApps.value = value,
@@ -170,7 +171,7 @@ class PackageNamesPage extends HookConsumerWidget {
                   onChanged: (_) => save(isSelected ? [...selected.where((e) => e != pkg)] : [...selected, pkg]),
                   secondary: app?.icon == null
                       ? const SizedBox.square(dimension: 48, child: Icon(Icons.android_rounded))
-                      : Image.memory(app!.icon!, width: 48, height: 48, cacheWidth: 48, cacheHeight: 48),
+                      : Image.memory(app!.icon!, width: MuseSize.appIconLarge, height: MuseSize.appIconLarge, cacheWidth: 48, cacheHeight: 48),
                   title: Row(
                     children: [
                       Flexible(child: Text(app?.name ?? pkg, maxLines: 1, overflow: TextOverflow.ellipsis)),
@@ -178,7 +179,7 @@ class PackageNamesPage extends HookConsumerWidget {
                         const Gap(4),
                         Tooltip(
                           message: appBasedRouting.outsideVpn,
-                          child: Icon(Icons.remove_moderator_outlined, size: 16, color: markColor),
+                          child: Icon(Icons.remove_moderator_outlined, size: MuseIconSize.tiny, color: markColor),
                         ),
                       ],
                     ],

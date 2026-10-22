@@ -64,13 +64,76 @@ abstract final class MuseSize {
 
   /// a status dot
   static const dot = 8.0;
+
+  /// room around a full-screen loading indicator
+  static const loadingInset = 64.0;
+
+  static const hairline = 0.5;
+  static const progressBar = 6.0;
+  static const spinnerStroke = 2.0;
+
+  /// node column on a wide 首页
+  static const sideColumn = 380.0;
+
+  /// right-aligned latency column of a node row
+  static const latencyColumn = 64.0;
+
+  /// flag / icon box in front of a row
+  static const flagBox = 32.0;
+
+  /// divider indent under a row with a flag box (16 + 32 + 12)
+  static const rowIndent = 60.0;
+
+  /// the hero card's big switch and its knob
+  static const switchWidth = 64.0;
+  static const switchHeight = 36.0;
+  static const switchKnob = 28.0;
+
+  /// the hero card's node row, a list row, a button
+  static const heroRow = 56.0;
+  static const button = 48.0;
+
+  /// app icons in lists
+  static const appIcon = 24.0;
+  static const appIconLarge = 48.0;
+
+  /// empty-state illustration
+  static const emptyArt = 72.0;
+  static const emptyIcon = 40.0;
+  static const segmented = 32.0;
+}
+
+/// 1.4.0: accent colours to pick from (one at a time; brand blue by default).
+enum MuseAccent {
+  blue('blue', '蓝', Color(0xFF2F6BFF), Color(0xFF5A8BFF), Color(0xFF1E4FD8)),
+  green('green', '绿', Color(0xFF16A34A), Color(0xFF3DBE6C), Color(0xFF0F7A37)),
+  purple('purple', '紫', Color(0xFF7C3AED), Color(0xFF9B67F2), Color(0xFF5B21B6));
+
+  const MuseAccent(this.key, this.title, this.brand, this.light, this.deep);
+
+  final String key;
+  final String title;
+  final Color brand;
+  final Color light;
+  final Color deep;
+
+  static MuseAccent fromKey(String key) => values.where((e) => e.key == key).firstOrNull ?? blue;
+}
+
+/// Makes [accent] the brand colour everywhere (call before building the app).
+void museApplyAccent(MuseAccent accent) {
+  MusePalette.brand = accent.brand;
+  MusePalette.brandLight = accent.light;
+  MusePalette.brandDeep = accent.deep;
 }
 
 /// Fixed palette. Brand blue only for primary actions and selected state; one value per status.
 abstract final class MusePalette {
-  static const brand = Color(0xFF2F6BFF);
-  static const brandLight = Color(0xFF5A8BFF);
-  static const brandDeep = Color(0xFF1E4FD8);
+  // 1.4.0: the accent can be 蓝 (default) / 绿 / 紫 (设置 › 外观); set by museApplyAccent before
+  // the app builds, and the app is rebuilt when it changes.
+  static Color brand = MuseAccent.blue.brand;
+  static Color brandLight = MuseAccent.blue.light;
+  static Color brandDeep = MuseAccent.blue.deep;
 
   static const green = Color(0xFF22C55E);
   static const orange = Color(0xFFF59E0B);
@@ -107,6 +170,7 @@ abstract final class MusePalette {
   static const darkHeroIdle = Color(0xFF1C2847);
 
   static const white = Color(0xFFFFFFFF);
+  static const black = Color(0xFF000000);
   static const transparent = Color(0x00000000);
 }
 
@@ -135,12 +199,17 @@ class MuseTheme {
 
   /// The connected hero card.
   LinearGradient get heroGradient => dark
-      ? const LinearGradient(
+      ? LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [MusePalette.darkHeroTop, MusePalette.darkHeroBottom],
+          colors: MusePalette.brand == MuseAccent.blue.brand
+              ? const [MusePalette.darkHeroTop, MusePalette.darkHeroBottom]
+              : [
+                  Color.lerp(MusePalette.brand, MusePalette.black, 0.12)!,
+                  Color.lerp(MusePalette.brandDeep, MusePalette.black, 0.38)!,
+                ],
         )
-      : const LinearGradient(
+      : LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [MusePalette.brandLight, MusePalette.brand],

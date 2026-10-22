@@ -215,7 +215,7 @@ class MuseNodeList extends HookConsumerWidget {
                       const SizedBox(
                         width: MuseSpace.s12,
                         height: MuseSpace.s12,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke),
                       ),
                       const SizedBox(width: MuseSpace.s8),
                       Text('停止', style: MuseType.body(context).copyWith(color: MusePalette.brand)),
@@ -413,7 +413,7 @@ class _NodeSection extends StatelessWidget {
     final items = <Widget>[];
     for (var i = 0; i < children.length; i++) {
       items.add(children[i]);
-      if (i != children.length - 1) items.add(Divider(height: 0.5, thickness: 0.5, indent: 60, color: mt.hairline));
+      if (i != children.length - 1) items.add(Divider(height: MuseSize.hairline, thickness: MuseSize.hairline, indent: MuseSize.rowIndent, color: mt.hairline));
     }
     return Padding(
       padding: EdgeInsets.fromLTRB(margin, MuseSpace.s8, margin, 0),
@@ -526,7 +526,7 @@ class MuseNodeRow extends StatelessWidget {
                             if (favorite)
                               const Padding(
                                 padding: EdgeInsets.only(right: MuseSpace.s4),
-                                child: Icon(Icons.star_rounded, size: 14, color: MusePalette.star, key: ValueKey('node_star')),
+                                child: Icon(Icons.star_rounded, size: MuseIconSize.tiny, color: MusePalette.star, key: ValueKey('node_star')),
                               ),
                             Flexible(
                               child: Text(
@@ -546,12 +546,12 @@ class MuseNodeRow extends StatelessWidget {
                   const SizedBox(width: MuseSpace.s8),
                   AnimatedContainer(
                     duration: MuseMotion.fast,
-                    width: 8,
-                    height: 8,
+                    width: MuseSize.dot,
+                    height: MuseSize.dot,
                     decoration: BoxDecoration(color: delayColor, shape: BoxShape.circle),
                   ),
                   SizedBox(
-                    width: 64,
+                    width: MuseSize.latencyColumn,
                     child: AnimatedSwitcher(
                       duration: MuseMotion.fast,
                       transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
@@ -569,11 +569,11 @@ class MuseNodeRow extends StatelessWidget {
               ),
             ),
             if (selected)
-              const Positioned(
+              Positioned(
                 left: 0,
                 top: 0,
                 bottom: 0,
-                child: SizedBox(width: 4, child: ColoredBox(color: MusePalette.brand, key: ValueKey('node_selected_bar'))),
+                child: SizedBox(width: MuseSize.selectedBar, child: ColoredBox(color: MusePalette.brand, key: const ValueKey('node_selected_bar'))),
               ),
           ],
         ),
@@ -597,15 +597,15 @@ class MuseFlagBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final mt = MuseTheme.of(context);
     return Container(
-      width: 32,
-      height: 32,
+      width: MuseSize.flagBox,
+      height: MuseSize.flagBox,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: onBrand ? MusePalette.white.withValues(alpha: 0.18) : mt.inner,
         borderRadius: MuseRadius.smallAll,
       ),
       child: flag != null
-          ? Text(flag!, style: const TextStyle(fontSize: 18, height: 1.1))
+          ? Text(flag!, style: const TextStyle(fontSize: MuseIconSize.flag, height: 1.1))
           : Icon(icon, size: MuseIconSize.small, color: onBrand ? MusePalette.white : MusePalette.brand),
     );
   }
@@ -676,7 +676,7 @@ Future<void> showMuseNodeDetails(
                   padding: const EdgeInsets.symmetric(vertical: MuseSpace.s4),
                   child: Row(
                     children: [
-                      SizedBox(width: 72, child: Text(k, style: MuseType.body(sheetContext).copyWith(color: mt.text2))),
+                      SizedBox(width: MuseSize.labelColumn, child: Text(k, style: MuseType.body(sheetContext).copyWith(color: mt.text2))),
                       Expanded(child: Text(v, style: MuseType.body(sheetContext))),
                     ],
                   ),

@@ -2,6 +2,7 @@
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
@@ -115,8 +116,8 @@ class MuseProtocolChip extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       constraints: const BoxConstraints(minWidth: 44),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(4)),
+      padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s4),
+      decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: MuseRadius.smallAll),
       child: Text(
         label,
         textAlign: TextAlign.center,

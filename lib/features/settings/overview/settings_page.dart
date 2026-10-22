@@ -190,7 +190,7 @@ Future<T?> museSettingPick<T>(BuildContext context, String title, List<(T, Strin
               key: ValueKey('pick_$label'),
               title: Text(label),
               trailing: value == current
-                  ? const Icon(Icons.check_rounded, color: MusePalette.brand, size: MuseIconSize.small)
+                  ? Icon(Icons.check_rounded, color: MusePalette.brand, size: MuseIconSize.small)
                   : null,
               onTap: () => Navigator.of(c).pop(value),
             ),
@@ -204,8 +204,8 @@ class MuseStatusDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 8,
-    height: 8,
+    width: MuseSize.dot,
+    height: MuseSize.dot,
     margin: const EdgeInsets.only(right: MuseSpace.s8),
     decoration: const BoxDecoration(color: MusePalette.green, shape: BoxShape.circle),
   );

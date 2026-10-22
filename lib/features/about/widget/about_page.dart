@@ -91,7 +91,7 @@ class AboutPage extends HookConsumerWidget {
               children: [
                 ClipRRect(
                   borderRadius: MuseRadius.cardAll,
-                  child: Assets.images.logo.svg(width: 72, height: 72),
+                  child: Assets.images.logo.svg(width: MuseSize.emptyArt, height: MuseSize.emptyArt),
                 ),
                 const Gap(MuseSpace.s12),
                 Text(Constants.appName, style: MuseType.title(context)),
@@ -108,7 +108,7 @@ class AboutPage extends HookConsumerWidget {
                 subtitle: updateStatus,
                 trailing: update is MuseUpdateIdle
                     ? null
-                    : const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                    : const SizedBox(width: MuseIconSize.small, height: MuseIconSize.small, child: CircularProgressIndicator(strokeWidth: 2)),
                 chevron: update is MuseUpdateIdle,
                 onTap: update is MuseUpdateIdle ? checkUpdate : null,
               ),

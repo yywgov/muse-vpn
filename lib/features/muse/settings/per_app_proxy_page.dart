@@ -76,7 +76,7 @@ class _AppListRow extends ConsumerWidget {
   final AppProxyMode mode;
 
   static const _maxLogos = 10;
-  static const _loadingLogo = ClipOval(child: ShimmerSkeleton(width: 24, height: 24));
+  static const _loadingLogo = ClipOval(child: ShimmerSkeleton(width: MuseSize.appIcon, height: MuseSize.appIcon));
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -117,13 +117,13 @@ class _AppListRow extends ConsumerWidget {
         leading: _LogoStack(
           children: [
             Container(
-              width: 24,
-              height: 24,
+              width: MuseSize.appIcon,
+              height: MuseSize.appIcon,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: color, width: 1.5),
               ),
-              child: Icon(Icons.add_rounded, size: 16, color: color),
+              child: Icon(Icons.add_rounded, size: MuseIconSize.tiny, color: color),
             ),
           ],
         ),
@@ -140,7 +140,7 @@ class _AppListRow extends ConsumerWidget {
           for (final pkg in logoApps)
             switch (ref.watch(appLogoProvider(pkg))) {
               AsyncData(value: final icon?) => ClipOval(
-                child: Image.memory(icon, width: 24, height: 24, cacheWidth: logoPx, cacheHeight: logoPx),
+                child: Image.memory(icon, width: MuseSize.appIcon, height: MuseSize.appIcon, cacheWidth: logoPx, cacheHeight: logoPx),
               ),
               AsyncLoading() => _loadingLogo,
               _ => const Icon(Icons.android_rounded),
@@ -279,7 +279,7 @@ class _AutoSelectionIssue extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 14, color: color),
+        Icon(icon, size: MuseIconSize.tiny, color: color),
         const Gap(4),
         Flexible(
           child: Text(text, style: TextStyle(color: color)),

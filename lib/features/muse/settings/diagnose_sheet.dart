@@ -144,7 +144,7 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
         children: [
           leading,
           const SizedBox(width: MuseSpace.s12),
-          SizedBox(width: 96, child: Text(title, style: MuseType.body(context).copyWith(color: mt.text2))),
+          SizedBox(width: MuseSize.labelColumnWide, child: Text(title, style: MuseType.body(context).copyWith(color: mt.text2))),
           Expanded(child: value),
         ],
       ),
@@ -201,7 +201,7 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
               if (_running)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: MuseSpace.s12),
-                  child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                  child: Center(child: SizedBox(width: MuseIconSize.small, height: MuseIconSize.small, child: CircularProgressIndicator(strokeWidth: 2))),
                 )
               else ...[
                 const SizedBox(height: MuseSpace.s16),
@@ -266,7 +266,7 @@ class _ServiceChip extends StatelessWidget {
       decoration: BoxDecoration(color: mt.inner, borderRadius: MuseRadius.smallAll),
       child: Row(
         children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+          Container(width: MuseSize.dot, height: MuseSize.dot, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
           const SizedBox(width: MuseSpace.s8),
           Expanded(
             child: Column(

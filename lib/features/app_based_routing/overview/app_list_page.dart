@@ -1,4 +1,5 @@
 import 'package:dartx/dartx.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -145,16 +146,16 @@ class AppListPage extends HookConsumerWidget with PresLogger {
     final chips = PreferredSize(
       preferredSize: const Size.fromHeight(48),
       child: SizedBox(
-        height: 48,
+        height: MuseSize.button,
         child: ListView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
           // centered rather than stretched to the row: a chip squeezed or stretched draws its label off center;
           // 6 dp above and below the label makes the 32 dp chip of M3, where Flutter's 8 dp gives about 37
           children: [
             Center(
               child: ChoiceChip(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s8),
                 label: Text(appBasedRouting.hideSysApps),
                 selected: hideSystemApps.value,
                 onSelected: (value) => hideSystemApps.value = value,
@@ -164,7 +165,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
               const Gap(8),
               Center(
                 child: ActionChip(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s8),
                   avatar: const Icon(Icons.undo_rounded),
                   label: Text(appBasedRouting.autoSelection.restore(n: removed.length)),
                   onPressed: restoreRemoved,
@@ -242,7 +243,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
           : null,
       body: displayedApps.when(
         data: (packages) => ListView.builder(
-          padding: const EdgeInsets.only(bottom: 88),
+          padding: const EdgeInsets.only(bottom: MuseSize.fabClearance),
           controller: scrollController,
           itemBuilder: (context, index) {
             final package = packages[index];
@@ -271,7 +272,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
               onChanged: (_) => ref.read(AppListProvider(mode).notifier).updatePkg(package.packageName),
               secondary: package.icon == null
                   ? null
-                  : Image.memory(package.icon!, width: 48, height: 48, cacheWidth: 48, cacheHeight: 48),
+                  : Image.memory(package.icon!, width: MuseSize.appIconLarge, height: MuseSize.appIconLarge, cacheWidth: 48, cacheHeight: 48),
             );
           },
           itemCount: packages.length,

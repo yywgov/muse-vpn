@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -18,7 +19,7 @@ class CustomAlertDialog extends HookConsumerWidget {
     return AlertDialog(
       title: title != null ? Text(title!) : null,
       content: SingleChildScrollView(
-        child: SizedBox(width: 468, child: Text(message, textDirection: TextDirection.ltr)),
+        child: SizedBox(width: MuseSize.dialogText, child: Text(message, textDirection: TextDirection.ltr)),
       ),
       actions: [
         TextButton(

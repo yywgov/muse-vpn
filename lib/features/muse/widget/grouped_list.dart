@@ -10,9 +10,9 @@ export 'package:hiddify/features/muse/widget/muse_tokens.dart';
 
 /// Brand colours, adapted for light and dark (1.3.0: thin names over [MuseTheme] / [MusePalette]).
 abstract final class MuseColors {
-  static const brand = MusePalette.brand;
-  static const brandLight = MusePalette.brandLight;
-  static const brandDeep = MusePalette.brandDeep;
+  static Color get brand => MusePalette.brand;
+  static Color get brandLight => MusePalette.brandLight;
+  static Color get brandDeep => MusePalette.brandDeep;
 
   /// Flat page colour (the top of the gradient), for app bars and system bars.
   static Color background(BuildContext context) => MuseTheme.of(context).bgTop;
@@ -137,7 +137,7 @@ class MuseSection extends StatelessWidget {
     for (var i = 0; i < children.length; i++) {
       items.add(children[i]);
       if (i != children.length - 1) {
-        items.add(Divider(height: 0.5, thickness: 0.5, indent: dividerIndent, color: theme.hairline));
+        items.add(Divider(height: MuseSize.hairline, thickness: MuseSize.hairline, indent: dividerIndent, color: theme.hairline));
       }
     }
     return Padding(
@@ -296,7 +296,7 @@ class MuseChoiceTile extends StatelessWidget {
       subtitle: subtitle,
       onTap: onTap,
       trailing: selected
-          ? const Icon(Icons.check_rounded, size: MuseIconSize.small, color: MusePalette.brand)
+          ? Icon(Icons.check_rounded, size: MuseIconSize.small, color: MusePalette.brand)
           : const SizedBox(width: MuseIconSize.small),
     );
   }

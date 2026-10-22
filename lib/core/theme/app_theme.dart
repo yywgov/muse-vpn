@@ -29,7 +29,7 @@ const museLightScrim = Color(0x52000000);
 class AppTheme {
   AppTheme(this.mode, this.fontFamily);
 
-  static const brand = MusePalette.brand;
+  static Color get brand => MusePalette.brand;
 
   // smooth on 120 Hz phones: the predictive-back aware Android transition
   static const _transitions = PageTransitionsTheme(
@@ -129,7 +129,7 @@ class AppTheme {
     return NavigationRailThemeData(
       backgroundColor: Colors.transparent,
       indicatorColor: Colors.transparent,
-      selectedIconTheme: const IconThemeData(size: MuseIconSize.regular, color: brand),
+      selectedIconTheme: IconThemeData(size: MuseIconSize.regular, color: brand),
       unselectedIconTheme: IconThemeData(size: MuseIconSize.regular, color: idle),
       selectedLabelTextStyle: TextStyle(fontFamily: _family, fontSize: 12, fontWeight: FontWeight.w600, color: brand),
       unselectedLabelTextStyle: TextStyle(fontFamily: _family, fontSize: 12, fontWeight: FontWeight.w500, color: idle),

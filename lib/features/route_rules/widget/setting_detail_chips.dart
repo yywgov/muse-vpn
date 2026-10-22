@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -66,14 +67,14 @@ class SettingDetailChips<T extends Object> extends HookConsumerWidget {
           }
         });
         return Container(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: MuseSpace.s8),
           height: 32,
           child: PlatformUtils.isDesktop
               ? Stack(
                   children: [
                     ListView.separated(
                       controller: controller,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
                       itemCount: values.length,
                       scrollDirection: Axis.horizontal,
                       itemBuilder: (context, index) => SettingDetailChip<T>(
@@ -95,7 +96,7 @@ class SettingDetailChips<T extends Object> extends HookConsumerWidget {
                 )
               : ListView.separated(
                   controller: controller,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
                   itemCount: values.length,
                   scrollDirection: Axis.horizontal,
                   itemBuilder: (context, index) => SettingDetailChip<T>(
@@ -155,10 +156,10 @@ class SettingDetailChip<T extends Object> extends ConsumerWidget {
       // TEMPORARY until the Flutter upgrade: dynamic_color 1.7 leaves surfaceContainerHighest unset, so it falls
       // back to the page color and the chip disappears; surfaceVariant is the same tone it does set
       // ignore: deprecated_member_use
-      decoration: BoxDecoration(color: theme.colorScheme.surfaceVariant, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: theme.colorScheme.surfaceVariant, borderRadius: MuseRadius.smallAll),
       child: isPackageName
           ? AndroidAppInfo(packageName: '$value')
-          : Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), child: valueByType(value, theme)),
+          : Padding(padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s4), child: valueByType(value, theme)),
     );
   }
 }
@@ -197,12 +198,12 @@ class AndroidAppInfo extends HookConsumerWidget {
       );
     } else if (app.hasError || (app.hasData && app.data == null)) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s4),
         child: Text(useEllipsis(), style: Theme.of(context).textTheme.labelMedium),
       );
     } else {
       return const Padding(
-        padding: EdgeInsets.all(4),
+        padding: EdgeInsets.all(MuseSpace.s4),
         child: AspectRatio(aspectRatio: 1.0, child: CircularProgressIndicator()),
       );
     }

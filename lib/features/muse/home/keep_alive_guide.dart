@@ -51,7 +51,7 @@ class _KeepAliveGuideDialog extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text('为防止系统清理后台导致断开，建议开启以下两项。'),
-          const SizedBox(height: 12),
+          const SizedBox(height: MuseSpace.s12),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(

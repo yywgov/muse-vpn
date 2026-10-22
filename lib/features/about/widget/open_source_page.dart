@@ -20,7 +20,7 @@ class OpenSourcePage extends ConsumerWidget {
           const MuseSection(
             children: [
               Padding(
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.all(MuseSpace.s16),
                 child: Text(
                   '穿云基于开源项目 Hiddify（hiddify-app / hiddify-core，内核为 sing-box）修改，'
                   '以 GNU 通用公共许可证第 3 版（GPLv3）发布，仅供学习交流，不得用于商业用途。\n\n'

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 
 class Skeleton extends StatelessWidget {
   const Skeleton({
@@ -29,7 +30,7 @@ class Skeleton extends StatelessWidget {
         width: width,
         height: height,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: MuseRadius.smallAll,
           shape: shape,
           color: theme.hintColor.withValues(alpha: .16),
         ),
