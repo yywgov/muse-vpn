@@ -20,18 +20,14 @@ class MuseDataPage extends HookConsumerWidget {
     final stats = ref.watch(statsNotifierProvider).asData?.value ?? SystemInfo.create();
     final activeProxy = running ? ref.watch(activeProxyNotifierProvider).valueOrNull : null;
 
-    Widget value(String text) => Text(text, style: Theme.of(context).textTheme.bodyMedium);
+    Widget value(String text) => Text(text, style: MuseType.body(context).copyWith(fontFeatures: MuseType.tabular));
 
-    return Scaffold(
-      backgroundColor: MuseColors.background(context),
-      appBar: AppBar(
-        backgroundColor: MuseColors.background(context),
-        scrolledUnderElevation: 0,
-        title: const Text('连接信息'),
-      ),
+    return MuseScaffold(
+      title: '连接信息',
       body: MuseGroupedBody(
         children: [
           MuseSection(
+            dividerIndent: MuseSpace.s16,
             header: '本次连接流量',
             children: [
               MuseTile(title: '已上传', trailing: value(stats.uplinkTotal.toInt().size())),
@@ -40,6 +36,7 @@ class MuseDataPage extends HookConsumerWidget {
             ],
           ),
           MuseSection(
+            dividerIndent: MuseSpace.s16,
             header: '连接',
             children: [
               MuseTile(

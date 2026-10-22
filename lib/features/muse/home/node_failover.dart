@@ -5,7 +5,9 @@
 
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/logic/failover_tracker.dart';
+import 'package:hiddify/features/muse/logic/keep_alive.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -22,7 +24,8 @@ String? museAutoGroupTag(OutboundGroup group) => group.items
     .firstOrNull;
 
 final museNodeFailoverProvider = Provider<void>((ref) {
-  if (!ref.watch(Preferences.nodeFailover) || !ref.watch(serviceRunningProvider)) {
+  // 1.3.0: step 2 of 智能保持连接 (logic/keep_alive.dart)
+  if (!ref.watch(Preferences.museKeepAlive) || !ref.watch(serviceRunningProvider)) {
     Future.microtask(() => ref.read(museFailoverFromProvider.notifier).state = null);
     return;
   }
@@ -48,6 +51,14 @@ final museNodeFailoverProvider = Provider<void>((ref) {
       ref.read(museFailoverFromProvider.notifier).state = tracker.failedFrom;
     }
     if (target == null) return;
+    // the user may have disconnected meanwhile: never act for them then
+    if (!ref.read(Preferences.startedByUser) || !ref.read(serviceRunningProvider)) return;
+    ChuanyunPlatform.recordDisconnect(
+      museKeepAliveLogLine(
+        MuseKeepAliveStep.switchNode,
+        tracker.failedFrom != null ? '所选节点连续测速失败，暂时换到自动最快' : '所选节点已恢复，换回',
+      ),
+    );
     switching = true;
     try {
       await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(group.tag, target);

@@ -43,7 +43,7 @@ abstract class ConfigOptions {
     overrideValue: Region.cn,
   );
 
-  /// 穿云: global routing mode (配置 / 代理 / 直连), applied on top of the route rules.
+  /// 穿云: global routing mode (规则 / 全局), applied on top of the route rules.
   static final museRouteMode = PreferencesNotifier.create<MuseRouteMode, String>(
     "muse-route-mode",
     MuseRouteMode.rule,

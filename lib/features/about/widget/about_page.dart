@@ -2,7 +2,8 @@
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 //
 // 1.1: 检查更新 downloads and installs the new version in the app; 复制版本信息 and the
-// Hiddify/GPL note are gone from here (the credit lives on the 开源许可 page).
+// GPL note are gone from here (the credit lives on the 开源许可 page).
+// 1.3.0: 导出日志 moved into 诊断 (设置 › 诊断 / 首页 出口 IP tile).
 
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -11,7 +12,6 @@ import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
-import 'package:hiddify/features/muse/data/diagnostics.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
@@ -25,7 +25,6 @@ class AboutPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appInfo = ref.watch(appInfoProvider).requireValue;
-    final theme = Theme.of(context);
     final update = ref.watch(museUpdaterProvider);
     final toast = ref.read(inAppNotificationControllerProvider);
 
@@ -65,7 +64,7 @@ class AboutPage extends HookConsumerWidget {
             .read(dialogNotifierProvider.notifier)
             .showConfirmation(
               title: '需要先卸载旧版（仅此一次）',
-              message: '之前的版本签名不固定，系统不允许直接覆盖安装。请先在「订阅/配置」里复制好订阅链接，'
+              message: '之前的版本签名不固定，系统不允许直接覆盖安装。请先在「订阅」里复制好订阅链接，'
                   '然后卸载穿云，再安装刚下载的新版。从这个版本起签名固定，以后点更新就能直接覆盖安装。',
               positiveBtnTxt: '打开安装包',
             );
@@ -87,20 +86,17 @@ class AboutPage extends HookConsumerWidget {
       body: MuseGroupedBody(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
+            padding: const EdgeInsets.symmetric(vertical: MuseSpace.s24),
             child: Column(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: MuseRadius.cardAll,
                   child: Assets.images.logo.svg(width: 72, height: 72),
                 ),
-                const Gap(12),
-                Text(Constants.appName, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
-                const Gap(4),
-                Text(
-                  '版本 ${appInfo.presentVersion}',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: MuseColors.secondaryText(context)),
-                ),
+                const Gap(MuseSpace.s12),
+                Text(Constants.appName, style: MuseType.title(context)),
+                const Gap(MuseSpace.s4),
+                Text('版本 ${appInfo.presentVersion}', style: MuseType.caption(context)),
               ],
             ),
           ),
@@ -121,22 +117,6 @@ class AboutPage extends HookConsumerWidget {
                 title: '开源许可 · 源代码',
                 chevron: true,
                 onTap: () => context.goNamed('openSource'),
-              ),
-            ],
-          ),
-          // 穿云: deliberately low-key — only needed when reporting a connection problem
-          MuseSection(
-            footer: '内含断开原因与最近日志，已去掉订阅链接、密码、UUID 和服务器地址，仅在你主动分享时才会发出。',
-            children: [
-              MuseTile(
-                leading: const Icon(Icons.bug_report_outlined),
-                title: '导出日志（已脱敏）',
-                onTap: () async {
-                  final ok = await MuseDiagnostics.export(ref);
-                  if (!ok && context.mounted) {
-                    ref.read(inAppNotificationControllerProvider).showErrorToast('导出失败');
-                  }
-                },
               ),
             ],
           ),

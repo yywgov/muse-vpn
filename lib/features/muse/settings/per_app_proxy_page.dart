@@ -42,6 +42,7 @@ class PerAppProxyPage extends ConsumerWidget {
           ),
           if (mode != null) ...[
             MuseSection(
+              dividerIndent: MuseSpace.s16,
               header: '模式',
               children: [
                 MuseChoiceTile(

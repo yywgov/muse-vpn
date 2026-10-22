@@ -1,108 +1,84 @@
-// 穿云 - shared presentation widgets (style B: navy gradient, large rounded cards).
+// 穿云 - shared presentation widgets (1.3.0: built on muse_tokens.dart).
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/features/muse/logic/latency.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 
-/// Brand colours, adapted for light and dark.
+export 'package:hiddify/features/muse/widget/muse_tokens.dart';
+
+/// Brand colours, adapted for light and dark (1.3.0: thin names over [MuseTheme] / [MusePalette]).
 abstract final class MuseColors {
-  static const brand = Color(0xFF2F6BFF);
-  static const brandLight = Color(0xFF3B8BFF);
-  static const brandDeep = Color(0xFF1A4FD6);
-
-  static bool _dark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
-
-  /// True-black (纯黑 / OLED) mode: the theme paints a pure black scaffold.
-  static bool isTrueBlack(BuildContext context) {
-    final theme = Theme.of(context);
-    return theme.brightness == Brightness.dark && theme.scaffoldBackgroundColor == Colors.black;
-  }
+  static const brand = MusePalette.brand;
+  static const brandLight = MusePalette.brandLight;
+  static const brandDeep = MusePalette.brandDeep;
 
   /// Flat page colour (the top of the gradient), for app bars and system bars.
-  static Color background(BuildContext context) => isTrueBlack(context)
-      ? Colors.black
-      : _dark(context)
-          ? const Color(0xFF0E1A3A)
-          : const Color(0xFFF3F6FB);
+  static Color background(BuildContext context) => MuseTheme.of(context).bgTop;
 
-  static LinearGradient pageGradient(BuildContext context) => isTrueBlack(context)
-      ? const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.black, Colors.black],
-        )
-      : _dark(context)
-      ? const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0E1A3A), Color(0xFF0A1024)],
-        )
-      : const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFF3F6FB), Color(0xFFEAF0FA)],
-        );
+  static LinearGradient pageGradient(BuildContext context) => MuseTheme.of(context).pageGradient;
 
-  static Color card(BuildContext context) => isTrueBlack(context)
-      ? const Color(0xFF151515)
-      : _dark(context)
-          ? const Color(0xFF16213F)
-          : Colors.white;
+  static Color card(BuildContext context) => MuseTheme.of(context).card;
 
-  static Color selectedCard(BuildContext context) => isTrueBlack(context)
-      ? const Color(0xFF1A2238)
-      : _dark(context)
-          ? const Color(0xFF1B2E63)
-          : const Color(0xFFEAF1FF);
+  static Color selectedCard(BuildContext context) => MuseTheme.of(context).selected;
 
   /// Subtle filled surface inside a card (chips, inner tiles).
-  static Color innerSurface(BuildContext context) => isTrueBlack(context)
-      ? const Color(0xFF1F1F1F)
-      : _dark(context)
-          ? const Color(0xFF1E2A4D)
-          : const Color(0xFFEEF2F8);
+  static Color innerSurface(BuildContext context) => MuseTheme.of(context).inner;
 
-  static Color secondaryText(BuildContext context) =>
-      _dark(context) ? const Color(0xFF8A94B3) : const Color(0xFF6B7280);
+  static Color secondaryText(BuildContext context) => MuseTheme.of(context).text2;
 
-  static Color separator(BuildContext context) =>
-      _dark(context) ? const Color(0x14FFFFFF) : const Color(0xFFE5E7EB);
+  static Color tertiaryText(BuildContext context) => MuseTheme.of(context).text3;
 
-  /// Latency colour (穿云 1.2.1, see museLatencyLevel): green < 300 ms, yellow 300–600 ms,
+  static Color separator(BuildContext context) => MuseTheme.of(context).hairline;
+
+  /// Latency colour (see museLatencyLevel): green < 300 ms, orange 300–600 ms,
   /// red > 600 ms or timeout, grey while not tested yet.
   static Color delay(BuildContext context, int delay) => switch (museLatencyLevel(delay)) {
-    MuseLatencyLevel.good => const Color(0xFF22C55E),
-    MuseLatencyLevel.fair => const Color(0xFFEAB308),
-    MuseLatencyLevel.bad => const Color(0xFFEF4444),
-    MuseLatencyLevel.unknown => secondaryText(context),
+    MuseLatencyLevel.good => MusePalette.green,
+    MuseLatencyLevel.fair => MusePalette.orange,
+    MuseLatencyLevel.bad => MusePalette.red,
+    MuseLatencyLevel.unknown => MuseTheme.of(context).text3,
   };
 }
 
-/// A page with the brand gradient behind a transparent app bar.
+/// A page on the cloud background behind a transparent app bar. [large] = a tab's root page:
+/// left-aligned large title.
 class MuseScaffold extends StatelessWidget {
-  const MuseScaffold({super.key, this.title, this.titleWidget, this.actions, required this.body, this.leading});
+  const MuseScaffold({
+    super.key,
+    this.title,
+    this.titleWidget,
+    this.actions,
+    required this.body,
+    this.leading,
+    this.large = false,
+  });
 
   final String? title;
   final Widget? titleWidget;
   final List<Widget>? actions;
   final Widget? leading;
   final Widget body;
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(gradient: MuseColors.pageGradient(context)),
+    return MuseBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
           scrolledUnderElevation: 0,
+          centerTitle: large ? false : null,
+          toolbarHeight: large ? 64 : null,
+          titleSpacing: large ? MuseSpace.page(context) : null,
           // 1.2.1: never guess the status bar icons from the transparent background
           systemOverlayStyle: museSystemOverlayStyle(Theme.of(context).brightness),
           leading: leading,
-          title: titleWidget ?? (title == null ? null : Text(title!)),
+          title: titleWidget ??
+              (title == null ? null : Text(title!, style: large ? MuseType.largeTitle(context) : null)),
           actions: actions,
         ),
         body: body,
@@ -122,9 +98,9 @@ class MuseGroupedBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
+        constraints: const BoxConstraints(maxWidth: 720),
         child: ListView(
-          padding: padding ?? const EdgeInsets.only(top: 4, bottom: 32),
+          padding: padding ?? const EdgeInsets.only(top: MuseSpace.s4, bottom: MuseSpace.s32),
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           children: children,
         ),
@@ -133,56 +109,66 @@ class MuseGroupedBody extends StatelessWidget {
   }
 }
 
-/// One rounded card with an optional small header above and footer below.
+/// One rounded card with an optional small header above and footer below (iOS-like group).
+/// Rows are separated by hairline dividers inset to the label column.
 class MuseSection extends StatelessWidget {
-  const MuseSection({super.key, this.header, this.headerTrailing, this.footer, required this.children});
+  const MuseSection({
+    super.key,
+    this.header,
+    this.headerTrailing,
+    this.footer,
+    required this.children,
+    this.dividerIndent = 52,
+  });
 
   final String? header;
   final Widget? headerTrailing;
   final String? footer;
   final List<Widget> children;
 
+  /// Where the hairline starts (label column of a row with a leading icon).
+  final double dividerIndent;
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final secondary = MuseColors.secondaryText(context);
+    final theme = MuseTheme.of(context);
+    final margin = MuseSpace.page(context);
     final items = <Widget>[];
     for (var i = 0; i < children.length; i++) {
       items.add(children[i]);
       if (i != children.length - 1) {
-        items.add(Divider(height: 1, thickness: 1, indent: 16, endIndent: 16, color: MuseColors.separator(context)));
+        items.add(Divider(height: 0.5, thickness: 0.5, indent: dividerIndent, color: theme.hairline));
       }
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: margin, vertical: MuseSpace.s8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (header != null || headerTrailing != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 0, 6),
+              padding: const EdgeInsets.fromLTRB(MuseSpace.s16, MuseSpace.s4, 0, MuseSpace.s8),
               child: Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      header ?? '',
-                      style: theme.textTheme.labelLarge?.copyWith(color: secondary, letterSpacing: 0.3),
-                    ),
-                  ),
+                  Expanded(child: Text(header ?? '', style: MuseType.caption(context))),
                   ?headerTrailing,
                 ],
               ),
             ),
-          Material(
-            color: MuseColors.card(context),
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: Column(mainAxisSize: MainAxisSize.min, children: items),
+          DecoratedBox(
+            decoration: theme.cardDecoration(),
+            child: ClipRRect(
+              borderRadius: MuseRadius.cardAll,
+              child: Material(
+                type: MaterialType.transparency,
+                child: Column(mainAxisSize: MainAxisSize.min, children: items),
+              ),
+            ),
           ),
           if (footer != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-              child: Text(footer!, style: theme.textTheme.bodySmall?.copyWith(color: secondary)),
+              padding: const EdgeInsets.fromLTRB(MuseSpace.s16, MuseSpace.s8, MuseSpace.s16, 0),
+              child: Text(footer!, style: MuseType.caption(context)),
             ),
         ],
       ),
@@ -190,7 +176,23 @@ class MuseSection extends StatelessWidget {
   }
 }
 
-/// A row with a title, a grey explanation and an optional trailing widget.
+/// Leading icon of a settings row: one size, one colour.
+class MuseRowIcon extends StatelessWidget {
+  const MuseRowIcon(this.icon, {super.key, this.color});
+
+  final IconData icon;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) =>
+      Icon(icon, size: MuseIconSize.small, color: color ?? MuseTheme.of(context).text2);
+}
+
+Widget? _leadingOf(Widget? leading) => leading is Icon && leading.size == null && leading.color == null && leading.icon != null
+    ? MuseRowIcon(leading.icon!)
+    : leading;
+
+/// A row with a title, an optional grey line and an optional trailing widget.
 class MuseTile extends StatelessWidget {
   const MuseTile({
     super.key,
@@ -213,26 +215,35 @@ class MuseTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = MuseTheme.of(context);
     return ListTile(
-      leading: leading,
-      title: Text(title),
+      contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
+      minLeadingWidth: MuseIconSize.small,
+      horizontalTitleGap: MuseSpace.s16,
+      minVerticalPadding: MuseSpace.s12,
+      leading: _leadingOf(leading),
+      title: Text(title, style: MuseType.body(context)),
       subtitle: subtitle == null
           ? null
-          : Text(
-              subtitle!,
-              maxLines: subtitleMaxLines,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(color: MuseColors.secondaryText(context)),
+          : Text(subtitle!, maxLines: subtitleMaxLines, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
+      trailing: trailing == null && !chevron
+          ? null
+          : DefaultTextStyle.merge(
+              style: MuseType.body(context).copyWith(color: theme.text2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ?trailing,
+                  if (chevron) Icon(Icons.chevron_right_rounded, size: MuseIconSize.small, color: theme.text3),
+                ],
+              ),
             ),
-      trailing:
-          trailing ?? (chevron ? Icon(Icons.chevron_right_rounded, color: MuseColors.secondaryText(context)) : null),
       onTap: onTap,
     );
   }
 }
 
-/// A switch row with a grey explanation.
+/// A switch row.
 class MuseSwitchTile extends StatelessWidget {
   const MuseSwitchTile({
     super.key,
@@ -251,31 +262,30 @@ class MuseSwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return SwitchListTile.adaptive(
-      secondary: leading,
-      title: Text(title),
-      subtitle: subtitle == null
-          ? null
-          : Text(subtitle!, style: theme.textTheme.bodySmall?.copyWith(color: MuseColors.secondaryText(context))),
+      contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
+      secondary: _leadingOf(leading),
+      title: Text(title, style: MuseType.body(context)),
+      subtitle: subtitle == null ? null : Text(subtitle!, style: MuseType.caption(context)),
+      activeTrackColor: MusePalette.brand,
       value: value,
       onChanged: onChanged,
     );
   }
 }
 
-/// A radio-like row: title + grey explanation, check mark when selected.
+/// A radio-like row: title + optional grey line, check mark when selected.
 class MuseChoiceTile extends StatelessWidget {
   const MuseChoiceTile({
     super.key,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     required this.selected,
     required this.onTap,
   });
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final bool selected;
   final VoidCallback onTap;
 
@@ -286,8 +296,8 @@ class MuseChoiceTile extends StatelessWidget {
       subtitle: subtitle,
       onTap: onTap,
       trailing: selected
-          ? Icon(Icons.check_rounded, color: Theme.of(context).colorScheme.primary)
-          : const SizedBox(width: 24),
+          ? const Icon(Icons.check_rounded, size: MuseIconSize.small, color: MusePalette.brand)
+          : const SizedBox(width: MuseIconSize.small),
     );
   }
 }

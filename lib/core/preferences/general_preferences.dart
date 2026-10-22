@@ -21,10 +21,12 @@ abstract class Preferences {
   // 穿云: switch the main group to 自动最快 when the hand-picked node stops answering (always on since 1.1)
   static final nodeFailover = PreferencesNotifier.create<bool, bool>("node_failover", true, overrideValue: true);
 
-  // 穿云 1.2.2: nodes that keep timing out fold into 「不可用」 on 首页 (and come back by themselves)
+  // 穿云 1.2.2: nodes that keep timing out fold into 「不可用」 (and come back by themselves).
+  // 1.3.0: part of 智能保持连接 (museKeepAlive); this key is no longer read
   static final hideBadNodes = PreferencesNotifier.create<bool, bool>("hide_bad_nodes", true);
 
-  // 穿云 1.2.3: 首页「出口」card (exit IP/region + Google/ChatGPT/Netflix), both platforms
+  // 穿云 1.2.3: 首页「出口」card (exit IP/region + Google/ChatGPT/Netflix), both platforms.
+  // 1.3.0: no toggle; follows whether the 出口 IP tile is shown
   static final museExitCheck = PreferencesNotifier.create<bool, bool>("muse_exit_check", true);
 
   // 穿云 1.2.3 Windows: Ctrl+Alt+P connects / disconnects from anywhere
@@ -37,7 +39,19 @@ abstract class Preferences {
   static final museAdBlockLevel = PreferencesNotifier.create<String, String>("muse_ad_block_level", "gentle");
 
   // 穿云 1.2.8: hide 「剩余流量 / 到期 / 官网 / 套餐」 lines that subscriptions list as nodes
-  static final museHideInfoNodes = PreferencesNotifier.create<bool, bool>("muse_hide_info_nodes", true);
+  // 1.3.0: always on, the toggle is gone
+  static final museHideInfoNodes = PreferencesNotifier.create<bool, bool>("muse_hide_info_nodes", true, overrideValue: true);
+
+  // 穿云 1.3.0: 智能保持连接 — one switch for failover, timed-out node folding, the core watchdog
+  // and the Windows connection keeper (lib/features/muse/logic/keep_alive.dart)
+  static final museKeepAlive = PreferencesNotifier.create<bool, bool>("muse_keep_alive", true);
+
+  // 穿云 1.3.0: 首页 dashboard tiles — order and hidden ones (comma lists, logic/home_tiles.dart)
+  static final museHomeTileOrder = PreferencesNotifier.create<String, String>("muse_home_tile_order", "");
+  static final museHomeTilesHidden = PreferencesNotifier.create<String, String>("muse_home_tiles_hidden", "");
+
+  // 穿云 1.3.0: last node list of the active subscription, for picking nodes while disconnected
+  static final museNodeCache = PreferencesNotifier.create<String, String>("muse_node_cache", "");
 
   // 穿云 1.2.8: favourite nodes (one tag per line), pinned to the top
   static final museFavoriteNodes = PreferencesNotifier.create<String, String>("muse_favorite_nodes", "");

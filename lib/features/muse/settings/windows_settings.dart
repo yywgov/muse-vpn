@@ -41,10 +41,10 @@ class WindowsSettingsSection extends ConsumerWidget {
         MuseTile(
           leading: const Icon(Icons.swap_horiz_rounded),
           title: '运行模式',
-          subtitle: mode == ServiceMode.tun ? 'TUN' : '系统代理',
           trailing: tunNeedsAdmin
-              ? const Icon(Icons.error_rounded, color: Colors.orange, size: 20)
-              : const Icon(Icons.chevron_right_rounded),
+              ? const Icon(Icons.error_rounded, color: MusePalette.orange, size: MuseIconSize.small)
+              : Text(mode == ServiceMode.tun ? 'TUN' : '系统代理'),
+          chevron: true,
           onTap: () async {
             final dialogs = ref.read(dialogNotifierProvider.notifier);
             final picked = await dialogs.showSettingPicker<ServiceMode>(
@@ -94,15 +94,14 @@ class WindowsSettingsSection extends ConsumerWidget {
         // 1.2.3
         MuseSwitchTile(
           leading: const Icon(Icons.keyboard_rounded),
-          title: '快捷键连接/断开',
-          subtitle: museHotkeyLabel,
+          title: '快捷键 $museHotkeyLabel',
           value: ref.watch(Preferences.museHotkey),
           onChanged: (v) => ref.read(Preferences.museHotkey.notifier).update(v),
         ),
         MuseTile(
           leading: const Icon(Icons.close_rounded),
           title: '关闭窗口时',
-          subtitle: closing.present(t),
+          trailing: Text(closing.present(t)),
           chevron: true,
           onTap: () async {
             final selected = await ref.read(dialogNotifierProvider.notifier).showActionAtClosing(selected: closing);

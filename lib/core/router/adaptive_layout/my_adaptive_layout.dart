@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
-import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// 穿云 desktop: widest the page column gets on a wide or maximized window.
-const desktopContentMaxWidth = 680.0;
+const desktopContentMaxWidth = 760.0;
+
+/// 穿云 1.3.0: 首页 gets more room (tile grid + node column).
+const desktopHomeMaxWidth = 1280.0;
 
 class MyAdaptiveLayout extends HookConsumerWidget {
   const MyAdaptiveLayout({
@@ -26,7 +29,6 @@ class MyAdaptiveLayout extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
     // focus switch management
     final primaryFocusHash = useState<int?>(null);
     final navScopeNode = useFocusScopeNode();
@@ -93,56 +95,12 @@ class MyAdaptiveLayout extends HookConsumerWidget {
           const NavigationNotification(canHandlePop: true).dispatch(context);
           return true;
         },
-        child: Material(
-          child: Scaffold(
-            body: isMobileBreakpoint
-                ? navigationShell
-                : Row(
-                    children: [
-                      FocusScope(
-                        node: navScopeNode,
-                        child: NavigationRail(
-                          // 穿云 desktop: compact rail (icon + label), no side-bar stats
-                          labelType: NavigationRailLabelType.all,
-                          destinations: _navRailDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
-                          selectedIndex: navigationShell.currentIndex,
-                          onDestinationSelected: (index) => _onTap(context, index),
-                        ),
-                      ),
-                      // the pages are laid out for a phone-width column: keep them at a readable
-                      // width, centered, on wide or maximized windows
-                      // (the page gradient continues behind the column, so it doesn't look like a panel)
-                      Expanded(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(gradient: MuseColors.pageGradient(context)),
-                          // 穿云 1.2: one thin scrollbar at the window's right edge, shown while
-                          // scrolling, instead of a thick always-on bar inside the page column
-                          child: MuseEdgeScrollbar(
-                            child: Align(
-                              alignment: Alignment.topCenter,
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: desktopContentMaxWidth),
-                                child: navigationShell,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-            bottomNavigationBar: isMobileBreakpoint
-                ? FocusScope(
-                    node: navScopeNode,
-                    child: NavigationBar(
-                      selectedIndex: navigationShell.currentIndex < mobileBranches.length
-                          ? navigationShell.currentIndex
-                          : 0,
-                      destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
-                      onDestinationSelected: (index) => _onTap(context, index),
-                    ),
-                  )
-                : null,
-          ),
+        child: MuseShellFrame(
+          isMobile: isMobileBreakpoint,
+          currentIndex: navigationShell.currentIndex,
+          navScopeNode: navScopeNode,
+          onTap: (index) => _onTap(context, index),
+          child: navigationShell,
         ),
       ),
     );
@@ -153,19 +111,104 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
   }
 
-  // 穿云: 首页 / 配置 / 设置 on every form factor.
-  List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => _mobileActions;
+}
 
-  static final _mobileActions = [
-    ShellRouteAction(Icons.home_rounded, '首页'),
-    ShellRouteAction(Icons.description_rounded, '配置'),
-    ShellRouteAction(Icons.settings_rounded, '设置'),
-  ];
+/// 穿云 1.3.0: 首页 / 节点 / 订阅 / 设置 (icon + label; the selected one only changes colour).
+final museShellActions = [
+  ShellRouteAction(Icons.home_outlined, '首页'),
+  ShellRouteAction(Icons.language_rounded, '节点'),
+  ShellRouteAction(Icons.link_rounded, '订阅'),
+  ShellRouteAction(Icons.settings_outlined, '设置'),
+];
 
-  List<NavigationDestination> _navDests(List<ShellRouteAction> actions) =>
-      actions.map((e) => NavigationDestination(icon: Icon(e.icon), label: e.title)).toList();
-  List<NavigationRailDestination> _navRailDests(List<ShellRouteAction> actions) =>
-      actions.map((e) => NavigationRailDestination(icon: Icon(e.icon), label: Text(e.title))).toList();
+/// The visible shell: bottom navigation on a phone, a rail plus one background and a centred
+/// content column on the desktop. Split from [MyAdaptiveLayout] so it can be rendered on its own.
+class MuseShellFrame extends ConsumerWidget {
+  const MuseShellFrame({
+    super.key,
+    required this.isMobile,
+    required this.currentIndex,
+    required this.onTap,
+    required this.child,
+    this.navScopeNode,
+  });
+
+  final bool isMobile;
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final Widget child;
+  final FocusScopeNode? navScopeNode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // a subscription link waits on the clipboard: dot on 订阅
+    final offer = ref.watch(museClipboardOfferProvider) != null;
+    Widget icon(int i) {
+      final a = museShellActions[i];
+      final ic = Icon(a.icon);
+      return i == 2 && offer ? Badge(smallSize: 8, backgroundColor: MusePalette.brand, child: ic) : ic;
+    }
+
+    final index = currentIndex < museShellActions.length ? currentIndex : 0;
+    if (isMobile) {
+      return Material(
+        child: Scaffold(
+          body: child,
+          bottomNavigationBar: FocusScope(
+            node: navScopeNode,
+            child: NavigationBar(
+              selectedIndex: index,
+              destinations: [
+                for (var i = 0; i < museShellActions.length; i++)
+                  NavigationDestination(icon: icon(i), label: museShellActions[i].title),
+              ],
+              onDestinationSelected: onTap,
+            ),
+          ),
+        ),
+      );
+    }
+    // 首页 uses the width for 3–4 tile columns and the side node list; other pages stay readable
+    final maxWidth = index == 0 ? desktopHomeMaxWidth : desktopContentMaxWidth;
+    return Material(
+      child: MuseBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Row(
+            children: [
+              FocusScope(
+                node: navScopeNode,
+                child: NavigationRail(
+                  labelType: NavigationRailLabelType.all,
+                  minWidth: 80,
+                  groupAlignment: -0.9,
+                  destinations: [
+                    for (var i = 0; i < museShellActions.length; i++)
+                      NavigationRailDestination(icon: icon(i), label: Text(museShellActions[i].title)),
+                  ],
+                  selectedIndex: index,
+                  onDestinationSelected: onTap,
+                ),
+              ),
+              Expanded(
+                // 穿云 1.2: one thin scrollbar at the window's right edge, shown while scrolling
+                child: MuseEdgeScrollbar(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: AnimatedContainer(
+                      duration: MuseMotion.fast,
+                      constraints: BoxConstraints(maxWidth: maxWidth),
+                      child: child,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// 穿云 desktop: the scrollbar of whatever page is showing, drawn at the window's right edge.

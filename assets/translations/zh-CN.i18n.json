@@ -53,7 +53,7 @@
     "dashboard": "仪表盘",
     "disable": "关闭",
     "psiphon": "Psiphon",
-    "profile": "配置",
+    "profile": "订阅",
     "file": "文件",
     "interval": {
       "day": {
@@ -123,12 +123,12 @@
       }
     },
     "profiles": {
-      "title": "配置文件",
-      "add": "添加配置文件",
-      "update": "更新配置文件",
-      "viewAllProfiles": "查看所有配置文件",
-      "activeProfileName": "当前配置文件：“${name}”",
-      "nonActiveProfileName": "选择“${name}”作为当前配置文件",
+      "title": "订阅",
+      "add": "添加订阅",
+      "update": "更新订阅",
+      "viewAllProfiles": "查看所有订阅",
+      "activeProfileName": "当前订阅：“${name}”",
+      "nonActiveProfileName": "选择“${name}”作为当前订阅",
       "freeSubNotFound": "未找到免费订阅",
       "freeSubNotFoundForRegion": "未找到“${region}”地区的免费订阅",
       "failedToLoad": "加载失败",
@@ -140,37 +140,37 @@
       },
       "msg": {
         "save": {
-          "success": "配置文件已保存"
+          "success": "订阅已保存"
         },
         "invalidUrl": "无效的链接",
         "add": {
-          "failure": "添加配置文件失败"
+          "failure": "添加订阅失败"
         },
         "update": {
-          "success": "配置文件已更新",
-          "failure": "更新配置文件失败",
+          "success": "订阅已更新",
+          "failure": "更新订阅失败",
           "failureNamed": "更新“${name}”失败",
           "bulkSuccess(plural, param=count)": {
-            "other": "已更新 $count 个配置文件"
+            "other": "已更新 $count 个订阅"
           },
           "bulkPartial": "${success} 个已更新\n${failed} 个失败：${names}"
         },
         "delete": {
-          "success": "配置文件已删除"
+          "success": "订阅已删除"
         }
       }
     },
     "profileDetails": {
-      "title": "配置文件",
+      "title": "订阅",
       "lastUpdate": "最后更新",
       "form": {
-        "nameHint": "配置文件名称",
+        "nameHint": "订阅名称",
         "emptyName": "名称为必填项",
         "invalidUrl": "无效的链接",
         "urlHint": "完整的订阅链接",
         "disableAutoUpdate": "关闭自动更新",
         "autoUpdateInterval": "自动更新间隔",
-        "loading": "正在添加配置文件…"
+        "loading": "正在添加订阅…"
       }
     },
     "logs": {
@@ -539,7 +539,7 @@
           }
         },
         "profile": {
-          "selectProfile": "选择配置",
+          "selectProfile": "选择订阅",
           "conduitPairingId": "Conduit 配对 ID"
         }
       }
@@ -610,8 +610,8 @@
       },
       "profile": {
         "delete": {
-          "title": "删除配置文件",
-          "msg": "删除此配置文件吗？此操作无法撤销。"
+          "title": "删除订阅",
+          "msg": "删除此订阅吗？此操作无法撤销。"
         }
       },
       "appList": {
@@ -626,8 +626,8 @@
         }
       },
       "addProfileByDeepLinkWarning": {
-        "title": "添加配置？",
-        "message": "来自“${host}”的外部链接想要添加新配置。要导入吗？"
+        "title": "添加订阅？",
+        "message": "来自“${host}”的外部链接想要添加新订阅。要导入吗？"
       },
       "importRouteRuleByDeepLinkWarning": {
         "title": "导入路由规则？",
@@ -640,7 +640,7 @@
       "disable": "不再显示"
     },
     "noActiveProfile": {
-      "title": "还没有配置",
+      "title": "还没有订阅",
       "msg": "请先添加订阅链接或节点配置：可粘贴订阅链接、从剪贴板导入，或扫描二维码。"
     },
     "unknownDomainsWarning": {
@@ -700,7 +700,7 @@
     },
     "profiles": {
       "unexpected": "意外错误",
-      "notFound": "未找到配置文件",
+      "notFound": "未找到订阅",
       "invalidConfig": "配置无效",
       "invalidUrl": "链接无效",
       "canceledByUser": "用户已取消"

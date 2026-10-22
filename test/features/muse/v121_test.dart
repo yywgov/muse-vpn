@@ -52,7 +52,7 @@ void main() {
       expect(museGroupIconKind(type: 'Balancer', name: 'lowest', selectedDisplay: 'PPFlight-Direct'), MuseGroupIcon.autoFastest);
       expect(museGroupIconKind(type: 'URLTest', name: 'auto'), MuseGroupIcon.autoFastest);
       expect(museGroupIconKind(type: 'Selector', name: 'select'), MuseGroupIcon.manual);
-      final home = File('lib/features/muse/home/muse_home_page.dart').readAsStringSync();
+      final home = File('lib/features/muse/nodes/node_list.dart').readAsStringSync();
       expect(home, contains('MuseGroupIcon.loadBalance => Icons.balance_rounded'));
     });
     test('负载均衡 subtitle no longer repeats its name', () {
@@ -61,7 +61,7 @@ void main() {
       expect(s, isNot(contains('负载均衡')));
     });
     test('node subtitles keep the protocol name', () {
-      final home = File('lib/features/muse/home/muse_home_page.dart').readAsStringSync();
+      final home = File('lib/features/muse/nodes/node_list.dart').readAsStringSync();
       expect(home, contains(': museProtocolName(proxy.type)'));
     });
   });

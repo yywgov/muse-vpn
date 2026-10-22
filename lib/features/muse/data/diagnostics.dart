@@ -25,7 +25,16 @@ abstract final class MuseDiagnostics {
     }
   }
 
-  static Future<void> _export(WidgetRef ref) async {
+  /// 1.3.0: the same redacted text, for 诊断 › 复制日志.
+  static Future<String?> redactedText(WidgetRef ref) async {
+    try {
+      return museRedact(await _build(ref));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String> _build(WidgetRef ref) async {
     final appInfo = ref.read(appInfoProvider).valueOrNull;
     final native = Platform.isAndroid ? await ChuanyunPlatform.nativeDiagnostics() : await _desktopDiagnostics();
     final now = DateTime.now();
@@ -45,6 +54,12 @@ abstract final class MuseDiagnostics {
     for (final r in logRing.records) {
       b.writeln(formatRecord(r));
     }
+    return b.toString();
+  }
+
+  static Future<void> _export(WidgetRef ref) async {
+    final text = await _build(ref);
+    final now = DateTime.now();
     // 穿云 Windows: no share sheet worth using — save to 下载 and show the file in Explorer
     final dir = Platform.isWindows
         ? (await getDownloadsDirectory() ?? await getTemporaryDirectory())
@@ -52,7 +67,7 @@ abstract final class MuseDiagnostics {
     final stamp =
         '${now.year}${_two(now.month)}${_two(now.day)}-${_two(now.hour)}${_two(now.minute)}${_two(now.second)}';
     final file = File('${dir.path}/chuanyun-diagnostics-$stamp.txt');
-    await file.writeAsString(museRedact(b.toString()));
+    await file.writeAsString(museRedact(text));
     if (Platform.isWindows) {
       await Process.start('explorer.exe', ['/select,', file.path]);
       return;

@@ -12,7 +12,7 @@ import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// Tags folded into 「不可用」 right now (empty when the option is off or not connected).
+/// Tags folded into 「不可用」 right now (empty when 智能保持连接 is off).
 final museHiddenNodesProvider = StateProvider<Set<String>>((ref) => const {});
 
 /// One tracker per profile: kept across reconnects, so a dead node does not come back to the
@@ -33,7 +33,8 @@ final museBadNodesProvider = Provider<void>((ref) {
     });
   }
 
-  if (!ref.watch(Preferences.hideBadNodes)) {
+  // 1.3.0: part of 智能保持连接
+  if (!ref.watch(Preferences.museKeepAlive)) {
     tracker.reset();
     publish(const {});
     return;

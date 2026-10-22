@@ -1,4 +1,6 @@
-// 穿云 - 设置 > 隐私: hide the launcher icon, stay out of recents, quiet notification.
+// 穿云 - 设置 › 隐私与后台 (Android): hide the launcher icon, stay out of recents, quiet
+// notification, and the 后台运行 / 自启动 rows while they still need doing.
+// 1.3.0: one group inside 设置 instead of its own page.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
@@ -7,10 +9,11 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
+import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class PrivacyPage extends HookConsumerWidget {
-  const PrivacyPage({super.key});
+class MusePrivacySection extends HookConsumerWidget {
+  const MusePrivacySection({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -42,49 +45,54 @@ class PrivacyPage extends HookConsumerWidget {
 
     final hideNotification = ref.watch(Preferences.hideNotification);
     final excludeRecents = ref.watch(Preferences.excludeFromRecents);
+    final batteryIgnored = ref.watch(batteryOptimizationNotifierProvider).valueOrNull;
+    final needsBattery = batteryIgnored == false;
+    final needsAutostart = !ref.watch(Preferences.autostartVisited);
 
-    return MuseScaffold(
-      title: '隐私',
-      body: MuseGroupedBody(
-        children: [
-          MuseSection(
-            children: [
-              MuseSwitchTile(
-                leading: const Icon(Icons.visibility_off_rounded),
-                title: '隐藏桌面图标',
-                value: iconHidden.value ?? false,
-                onChanged: iconHidden.value == null ? null : toggleIcon,
-              ),
-              MuseSwitchTile(
-                leading: const Icon(Icons.layers_clear_rounded),
-                title: '不在最近任务显示',
-                value: excludeRecents,
-                onChanged: (value) async {
-                  await ref.read(Preferences.excludeFromRecents.notifier).update(value);
-                  await ChuanyunPlatform.setExcludeFromRecents(value);
-                },
-              ),
-            ],
+    return MuseSection(
+      header: '隐私与后台',
+      children: [
+        if (needsBattery)
+          MuseTile(
+            leading: const MuseRowIcon(Icons.battery_alert_rounded, color: MusePalette.orange),
+            title: '允许后台运行',
+            trailing: const Icon(Icons.error_rounded, color: MusePalette.orange, size: MuseIconSize.small),
+            chevron: true,
+            onTap: () => ref.read(batteryOptimizationNotifierProvider.notifier).requestToIgnore(),
           ),
-          MuseSection(
-            header: '通知',
-            children: [
-              MuseSwitchTile(
-                leading: const Icon(Icons.notifications_off_rounded),
-                title: '隐藏通知',
-                value: hideNotification,
-                onChanged: ref.read(Preferences.hideNotification.notifier).update,
-              ),
-              MuseTile(
-                leading: const Icon(Icons.tune_rounded),
-                title: '系统通知设置',
-                chevron: true,
-                onTap: ChuanyunPlatform.openNotificationSettings,
-              ),
-            ],
+        if (needsAutostart)
+          MuseTile(
+            leading: const MuseRowIcon(Icons.rocket_launch_rounded, color: MusePalette.orange),
+            title: '自启动',
+            trailing: const Icon(Icons.error_rounded, color: MusePalette.orange, size: MuseIconSize.small),
+            chevron: true,
+            onTap: () async {
+              await ChuanyunPlatform.openAutostartSettings();
+              await ref.read(Preferences.autostartVisited.notifier).update(true);
+            },
           ),
-        ],
-      ),
+        MuseSwitchTile(
+          leading: const Icon(Icons.visibility_off_rounded),
+          title: '隐藏桌面图标',
+          value: iconHidden.value ?? false,
+          onChanged: iconHidden.value == null ? null : toggleIcon,
+        ),
+        MuseSwitchTile(
+          leading: const Icon(Icons.layers_clear_rounded),
+          title: '不在最近任务显示',
+          value: excludeRecents,
+          onChanged: (value) async {
+            await ref.read(Preferences.excludeFromRecents.notifier).update(value);
+            await ChuanyunPlatform.setExcludeFromRecents(value);
+          },
+        ),
+        MuseSwitchTile(
+          leading: const Icon(Icons.notifications_off_rounded),
+          title: '隐藏通知',
+          value: hideNotification,
+          onChanged: ref.read(Preferences.hideNotification.notifier).update,
+        ),
+      ],
     );
   }
 }

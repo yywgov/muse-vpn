@@ -28,6 +28,7 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
+import 'package:hiddify/features/muse/logic/keep_alive.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
@@ -111,7 +112,8 @@ class MuseConnectionKeeper with InfraLogger {
 
   void _log(String line) {
     loggy.info('keeper: $line');
-    ChuanyunPlatform.recordDisconnect(line);
+    // 1.3.0: the single 智能保持连接 log
+    ChuanyunPlatform.recordDisconnect(museKeepAliveLogLine(MuseKeepAliveStep.reconnect, line));
   }
 
   Future<void> check({required String reason}) async {
@@ -146,12 +148,14 @@ class MuseConnectionKeeper with InfraLogger {
           _log('界面显示 ${museConnectionName(ui)}，内核实际为 ${museCoreName(core)}：修正界面状态');
           await service.resyncStatus();
         case KeeperAction.recover:
+          // 1.3.0: step 1 of 智能保持连接; switched off = only the UI is kept honest
+          if (!ref.read(Preferences.museKeepAlive)) return;
           _log(core == null ? '内核无响应（非用户操作），开始恢复' : '内核已停止（非用户操作），开始恢复');
           await _recover();
           return;
         case KeeperAction.none:
       }
-      if (want && (core is CoreStarted) && !userJustStopped) {
+      if (want && (core is CoreStarted) && !userJustStopped && ref.read(Preferences.museKeepAlive)) {
         if (wake || reason != 'tick' || now.difference(_lastProbe) >= probeEvery) {
           _lastProbe = now;
           if (!await _proxyPathHealthy()) {

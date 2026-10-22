@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/subscription_bar.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
@@ -53,13 +54,15 @@ class ProfileTile extends HookConsumerWidget {
       }
     }
 
+    // 1.3.0: flat inside the 订阅 card; the active one is tinted (brand = selected state only)
+    final mt = MuseTheme.of(context);
     final card = Card(
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        side: profile.active ? BorderSide(color: theme.colorScheme.outline) : BorderSide.none,
-        borderRadius: ProfileTileConst.cardBorderRadius,
-      ),
-      elevation: profile.active ? 0 : 1,
+      color: profile.active ? mt.selected : MusePalette.transparent,
+      surfaceTintColor: MusePalette.transparent,
+      shadowColor: MusePalette.transparent,
+      shape: const RoundedRectangleBorder(borderRadius: ProfileTileConst.cardBorderRadius),
+      elevation: 0,
       child: IntrinsicHeight(
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
@@ -70,7 +73,7 @@ class ProfileTile extends HookConsumerWidget {
                 width: 48,
                 child: Semantics(sortKey: const OrdinalSortKey(1), child: ProfileActionButton(profile, true)),
               ),
-              if (profile.active) VerticalDivider(width: 1, color: theme.colorScheme.outline) else const Gap(1),
+              VerticalDivider(width: 1, thickness: 0.5, color: mt.hairline),
               Expanded(child: _body(context, t, theme, subInfo, handleTap)),
             ],
           ),
@@ -226,7 +229,7 @@ class ProfileActionButton extends HookConsumerWidget {
           liveRegion: true,
           child: Icon(
             success ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
-            color: success ? Colors.green : Theme.of(context).colorScheme.error,
+            color: success ? MusePalette.green : Theme.of(context).colorScheme.error,
           ),
         );
       }

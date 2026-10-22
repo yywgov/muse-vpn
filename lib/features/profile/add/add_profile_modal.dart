@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -5,6 +8,9 @@ import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
+import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/features/muse/home/clipboard_import.dart';
+import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/profile/add/widgets/widgets.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
@@ -45,40 +51,80 @@ class AddProfileModal extends HookConsumerWidget {
   }
 }
 
+/// 穿云 1.3.0: the one 「添加」 sheet — a detected clipboard link first, then 粘贴链接 / 扫描二维码 /
+/// 从文件导入 / 手动输入.
 class AddProfileOptions extends HookConsumerWidget {
   const AddProfileOptions({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // final isLoadingProfile = ref.watch(addProfileNotifierProvider).isLoading;
-    final isDesktop = PlatformUtils.isDesktop;
-    final gapCount = isDesktop ? AddProfileModalConst.fixBtnsGapCountDesktop : AddProfileModalConst.fixBtnsGapCount;
-    final itemCount = isDesktop ? AddProfileModalConst.fixBtnsItemCountDesktop : AddProfileModalConst.fixBtnsItemCount;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final fixBtnsHeight = (constraints.maxWidth - AddProfileModalConst.fixBtnsGap * gapCount) / itemCount;
-        // the import buttons only (the 帮助 chip row and the free-server list are gone)
-        final fullHeight = fixBtnsHeight + AddProfileModalConst.fixBtnsGap * 2 + 32;
-        final initial = fullHeight;
-        var min = fullHeight;
-        var max = fullHeight / constraints.maxHeight;
-        if (isDesktop) {
-          min = initial;
-          max = initial / constraints.maxHeight;
-        }
-        return DraggableScrollableSheet(
-          initialChildSize: initial / constraints.maxHeight,
-          minChildSize: min / constraints.maxHeight,
-          maxChildSize: max,
-          expand: false,
-          builder: (context, scrollController) => Column(
-            children: [
-              const Gap(AddProfileModalConst.fixBtnsGap),
-              FixBtns(height: fixBtnsHeight),
-              const Spacer(),
-            ],
-          ),
+    final mt = MuseTheme.of(context);
+    Widget option(Key key, IconData icon, String title, VoidCallback onTap) => ListTile(
+      key: key,
+      contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
+      minLeadingWidth: MuseIconSize.regular,
+      horizontalTitleGap: MuseSpace.s16,
+      leading: Icon(icon, size: MuseIconSize.regular, color: mt.text2),
+      title: Text(title, style: MuseType.body(context)),
+      trailing: Icon(Icons.chevron_right_rounded, size: MuseIconSize.small, color: mt.text3),
+      onTap: onTap,
+    );
+    final options = <Widget>[
+      option(const ValueKey('add_from_clipboard_button'), Icons.content_paste_rounded, '粘贴链接', () async {
+        final cr = await Clipboard.getData(Clipboard.kTextPlain).then((value) => value?.text ?? '');
+        ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
+      }),
+      if (!PlatformUtils.isDesktop)
+        option(const ValueKey('add_by_qr_code_button'), Icons.qr_code_scanner_rounded, '扫描二维码', () async {
+          final cr = await ref.read(dialogNotifierProvider.notifier).showQrScanner();
+          if (cr == null) return;
+          ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
+        }),
+      option(const ValueKey('add_from_file_button'), Icons.insert_drive_file_rounded, '从文件导入', () async {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['txt', 'json', 'yaml', 'yml', 'conf', 'ovpn'],
         );
-      },
+        if (result == null) return;
+        final picked = result.files.single;
+        var bytes = picked.bytes;
+        if (bytes == null) {
+          final path = picked.path;
+          if (path == null) return;
+          final file = File(path);
+          if (!await file.exists()) return;
+          bytes = await file.readAsBytes();
+        }
+        ref.read(addProfileNotifierProvider.notifier).addClipboard(decodeTextBytes(bytes));
+      }),
+      option(const ValueKey('add_manually_button'), Icons.edit_rounded, '手动输入链接', () {
+        ref.read(addProfilePageNotifierProvider.notifier).goManual();
+      }),
+    ];
+    final items = <Widget>[];
+    for (var i = 0; i < options.length; i++) {
+      items.add(options[i]);
+      if (i != options.length - 1) items.add(Divider(height: 0.5, thickness: 0.5, indent: 56, color: mt.hairline));
+    }
+    return Column(
+      key: const ValueKey('add_profile_options'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(MuseSpace.s24, MuseSpace.s24, MuseSpace.s24, MuseSpace.s16),
+          child: Text('添加订阅', style: MuseType.title(context)),
+        ),
+        const MuseClipboardOfferTile(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s24),
+          child: Material(
+            color: mt.inner,
+            shape: const RoundedRectangleBorder(borderRadius: MuseRadius.cardAll),
+            clipBehavior: Clip.antiAlias,
+            child: Column(mainAxisSize: MainAxisSize.min, children: items),
+          ),
+        ),
+      ],
     );
   }
 }

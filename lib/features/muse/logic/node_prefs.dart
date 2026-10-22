@@ -98,6 +98,8 @@ String? museNodeToRestore(String raw, String profileId, {required String selecte
 // ---------------------------------------------------------------- 去广告 温和 / 强力
 
 enum MuseAdBlockLevel {
+  // 1.3.0: 关 (the malware / phishing lists stay on)
+  off('off', '关', '不拦广告，恶意和钓鱼网站仍会拦截'),
   gentle('gentle', '温和', '只拦明确的广告和追踪域名，不影响 App 正常使用（推荐）'),
   strong('strong', '强力', '使用完整广告规则库，拦得更多，个别 App 可能打不开');
 
@@ -168,7 +170,13 @@ List<Rule> museApplyAdBlockLevel(List<Rule> rules, MuseAdBlockLevel level) {
       out.add(r);
       continue;
     }
-    out.add(r.deepCopy()..ruleSets.removeWhere((s) => s.contains('category-ads')));
+    final rest = r.deepCopy()..ruleSets.removeWhere((s) => s.contains('category-ads'));
+    if (level == MuseAdBlockLevel.off) {
+      // a rule left with nothing to match is dropped rather than sent to the core
+      if (rest.ruleSets.isNotEmpty) out.add(rest);
+      continue;
+    }
+    out.add(rest);
     out.add(
       Rule(
         name: 'builtin:blockAds:gentle',

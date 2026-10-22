@@ -13,8 +13,8 @@ import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
 import 'package:hiddify/features/muse/config/muse_config_page.dart';
 import 'package:hiddify/features/muse/data/muse_data_page.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart';
+import 'package:hiddify/features/muse/nodes/muse_nodes_page.dart';
 import 'package:hiddify/features/muse/settings/per_app_proxy_page.dart';
-import 'package:hiddify/features/muse/settings/privacy_page.dart';
 import 'package:hiddify/features/profile/details/profile_details_page.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_notifier.dart';
 import 'package:hiddify/features/route_rules/overview/generic_list_page.dart';
@@ -31,6 +31,7 @@ part 'routing_config_notifier.g.dart';
 // each branch in go router has its own focus scope
 final branchesScope = <String, FocusScopeNode>{
   'home': FocusScopeNode(),
+  'nodes': FocusScopeNode(),
   'config': FocusScopeNode(),
   'settings': FocusScopeNode(),
 };
@@ -40,8 +41,8 @@ final loadingConfig = RoutingConfig(
   routes: <RouteBase>[GoRoute(path: '/home', builder: (context, state) => const Material())],
 );
 
-// 穿云: three tabs, 首页 / 配置 / 设置, on every form factor.
-const mobileBranches = ['home', 'config', 'settings'];
+// 穿云 1.3.0: four tabs, 首页 / 节点 / 订阅 / 设置, on every form factor.
+const mobileBranches = ['home', 'nodes', 'config', 'settings'];
 
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => mobileBranches[index];
 
@@ -103,6 +104,15 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                   name: 'home',
                   path: '/home',
                   builder: (_, _) => FocusScope(node: branchesScope['home'], child: const MuseHomePage()),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: <GoRoute>[
+                GoRoute(
+                  name: 'nodes',
+                  path: '/nodes',
+                  builder: (_, _) => FocusScope(node: branchesScope['nodes'], child: const MuseNodesPage()),
                 ),
               ],
             ),
@@ -186,7 +196,6 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       (_) => const PerAppProxyPage(),
                       routes: [_slide('appList', 'app-list', (_) => const AppListPage())],
                     ),
-                    _slide('privacy', 'privacy', (_) => const PrivacyPage()),
                     // 1.2.2: 高级 (a page with this one row) is gone; TLS 分片 opens from 设置 directly
                     _slide('tlsTricks', 'tls-tricks', (_) => const TlsTricksPage()),
                     _slide('connections', 'connections', (_) => const MuseDataPage()),

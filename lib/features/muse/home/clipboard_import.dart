@@ -1,4 +1,4 @@
-// 穿云 1.1 - 剪贴板里有订阅链接时，首页顶部弹出「导入」。
+// 穿云 1.1 - 剪贴板里有订阅链接时提示导入（1.3.0：「添加」上的小圆点 + 添加面板第一行）。
 // Only checked when the app opens or comes back to the front, never offered twice for the same
 // link, and never for a link that is already one of the user's subscriptions.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
@@ -49,89 +50,74 @@ String? museSubscriptionLinkFromClipboard(String? text) {
 /// The subscription url a clipboard link imports (the inner url for import schemes).
 String museSubscriptionUrlOf(String link) => LinkParser.parse(link)?.url ?? link;
 
-/// Top card on 首页: 「检测到订阅链接」 [忽略] [导入].
-class MuseClipboardImportBanner extends HookConsumerWidget {
-  const MuseClipboardImportBanner({super.key});
+/// 1.3.0: checks the clipboard when the app opens or comes back to the front; a new subscription
+/// link puts a dot on 添加 and becomes the first row of the 添加 sheet (no 首页 banner any more).
+void useMuseClipboardWatcher(WidgetRef ref) {
+  final context = useContext();
+  Future<void> check() async {
+    // a short wait: on Android the clipboard can only be read once the window has focus
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (!context.mounted) return;
+    try {
+      // hasStrings does not read the content, so no "pasted from clipboard" toast for nothing
+      if (!await Clipboard.hasStrings()) return;
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final link = museSubscriptionLinkFromClipboard(data?.text);
+      if (link == null || !context.mounted) return;
+      if (ref.read(Preferences.clipboardLastOffered) == link) return;
+      final url = museSubscriptionUrlOf(link);
+      final profiles = ref.read(profilesNotifierProvider).valueOrNull ?? const <ProfileEntity>[];
+      if (profiles.any((p) => p is RemoteProfileEntity && p.url == url)) return;
+      ref.read(museClipboardOfferProvider.notifier).state = link;
+    } catch (_) {
+      // clipboard unavailable: nothing to offer
+    }
+  }
+
+  useEffect(() {
+    check();
+    return null;
+  }, const []);
+  useOnAppLifecycleStateChange((_, state) {
+    if (state == AppLifecycleState.resumed) check();
+  });
+}
+
+/// First row of the 添加 sheet while a clipboard link is on offer: 「导入剪贴板里的订阅 · host」.
+class MuseClipboardOfferTile extends ConsumerWidget {
+  const MuseClipboardOfferTile({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final offer = useState<String?>(null);
-    // keeps the add notifier (and its success/error toasts) alive while an import runs
-    ref.listen(addProfileNotifierProvider, (_, _) {});
-
-    Future<void> check() async {
-      // a short wait: on Android the clipboard can only be read once the window has focus
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      if (!context.mounted) return;
-      try {
-        // hasStrings does not read the content, so no "pasted from clipboard" toast for nothing
-        if (!await Clipboard.hasStrings()) return;
-        final data = await Clipboard.getData(Clipboard.kTextPlain);
-        final link = museSubscriptionLinkFromClipboard(data?.text);
-        if (link == null || !context.mounted) return;
-        if (ref.read(Preferences.clipboardLastOffered) == link) return;
-        final url = museSubscriptionUrlOf(link);
-        final profiles = ref.read(profilesNotifierProvider).valueOrNull ?? const <ProfileEntity>[];
-        final known = profiles.any((p) => p is RemoteProfileEntity && p.url == url);
-        if (known) return;
-        offer.value = link;
-      } catch (_) {
-        // clipboard unavailable: nothing to offer
-      }
-    }
-
-    useEffect(() {
-      check();
-      return null;
-    }, const []);
-    useOnAppLifecycleStateChange((_, state) {
-      if (state == AppLifecycleState.resumed) check();
-    });
-
-    final link = offer.value;
+    final link = ref.watch(museClipboardOfferProvider);
     if (link == null) return const SizedBox.shrink();
-
-    Future<void> close() async {
-      offer.value = null;
+    final mt = MuseTheme.of(context);
+    final host = Uri.tryParse(museSubscriptionUrlOf(link))?.host ?? '';
+    Future<void> done() async {
+      ref.read(museClipboardOfferProvider.notifier).state = null;
       await ref.read(Preferences.clipboardLastOffered.notifier).update(link);
     }
 
-    final theme = Theme.of(context);
-    final host = Uri.tryParse(museSubscriptionUrlOf(link))?.host ?? '';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-        decoration: BoxDecoration(color: MuseColors.card(context), borderRadius: BorderRadius.circular(20)),
-        child: Row(
-          children: [
-            const Icon(Icons.content_paste_rounded, color: MuseColors.brand),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('检测到订阅链接', style: theme.textTheme.titleSmall),
-                  if (host.isNotEmpty)
-                    Text(
-                      host,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(color: MuseColors.secondaryText(context)),
-                    ),
-                ],
-              ),
-            ),
-            TextButton(onPressed: close, child: const Text('忽略')),
-            FilledButton(
-              onPressed: () async {
-                await close();
-                await ref.read(addProfileNotifierProvider.notifier).addClipboard(link);
-              },
-              child: const Text('导入'),
-            ),
-          ],
+      padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s8),
+      child: Material(
+        color: mt.selected,
+        shape: const RoundedRectangleBorder(borderRadius: MuseRadius.cardAll),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          key: const ValueKey('clipboard_offer'),
+          leading: const Icon(Icons.content_paste_rounded, color: MusePalette.brand, size: MuseIconSize.regular),
+          title: Text('导入剪贴板里的订阅', style: MuseType.body(context).copyWith(fontWeight: FontWeight.w600)),
+          subtitle: host.isEmpty ? null : Text(host, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
+          trailing: IconButton(
+            tooltip: '忽略',
+            icon: Icon(Icons.close_rounded, size: MuseIconSize.small, color: mt.text3),
+            onPressed: done,
+          ),
+          onTap: () async {
+            await done();
+            await ref.read(addProfileNotifierProvider.notifier).addClipboard(link);
+          },
         ),
       ),
     );

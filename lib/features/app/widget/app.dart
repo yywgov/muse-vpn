@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/home/node_memory.dart';
 import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/core/localization/locale_extensions.dart';
@@ -74,13 +75,16 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
 
     ref.listen(foregroundProfilesUpdateNotifierProvider, (_, _) {});
     if (PlatformUtils.isAndroid) ref.listen(appBasedRoutingProvider, (_, _) {});
+    // 穿云 1.3.0 智能保持连接 (one switch, logic/keep_alive.dart): node failover, timed-out node
+    // folding, core watchdog, Windows connection keeper (recovery, system proxy restore, wake)
     ref.listen(museNodeFailoverProvider, (_, _) {});
-    // 穿云 1.2.2: fold nodes that keep timing out into 「不可用」
     ref.listen(museBadNodesProvider, (_, _) {});
     ref.listen(museAutoFastestProvider, (_, _) {});
     ref.listen(museCoreWatchdogProvider, (_, _) {});
-    // 穿云 Windows 1.2.1: 连接守护 (auto-recovery, system proxy restore, wake from sleep)
     ref.listen(museConnectionKeeperProvider, (_, _) {});
+    // 穿云 1.3.0: node list kept for picking while disconnected; 网速 sparkline history
+    ref.listen(museNodeCacheWriterProvider, (_, _) {});
+    ref.listen(museSpeedHistoryProvider, (_, _) {});
     // 穿云 1.2.3 Windows: Ctrl+Alt+P 连接/断开
     if (PlatformUtils.isWindows) ref.listen(museHotkeyProvider, (_, _) {});
     // 穿云 1.2.8: Windows too (toast); 每个订阅记住上次的节点; 连上后探测外网

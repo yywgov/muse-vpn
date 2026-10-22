@@ -1,4 +1,4 @@
-// 穿云 - config tab (配置): subscriptions/profiles + routing.
+// 穿云 - 订阅 tab: subscriptions + routing rules (1.3.0: named 订阅 everywhere).
 // Part of 穿云 (Chuanyun), a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
+import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
@@ -20,26 +21,25 @@ class MuseConfigPage extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final asyncProfiles = ref.watch(profilesNotifierProvider);
 
-    return Scaffold(
-      backgroundColor: MuseColors.background(context),
-      appBar: AppBar(
-        backgroundColor: MuseColors.background(context),
-        scrolledUnderElevation: 0,
-        title: const Text('配置'),
-        actions: [
+    final offer = ref.watch(museClipboardOfferProvider) != null;
+    return MuseScaffold(
+      large: true,
+      title: '订阅',
+      actions: [
           IconButton(
             onPressed: () => ref.read(foregroundProfilesUpdateNotifierProvider.notifier).trigger(),
             icon: const Icon(Icons.sync_rounded),
             tooltip: t.pages.profiles.updateSubscriptions,
           ),
           IconButton(
+            key: const ValueKey('profile_add_button'),
             onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
-            icon: const Icon(Icons.add_rounded),
-            tooltip: '添加订阅/配置',
+            // a subscription link waits on the clipboard
+            icon: Badge(isLabelVisible: offer, smallSize: 8, backgroundColor: MusePalette.brand, child: const Icon(Icons.add_rounded)),
+            tooltip: '添加',
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: MuseSpace.s8),
         ],
-      ),
       // 1.2.5: pull down to update every subscription (FlClash / Clash Verge Rev)
       body: RefreshIndicator(
         key: const ValueKey('config_pull_refresh'),
@@ -52,14 +52,14 @@ class MuseConfigPage extends HookConsumerWidget {
         child: MuseGroupedBody(
         children: [
           MuseSection(
-            header: '订阅 / 配置',
+            dividerIndent: MuseSpace.s16,
             children: [
               ...asyncProfiles.when(
                 data: (profiles) => profiles.isEmpty
                     ? [
                         MuseTile(
                           leading: const Icon(Icons.add_circle_outline_rounded),
-                          title: '添加订阅或配置',
+                          title: '添加订阅',
                           chevron: true,
                           onTap: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
                         ),
@@ -67,22 +67,21 @@ class MuseConfigPage extends HookConsumerWidget {
                     : [
                         for (final profile in profiles)
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s4),
                             child: ProfileTile(key: ValueKey(profile.id), profile: profile),
                           ),
                       ],
                 loading: () => [
                   const Padding(
-                    padding: EdgeInsets.all(24),
+                    padding: EdgeInsets.all(MuseSpace.s24),
                     child: Center(child: CircularProgressIndicator()),
                   ),
                 ],
-                error: (error, _) => [MuseTile(title: '读取配置失败', subtitle: t.presentShortError(error))],
+                error: (error, _) => [MuseTile(title: '读取订阅失败', subtitle: t.presentShortError(error))],
               ),
             ],
           ),
           MuseSection(
-            header: '规则',
             children: [
               MuseTile(
                 leading: const Icon(Icons.route_rounded),

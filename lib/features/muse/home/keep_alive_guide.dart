@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/settings/data/battery_optimization_repository.dart';
 import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -55,7 +56,7 @@ class _KeepAliveGuideDialog extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             leading: Icon(
               ignored ? Icons.check_circle_rounded : Icons.battery_alert_rounded,
-              color: ignored ? Colors.green : Colors.orange,
+              color: ignored ? MusePalette.green : MusePalette.orange,
             ),
             title: const Text('允许后台运行'),
             onTap: ignored ? null : () => ref.read(batteryOptimizationNotifierProvider.notifier).requestToIgnore(),
@@ -64,7 +65,7 @@ class _KeepAliveGuideDialog extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             leading: Icon(
               autostartVisited ? Icons.check_circle_rounded : Icons.rocket_launch_rounded,
-              color: autostartVisited ? Colors.green : Colors.orange,
+              color: autostartVisited ? MusePalette.green : MusePalette.orange,
             ),
             title: const Text('自启动'),
             onTap: () async {

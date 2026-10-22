@@ -9,7 +9,9 @@ import 'package:hiddify/utils/platform_utils.dart';
 
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/muse/logic/failover_tracker.dart';
+import 'package:hiddify/features/muse/logic/keep_alive.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -22,6 +24,8 @@ final museCoreWatchdogProvider = Provider<void>((ref) {
   // Windows: the connection keeper (desktop/connection_keeper.dart) does this, keyed on the
   // user's intent instead of the UI status
   if (PlatformUtils.isWindows) return;
+  // 1.3.0: step 3 of 智能保持连接 (logic/keep_alive.dart)
+  if (!ref.watch(Preferences.museKeepAlive)) return;
   if (!ref.watch(serviceRunningProvider)) return;
   final counter = MuseWatchdogCounter();
   var busy = false;
@@ -40,9 +44,19 @@ final museCoreWatchdogProvider = Provider<void>((ref) {
         ref.read(museWatchdogRecoveringProvider.notifier).state = false;
       }
       if (counter.record(ok: ok)) {
+        final notifier = ref.read(connectionNotifierProvider.notifier);
+        final generation = notifier.intentGeneration;
+        // a manual disconnect wins
+        final step = museKeepAliveStepFor(
+          MuseKeepAliveProblem.coreUnresponsive,
+          attempt: 0,
+          userStopped: !ref.read(Preferences.startedByUser),
+        );
+        if (step == null) return;
         ref.read(museWatchdogRecoveringProvider.notifier).state = true;
-        ChuanyunPlatform.recordDisconnect("内核无响应，自动重启");
-        await ref.read(connectionNotifierProvider.notifier).restartAfterWatchdog();
+        ChuanyunPlatform.recordDisconnect(museKeepAliveLogLine(step, '内核无响应，自动重启'));
+        if (notifier.intentGeneration != generation) return;
+        await notifier.restartAfterWatchdog();
       }
     } catch (_) {
       // next tick

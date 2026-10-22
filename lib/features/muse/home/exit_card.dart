@@ -1,4 +1,4 @@
-// 穿云 1.2.3 - 首页「出口」card: the IP and region traffic leaves from and whether Google,
+// 穿云 1.2.3 - 出口检测 (1.3.0: shown on the 首页 出口 IP tile and in 诊断): the IP and region traffic leaves from and whether Google,
 // ChatGPT and Netflix work from there. Checked through the local mixed port (so it sees exactly
 // what proxied apps see), once after connecting, after each node change, and on tap.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
@@ -7,11 +7,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
-import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -176,154 +174,3 @@ final museExitProvider = StateNotifierProvider<MuseExitNotifier, MuseExitResult?
   ref.onDispose(() => pending?.cancel());
   return notifier;
 });
-
-/// The card itself; nothing while disconnected or with 出口检测 switched off.
-class MuseExitCard extends ConsumerWidget {
-  const MuseExitCard({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final enabled = ref.watch(Preferences.museExitCheck);
-    final running = ref.watch(serviceRunningProvider);
-    final result = ref.watch(museExitProvider);
-    if (!enabled || !running) return const SizedBox.shrink();
-    final theme = Theme.of(context);
-    final secondary = MuseColors.secondaryText(context);
-    final r = result ?? const MuseExitResult();
-    final info = r.info;
-
-    final String place;
-    final String? flag;
-    if (info != null) {
-      place = '${museCountryLabel(info.country)} · ${museMaskIp(info.ip)}';
-      flag = museCountryFlag(info.country);
-    } else if (r.infoFailed) {
-      place = '获取出口失败';
-      flag = null;
-    } else {
-      place = '正在检测出口…';
-      flag = null;
-    }
-
-    return Padding(
-      key: const ValueKey('home_exit_card'),
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: Material(
-        color: MuseColors.card(context),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: r.busy && result != null ? null : () => ref.read(museExitProvider.notifier).check(),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: MuseColors.brand.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: flag != null
-                          ? Text(flag, style: const TextStyle(fontSize: 20, height: 1.1))
-                          : const Icon(Icons.travel_explore_rounded, size: 18, color: MuseColors.brandLight),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('出口', style: theme.textTheme.bodySmall?.copyWith(color: secondary)),
-                          Text(
-                            place,
-                            key: const ValueKey('home_exit_place'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyLarge?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: r.busy
-                          ? const Padding(
-                              padding: EdgeInsets.all(8),
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Tooltip(
-                              message: '重新检测',
-                              child: Icon(Icons.refresh_rounded, size: 20, color: secondary),
-                            ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(child: _ServiceChip(name: 'Google', state: r.google)),
-                    const SizedBox(width: 6),
-                    Expanded(child: _ServiceChip(name: 'ChatGPT', state: r.chatGpt)),
-                    const SizedBox(width: 6),
-                    Expanded(child: _ServiceChip(name: 'Netflix', state: r.netflix, partial: '仅自制剧')),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ServiceChip extends StatelessWidget {
-  const _ServiceChip({required this.name, required this.state, this.partial = '部分'});
-
-  final String name;
-  final MuseServiceState state;
-  final String partial;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final secondary = MuseColors.secondaryText(context);
-    final Color dot = switch (state) {
-      MuseServiceState.ok => const Color(0xFF34C759),
-      MuseServiceState.partial => const Color(0xFFFF9F0A),
-      MuseServiceState.blocked => theme.colorScheme.error,
-      MuseServiceState.failed => theme.colorScheme.error.withValues(alpha: 0.7),
-      MuseServiceState.checking => secondary.withValues(alpha: 0.5),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(color: MuseColors.innerSurface(context), borderRadius: BorderRadius.circular(10)),
-      child: Row(
-        children: [
-          Container(width: 7, height: 7, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.labelMedium),
-                Text(
-                  museServiceStateLabel(state, partial: partial),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(color: secondary),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
