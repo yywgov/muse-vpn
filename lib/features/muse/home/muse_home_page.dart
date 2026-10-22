@@ -5,8 +5,10 @@
 
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -629,6 +631,8 @@ class _Tile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mt = MuseTheme.of(context);
+    // 1.4.0: 隐私模式 blurs the numbers (设置 › 外观)
+    final masked = ref.watch(MusePrefs.privacyMask);
     return DecoratedBox(
       decoration: mt.cardDecoration(),
       child: Material(
@@ -646,7 +650,7 @@ class _Tile extends ConsumerWidget {
                 Row(
                   children: [
                     Expanded(child: Text(title, maxLines: 1, style: MuseType.caption(context))),
-                    ?titleTrailing,
+                    if (titleTrailing != null) museMaybeMask(masked, titleTrailing!),
                   ],
                 ),
                 AnimatedSwitcher(
@@ -654,15 +658,18 @@ class _Tile extends ConsumerWidget {
                   transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
                   layoutBuilder: (current, previous) =>
                       Stack(alignment: Alignment.centerLeft, children: [...previous, ?current]),
-                  child: Text(
-                    value,
-                    key: ValueKey(value),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: MuseType.number(context).copyWith(color: valueColor),
+                  child: museMaybeMask(
+                    masked,
+                    Text(
+                      value,
+                      key: ValueKey(value),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: MuseType.number(context).copyWith(color: valueColor),
+                    ),
                   ),
                 ),
-                SizedBox(height: MuseSize.tileBottom, child: bottom),
+                SizedBox(height: MuseSize.tileBottom, child: museMaybeMask(masked, bottom)),
               ],
             ),
           ),
@@ -1147,3 +1154,8 @@ class _EmptyState extends ConsumerWidget {
     );
   }
 }
+
+/// [child] blurred when [masked] (隐私模式).
+Widget museMaybeMask(bool masked, Widget child) => masked
+    ? ImageFiltered(key: const ValueKey('privacy_mask'), imageFilter: ImageFilter.blur(sigmaX: MuseSize.privacyBlur, sigmaY: MuseSize.privacyBlur), child: child)
+    : child;

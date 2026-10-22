@@ -15,3 +15,6 @@ Map<String, dynamic> museTestExtras({required int workers, required int timeoutS
   'muse-test-workers': workers.clamp(4, 64),
   'muse-test-timeout-ms': timeoutSec.clamp(2, 15) * 1000,
 };
+
+/// Custom hosts for the core (`muse-hosts`, core 5.0.0-muse.14); nothing when empty.
+Map<String, dynamic> museHostsExtras(Map<String, String> hosts) => hosts.isEmpty ? const {} : {'muse-hosts': hosts};

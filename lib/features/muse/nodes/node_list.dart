@@ -21,6 +21,7 @@ import 'package:hiddify/features/muse/logic/exit_check.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
+import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
@@ -142,6 +143,16 @@ class MuseNodeList extends HookConsumerWidget {
     final searchController = useTextEditingController();
     final sortMode = MuseNodeSort.fromKey(ref.watch(Preferences.museNodeSort));
     final favorites = museParseFavorites(ref.watch(Preferences.museFavoriteNodes));
+    // 1.4.0: rename / note / hide, name filters, duplicates, collapsible regions
+    final metas = MuseNodeMetas.parse(ref.watch(MusePrefs.nodeMeta));
+    final beautify = ref.watch(MusePrefs.beautifyNames);
+    final includeRe = ref.watch(MusePrefs.includeRegex);
+    final excludeRe = ref.watch(MusePrefs.excludeRegex);
+    final hideDuplicates = ref.watch(MusePrefs.hideDuplicates);
+    final collapsedRaw = ref.watch(MusePrefs.collapsedRegions);
+    final collapsed = collapsedRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+    final showUserHidden = useState(false);
+    String shownName(OutboundInfo e) => metas.displayName(e.tag, museNodeName(e), beautify: beautify);
 
     // every node answered (or timed out) since 测速 started: end the test
     if (testing && group != null) {
@@ -160,7 +171,9 @@ class MuseNodeList extends HookConsumerWidget {
     bool matches(OutboundInfo e) {
       final q = query.value;
       if (!searching.value || q.trim().isEmpty) return true;
-      return museNodeMatches(museNodeName(e), q, regionOf: museRegionCode);
+      return museNodeMatches(museNodeName(e), q, regionOf: museRegionCode) ||
+          museNodeMatches(shownName(e), q, regionOf: museRegionCode) ||
+          metas.of(e.tag).note.toLowerCase().contains(q.trim().toLowerCase());
     }
 
     final toolbar = Padding(
@@ -266,9 +279,26 @@ class MuseNodeList extends HookConsumerWidget {
         ),
       );
     } else {
+      final duplicates = hideDuplicates
+          ? museDuplicateTags<OutboundInfo>(
+              group.items.where((e) => !e.isGroup).toList(),
+              tag: (e) => e.tag,
+              type: (e) => e.type,
+              host: (e) => e.host,
+              port: (e) => e.port,
+            )
+          : const <String>{};
       final listed = group.items
-          .where((e) => e.isGroup || e.tag == group.selected || !museIsInfoNode(museNodeName(e)))
+          .where(
+            (e) =>
+                e.isGroup ||
+                e.tag == group.selected ||
+                (!museIsInfoNode(museNodeName(e)) &&
+                    !duplicates.contains(e.tag) &&
+                    museNodeNamePasses(museNodeName(e), include: includeRe, exclude: excludeRe)),
+          )
           .toList();
+      final userHidden = {for (final t in metas.hiddenTags) if (t != group.selected) t};
       final sorted = museFavoritesFirst<OutboundInfo>(
         museOrderNodes<OutboundInfo>(
           listed,
@@ -294,8 +324,9 @@ class MuseNodeList extends HookConsumerWidget {
         frozenSort.value = sortMode;
       }
       final filtering = searching.value && query.value.trim().isNotEmpty;
-      final visible = ordered.where((e) => !hidden.contains(e.tag) && matches(e)).toList();
-      final folded = ordered.where((e) => hidden.contains(e.tag) && matches(e)).toList();
+      final visible = ordered.where((e) => !hidden.contains(e.tag) && !userHidden.contains(e.tag) && matches(e)).toList();
+      final folded = ordered.where((e) => hidden.contains(e.tag) && !userHidden.contains(e.tag) && matches(e)).toList();
+      final hiddenByUser = ordered.where((e) => userHidden.contains(e.tag) && matches(e)).toList();
       final nodeCount = listed.where((e) => !e.isGroup).length;
       final latencyCache = ref.watch(museLatencyCacheProvider);
 
@@ -309,6 +340,8 @@ class MuseNodeList extends HookConsumerWidget {
         dimmed: dimmed,
         selected: group.selected == proxy.tag,
         favorite: favorites.contains(proxy.tag),
+        displayName: proxy.isGroup ? null : shownName(proxy),
+        note: proxy.isGroup ? '' : metas.of(proxy.tag).note,
         onLongPress: () => showMuseNodeDetails(context, ref, proxy, since: since, groupTag: group.tag),
         onTap: () async {
           await musePickNode(ref, group.tag, proxy.tag);
@@ -316,12 +349,52 @@ class MuseNodeList extends HookConsumerWidget {
         },
       );
 
-      Widget section(String? header, List<OutboundInfo> items, {Key? key, bool dimmed = false}) => _NodeSection(
+      Widget section(
+        String? header,
+        List<OutboundInfo> items, {
+        Key? key,
+        bool dimmed = false,
+        bool? isCollapsed,
+        VoidCallback? onHeaderTap,
+      }) => _NodeSection(
         key: key,
         header: header,
         margin: margin,
-        children: [for (final p in items) row(p, dimmed: dimmed)],
+        collapsed: isCollapsed,
+        onHeaderTap: onHeaderTap,
+        children: isCollapsed ?? false ? const [] : [for (final p in items) row(p, dimmed: dimmed)],
       );
+
+      Future<void> toggleRegion(String code) async {
+        final next = {...collapsed};
+        if (!next.remove(code)) next.add(code);
+        await ref.read(MusePrefs.collapsedRegions.notifier).update(next.join(','));
+      }
+
+      Widget foldToggle({required Key key, required IconData icon, required String label, required bool open, required VoidCallback onTap}) =>
+          Padding(
+            padding: EdgeInsets.fromLTRB(margin, MuseSpace.s8, margin, 0),
+            child: Material(
+              color: mt.card,
+              shape: mt.cardShape(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                key: key,
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s12),
+                  child: Row(
+                    children: [
+                      Icon(icon, size: MuseIconSize.small, color: mt.text3),
+                      const SizedBox(width: MuseSpace.s12),
+                      Expanded(child: Text(label, style: MuseType.body(context).copyWith(color: mt.text2))),
+                      Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: mt.text3),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
 
       if (filtering && visible.isEmpty && folded.isEmpty) {
         children.add(
@@ -344,40 +417,48 @@ class MuseNodeList extends HookConsumerWidget {
         )) {
           final code = s.region;
           final label = code == null ? '其他' : '${museCountryFlag(code) ?? ''} ${museCountryLabel(code)}'.trim();
-          children.add(section('$label · ${s.items.length}', s.items, key: ValueKey('region_header_${code ?? 'other'}')));
+          // 1.4.0: the header shows the group's best delay; tap folds the group
+          final best = s.items
+              .map((e) => museFreshDelay(e, since))
+              .where(ConnectionConst.isValidDelay)
+              .fold<int>(0, (a, b) => a == 0 || b < a ? b : a);
+          final key = code ?? 'other';
+          children.add(
+            section(
+              '$label · ${s.items.length}${best > 0 ? ' · $best ms' : ''}',
+              s.items,
+              key: ValueKey('region_header_$key'),
+              isCollapsed: !filtering && collapsed.contains(key),
+              onHeaderTap: () => toggleRegion(key),
+            ),
+          );
         }
       } else if (nodes.isNotEmpty) {
         children.add(section(null, nodes));
       }
       if (folded.isNotEmpty) {
         children.add(
-          Padding(
-            padding: EdgeInsets.fromLTRB(margin, MuseSpace.s8, margin, 0),
-            child: Material(
-              color: mt.card,
-              shape: mt.cardShape(),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                key: const ValueKey('hidden_nodes_toggle'),
-                onTap: () => showHidden.value = !showHidden.value,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s12),
-                  child: Row(
-                    children: [
-                      Icon(Icons.block_rounded, size: MuseIconSize.small, color: mt.text3),
-                      const SizedBox(width: MuseSpace.s12),
-                      Expanded(
-                        child: Text('不可用 · ${folded.length}', style: MuseType.body(context).copyWith(color: mt.text2)),
-                      ),
-                      Icon(showHidden.value ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: mt.text3),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          foldToggle(
+            key: const ValueKey('hidden_nodes_toggle'),
+            icon: Icons.block_rounded,
+            label: '不可用 · ${folded.length}',
+            open: showHidden.value,
+            onTap: () => showHidden.value = !showHidden.value,
           ),
         );
         if (showHidden.value || filtering) children.add(section(null, folded, dimmed: true));
+      }
+      if (hiddenByUser.isNotEmpty) {
+        children.add(
+          foldToggle(
+            key: const ValueKey('user_hidden_nodes_toggle'),
+            icon: Icons.visibility_off_outlined,
+            label: '已隐藏 · ${hiddenByUser.length}',
+            open: showUserHidden.value,
+            onTap: () => showUserHidden.value = !showUserHidden.value,
+          ),
+        );
+        if (showUserHidden.value || filtering) children.add(section(null, hiddenByUser, dimmed: true));
       }
     }
 
@@ -401,11 +482,15 @@ class MuseNodeList extends HookConsumerWidget {
 
 /// One card of node rows with an optional caption above.
 class _NodeSection extends StatelessWidget {
-  const _NodeSection({super.key, this.header, required this.margin, required this.children});
+  const _NodeSection({super.key, this.header, required this.margin, required this.children, this.collapsed, this.onHeaderTap});
 
   final String? header;
   final double margin;
   final List<Widget> children;
+
+  /// null = not foldable
+  final bool? collapsed;
+  final VoidCallback? onHeaderTap;
 
   @override
   Widget build(BuildContext context) {
@@ -421,10 +506,25 @@ class _NodeSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (header != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(MuseSpace.s16, MuseSpace.s4, MuseSpace.s16, MuseSpace.s8),
-              child: Text(header!, style: MuseType.caption(context)),
+            InkWell(
+              onTap: onHeaderTap,
+              borderRadius: MuseRadius.smallAll,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(MuseSpace.s16, MuseSpace.s4, MuseSpace.s16, MuseSpace.s8),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(header!, style: MuseType.caption(context))),
+                    if (collapsed != null)
+                      Icon(
+                        collapsed! ? Icons.expand_more_rounded : Icons.expand_less_rounded,
+                        size: MuseIconSize.tiny,
+                        color: mt.text3,
+                      ),
+                  ],
+                ),
+              ),
             ),
+          if (items.isNotEmpty)
           DecoratedBox(
             decoration: mt.cardDecoration(),
             child: ClipRRect(
@@ -453,8 +553,13 @@ class MuseNodeRow extends StatelessWidget {
     this.cachedDelay,
     this.dimmed = false,
     this.favorite = false,
+    this.displayName,
+    this.note = '',
   });
 
+  /// 1.4.0: the user's own name (or the tidied one) instead of the subscription's
+  final String? displayName;
+  final String note;
   final OutboundInfo proxy;
   final DateTime? since;
   final DateTime? testStarted;
@@ -483,7 +588,7 @@ class MuseNodeRow extends StatelessWidget {
       MuseDelayKind.timeout => MusePalette.red,
       _ => mt.text3,
     };
-    final fullName = museNodeName(proxy);
+    final fullName = displayName ?? museNodeName(proxy);
     final rawName = proxy.isGroup ? fullName.split(' → ').first.trim() : fullName;
     final type = proxy.type.toLowerCase();
     final name = proxy.isGroup || type == 'direct' || type == 'block' ? museGroupName(rawName) : rawName;
@@ -491,6 +596,8 @@ class MuseNodeRow extends StatelessWidget {
         ? museGroupSubtitle(type: proxy.type, name: rawName, selectedDisplay: proxy.groupSelectedTagDisplay, nodeCount: nodeCount)
         : museIsInvalidNodeType(proxy.type)
         ? museInvalidNodeSubtitle(proxy.type)
+        : note.isNotEmpty
+        ? '${museProtocolName(proxy.type)} · $note'
         : museProtocolName(proxy.type);
     final groupIcon = proxy.isGroup
         ? switch (museGroupIconKind(type: proxy.type, name: rawName, selectedDisplay: proxy.groupSelectedTagDisplay)) {
@@ -501,7 +608,7 @@ class MuseNodeRow extends StatelessWidget {
             MuseGroupIcon.other => Icons.folder_rounded,
           }
         : Icons.public_rounded;
-    final flag = proxy.isGroup ? null : museFlagEmoji(name);
+    final flag = proxy.isGroup ? null : (museFlagEmoji(name) ?? museFlagEmoji(museNodeName(proxy)));
 
     final row = Material(
       color: selected ? mt.selected : MusePalette.transparent,
@@ -634,6 +741,13 @@ Future<void> showMuseNodeDetails(
     delayText = '超时';
   }
   final region = museRegionCode(name);
+  // 1.4.0: address, landing IP, health from the recent 测速 results
+  final metas = MuseNodeMetas.parse(ref.read(MusePrefs.nodeMeta));
+  final meta = metas.of(proxy.tag);
+  final history = MuseDelayHistories.parse(ref.read(MusePrefs.delayHistory)).of(proxy.tag);
+  final health = museHealthScore(history);
+  final exitCode = proxy.hasIpinfo() ? proxy.ipinfo.countryCode : '';
+  final mismatch = museRegionMismatch(nameRegion: region, exitRegion: exitCode);
   final invalidError = proxy.isGroup ? '' : museInvalidNodeError(proxy.type);
   final rows = <(String, String)>[
     (
@@ -647,7 +761,21 @@ Future<void> showMuseNodeDetails(
     if (region != null) ('地区', '${museCountryFlag(region) ?? ''} ${museCountryLabel(region)}'.trim()),
     ('延迟', delayText),
     if (testedAt != null && delay != 0) ('测速时间', museUpdatedAgo(testedAt, now: DateTime.now()).replaceAll('更新', '')),
+    if (!proxy.isGroup && proxy.host.isNotEmpty) ('地址', '${proxy.host}${proxy.port > 0 ? ':${proxy.port}' : ''}'),
+    if (proxy.hasIpinfo() && proxy.ipinfo.ip.isNotEmpty)
+      ('落地', '${proxy.ipinfo.ip} ${museCountryFlag(exitCode) ?? exitCode}${mismatch ? ' · 名不符实' : ''}'.trim()),
+    if (history.samples.length >= 2)
+      (
+        '健康',
+        '${museHealthLabel(health)} $health · 丢包 ${(history.loss * 100).round()}% · 抖动 ${history.jitter.round()} ms',
+      ),
+    if (meta.note.isNotEmpty) ('备注', meta.note),
   ];
+  Future<void> saveMeta(MuseNodeMeta next) async {
+    final cur = MuseNodeMetas.parse(ref.read(MusePrefs.nodeMeta));
+    await ref.read(MusePrefs.nodeMeta.notifier).update(cur.set(proxy.tag, next).toRaw());
+  }
+
   void toast(String text, {bool error = false}) {
     try {
       final n = ref.read(inAppNotificationControllerProvider);
@@ -741,6 +869,48 @@ Future<void> showMuseNodeDetails(
                   ],
                 ),
                 const SizedBox(height: MuseSpace.s12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('node_rename'),
+                        icon: const Icon(Icons.edit_outlined, size: MuseIconSize.small),
+                        label: const Text('重命名'),
+                        onPressed: () async {
+                          Navigator.of(sheetContext).pop();
+                          final v = await museAskText(context, '重命名', initial: meta.rename.isEmpty ? name : meta.rename);
+                          if (v != null) await saveMeta(meta.copyWith(rename: v == museNodeName(proxy) ? '' : v));
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: MuseSpace.s12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('node_note'),
+                        icon: const Icon(Icons.sticky_note_2_outlined, size: MuseIconSize.small),
+                        label: const Text('备注'),
+                        onPressed: () async {
+                          Navigator.of(sheetContext).pop();
+                          final v = await museAskText(context, '备注', initial: meta.note);
+                          if (v != null) await saveMeta(meta.copyWith(note: v));
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: MuseSpace.s12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('node_hide'),
+                        icon: Icon(meta.hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: MuseIconSize.small),
+                        label: Text(meta.hidden ? '显示' : '隐藏'),
+                        onPressed: () async {
+                          Navigator.of(sheetContext).pop();
+                          await saveMeta(meta.copyWith(hidden: !meta.hidden));
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: MuseSpace.s12),
               ],
               Row(
                 children: [
@@ -810,3 +980,33 @@ Future<void> showMuseNodePicker(BuildContext context) => showModalBottomSheet<vo
     ),
   ),
 );
+
+/// A one-line text prompt; null when cancelled, '' allowed (clears the value).
+Future<String?> museAskText(BuildContext context, String title, {String initial = '', String? hint, int maxLines = 1}) {
+  final controller = TextEditingController(text: initial);
+  return showDialog<String>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: Text(title),
+      content: SizedBox(
+        width: MuseSize.dialogText,
+        child: TextField(
+          key: const ValueKey('ask_text_field'),
+          controller: controller,
+          autofocus: true,
+          maxLines: maxLines,
+          decoration: InputDecoration(hintText: hint),
+          onSubmitted: maxLines == 1 ? (v) => Navigator.of(c).pop(v.trim()) : null,
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('取消')),
+        FilledButton(
+          key: const ValueKey('ask_text_ok'),
+          onPressed: () => Navigator.of(c).pop(controller.text.trim()),
+          child: const Text('确定'),
+        ),
+      ],
+    ),
+  );
+}

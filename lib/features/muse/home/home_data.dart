@@ -12,6 +12,7 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';
+import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/logic/node_cache.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
@@ -141,6 +142,18 @@ final museLatencyCacheWriterProvider = Provider<void>((ref) {
     if (identical(next, cur)) return;
     lastWrite = DateTime.now();
     ref.read(MusePrefs.latencyCache.notifier).update(next.toRaw());
+    // 1.4.0: recent results per node (健康 / 丢包 / 抖动 in the node details): only results newer
+    // than what the cache held count as a new sample
+    final newer = <String, int>{
+      for (final e in fresh.entries)
+        if ((cur.forProfile(profileId).delays[e.key]?.at.millisecondsSinceEpoch ?? 0) ~/ 1000 !=
+            e.value.at.millisecondsSinceEpoch ~/ 1000)
+          e.key: e.value.delay,
+    };
+    if (newer.isNotEmpty) {
+      final h = MuseDelayHistories.parse(ref.read(MusePrefs.delayHistory)).add(profileId, newer);
+      ref.read(MusePrefs.delayHistory.notifier).update(h.toRaw());
+    }
   }
 
   ref.listen<AsyncValue<OutboundGroup?>>(proxiesOverviewNotifierProvider, (_, next) {

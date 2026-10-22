@@ -1,3 +1,6 @@
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/logic/net_tools.dart';
+import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:dartx/dartx.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
@@ -497,7 +500,10 @@ abstract class ConfigOptions {
       logLevel: ref.watch(logLevel),
       resolveDestination: ref.watch(resolveDestination),
       ipv6Mode: ref.watch(ipv6Mode),
-      remoteDnsAddress: ref.watch(remoteDnsAddress),
+      // 1.4.0: DNS preset (设置 › 网络); 默认 keeps the built-in address
+      remoteDnsAddress: museDnsPreset(ref.watch(MusePrefs.dnsPreset)).address.isNotEmpty
+          ? museDnsPreset(ref.watch(MusePrefs.dnsPreset)).address
+          : ref.watch(remoteDnsAddress),
       remoteDnsDomainStrategy: ref.watch(remoteDnsDomainStrategy),
       directDnsAddress: 'udp://223.5.5.5', // 穿云: fixed on every platform
       directDnsDomainStrategy: ref.watch(directDnsDomainStrategy),
@@ -570,7 +576,15 @@ abstract class ConfigOptions {
       routeRule:
           RouteRule(
                 rules: museApplyAdBlockLevel(
-                  ref.watch(museRouteMode).applyTo(ref.watch(rulesNotifierProvider)),
+                  // 1.4.0: 分流 presets sit between the user's rules and the built-in ones
+                  ref
+                      .watch(museRouteMode)
+                      .applyTo(
+                        museApplyPresets(
+                          ref.watch(rulesNotifierProvider),
+                          museParsePresetChoice(ref.watch(MusePrefs.rulePresets)),
+                        ),
+                      ),
                   MuseAdBlockLevel.fromKey(ref.watch(Preferences.museAdBlockLevel)),
                 ),
               ).toProto3Json()!

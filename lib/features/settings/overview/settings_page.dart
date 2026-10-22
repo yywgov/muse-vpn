@@ -15,6 +15,7 @@ import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/settings/privacy_page.dart';
 import 'package:hiddify/features/muse/settings/windows_settings.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
@@ -52,15 +53,7 @@ class SettingsPage extends HookConsumerWidget {
                 title: '外观',
                 trailing: Text(shownTheme.present(t)),
                 chevron: true,
-                onTap: () async {
-                  final picked = await museSettingPick<AppThemeMode>(
-                    context,
-                    '外观',
-                    [for (final m in AppThemeMode.choices) (m, m.present(t))],
-                    shownTheme,
-                  );
-                  if (picked != null) await ref.read(themePreferencesProvider.notifier).changeThemeMode(picked);
-                },
+                onTap: () => musePushPage(context, const MuseAppearancePage()),
               ),
               // 1.3.0: one switch for reconnect → switch node → restart core (logic/keep_alive.dart)
               MuseSwitchTile(
@@ -110,6 +103,46 @@ class SettingsPage extends HookConsumerWidget {
                   chevron: true,
                   onTap: () => context.goNamed('perAppProxy'),
                 ),
+            ],
+          ),
+          // 1.4.0
+          MuseSection(
+            children: [
+              MuseTile(
+                key: const ValueKey('settings_nodes'),
+                leading: const Icon(Icons.public_rounded),
+                title: '节点',
+                chevron: true,
+                onTap: () => musePushPage(context, const MuseNodeSettingsPage()),
+              ),
+              MuseTile(
+                key: const ValueKey('settings_routing'),
+                leading: const Icon(Icons.alt_route_rounded),
+                title: '分流',
+                chevron: true,
+                onTap: () => musePushPage(context, const MuseRoutingPage()),
+              ),
+              MuseTile(
+                key: const ValueKey('settings_network'),
+                leading: const Icon(Icons.lan_outlined),
+                title: '网络',
+                chevron: true,
+                onTap: () => musePushPage(context, const MuseNetworkPage()),
+              ),
+              MuseTile(
+                key: const ValueKey('settings_sync'),
+                leading: const Icon(Icons.cloud_sync_outlined),
+                title: '同步与备份',
+                chevron: true,
+                onTap: () => musePushPage(context, const MuseSyncPage()),
+              ),
+              MuseTile(
+                key: const ValueKey('settings_stats'),
+                leading: const Icon(Icons.bar_chart_rounded),
+                title: '统计',
+                chevron: true,
+                onTap: () => musePushPage(context, const MuseStatsPage()),
+              ),
             ],
           ),
           if (PlatformUtils.isWindows) const WindowsSettingsSection(),

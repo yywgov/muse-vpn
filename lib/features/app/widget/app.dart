@@ -1,5 +1,6 @@
 import 'package:hiddify/features/muse/data/core_extras_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/data/traffic_recorder.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
 import 'package:flutter/foundation.dart';
@@ -90,6 +91,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     // 1.4.0: 测速 settings for the core, delay cache
     ref.listen(museCoreExtrasProvider, (_, _) {});
     ref.listen(museLatencyCacheWriterProvider, (_, _) {});
+    ref.listen(museTrafficRecorderProvider, (_, _) {});
     // 穿云 1.3.0: node list kept for picking while disconnected; 网速 sparkline history
     ref.listen(museNodeCacheWriterProvider, (_, _) {});
     ref.listen(museSpeedHistoryProvider, (_, _) {});

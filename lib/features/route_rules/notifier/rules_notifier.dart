@@ -217,6 +217,14 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
     return true;
   }
 
+  /// 穿云 1.4.0: rules from a 穿云 rule file go first; an existing rule with the same name is
+  /// replaced, built-in rules keep their own content.
+  Future<void> museImport(List<Rule> imported) async {
+    final names = {for (final r in imported) r.name};
+    state = _withBuiltins([...imported, ...state.where((r) => !names.contains(r.name))]);
+    await _updateFile();
+  }
+
   //export JSON
   Future<void> resetRules() async {
     if (await file.exists()) {

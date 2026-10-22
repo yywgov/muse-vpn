@@ -9,7 +9,7 @@ name: 穿云 Windows
 # workflow skips them).
 on:
   push:
-    branches: [main]
+    branches: [main, v1.4]
     tags: ['v*']
     paths-ignore: ['**.md', 'docs/**']
   pull_request:

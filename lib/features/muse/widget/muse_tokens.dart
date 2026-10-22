@@ -101,6 +101,15 @@ abstract final class MuseSize {
   static const emptyArt = 72.0;
   static const emptyIcon = 40.0;
   static const segmented = 32.0;
+
+  /// 1.4.0: 统计 chart height, gap between its bars, minimum bar, QR code
+  static const chartHeight = 160.0;
+  static const barGap = 2.0;
+  static const barMin = 4.0;
+  static const qrCode = 240.0;
+
+  /// 隐私模式 blur strength
+  static const privacyBlur = 6.0;
 }
 
 /// 1.4.0: accent colours to pick from (one at a time; brand blue by default).
@@ -153,6 +162,7 @@ abstract final class MusePalette {
   static const lightHeroIdle = Color(0xFFFFFFFF);
   static const lightShadow = Color(0x0F111827);
   static const knobShadow = Color(0x26000000);
+  static const qrInk = Color(0xFF000000);
 
   // dark (night blue, never pure black)
   static const darkBgTop = Color(0xFF17223F);

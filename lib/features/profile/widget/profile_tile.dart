@@ -1,3 +1,5 @@
+import 'package:hiddify/features/muse/logic/sub_tools.dart';
+import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/subscription_bar.dart';
@@ -317,6 +319,18 @@ class ProfileActionsMenu extends HookConsumerWidget {
             }
             ref.read(updateProfileNotifierProvider(profile.id).notifier).updateProfile(profile as RemoteProfileEntity);
           },
+        ),
+      // 1.4.0: QR code of the subscription (scanned by another phone, opens 穿云 to import)
+      if (profile case final RemoteProfileEntity remote)
+        AdaptiveMenuItem(
+          leadingIcon: const Icon(Icons.qr_code_2_rounded),
+          title: '二维码分享',
+          onTap: () => showMuseQrDialog(
+            context,
+            title: remote.name,
+            data: museSubscriptionQrPayload(remote.url, name: remote.name),
+            copyText: remote.url,
+          ),
         ),
       AdaptiveMenuItem(
         leadingIcon: const Icon(Icons.edit_rounded),
