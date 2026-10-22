@@ -5,7 +5,7 @@ name: 穿云 Android
 # Push a tag v* -> also publish a GitHub Release with the APKs.
 on:
   push:
-    branches: [main, v1.4]
+    branches: [main, v1.4, 'rel-*']
     tags: ['v*']
     paths-ignore: ['**.md', 'docs/**']
   pull_request:

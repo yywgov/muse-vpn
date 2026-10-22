@@ -13,6 +13,16 @@ import 'dart:isolate';
 import 'package:hiddify/features/muse/data/sync_service.dart';
 import 'package:hiddify/features/muse/logic/lan_sync.dart';
 
+// The key derivation is slow on purpose, so sealing/opening runs off the UI isolate. The closures
+// are built here, in a scope holding only sendable values: a closure made inside a request handler
+// would drag the HttpRequest/HttpResponse (unsendable) into the isolate message.
+Future<MuseLanMessage> _openAsync(String body, String key, String expectType) {
+  final now = DateTime.now();
+  return Isolate.run(() => museLanOpen(body, key, expectType: expectType, now: now));
+}
+
+Future<String> _sealAsync(MuseLanMessage m, String key) => Isolate.run(() => museLanSeal(m, key));
+
 enum MuseLanHostState { starting, waiting, syncing, done, expired, failed }
 
 /// The host: listens on the LAN address until one sync is done, the pairing expires or [stop].
@@ -105,18 +115,21 @@ class MuseLanHost {
       if (body == null) return reply(HttpStatus.requestEntityTooLarge);
       final MuseLanMessage msg;
       try {
-        msg = await Isolate.run(() => museLanOpen(body, p.key, expectType: 'push', now: DateTime.now()));
+        msg = await _openAsync(body, p.key, 'push');
       } on MuseLanException catch (e) {
+        await reply(HttpStatus.forbidden, e.message);
         if (++_bad >= museLanMaxBadRequests) {
           _set(MuseLanHostState.failed, '收到多次错误的请求，已停止');
           unawaited(_close());
         }
-        return reply(HttpStatus.forbidden, e.message);
+        return;
       }
       if (!await confirm(msg.device.isEmpty ? from : msg.device)) {
+        // answer first: closing the server force-closes the open connection
+        await reply(HttpStatus.forbidden, '对方拒绝了同步');
         _set(MuseLanHostState.failed, '已拒绝');
         unawaited(_close());
-        return reply(HttpStatus.forbidden, '对方拒绝了同步');
+        return;
       }
       _set(MuseLanHostState.syncing);
       final local = await _sync.stampedLocal(remoteKeys: msg.snapshot.entries.keys.toSet());
@@ -128,15 +141,14 @@ class MuseLanHost {
         device: MuseSyncService.deviceName,
         snapshot: merged,
       );
-      final key = p.key;
-      final sealed = await Isolate.run(() => museLanSeal(out, key));
+      final sealed = await _sealAsync(out, p.key);
       result = await _sync.applyMerged(merged);
       await reply(HttpStatus.ok, sealed);
       _set(MuseLanHostState.done, result!.summary);
       unawaited(_close());
     } catch (e) {
-      _set(MuseLanHostState.failed, '同步失败：$e');
       await reply(HttpStatus.internalServerError);
+      _set(MuseLanHostState.failed, '同步失败：$e');
       unawaited(_close());
     } finally {
       _busy = false;
@@ -182,7 +194,7 @@ Future<MuseSyncResult> museLanSyncWith(MuseSyncService sync, MuseLanPairing p, {
     firstSync: sync.lastSynced().entries.isEmpty,
   );
   final key = p.key;
-  final sealed = await Isolate.run(() => museLanSeal(msg, key));
+  final sealed = await _sealAsync(msg, key);
   final client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 8)
     // straight to the LAN device, never through 穿云's own proxy
@@ -199,6 +211,8 @@ Future<MuseSyncResult> museLanSyncWith(MuseSyncService sync, MuseLanPairing p, {
     body = await res.transform(utf8.decoder).join().timeout(const Duration(seconds: 20));
   } on TimeoutException {
     throw const MuseLanException('对方没有回应（确认对方已打开配对码并点了同意）');
+  } on HttpException {
+    throw const MuseLanException('连接被对方中断，请重新扫码');
   } on SocketException {
     throw const MuseLanException('连不上对方：确认两台设备在同一网络，Windows 需在防火墙中允许穿云（专用网络）');
   } finally {
@@ -206,7 +220,7 @@ Future<MuseSyncResult> museLanSyncWith(MuseSyncService sync, MuseLanPairing p, {
   }
   if (status == HttpStatus.gone) throw const MuseLanException('配对码已用过或已过期');
   if (status != HttpStatus.ok) throw MuseLanException(body.isNotEmpty ? body : '对方返回 $status');
-  final reply = await Isolate.run(() => museLanOpen(body, key, expectType: 'merged', now: DateTime.now()));
+  final reply = await _openAsync(body, key, 'merged');
   return sync.applyMerged(reply.snapshot);
 }
 
