@@ -18,3 +18,6 @@ Map<String, dynamic> museTestExtras({required int workers, required int timeoutS
 
 /// Custom hosts for the core (`muse-hosts`, core 5.0.0-muse.14); nothing when empty.
 Map<String, dynamic> museHostsExtras(Map<String, String> hosts) => hosts.isEmpty ? const {} : {'muse-hosts': hosts};
+
+/// Sites / apps through one node (`muse-node-rules`, core 5.0.0-muse.14); nothing when empty.
+Map<String, dynamic> museNodeRulesExtras(List<Map<String, dynamic>> rules) => rules.isEmpty ? const {} : {'muse-node-rules': rules};

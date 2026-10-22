@@ -129,7 +129,10 @@ void main() {
     test('traffic: 80 % used, then used up', () {
       expect(kinds(used: 79 * gb), isEmpty);
       expect(kinds(used: 80 * gb), ['traffic80']);
-      expect(kinds(used: 99 * gb), ['traffic80']);
+      expect(kinds(used: 89 * gb), ['traffic80']);
+      // 1.4.1: again at 10 % left
+      expect(kinds(used: 90 * gb), ['traffic90']);
+      expect(kinds(used: 99 * gb), ['traffic90']);
       expect(kinds(used: 100 * gb), ['traffic100']);
       expect(kinds(used: 120 * gb), ['traffic100']);
     });
@@ -169,12 +172,12 @@ void main() {
         'tag_name': 'v1.1.0',
         'prerelease': false,
         'assets': [
-          {'name': 'hiddify-arm64-debug.apk', 'browser_download_url': 'https://x/other', 'size': 1},
-          {'name': 'Chuanyun-Android-arm64.apk', 'browser_download_url': 'https://x/apk', 'size': 42},
+          {'name': 'hiddify-arm64-debug.apk', 'browser_download_url': 'https://github.com/yywgov/muse-vpn/releases/download/v1/other', 'size': 1},
+          {'name': 'Chuanyun-Android-arm64.apk', 'browser_download_url': 'https://github.com/yywgov/muse-vpn/releases/download/v1/apk', 'size': 42},
         ],
       });
       expect(r?.version, '1.1.0');
-      expect(r?.apkUrl, 'https://x/apk');
+      expect(r?.apkUrl, 'https://github.com/yywgov/muse-vpn/releases/download/v1/apk');
       expect(r?.apkSize, 42);
     });
 
@@ -184,12 +187,12 @@ void main() {
         'prerelease': false,
         'html_url': 'https://github.com/yywgov/muse-vpn/releases/tag/v1.2.0',
         'assets': [
-          {'name': 'Chuanyun-Android-arm64.apk', 'browser_download_url': 'https://x/apk', 'size': 42},
-          {'name': 'Chuanyun-Windows-x64.zip', 'browser_download_url': 'https://x/zip', 'size': 7},
+          {'name': 'Chuanyun-Android-arm64.apk', 'browser_download_url': 'https://github.com/yywgov/muse-vpn/releases/download/v1/apk', 'size': 42},
+          {'name': 'Chuanyun-Windows-x64.zip', 'browser_download_url': 'https://github.com/yywgov/muse-vpn/releases/download/v1/zip', 'size': 7},
         ],
       };
       final r = museParseRelease(json, windows: true);
-      expect(r?.apkUrl, 'https://x/zip');
+      expect(r?.apkUrl, 'https://github.com/yywgov/muse-vpn/releases/download/v1/zip');
       expect(museIsWindowsInstaller(r!), isFalse);
       expect(r.pageUrl, 'https://github.com/yywgov/muse-vpn/releases/tag/v1.2.0');
       expect(museParseRelease({...json, 'assets': []}, windows: true), isNull);
@@ -200,12 +203,12 @@ void main() {
         'tag_name': 'v1.2.0',
         'prerelease': false,
         'assets': [
-          {'name': 'Chuanyun-Windows-x64.zip', 'browser_download_url': 'https://x/zip', 'size': 7},
-          {'name': 'Chuanyun-Windows-x64-Setup.exe', 'browser_download_url': 'https://x/setup.exe', 'size': 9},
+          {'name': 'Chuanyun-Windows-x64.zip', 'browser_download_url': 'https://github.com/yywgov/muse-vpn/releases/download/v1/zip', 'size': 7},
+          {'name': 'Chuanyun-Windows-x64-Setup.exe', 'browser_download_url': 'https://github.com/yywgov/muse-vpn/releases/download/v1/setup.exe', 'size': 9},
         ],
       };
       final r = museParseRelease(json, windows: true);
-      expect(r?.apkUrl, 'https://x/setup.exe');
+      expect(r?.apkUrl, 'https://github.com/yywgov/muse-vpn/releases/download/v1/setup.exe');
       expect(r?.apkSize, 9);
       expect(museIsWindowsInstaller(r!), isTrue);
     });

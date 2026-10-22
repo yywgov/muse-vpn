@@ -32,10 +32,23 @@ abstract final class ChuanyunPlatform {
 
   static Future<bool> openAppDetails() async => await _call<bool>('open_app_details') ?? false;
 
+  static Future<bool> openDateSettings() async => await _call<bool>('open_date_settings') ?? false;
+
   static Future<bool> openAutostartSettings() async => await _call<bool>('open_autostart_settings') ?? false;
 
   /// Epoch millis when the VPN service last came up (0/null when stopped or not Android).
   static Future<int?> connectedSince() => _call<int>('get_connected_since');
+
+  /// 1.4.1: manufacturer / brand / boot time (epoch ms) — null when not Android.
+  static Future<({String manufacturer, String brand, int bootTime})?> deviceInfo() async {
+    final m = await _call<Map<Object?, Object?>>('device_info');
+    if (m == null) return null;
+    return (
+      manufacturer: '${m['manufacturer'] ?? ''}',
+      brand: '${m['brand'] ?? ''}',
+      bootTime: (m['boot_time'] as num?)?.toInt() ?? 0,
+    );
+  }
 
   /// 穿云: what the Android side keeps for 导出诊断 (device facts, disconnect reasons, crash traces).
   static Future<Map<Object?, Object?>?> nativeDiagnostics() => _call<Map<Object?, Object?>>('diagnostics_native');

@@ -37,6 +37,7 @@ import 'package:hiddify/riverpod_observer.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path/path.dart' as p;
+import 'package:hiddify/features/muse/data/crash_recorder.dart';
 
 Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async {
   if (!kIsWeb) {
@@ -44,8 +45,15 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   }
   // phase 1 — console and the in-memory history, before the folders are known
   logStart();
-  FlutterError.onError = Logger.logFlutterError;
-  WidgetsBinding.instance.platformDispatcher.onError = Logger.logPlatformDispatcherError;
+  // 穿云 1.4.1: errors also go to the local crash log (诊断 › 导出崩溃记录)
+  FlutterError.onError = (d) {
+    Logger.logFlutterError(d);
+    MuseCrashRecorder.onFlutterError(d);
+  };
+  WidgetsBinding.instance.platformDispatcher.onError = (e, st) {
+    MuseCrashRecorder.record(e, st);
+    return Logger.logPlatformDispatcherError(e, st);
+  };
 
   final stopWatch = Stopwatch()..start();
 
@@ -108,6 +116,9 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
 
   final appInfo = await _safeInit("app info", () => container.read(appInfoProvider.future));
   await _init("preferences", () => container.read(sharedPreferencesProvider.future));
+  try {
+    MuseCrashRecorder.attach(container.read(sharedPreferencesProvider).requireValue);
+  } catch (_) {}
   // The ring starts at a safe default and only now learns the size the user
   // picked, since nothing could be read from disk before this point.
   logRing.capacity = container.read(Preferences.logBufferSize);

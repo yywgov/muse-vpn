@@ -12,6 +12,8 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
@@ -22,6 +24,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:version/version.dart';
 
 const museLatestReleaseApi = 'https://api.github.com/repos/yywgov/muse-vpn/releases/latest';
+
+/// 1.4.1 Beta 通道: the newest releases including prereleases.
+const museReleasesApi = 'https://api.github.com/repos/yywgov/muse-vpn/releases?per_page=10';
+
+/// The only place an update file may come from (a mirror only relays this URL).
+const museReleaseDownloadPrefix = 'https://github.com/yywgov/muse-vpn/releases/download/';
 
 /// Release asset the app updates from (signed with the fixed 穿云 key).
 const museApkAssetName = 'Chuanyun-Android-arm64.apk';
@@ -81,10 +89,12 @@ class MuseUpdateDownloading extends MuseUpdateState {
 
 /// Picks the arm64 APK (or with [windows] the Windows zip) out of a GitHub release
 /// (JSON of the releases API), or null.
-MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false}) {
+/// 1.4.1: [allowPrerelease] for the Beta 通道. Asset URLs outside this repository's release
+/// downloads are ignored (release info that came through a mirror can't point elsewhere).
+MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false, bool allowPrerelease = false}) {
   final tag = json['tag_name'] as String? ?? '';
   final version = tag.replaceFirst(RegExp('^v'), '').split('+').first;
-  if (version.isEmpty || json['prerelease'] == true || json['draft'] == true) return null;
+  if (version.isEmpty || (json['prerelease'] == true && !allowPrerelease) || json['draft'] == true) return null;
   final assets = (json['assets'] as List? ?? const []).whereType<Map<String, dynamic>>().toList();
   final pageUrl = json['html_url'] as String? ?? 'https://github.com/yywgov/muse-vpn/releases/latest';
   if (windows) {
@@ -92,7 +102,7 @@ MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false})
       for (final asset in assets) {
         final name = (asset['name'] as String? ?? '').toLowerCase();
         final url = asset['browser_download_url'] as String?;
-        if (url != null && name == wanted.toLowerCase()) {
+        if (url != null && url.startsWith(museReleaseDownloadPrefix) && name == wanted.toLowerCase()) {
           return (
             version: version,
             apkUrl: url,
@@ -114,7 +124,7 @@ MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false})
     final name = (asset['name'] as String? ?? '').toLowerCase();
     if (name.endsWith('.apk') && name.contains('arm64')) {
       final url = asset['browser_download_url'] as String?;
-      if (url == null) continue;
+      if (url == null || !url.startsWith(museReleaseDownloadPrefix)) continue;
       return (
         version: version,
         apkUrl: url,
@@ -130,7 +140,31 @@ MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false})
 /// 1.2.4: GitHub download accelerators tried (after the user's own node) when github.com is slow
 /// or blocked. The file is checked against the release's SHA-256 (and on Android the system
 /// installer checks the signing key), so a mirror cannot slip in a different file.
-const museDownloadMirrors = ['https://ghfast.top/', 'https://gh-proxy.com/'];
+/// 1.4.1: more mirrors (checked working 2026-10-22); the fastest is picked by a short probe.
+const museDownloadMirrors = [
+  'https://ghfast.top/',
+  'https://gh-proxy.com/',
+  'https://edgeone.gh-proxy.com/',
+  'https://hk.gh-proxy.com/',
+  'https://gh.llkk.cc/',
+  'https://gh-proxy.org/',
+];
+
+/// Mirrors that also relay api.github.com (to find out about an update when GitHub is blocked).
+const museApiMirrors = ['https://gh-proxy.com/', 'https://edgeone.gh-proxy.com/', 'https://hk.gh-proxy.com/', 'https://gh-proxy.org/'];
+
+/// 1.4.1: [sources] ordered by a probe's speed ([speeds]: url → bytes/s, null = failed or not
+/// probed): working sources fastest first, then the rest in their original order (still tried,
+/// GitHub itself last of those).
+List<({String url, int? proxyPort})> museRankSources(List<({String url, int? proxyPort})> sources, Map<String, double?> speeds) {
+  final ok = [for (final s in sources) if ((speeds[s.url] ?? 0) > 0) s]
+    ..sort((a, b) => speeds[b.url]!.compareTo(speeds[a.url]!));
+  return [...ok, for (final s in sources) if (!ok.contains(s)) s];
+}
+
+/// Whether a Windows release is safe to install silently: its info came from GitHub itself, not
+/// relayed by a mirror (a mirror could hand out its own digest), and it carries a digest.
+bool museCanInstallSilently(MuseRelease r, {required bool viaMirror}) => !viaMirror && r.sha256 != null;
 
 /// Where an update is downloaded from, in order: through the running 穿云 connection (local
 /// mixed port), then the mirrors, then github.com directly.
@@ -202,7 +236,9 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
   /// [museDownloadSources]), in 4 parallel ranges when the size is known.
   Future<void> _download(String url, String path, int size, {required bool verified}) async {
     // mirrors only for a file whose SHA-256 is checked afterwards
-    final sources = museDownloadSources(url, proxyPort: await _proxyPort(), mirrors: verified);
+    var sources = museDownloadSources(url, proxyPort: await _proxyPort(), mirrors: verified);
+    // 1.4.1: a 64 KB probe of every source at once, fastest first
+    if (sources.length > 2) sources = museRankSources(sources, await _probeSpeeds(sources));
     Object? lastError;
     for (final src in sources) {
       if (_cancel?.isCancelled ?? false) break;
@@ -220,8 +256,45 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
     throw lastError ?? const FileSystemException('download failed');
   }
 
+  /// Bytes/s of a 64 KB range from each source (null = failed), 5 s at most in total.
+  Future<Map<String, double?>> _probeSpeeds(List<({String url, int? proxyPort})> sources) async {
+    final out = <String, double?>{};
+    await Future.wait([
+      for (final src in sources)
+        () async {
+          final dio = _dio(proxyPort: src.proxyPort);
+          final sw = Stopwatch()..start();
+          try {
+            final r = await dio
+                .get<List<int>>(
+                  src.url,
+                  cancelToken: _cancel,
+                  options: Options(responseType: ResponseType.bytes, headers: {'Range': 'bytes=0-65535'}),
+                )
+                .timeout(const Duration(seconds: 5));
+            final n = r.data?.length ?? 0;
+            final html = (r.headers.value('content-type') ?? '').contains('text/html');
+            out[src.url] = (r.statusCode == 206 || r.statusCode == 200) && n > 1024 && !html ? n / (sw.elapsedMilliseconds + 1) * 1000 : null;
+          } catch (_) {
+            out[src.url] = null;
+          } finally {
+            dio.close(force: true);
+          }
+        }(),
+    ]);
+    return out;
+  }
+
   Future<void> _downloadFrom(String url, String path, int size, int? proxyPort) async {
     final dio = _dio(proxyPort: proxyPort);
+    try {
+      await _downloadWith(dio, url, path, size);
+    } finally {
+      dio.close(force: true); // 1.4.1: one client per source, closed afterwards
+    }
+  }
+
+  Future<void> _downloadWith(Dio dio, String url, String path, int size) async {
     void progress(int received) {
       if (size > 0) state = MuseUpdateDownloading((received / size).clamp(0, 1));
     }
@@ -276,23 +349,50 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
     }
   }
 
+  /// Whether the last [check] got the release info through a mirror (see museCanInstallSilently).
+  bool lastCheckViaMirror = false;
+
   /// The latest release when it is newer than this build, null when up to date. Throws on failure.
+  /// 1.4.1: Beta 通道 (prereleases too) and, when GitHub can't be reached, the API mirrors.
   Future<MuseRelease?> check() async {
     if (state is! MuseUpdateIdle) return null;
     state = const MuseUpdateChecking();
     try {
-      // 1.2.4: through the running connection when there is one, github.com directly otherwise
+      final beta = ref.read(MusePrefs.betaChannel);
+      final api = beta ? museReleasesApi : museLatestReleaseApi;
       final port = await _proxyPort();
-      Response<Map<String, dynamic>> response;
-      try {
-        response = await _dio(proxyPort: port).get<Map<String, dynamic>>(museLatestReleaseApi);
-      } catch (_) {
-        if (port == null) rethrow;
-        response = await _dio().get<Map<String, dynamic>>(museLatestReleaseApi);
+      Object? data;
+      lastCheckViaMirror = false;
+      final tries = <({String url, int? port, bool mirror})>[
+        if (port != null) (url: api, port: port, mirror: false),
+        (url: api, port: null, mirror: false),
+        for (final m in museApiMirrors) (url: '$m$api', port: null, mirror: true),
+      ];
+      Object? lastError;
+      for (final t in tries) {
+        final dio = _dio(proxyPort: t.port);
+        try {
+          final r = await dio.get<Object>(t.url);
+          if (r.data is Map || r.data is List) {
+            data = r.data;
+            lastCheckViaMirror = t.mirror;
+            break;
+          }
+        } catch (e) {
+          lastError = e;
+        } finally {
+          dio.close(force: true);
+        }
       }
-      final release = response.data == null
-          ? null
-          : museParseRelease(response.data!, windows: PlatformUtils.isWindows);
+      if (data == null) throw lastError ?? const FileSystemException('release check failed');
+      final windows = PlatformUtils.isWindows;
+      MuseRelease? release;
+      if (data is List) {
+        final picked = musePickRelease([for (final e in data) if (e is Map<String, dynamic>) e], beta: beta);
+        release = picked == null ? null : museParseRelease(picked, windows: windows, allowPrerelease: beta);
+      } else if (data is Map<String, dynamic>) {
+        release = museParseRelease(data, windows: windows, allowPrerelease: beta);
+      }
       final current = ref.read(appInfoProvider).requireValue.version;
       if (release == null || !museIsNewer(release.version, current)) return null;
       return release;
@@ -308,7 +408,9 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
     // 穿云 Windows: only the portable zip in this release -> open the release page.
     // 1.2.2: so does an installer without a SHA-256 digest: an unverified file is never run
     // silently with administrator rights.
-    if (PlatformUtils.isWindows && (!museIsWindowsInstaller(release) || release.sha256 == null)) {
+    // 1.4.1: also when the release info was relayed by a mirror
+    if (PlatformUtils.isWindows &&
+        (!museIsWindowsInstaller(release) || !museCanInstallSilently(release, viaMirror: lastCheckViaMirror))) {
       return UriUtils.tryLaunch(Uri.parse(release.pageUrl));
     }
     if (PlatformUtils.isWindows) return _downloadAndRunSetup(release);

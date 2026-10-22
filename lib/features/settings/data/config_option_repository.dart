@@ -583,6 +583,8 @@ abstract class ConfigOptions {
                         museApplyPresets(
                           ref.watch(rulesNotifierProvider),
                           museParsePresetChoice(ref.watch(MusePrefs.rulePresets)),
+                          // 1.4.1: rule-sets the user added by link
+                          remote: museParseRemoteRuleSets(ref.watch(MusePrefs.remoteRuleSets)),
                         ),
                       ),
                   MuseAdBlockLevel.fromKey(ref.watch(Preferences.museAdBlockLevel)),

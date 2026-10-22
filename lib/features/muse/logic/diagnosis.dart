@@ -63,3 +63,60 @@ String museDiagConclusion(List<MuseDiagItem> items) {
   if (items.any((e) => e.level == MuseDiagLevel.warn)) return '基本正常，有需要留意的地方';
   return '一切正常';
 }
+
+// ---------------------------------------------------------------- 1.4.1: 故障诊断向导
+
+/// 时间: TLS and several protocols (VMess) fail when the clock is off.
+MuseDiagItem museDiagClock(Duration? skew) {
+  if (skew == null) return const MuseDiagItem('时间', MuseDiagLevel.skip, '无法核对时间');
+  final s = skew.inSeconds.abs();
+  if (s <= 60) return const MuseDiagItem('时间', MuseDiagLevel.ok, '系统时间准确');
+  final mins = (s / 60).round();
+  final level = s > 90 ? MuseDiagLevel.fail : MuseDiagLevel.warn;
+  return MuseDiagItem('时间', level, '系统时间${skew.isNegative ? '慢' : '快'}了约 $mins 分钟，部分节点会连不上，请打开「自动设置时间」');
+}
+
+/// Windows 系统代理残留 (穿云 was closed abnormally and the setting still points at it).
+MuseDiagItem museDiagStaleProxy({required bool stale, int? port}) => stale
+    ? MuseDiagItem('系统代理', MuseDiagLevel.fail, '系统代理还指向 127.0.0.1:${port ?? ''}，但没有程序在监听，其他软件会上不了网')
+    : const MuseDiagItem('系统代理', MuseDiagLevel.ok, '没有残留的系统代理');
+
+/// What the wizard offers to do next.
+enum MuseDiagAction {
+  repairProxy('修复系统代理'),
+  switchNode('换个节点'),
+  testNodes('全部测速'),
+  updateSubs('更新订阅'),
+  reconnect('重新连接'),
+  connect('连接'),
+  fixClock('打开时间设置');
+
+  const MuseDiagAction(this.title);
+
+  final String title;
+}
+
+/// The fixes for what the checks found, most useful first (at most three).
+List<MuseDiagAction> museDiagActions(List<MuseDiagItem> items, {required bool connected}) {
+  MuseDiagLevel? level(String title) => items.where((e) => e.title == title).firstOrNull?.level;
+  final out = <MuseDiagAction>[];
+  if (level('系统代理') == MuseDiagLevel.fail && !connected) out.add(MuseDiagAction.repairProxy);
+  if (level('时间') == MuseDiagLevel.fail) out.add(MuseDiagAction.fixClock);
+  if (level('网络') == MuseDiagLevel.fail) return out; // the device itself is offline: nothing else helps
+  if (!connected) {
+    out.add(MuseDiagAction.connect);
+    return out.take(3).toList();
+  }
+  final node = level('节点');
+  final internet = level('外网');
+  final routing = level('系统代理 / VPN');
+  if (routing == MuseDiagLevel.fail) out.add(MuseDiagAction.reconnect);
+  if (node == MuseDiagLevel.fail || internet == MuseDiagLevel.fail) {
+    out.add(MuseDiagAction.switchNode);
+    out.add(MuseDiagAction.testNodes);
+    out.add(MuseDiagAction.updateSubs);
+  } else if (node == MuseDiagLevel.warn) {
+    out.add(MuseDiagAction.testNodes);
+  }
+  return out.toSet().take(3).toList();
+}

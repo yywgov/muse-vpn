@@ -134,6 +134,11 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
 
                 "open_app_details" -> result.success(startFirst(listOf(appDetailsIntent())))
 
+                // 穿云 1.4.1: 诊断 › 时间不准
+                "open_date_settings" -> result.success(
+                    startFirst(listOf(Intent(android.provider.Settings.ACTION_DATE_SETTINGS), appDetailsIntent()))
+                )
+
                 // ColorOS / OPPO: 自启动 manager; other systems fall back to the app's details page
                 "open_autostart_settings" -> {
                     val intents = listOf(
@@ -147,6 +152,16 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
                 }
 
                 "get_connected_since" -> result.success(Settings.connectedSince)
+
+                // 穿云 1.4.1: background-kill detection (a start recorded before the last boot is a
+                // reboot, not a kill) and the brand-specific keep-alive steps
+                "device_info" -> result.success(
+                    mapOf(
+                        "manufacturer" to (Build.MANUFACTURER ?: ""),
+                        "brand" to (Build.BRAND ?: ""),
+                        "boot_time" to (System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()),
+                    )
+                )
 
                 // 穿云: 关于 › 导出诊断 — disconnect reasons, core crash traces, device facts
                 "diagnostics_native" -> {

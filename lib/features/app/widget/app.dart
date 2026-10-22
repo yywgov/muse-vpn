@@ -1,6 +1,8 @@
 import 'package:hiddify/features/muse/data/core_extras_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/traffic_recorder.dart';
+import 'package:hiddify/features/muse/home/net_watch.dart';
+import 'package:hiddify/features/muse/desktop/launch_control.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
 import 'package:flutter/foundation.dart';
@@ -92,6 +94,11 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     ref.listen(museCoreExtrasProvider, (_, _) {});
     ref.listen(museLatencyCacheWriterProvider, (_, _) {});
     ref.listen(museTrafficRecorderProvider, (_, _) {});
+    // 1.4.1: wake re-check, 定时连接/断开, 连接质量提醒
+    ref.listen(museWakeCheckProvider, (_, _) {});
+    ref.listen(museScheduleProvider, (_, _) {});
+    ref.listen(museQualityAlertProvider, (_, _) {});
+    ref.listen(museLaunchControlProvider, (_, _) {});
     // 穿云 1.3.0: node list kept for picking while disconnected; 网速 sparkline history
     ref.listen(museNodeCacheWriterProvider, (_, _) {});
     ref.listen(museSpeedHistoryProvider, (_, _) {});

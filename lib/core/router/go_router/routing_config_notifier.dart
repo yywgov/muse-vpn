@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'package:hiddify/features/muse/desktop/launch_control.dart';
+import 'package:hiddify/features/muse/logic/net_tools.dart';
+import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -77,6 +81,12 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
           url = state.uri.queryParameters['url'];
         }
 
+        // 穿云 1.4.1: chuanyun://connect[?node=] / chuanyun://disconnect
+        final control = url == null ? null : museParseDeepLink(url);
+        if (control != null && (control.connect || control.disconnect)) {
+          unawaited(museApplyLaunchControl(ref, MuseCliArgs(connect: control.connect, disconnect: control.disconnect, node: control.node)));
+          return '/home';
+        }
         if (url != null && Uri.parse(url).host == 'import') {
           // Auto import profile from url
           WidgetsBinding.instance.addPostFrameCallback(

@@ -74,13 +74,23 @@ class MuseTrafficLog {
 
 /// Turns the core's running session totals into per-day deltas: a total that went down means a
 /// new session (counted from zero).
+/// 1.4.1: the first sample after start-up / [reset] only sets the baseline. The core's totals
+/// cover the whole session, and a session that was already running when the app (re)started was
+/// counted before: adding the first total again double-counted it.
 class MuseTrafficCounter {
   int _lastUp = 0;
   int _lastDown = 0;
+  bool _primed = false;
 
   (int, int) delta(int up, int down) {
-    final du = up >= _lastUp ? up - _lastUp : up;
-    final dd = down >= _lastDown ? down - _lastDown : down;
+    if (!_primed) {
+      _primed = true;
+      _lastUp = up < 0 ? 0 : up;
+      _lastDown = down < 0 ? 0 : down;
+      return (0, 0);
+    }
+    final du = up >= _lastUp ? up - _lastUp : (up < 0 ? 0 : up);
+    final dd = down >= _lastDown ? down - _lastDown : (down < 0 ? 0 : down);
     _lastUp = up;
     _lastDown = down;
     return (du, dd);
@@ -89,6 +99,7 @@ class MuseTrafficCounter {
   void reset() {
     _lastUp = 0;
     _lastDown = 0;
+    _primed = false;
   }
 }
 

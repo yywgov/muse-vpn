@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -158,6 +159,16 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
     // Single, user-initiated updates report failure via a dialog; success is
     // shown inline by the button indicator. Bulk runs stay silent here and are
     // summarized in one aggregate toast by ForegroundProfilesUpdateNotifier.
+    // 穿云 1.4.1: what the update changed (single, user-started updates)
+    if (!isBulk && !state.hasError) {
+      try {
+        final after = await _profilesRepo.getRawConfig(profile.id).getOrElse((_) => '').run();
+        final diff = museSubDiff(museConfigNodeNames(before), museConfigNodeNames(after));
+        if (before.isNotEmpty && diff.changed) {
+          ref.read(inAppNotificationControllerProvider).showInfoToast('${profile.name}：${diff.summary}');
+        }
+      } catch (_) {}
+    }
     if (state case AsyncError(:final error) when !isBulk) {
       final t = ref.read(translationsProvider).requireValue;
       ref

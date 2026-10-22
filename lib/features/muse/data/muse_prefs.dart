@@ -82,8 +82,8 @@ abstract final class MusePrefs {
   /// Wi‑Fi rules (Windows; experimental)
   static final wifiRules = PreferencesNotifier.create<String, String>("muse_wifi_rules", "");
 
-  // ---- 同步 (坚果云 WebDAV)
-  static final webdavUrl = PreferencesNotifier.create<String, String>("muse_webdav_url", "https://dav.jianguoyun.com/dav/");
+  // ---- 同步 (1.4.1: 局域网同步 first; WebDAV — any server — under 更多)
+  static final webdavUrl = PreferencesNotifier.create<String, String>("muse_webdav_url", "");
   static final webdavUser = PreferencesNotifier.create<String, String>("muse_webdav_user", "");
   static final webdavPassword = PreferencesNotifier.create<String, String>("muse_webdav_password", "");
 
@@ -105,6 +105,19 @@ abstract final class MusePrefs {
 
   /// salted SHA-256 of the PIN
   static final appLockPin = PreferencesNotifier.create<String, String>("muse_app_lock_pin", "");
+
+  // ---- 1.4.1
+  /// the VPN start (connectedSince) already reported as killed in the background
+  static final killReported = PreferencesNotifier.create<int, int>("muse_kill_reported", 0);
+
+  /// times 穿云 was found killed in the background
+  static final killCount = PreferencesNotifier.create<int, int>("muse_kill_count", 0);
+
+  /// the app version of the previous start (an update kills the service too)
+  static final lastRunVersion = PreferencesNotifier.create<String, String>("muse_last_run_version", "");
+
+  /// the slot the schedule fired last (logic/net_tools.dart museScheduleDue)
+  static final scheduleLastFired = PreferencesNotifier.create<int, int>("muse_schedule_last_fired", -1);
 
   // ---- 更新
   static final betaChannel = PreferencesNotifier.create<bool, bool>("muse_beta_channel", false);

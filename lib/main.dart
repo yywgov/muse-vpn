@@ -7,9 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_driver/driver_extension.dart';
 import 'package:hiddify/bootstrap.dart';
+import 'package:hiddify/features/muse/desktop/launch_control.dart';
+import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/core/model/environment.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  // 穿云 1.4.1: --connect / --node= / --disconnect (desktop)
+  museLaunchArgs = museParseCliArgs(args);
   // Debug builds that ask for it: lets an external client tap, type and scroll
   // the app. Behind a flag because the extension installs a TestTextInput that
   // takes over the text input channel — with it on, no field in the app accepts

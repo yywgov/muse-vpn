@@ -11,7 +11,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/features/muse/data/diagnostics.dart';
+import 'package:hiddify/features/muse/logic/net_tools.dart';
+import 'package:hiddify/features/muse/nodes/node_list.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart' show museSaveTextFile;
+import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
 import 'package:hiddify/features/muse/home/exit_card.dart';
 import 'package:hiddify/features/muse/home/reachability.dart';
@@ -56,8 +64,16 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
     final connected = ref.read(serviceRunningProvider);
     // 出口 / services: checked alongside, shown live below
     if (connected) unawaited(ref.read(museExitProvider.notifier).check());
-    // 网络: a domestic site, straight out (not through the proxy)
-    _add(museDiagNetwork(directOk: await _get('http://www.baidu.com/', direct: true) != null));
+    // 网络: a domestic site, straight out (not through the proxy); its Date header checks the clock
+    final direct = await _get('http://www.baidu.com/', direct: true);
+    _add(museDiagNetwork(directOk: direct != null));
+    // 1.4.1 时间: a clock off by minutes breaks TLS / VMess
+    if (direct != null) _add(museDiagClock(museClockSkew(direct.date, DateTime.now())));
+    // 1.4.1 Windows: a system proxy left pointing at a dead local port (穿云 closed abnormally)
+    if (Platform.isWindows && !connected) {
+      final stale = await WindowsProxyGuard.checkStale(connected: false);
+      if (stale.port != null || stale.stale) _add(museDiagStaleProxy(stale: stale.stale, port: stale.port));
+    }
     // DNS
     final domestic = await _resolves('www.baidu.com');
     final foreign = await _resolves('www.google.com');
@@ -104,18 +120,66 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
     }
   }
 
-  static Future<int?> _get(String url, {bool direct = false}) async {
+  static Future<({int status, String? date})?> _get(String url, {bool direct = false}) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
     if (direct) client.findProxy = (_) => 'DIRECT';
     try {
       final req = await client.getUrl(Uri.parse(url)).timeout(const Duration(seconds: 8));
       final res = await req.close().timeout(const Duration(seconds: 8));
       unawaited(res.drain<void>().catchError((_) {}));
-      return res.statusCode;
+      return (status: res.statusCode, date: res.headers.value(HttpHeaders.dateHeader));
     } catch (_) {
       return null;
     } finally {
       client.close(force: true);
+    }
+  }
+
+  bool _acting = false;
+
+  /// 1.4.1: what the wizard's buttons do.
+  Future<void> _act(MuseDiagAction a) async {
+    if (_acting) return;
+    setState(() => _acting = true);
+    try {
+      switch (a) {
+        case MuseDiagAction.repairProxy:
+          final ok = await WindowsProxyGuard.repairStale();
+          _toast(ok ? '已修复系统代理' : '修复失败，请在 Windows 设置 › 网络 › 代理 中关闭「使用代理服务器」', error: !ok);
+        case MuseDiagAction.switchNode:
+          if (mounted) Navigator.of(context).pop();
+          if (mounted) await showMuseNodePicker(context);
+          return;
+        case MuseDiagAction.testNodes:
+          await museRunNodeTest(ref);
+          _toast('已开始测速');
+        case MuseDiagAction.updateSubs:
+          await ref.read(foregroundProfilesUpdateNotifierProvider.notifier).trigger();
+          _toast('正在更新订阅');
+        case MuseDiagAction.reconnect:
+          await ref.read(connectionNotifierProvider.notifier).reconnect(await ref.read(activeProfileProvider.future));
+          _toast('已重新连接');
+        case MuseDiagAction.connect:
+          if (mounted) Navigator.of(context).pop();
+          await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+          return;
+        case MuseDiagAction.fixClock:
+          if (Platform.isWindows) {
+            await Process.start('cmd', ['/c', 'start', 'ms-settings:dateandtime'], mode: ProcessStartMode.detached);
+          } else {
+            await ChuanyunPlatform.openDateSettings();
+          }
+      }
+      if (!mounted) return;
+      setState(() {
+        _items.clear();
+        _running = true;
+      });
+      await _run();
+    } catch (e) {
+      _toast('操作失败：$e', error: true);
+    } finally {
+      if (mounted) setState(() => _acting = false);
     }
   }
 
@@ -206,6 +270,23 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
               else ...[
                 const SizedBox(height: MuseSpace.s16),
                 Text(museDiagConclusion(_items), style: MuseType.body(context).copyWith(fontWeight: FontWeight.w600)),
+                // 1.4.1 向导: one tap for the fix
+                if (museDiagActions(_items, connected: connected).isNotEmpty) ...[
+                  const SizedBox(height: MuseSpace.s12),
+                  Wrap(
+                    key: const ValueKey('diagnose_actions'),
+                    spacing: MuseSpace.s8,
+                    runSpacing: MuseSpace.s8,
+                    children: [
+                      for (final a in museDiagActions(_items, connected: connected))
+                        FilledButton.tonal(
+                          key: ValueKey('diagnose_action_${a.name}'),
+                          onPressed: _acting ? null : () => _act(a),
+                          child: Text(a.title),
+                        ),
+                    ],
+                  ),
+                ],
               ],
               const SizedBox(height: MuseSpace.s16),
               Row(
@@ -235,6 +316,22 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
                     ),
                   ),
                 ],
+              ),
+              // 1.4.1: the local crash log, redacted (nothing is uploaded)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('diagnose_export_crashes'),
+                  icon: const Icon(Icons.bug_report_outlined, size: MuseIconSize.small),
+                  label: const Text('导出崩溃记录'),
+                  onPressed: () async {
+                    final text = MuseCrashRecorder.exportText(ref.read(sharedPreferencesProvider).requireValue);
+                    if (text.isEmpty) return _toast('没有崩溃记录');
+                    if (!context.mounted) return;
+                    final ok = await museSaveTextFile(context, 'chuanyun-crashes.txt', text);
+                    if (ok) _toast('已导出（已脱敏）');
+                  },
+                ),
               ),
             ],
           ),

@@ -13,6 +13,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:path/path.dart' as p;
@@ -126,6 +127,59 @@ abstract final class WindowsProxyGuard {
     } catch (_) {
       return MuseSystemProxy.unknown;
     }
+  }
+
+  /// 1.4.1: the system proxy as the registry has it (null = not Windows / unreadable).
+  static Future<MuseProxySetting?> readSetting() async {
+    if (!PlatformUtils.isWindows) return null;
+    try {
+      final q = await Process.run('reg', ['query', _key]).timeout(const Duration(seconds: 5));
+      final out = q.stdout.toString();
+      if (!out.contains('ProxyEnable')) return null;
+      return MuseProxySetting(
+        enabled: RegExp(r'ProxyEnable\s+REG_DWORD\s+0x0*1\b').hasMatch(out),
+        server: RegExp(r'ProxyServer\s+REG_SZ\s+(.*)').firstMatch(out)?.group(1)?.trim() ?? '',
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<bool> _listening(int port) async {
+    try {
+      final s = await Socket.connect(InternetAddress.loopbackIPv4, port, timeout: const Duration(milliseconds: 800));
+      s.destroy();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 1.4.1 残留系统代理: points at a local port nothing listens on while 穿云 is disconnected
+  /// (any port: an older 穿云 port, or another tool that died).
+  static Future<({bool stale, int? port})> checkStale({required bool connected}) async {
+    final s = await readSetting();
+    final port = s?.loopbackPort;
+    if (s == null || port == null || connected) return (stale: false, port: port);
+    return (stale: museIsStaleProxy(s, connected: connected, listening: await _listening(port)), port: port);
+  }
+
+  /// Puts the user's own settings back (guard backup) and, if the setting still points at a dead
+  /// local port, switches the proxy off. True when it is clean afterwards.
+  static Future<bool> repairStale() async {
+    if (!PlatformUtils.isWindows) return false;
+    final before = await checkStale(connected: false);
+    if (!before.stale) return true;
+    await restore('修复残留代理');
+    var now = await checkStale(connected: false);
+    if (now.stale) {
+      try {
+        await Process.run('reg', ['add', _key, '/v', 'ProxyEnable', '/t', 'REG_DWORD', '/d', '0', '/f']).timeout(const Duration(seconds: 5));
+      } catch (_) {}
+      now = await checkStale(connected: false);
+    }
+    _logger.info('stale system proxy repaired: ${!now.stale} (port ${before.port})');
+    return !now.stale;
   }
 
   /// Fallback when ChuanyunGuard.exe is missing: switch off a ProxyEnable that points at us.

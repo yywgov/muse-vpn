@@ -105,14 +105,40 @@ class MuseSchedule {
   String toRaw() => '$connectAt,$disconnectAt';
 }
 
-/// What the schedule wants at [now], given when it last acted ([lastMinute] = minute of day the
-/// last action fired, so each time fires once per day).
-MuseWifiAction museScheduleDue(MuseSchedule s, DateTime now, {required int lastMinute, required bool running}) {
-  final m = now.hour * 60 + now.minute;
-  if (m == lastMinute) return MuseWifiAction.none;
-  if (s.connectAt == m && !running) return MuseWifiAction.connect;
-  if (s.disconnectAt == m && running) return MuseWifiAction.disconnect;
+/// Minutes since the epoch (local wall clock), the unit [museScheduleDue] remembers.
+int museEpochMinute(DateTime t) => DateTime(t.year, t.month, t.day, t.hour, t.minute).millisecondsSinceEpoch ~/ 60000;
+
+/// What the schedule wants at [now]. [lastFired] is the [museEpochMinute] of the slot that last
+/// fired (so each time fires once per day — 1.4.1: was the minute of the day, which never fired
+/// again on the next day at the same time). A tick that comes up to [grace] late (timer drift,
+/// a busy moment) still fires the slot.
+MuseWifiAction museScheduleDue(
+  MuseSchedule s,
+  DateTime now, {
+  required int lastFired,
+  required bool running,
+  Duration grace = const Duration(minutes: 2),
+}) {
+  MuseWifiAction? check(int at, MuseWifiAction action) {
+    if (at < 0 || at >= 24 * 60) return null;
+    final slot = DateTime(now.year, now.month, now.day, at ~/ 60, at % 60);
+    final late = now.difference(slot);
+    if (late.isNegative || late > grace) return null;
+    if (museEpochMinute(slot) == lastFired) return null;
+    return action;
+  }
+
+  final c = check(s.connectAt, MuseWifiAction.connect);
+  if (c != null && !running) return c;
+  final d = check(s.disconnectAt, MuseWifiAction.disconnect);
+  if (d != null && running) return d;
   return MuseWifiAction.none;
+}
+
+/// The slot [museScheduleDue] just fired at [now] for [action] (store it as lastFired).
+int museScheduleSlot(MuseSchedule s, DateTime now, MuseWifiAction action) {
+  final at = action == MuseWifiAction.connect ? s.connectAt : s.disconnectAt;
+  return museEpochMinute(DateTime(now.year, now.month, now.day, at ~/ 60, at % 60));
 }
 
 String museMinuteLabel(int m) => m < 0 ? '关闭' : '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
@@ -212,4 +238,93 @@ Map<String, dynamic>? musePickRelease(List<Map<String, dynamic>> releases, {requ
     return r;
   }
   return null;
+}
+
+// ---------------------------------------------------------------- 1.4.1: sleep / wake
+
+/// Notices that the device slept (or the app was frozen): a periodic tick that arrives much later
+/// than [interval].
+class MuseWakeDetector {
+  MuseWakeDetector({this.interval = const Duration(seconds: 15), this.slack = const Duration(seconds: 45)});
+
+  final Duration interval;
+  final Duration slack;
+  DateTime? _last;
+
+  /// The gap when this tick comes after a sleep, else null.
+  Duration? tick(DateTime now) {
+    final last = _last;
+    _last = now;
+    if (last == null) return null;
+    final gap = now.difference(last);
+    return gap > interval + slack ? gap : null;
+  }
+}
+
+enum MuseWakeAction { none, recheck, reconnect }
+
+/// After a wake: check the connection while the user wants it on (keep-alive on), reconnect once
+/// when the check failed although the network itself is back ([directOk]).
+MuseWakeAction museWakeDecide({
+  required bool wantConnected,
+  required bool keepAlive,
+  required bool running,
+  bool? reachOk,
+  bool directOk = true,
+}) {
+  if (!wantConnected || !keepAlive || !running) return MuseWakeAction.none;
+  if (reachOk == null) return MuseWakeAction.recheck;
+  if (!reachOk && directOk) return MuseWakeAction.reconnect;
+  return MuseWakeAction.none;
+}
+
+// ---------------------------------------------------------------- 1.4.1: leftover system proxy
+
+/// The Windows system proxy as read from the registry.
+class MuseProxySetting {
+  const MuseProxySetting({required this.enabled, required this.server});
+
+  final bool enabled;
+  final String server;
+
+  /// The loopback port it points at (127.0.0.1 / localhost / [::1]), else null.
+  int? get loopbackPort {
+    if (!enabled) return null;
+    final m = RegExp(r'(?:^|[=;\s])(?:https?=|socks=)?(?:127\.0\.0\.1|localhost|\[::1\]):(\d{1,5})', caseSensitive: false).firstMatch(server.trim());
+    return m == null ? null : int.tryParse(m.group(1)!);
+  }
+}
+
+/// A system proxy left behind (穿云 crashed / was killed, or another tool died): it points at a
+/// local port that nothing listens on while 穿云 isn't connected. Such a setting breaks every
+/// app's internet. [listening] = something answered on that port.
+bool museIsStaleProxy(MuseProxySetting s, {required bool connected, required bool listening}) {
+  if (connected) return false;
+  return s.loopbackPort != null && !listening;
+}
+
+// ---------------------------------------------------------------- 1.4.1: clock
+
+/// How far this device's clock is off a server's `Date` header (null when unreadable).
+Duration? museClockSkew(String? dateHeader, DateTime localNow) {
+  if (dateHeader == null || dateHeader.isEmpty) return null;
+  try {
+    final server = HttpDateParse.parse(dateHeader);
+    return localNow.toUtc().difference(server);
+  } catch (_) {
+    return null;
+  }
+}
+
+/// RFC 1123 dates (`Thu, 22 Oct 2026 12:00:00 GMT`) without dart:io.
+abstract final class HttpDateParse {
+  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  static DateTime parse(String s) {
+    final m = RegExp(r'(\d{1,2}) (\w{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2})').firstMatch(s);
+    if (m == null) throw const FormatException('bad date');
+    final month = _months.indexOf(m.group(2)!) + 1;
+    if (month == 0) throw const FormatException('bad month');
+    return DateTime.utc(int.parse(m.group(3)!), month, int.parse(m.group(1)!), int.parse(m.group(4)!), int.parse(m.group(5)!), int.parse(m.group(6)!));
+  }
 }

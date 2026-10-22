@@ -6,6 +6,7 @@
 // 1.3.0: 导出日志 moved into 诊断 (设置 › 诊断 / 首页 出口 IP tile).
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
@@ -111,6 +112,15 @@ class AboutPage extends HookConsumerWidget {
                     : const SizedBox(width: MuseIconSize.small, height: MuseIconSize.small, child: CircularProgressIndicator(strokeWidth: 2)),
                 chevron: update is MuseUpdateIdle,
                 onTap: update is MuseUpdateIdle ? checkUpdate : null,
+              ),
+              // 1.4.1: Beta 通道 — prereleases too (off by default)
+              MuseSwitchTile(
+                key: const ValueKey('about_beta'),
+                leading: const Icon(Icons.science_outlined),
+                title: 'Beta 通道',
+                subtitle: '也接收测试版更新，可能不稳定',
+                value: ref.watch(MusePrefs.betaChannel),
+                onChanged: (v) => ref.read(MusePrefs.betaChannel.notifier).update(v),
               ),
               MuseTile(
                 leading: const Icon(Icons.code_rounded),

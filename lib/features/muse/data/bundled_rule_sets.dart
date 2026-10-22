@@ -7,9 +7,11 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:path/path.dart' as p;
 
-const museBundledRuleSets = [
+/// Built-in lists (国内直连 + 去广告).
+const museCoreRuleSets = [
   'geosite-cn',
   'geoip-cn',
   'geosite-category-ads-all',
@@ -19,6 +21,9 @@ const museBundledRuleSets = [
   'geoip-malware',
   'geoip-phishing',
 ];
+
+/// 1.4.1: plus the geosite lists the 分流 presets use (logic/rules_tools.dart).
+List<String> get museBundledRuleSets => [...museCoreRuleSets, for (final g in musePresetGeosites) 'geosite-$g'];
 
 /// Copies the bundled rule-sets into [baseDir]/rule-sets (only files that are missing or differ
 /// in size, so an app update brings newer lists). Never throws.

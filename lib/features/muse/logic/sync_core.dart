@@ -8,6 +8,7 @@
 // Part of 穿云 (GPLv3).
 
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -82,17 +83,30 @@ MuseSnapshot museMergeSnapshots(MuseSnapshot local, MuseSnapshot remote) {
 /// The local entries, stamped: a value that differs from what was last synced ([lastSynced])
 /// gets [now] as its time (it changed here since), an unchanged one keeps its old time. Keys that
 /// were synced before and are gone now become deletions.
+///
+/// 1.4.1:
+///  * a device that never synced ([lastSynced] empty) stamps its values 0 for keys the other side
+///    has ([remoteKeys]): joining a sync takes the existing values instead of overwriting them
+///    with whatever this fresh device happens to hold;
+///  * a subscription another device deleted (`sub:` synced as a deletion) is never brought back
+///    by this device just because sync never deletes subscriptions here.
 MuseSnapshot museStampLocal({
   required Map<String, Object?> current,
   required MuseSnapshot lastSynced,
   required int now,
   String device = '',
+  Set<String> remoteKeys = const {},
 }) {
+  final firstSync = lastSynced.entries.isEmpty;
   final out = <String, MuseSyncEntry>{};
   current.forEach((k, v) {
     final prev = lastSynced.entries[k];
     if (prev != null && jsonEncode(prev.value) == jsonEncode(v)) {
       out[k] = prev;
+    } else if (prev != null && prev.value == null && k.startsWith('sub:')) {
+      out[k] = prev; // deleted elsewhere, only kept here because sync never deletes subscriptions
+    } else if (firstSync && remoteKeys.contains(k)) {
+      out[k] = MuseSyncEntry(v, 0);
     } else {
       out[k] = MuseSyncEntry(v, now);
     }
@@ -126,6 +140,12 @@ MuseSnapshot museRedactSnapshot(MuseSnapshot s) =>
 // ---------------------------------------------------------------- encryption
 
 const _magic = 'chuanyun-enc';
+
+/// Bounds for the PBKDF2 iteration count read from a file.
+const museMinIterations = 1000;
+const museMaxIterations = 300000;
+
+int museClampIterations(int n) => n.clamp(museMinIterations, museMaxIterations);
 
 class MuseCryptoException implements Exception {
   const MuseCryptoException(this.message);
@@ -186,7 +206,9 @@ String museDecrypt(String envelope, String password) {
     final salt = base64.decode('${j['salt']}');
     final nonce = base64.decode('${j['nonce']}');
     final data = base64.decode('${j['data']}');
-    final key = museDeriveKey(password, salt, iterations: (j['iter'] as num?)?.toInt() ?? 60000);
+    // 1.4.1: the iteration count comes from the file: bounded, so a crafted file can't hang the app
+    final iter = museClampIterations((j['iter'] as num?)?.toInt() ?? 60000);
+    final key = museDeriveKey(password, salt, iterations: iter);
     final cipher = GCMBlockCipher(AESEngine())..init(false, AEADParameters(KeyParameter(key), 128, nonce, Uint8List(0)));
     return utf8.decode(cipher.process(data));
   } on InvalidCipherTextException {
@@ -196,3 +218,9 @@ String museDecrypt(String envelope, String password) {
     throw const MuseCryptoException('密码不对或文件已损坏');
   }
 }
+
+/// 1.4.1: [museEncrypt] / [museDecrypt] off the UI thread (PBKDF2 takes a moment in Dart).
+Future<String> museEncryptAsync(String plain, String password, {int iterations = 60000}) =>
+    Isolate.run(() => museEncrypt(plain, password, iterations: iterations));
+
+Future<String> museDecryptAsync(String envelope, String password) => Isolate.run(() => museDecrypt(envelope, password));

@@ -61,6 +61,17 @@ Future<void> museRunNodeTest(WidgetRef ref) async {
   });
 }
 
+/// 1.4.1 多选 › 测速: the chosen nodes one after another (the core queues them on its own
+/// bounded workers); the list shows them as 测速中 until they answer.
+Future<void> museTestNodes(WidgetRef ref, Set<String> tags) async {
+  final notifier = ref.read(proxiesOverviewNotifierProvider.notifier);
+  for (final t in tags.take(200)) {
+    try {
+      await notifier.urlTest(t);
+    } catch (_) {}
+  }
+}
+
 /// Ends the running 测速 in the list (results that still arrive are shown as they come).
 void museStopNodeTest(WidgetRef ref) => ref.read(museNodeTestStartedProvider.notifier).state = null;
 
@@ -143,6 +154,9 @@ class MuseNodeList extends HookConsumerWidget {
     final searchController = useTextEditingController();
     final sortMode = MuseNodeSort.fromKey(ref.watch(Preferences.museNodeSort));
     final favorites = museParseFavorites(ref.watch(Preferences.museFavoriteNodes));
+    // 1.4.1: 多选 (测速 / 收藏 / 隐藏 / 复制名称 for several nodes at once)
+    final selecting = useState(false);
+    final picked = useState<Set<String>>(const {});
     // 1.4.0: rename / note / hide, name filters, duplicates, collapsible regions
     final metas = MuseNodeMetas.parse(ref.watch(MusePrefs.nodeMeta));
     final beautify = ref.watch(MusePrefs.beautifyNames);
@@ -182,10 +196,22 @@ class MuseNodeList extends HookConsumerWidget {
         children: [
           Expanded(
             child: Text(
-              group == null ? '' : '$nodeTotal 个节点',
+              group == null ? '' : (selecting.value ? '已选 ${picked.value.length} 个' : '$nodeTotal 个节点'),
+              key: const ValueKey('node_count_label'),
               style: MuseType.caption(context),
             ),
           ),
+          if (!embedded && nodeTotal > 1)
+            IconButton(
+              key: const ValueKey('node_select_button'),
+              tooltip: selecting.value ? '完成' : '多选',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(selecting.value ? Icons.close_rounded : Icons.checklist_rounded, size: MuseIconSize.small),
+              onPressed: () {
+                selecting.value = !selecting.value;
+                picked.value = const {};
+              },
+            ),
           if (nodeTotal > 6)
             IconButton(
               key: const ValueKey('node_search_button'),
@@ -342,8 +368,16 @@ class MuseNodeList extends HookConsumerWidget {
         favorite: favorites.contains(proxy.tag),
         displayName: proxy.isGroup ? null : shownName(proxy),
         note: proxy.isGroup ? '' : metas.of(proxy.tag).note,
-        onLongPress: () => showMuseNodeDetails(context, ref, proxy, since: since, groupTag: group.tag),
-        onTap: () async {
+        checked: selecting.value && !proxy.isGroup ? picked.value.contains(proxy.tag) : null,
+        onLongPress: selecting.value ? null : () => showMuseNodeDetails(context, ref, proxy, since: since, groupTag: group.tag),
+        onTap: selecting.value
+            ? () {
+                if (proxy.isGroup) return;
+                final next = {...picked.value};
+                if (!next.remove(proxy.tag)) next.add(proxy.tag);
+                picked.value = next;
+              }
+            : () async {
           await musePickNode(ref, group.tag, proxy.tag);
           onPicked?.call();
         },
@@ -470,12 +504,82 @@ class MuseNodeList extends HookConsumerWidget {
       children: children,
     );
     if (embedded) return list;
-    return RefreshIndicator(
+    final refresh = RefreshIndicator(
       key: const ValueKey('nodes_pull_refresh'),
       onRefresh: () => museNodePull(ref),
       color: MusePalette.brand,
-      notificationPredicate: (n) => hasProfile && n.depth == 0,
+      notificationPredicate: (n) => hasProfile && n.depth == 0 && !selecting.value,
       child: list,
+    );
+    if (!selecting.value || group == null) return refresh;
+    final sel = picked.value;
+    final allNodes = [for (final e in group.items) if (!e.isGroup) e.tag];
+    void toast(String t) {
+      try {
+        ref.read(inAppNotificationControllerProvider).showSuccessToast(t);
+      } catch (_) {}
+    }
+
+    Future<void> done(String msg) async {
+      toast(msg);
+      selecting.value = false;
+      picked.value = const {};
+    }
+
+    Widget action(String key, IconData icon, String label, Future<void> Function()? onTap) => Expanded(
+      child: TextButton.icon(
+        key: ValueKey('node_batch_$key'),
+        onPressed: sel.isEmpty || onTap == null ? null : onTap,
+        icon: Icon(icon, size: MuseIconSize.small),
+        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+    );
+
+    return Column(
+      children: [
+        Expanded(child: refresh),
+        Material(
+          color: mt.card,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: margin, vertical: MuseSpace.s4),
+              child: Row(
+                key: const ValueKey('node_batch_bar'),
+                children: [
+                  TextButton(
+                    key: const ValueKey('node_batch_all'),
+                    onPressed: () => picked.value = sel.length == allNodes.length ? const {} : allNodes.toSet(),
+                    child: Text(sel.length == allNodes.length ? '全不选' : '全选'),
+                  ),
+                  action('test', Icons.speed_rounded, '测速', running ? () async {
+                    await museTestNodes(ref, sel);
+                    await done('已开始测速 ${sel.length} 个节点');
+                  } : null),
+                  action('favorite', Icons.star_outline_rounded, '收藏', () async {
+                    var raw = ref.read(Preferences.museFavoriteNodes);
+                    for (final t in sel) {
+                      if (!museParseFavorites(raw).contains(t)) raw = museToggleFavorite(raw, t);
+                    }
+                    await ref.read(Preferences.museFavoriteNodes.notifier).update(raw);
+                    await done('已收藏 ${sel.length} 个');
+                  }),
+                  action('hide', Icons.visibility_off_outlined, '隐藏', () async {
+                    final metas = MuseNodeMetas.parse(ref.read(MusePrefs.nodeMeta));
+                    await ref.read(MusePrefs.nodeMeta.notifier).update(metas.setHidden(sel.where((t) => t != group.selected), true).toRaw());
+                    await done(sel.contains(group.selected) ? '已隐藏（正在使用的节点除外）' : '已隐藏 ${sel.length} 个');
+                  }),
+                  action('copy', Icons.copy_rounded, '复制', () async {
+                    final names = [for (final e in group.items) if (sel.contains(e.tag)) museNodeName(e)];
+                    await Clipboard.setData(ClipboardData(text: names.join('\n')));
+                    await done('已复制 ${names.length} 个名称');
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -555,11 +659,15 @@ class MuseNodeRow extends StatelessWidget {
     this.favorite = false,
     this.displayName,
     this.note = '',
+    this.checked,
   });
 
   /// 1.4.0: the user's own name (or the tidied one) instead of the subscription's
   final String? displayName;
   final String note;
+
+  /// 1.4.1 多选: null = not selecting, else whether this row is picked
+  final bool? checked;
   final OutboundInfo proxy;
   final DateTime? since;
   final DateTime? testStarted;
@@ -621,7 +729,18 @@ class MuseNodeRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s12),
               child: Row(
                 children: [
-                  MuseFlagBox(flag: flag, icon: groupIcon),
+                  if (checked != null)
+                    SizedBox(
+                      key: ValueKey('node_check_${proxy.tag}'),
+                      width: MuseSize.flagBox,
+                      height: MuseSize.flagBox,
+                      child: Icon(
+                        checked! ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                        color: checked! ? MusePalette.brand : mt.text3,
+                      ),
+                    )
+                  else
+                    MuseFlagBox(flag: flag, icon: groupIcon),
                   const SizedBox(width: MuseSpace.s12),
                   Expanded(
                     child: Column(
@@ -982,31 +1101,75 @@ Future<void> showMuseNodePicker(BuildContext context) => showModalBottomSheet<vo
 );
 
 /// A one-line text prompt; null when cancelled, '' allowed (clears the value).
-Future<String?> museAskText(BuildContext context, String title, {String initial = '', String? hint, int maxLines = 1}) {
-  final controller = TextEditingController(text: initial);
-  return showDialog<String>(
-    context: context,
-    builder: (c) => AlertDialog(
-      title: Text(title),
-      content: SizedBox(
-        width: MuseSize.dialogText,
-        child: TextField(
-          key: const ValueKey('ask_text_field'),
-          controller: controller,
-          autofocus: true,
-          maxLines: maxLines,
-          decoration: InputDecoration(hintText: hint),
-          onSubmitted: maxLines == 1 ? (v) => Navigator.of(c).pop(v.trim()) : null,
+/// 1.4.1: the dialog owns (and disposes) its text controller; [obscure] hides a password.
+Future<String?> museAskText(
+  BuildContext context,
+  String title, {
+  String initial = '',
+  String? hint,
+  int maxLines = 1,
+  bool obscure = false,
+}) => showDialog<String>(
+  context: context,
+  builder: (c) => _MuseAskTextDialog(title: title, initial: initial, hint: hint, maxLines: obscure ? 1 : maxLines, obscure: obscure),
+);
+
+class _MuseAskTextDialog extends StatefulWidget {
+  const _MuseAskTextDialog({required this.title, required this.initial, this.hint, required this.maxLines, required this.obscure});
+
+  final String title;
+  final String initial;
+  final String? hint;
+  final int maxLines;
+  final bool obscure;
+
+  @override
+  State<_MuseAskTextDialog> createState() => _MuseAskTextDialogState();
+}
+
+class _MuseAskTextDialogState extends State<_MuseAskTextDialog> {
+  late final TextEditingController _controller = TextEditingController(text: widget.initial);
+  late bool _hidden = widget.obscure;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: SizedBox(
+      width: MuseSize.dialogText,
+      child: TextField(
+        key: const ValueKey('ask_text_field'),
+        controller: _controller,
+        autofocus: true,
+        maxLines: widget.maxLines,
+        obscureText: _hidden,
+        autocorrect: !widget.obscure,
+        enableSuggestions: !widget.obscure,
+        decoration: InputDecoration(
+          hintText: widget.hint,
+          suffixIcon: widget.obscure
+              ? IconButton(
+                  key: const ValueKey('ask_text_reveal'),
+                  icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                  onPressed: () => setState(() => _hidden = !_hidden),
+                )
+              : null,
         ),
+        onSubmitted: widget.maxLines == 1 ? (v) => Navigator.of(context).pop(v.trim()) : null,
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('取消')),
-        FilledButton(
-          key: const ValueKey('ask_text_ok'),
-          onPressed: () => Navigator.of(c).pop(controller.text.trim()),
-          child: const Text('确定'),
-        ),
-      ],
     ),
+    actions: [
+      TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('取消')),
+      FilledButton(
+        key: const ValueKey('ask_text_ok'),
+        onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+        child: const Text('确定'),
+      ),
+    ],
   );
 }

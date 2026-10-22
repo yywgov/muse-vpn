@@ -4,6 +4,8 @@
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/home/background_guard.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
@@ -48,6 +50,7 @@ class MusePrivacySection extends HookConsumerWidget {
     final batteryIgnored = ref.watch(batteryOptimizationNotifierProvider).valueOrNull;
     final needsBattery = batteryIgnored == false;
     final needsAutostart = !ref.watch(Preferences.autostartVisited);
+    final killCount = ref.watch(MusePrefs.killCount);
 
     return MuseSection(
       header: '隐私与后台',
@@ -71,6 +74,15 @@ class MusePrivacySection extends HookConsumerWidget {
               await ref.read(Preferences.autostartVisited.notifier).update(true);
             },
           ),
+        // 1.4.1: per-brand steps (also shown after the system killed 穿云 in the background)
+        MuseTile(
+          key: const ValueKey('settings_background_guide'),
+          leading: const Icon(Icons.shield_moon_outlined),
+          title: '后台保活指南',
+          trailing: killCount > 0 ? Text('被关闭 $killCount 次') : null,
+          chevron: true,
+          onTap: () => showMuseBackgroundGuide(context),
+        ),
         MuseSwitchTile(
           leading: const Icon(Icons.visibility_off_rounded),
           title: '隐藏桌面图标',

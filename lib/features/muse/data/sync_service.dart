@@ -1,10 +1,14 @@
-// 穿云 1.4.0 - 同步 (坚果云 WebDAV) and 本地备份 / 恢复.
+// 穿云 1.4.0 - 同步 and 本地备份 / 恢复. 1.4.1: 局域网同步 first (data/lan_sync_service.dart);
+// WebDAV (any server) is the secondary option.
 // What is synced: the settings in [museSyncedPrefs] and the subscription links (`sub:<url>` →
 // name). Subscriptions are only ever added by a sync, never deleted. The file on the server is
 // always encrypted (AES-GCM, logic/sync_core.dart) with the sync password (or the app password).
+// 1.4.1: the Dio client is closed after each sync, PBKDF2 runs off the UI thread, a device that
+// never synced takes the existing values, a subscription deleted elsewhere is not resurrected.
 // Part of 穿云 (GPLv3).
 
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:dio/dio.dart';
@@ -40,6 +44,10 @@ final museSyncedPrefs = <String, ProviderOrFamily>{
   'muse_home_tile_order': Preferences.museHomeTileOrder,
   'muse_home_tiles_hidden': Preferences.museHomeTilesHidden,
   'muse-route-mode': ConfigOptions.museRouteMode,
+  // 1.4.1
+  'muse_node_rules': MusePrefs.nodeRules,
+  'muse_remote_rule_sets': MusePrefs.remoteRuleSets,
+  'muse_sub_user_agent': MusePrefs.subUserAgent,
 };
 
 const museSyncFileName = 'chuanyun-sync.json';
@@ -139,6 +147,47 @@ class MuseSyncService {
     return MuseSyncResult(changed: changed, subsAdded: added);
   }
 
+  /// The last merged state this device knows (shared by LAN and WebDAV sync).
+  MuseSnapshot lastSynced() {
+    try {
+      final raw = ref.read(MusePrefs.syncLast);
+      if (raw.isNotEmpty) return MuseSnapshot.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {}
+    return MuseSnapshot.empty;
+  }
+
+  /// This device's values stamped against [lastSynced] ([remoteKeys]: what the other side has,
+  /// for a first sync).
+  Future<MuseSnapshot> stampedLocal({Set<String> remoteKeys = const {}, int? now}) async => museStampLocal(
+    current: await localValues(),
+    lastSynced: lastSynced(),
+    now: now ?? DateTime.now().millisecondsSinceEpoch,
+    device: deviceId,
+    remoteKeys: remoteKeys,
+  );
+
+  /// Applies [merged] here and remembers it as the last synced state.
+  Future<MuseSyncResult> applyMerged(MuseSnapshot merged) async {
+    final result = await apply(museSyncChanges(await localValues(), merged));
+    await ref.read(MusePrefs.syncLast.notifier).update(jsonEncode(merged.toJson()));
+    await ref.read(MusePrefs.syncLastAt.notifier).update(DateTime.now().millisecondsSinceEpoch);
+    return result;
+  }
+
+  /// A readable name for this device (shown to the other side when pairing).
+  static String get deviceName {
+    String host;
+    try {
+      host = Platform.localHostname;
+    } catch (_) {
+      host = '';
+    }
+    final kind = Platform.isAndroid ? 'Android' : (Platform.isWindows ? 'Windows' : Platform.operatingSystem);
+    return host.isEmpty || host == 'localhost' ? kind : '$kind · $host';
+  }
+
+  String get deviceId => _deviceId;
+
   String get _deviceId {
     var id = ref.read(MusePrefs.deviceId);
     if (id.isEmpty) {
@@ -172,7 +221,7 @@ class MuseSyncService {
 
   String _base() {
     var url = ref.read(MusePrefs.webdavUrl).trim();
-    if (url.isEmpty) url = 'https://dav.jianguoyun.com/dav/';
+    if (url.isEmpty) throw const MuseSyncException('请先填写服务器地址');
     if (!url.endsWith('/')) url = '$url/';
     final u = Uri.tryParse(url);
     if (u == null || u.scheme != 'https' || u.host.isEmpty) throw const MuseSyncException('服务器地址需以 https:// 开头');
@@ -181,7 +230,7 @@ class MuseSyncService {
 
   static String _httpError(int? code) => switch (code) {
     401 => '账号或应用密码不对',
-    403 => '没有权限（坚果云需使用「应用密码」）',
+    403 => '没有权限（部分服务需使用「应用密码」）',
     404 => '服务器上没有这个目录',
     507 => '服务器空间已满',
     _ => '服务器返回 $code',
@@ -190,55 +239,49 @@ class MuseSyncService {
   /// Download → merge (last change per field wins) → apply here → upload.
   Future<MuseSyncResult> syncNow() async {
     final dio = _dio();
-    final base = _base();
-    final password = _password;
-    final folder = '$base$museSyncFolder/';
-    final fileUrl = '$folder$museSyncFileName';
-    final now = DateTime.now().millisecondsSinceEpoch;
-
-    // remote
-    MuseSnapshot remote = const MuseSnapshot({});
-    final Response<String> got;
     try {
-      got = await dio.get<String>(fileUrl);
-    } on DioException catch (e) {
-      throw MuseSyncException('连接服务器失败：${e.message ?? e.type.name}');
-    }
-    if (got.statusCode == 200 && (got.data ?? '').isNotEmpty) {
+      final base = _base();
+      final password = _password;
+      final folder = '$base$museSyncFolder/';
+      final fileUrl = '$folder$museSyncFileName';
+
+      // remote
+      MuseSnapshot remote = const MuseSnapshot({});
+      final Response<String> got;
       try {
-        remote = MuseSnapshot.fromJson(jsonDecode(museDecrypt(got.data!, password)) as Map<String, dynamic>);
-      } on MuseCryptoException catch (e) {
-        throw MuseSyncException('解密同步文件失败：$e（两台设备的同步密码需相同）');
-      } catch (_) {
-        throw const MuseSyncException('同步文件已损坏');
+        got = await dio.get<String>(fileUrl);
+      } on DioException catch (e) {
+        throw MuseSyncException('连接服务器失败：${e.message ?? e.type.name}');
       }
-    } else if (got.statusCode != 404) {
-      throw MuseSyncException(_httpError(got.statusCode));
-    }
+      if (got.statusCode == 200 && (got.data ?? '').isNotEmpty) {
+        try {
+          remote = MuseSnapshot.fromJson(jsonDecode(await museDecryptAsync(got.data!, password)) as Map<String, dynamic>);
+        } on MuseCryptoException catch (e) {
+          throw MuseSyncException('解密同步文件失败：$e（两台设备的同步密码需相同）');
+        } catch (_) {
+          throw const MuseSyncException('同步文件已损坏');
+        }
+      } else if (got.statusCode != 404) {
+        throw MuseSyncException(_httpError(got.statusCode));
+      }
 
-    // local, stamped against what was synced last time
-    final current = await localValues();
-    MuseSnapshot last = const MuseSnapshot({});
-    try {
-      final raw = ref.read(MusePrefs.syncLast);
-      if (raw.isNotEmpty) last = MuseSnapshot.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-    } catch (_) {}
-    final local = museStampLocal(current: current, lastSynced: last, now: now, device: _deviceId);
-    final merged = museMergeSnapshots(local, remote);
-    final result = await apply(museSyncChanges(current, merged));
+      // local, stamped against what was synced last time
+      final local = await stampedLocal(remoteKeys: remote.entries.keys.toSet());
+      final merged = museMergeSnapshots(local, remote);
+      final body = await museEncryptAsync(jsonEncode(merged.toJson()), password);
 
-    // upload
-    try {
-      await dio.request<String>(folder, options: Options(method: 'MKCOL'));
-      final body = museEncrypt(jsonEncode(merged.toJson()), password);
-      final put = await dio.put<String>(fileUrl, data: body, options: Options(contentType: 'application/json'));
-      if (put.statusCode == null || put.statusCode! >= 300) throw MuseSyncException(_httpError(put.statusCode));
-    } on DioException catch (e) {
-      throw MuseSyncException('上传失败：${e.message ?? e.type.name}');
+      // upload first, then apply: a failed upload leaves this device unchanged
+      try {
+        await dio.request<String>(folder, options: Options(method: 'MKCOL'));
+        final put = await dio.put<String>(fileUrl, data: body, options: Options(contentType: 'application/json'));
+        if (put.statusCode == null || put.statusCode! >= 300) throw MuseSyncException(_httpError(put.statusCode));
+      } on DioException catch (e) {
+        throw MuseSyncException('上传失败：${e.message ?? e.type.name}');
+      }
+      return applyMerged(merged);
+    } finally {
+      dio.close(force: true);
     }
-    await ref.read(MusePrefs.syncLast.notifier).update(jsonEncode(merged.toJson()));
-    await ref.read(MusePrefs.syncLastAt.notifier).update(now);
-    return result;
   }
 
   /// A backup file's text. [password] empty = plain JSON; [redact] drops subscription links.
@@ -247,7 +290,7 @@ class MuseSyncService {
     var snap = MuseSnapshot({for (final e in (await localValues()).entries) e.key: MuseSyncEntry(e.value, now)}, device: _deviceId);
     if (redact) snap = museRedactSnapshot(snap);
     final plain = const JsonEncoder.withIndent('  ').convert(snap.toJson());
-    return password.isEmpty ? plain : museEncrypt(plain, password);
+    return password.isEmpty ? plain : museEncryptAsync(plain, password);
   }
 
   /// Restores a backup file's text (asks for nothing: [password] is needed for an encrypted file).
@@ -256,7 +299,7 @@ class MuseSyncService {
     if (museIsEncrypted(text)) {
       if (password.isEmpty) throw const MuseSyncException('这个备份已加密，请输入密码');
       try {
-        plain = museDecrypt(text, password);
+        plain = await museDecryptAsync(text, password);
       } on MuseCryptoException catch (e) {
         throw MuseSyncException('$e');
       }

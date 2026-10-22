@@ -1,3 +1,5 @@
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -156,9 +158,12 @@ class ProfileParser {
           url.trim(),
           tempFilePath,
           cancelToken: cancelToken,
-          userAgent: _ref.read(ConfigOptions.useXrayCoreWhenPossible)
-              ? _httpClient.userAgent.replaceAll("HiddifyNext", "HiddifyNextX")
-              : null,
+          // 穿云 1.4.1: 设置 › 节点 › 订阅 UA ('auto' keeps the app's own)
+          userAgent:
+              museUserAgentFor(_ref.read(MusePrefs.subUserAgent), appVersion: '') ??
+              (_ref.read(ConfigOptions.useXrayCoreWhenPossible)
+                  ? _httpClient.userAgent.replaceAll("HiddifyNext", "HiddifyNextX")
+                  : null),
         )
         .catchError((err) {
           if (CancelToken.isCancel(err as DioException)) {
@@ -214,9 +219,11 @@ class ProfileParser {
             line,
             tmpPath,
             cancelToken: cancelToken,
-            userAgent: ref.read(ConfigOptions.useXrayCoreWhenPossible)
-                ? httpClient.userAgent.replaceAll('HiddifyNext', 'HiddifyNextX')
-                : null,
+            userAgent:
+                museUserAgentFor(ref.read(MusePrefs.subUserAgent), appVersion: '') ??
+                (ref.read(ConfigOptions.useXrayCoreWhenPossible)
+                    ? httpClient.userAgent.replaceAll('HiddifyNext', 'HiddifyNextX')
+                    : null),
           );
 
           results[currentIndex] = (await File(tmpPath).readAsString()).trim();

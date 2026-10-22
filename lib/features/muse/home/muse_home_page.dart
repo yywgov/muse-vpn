@@ -9,6 +9,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/home/background_guard.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -166,6 +167,16 @@ class MuseHeroCard extends HookConsumerWidget {
     ref.listen(museConnectionProvider, (prev, next) {
       if (prev?.valueOrNull is! Connected && next.valueOrNull is Connected) museMaybeShowKeepAliveGuide(context, ref);
     });
+    // 1.4.1 Android: killed by the system in the background since the last start → the steps
+    useEffect(() {
+      if (!PlatformUtils.isAndroid) return null;
+      unawaited(
+        museCheckBackgroundKill(ref).then((killed) {
+          if (killed && context.mounted) unawaited(showMuseBackgroundGuide(context, killed: true));
+        }),
+      );
+      return null;
+    }, const []);
     final since = ref.watch(museConnectedSinceProvider).valueOrNull;
     final recovering = ref.watch(museWatchdogRecoveringProvider);
     final failoverFrom = ref.watch(museFailoverFromProvider);
@@ -716,17 +727,24 @@ class _FlowTile extends ConsumerWidget {
       bottom: Row(
         children: [
           Expanded(
+            flex: 2,
             child: CustomPaint(
               size: Size.infinite,
               painter: _SparklinePainter(history, MusePalette.brand, MuseTheme.of(context).hairline),
             ),
           ),
           const SizedBox(width: MuseSpace.s12),
-          Text(
-            '本次 ↑ ${museBytes(up)}  ↓ ${museBytes(down)}',
-            key: const ValueKey('flow_session'),
-            maxLines: 1,
-            style: MuseType.caption(context),
+          // 1.4.1: may shrink (ellipsis) in a narrow tile / large text instead of overflowing
+          Flexible(
+            flex: 3,
+            child: Text(
+              '本次 ↑ ${museBytes(up)}  ↓ ${museBytes(down)}',
+              key: const ValueKey('flow_session'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: MuseType.caption(context).copyWith(fontFeatures: MuseType.tabular),
+            ),
           ),
         ],
       ),

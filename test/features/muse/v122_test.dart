@@ -62,7 +62,7 @@ void main() {
         'assets': [
           {
             'name': 'Chuanyun-Windows-x64-Setup.exe',
-            'browser_download_url': 'https://x/setup.exe',
+            'browser_download_url': 'https://github.com/yywgov/muse-vpn/releases/download/v1/setup.exe',
             'size': 9,
             'digest': 'sha256:$hex',
           },

@@ -33,6 +33,9 @@ List<MuseSubscriptionAlert> museSubscriptionAlerts({
     final remaining = total - used;
     if (remaining <= 0) {
       alerts.add((key: '$profileId:traffic100:$period', text: '流量已用完'));
+    } else if (used >= total * 0.90) {
+      // 1.4.1: once more when only 10 % is left
+      alerts.add((key: '$profileId:traffic90:$period', text: '流量只剩 ${(remaining * 100 / total).ceil()}%（${_size(remaining)}）'));
     } else if (used >= total * 0.80) {
       alerts.add((key: '$profileId:traffic80:$period', text: '流量已用 ${(used * 100 / total).floor()}%，剩余 ${_size(remaining)}'));
     }

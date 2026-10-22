@@ -121,7 +121,7 @@ Set<MuseSubReminder> museSubReminders({
 
 /// What a `chuanyun://` link asks for.
 class MuseDeepLink {
-  const MuseDeepLink({this.url, this.name, this.connect = false, this.node});
+  const MuseDeepLink({this.url, this.name, this.connect = false, this.node, this.disconnect = false});
 
   /// a subscription to import
   final String? url;
@@ -130,6 +130,9 @@ class MuseDeepLink {
   /// `chuanyun://connect` (optionally `?node=`)
   final bool connect;
   final String? node;
+
+  /// `chuanyun://disconnect` (1.4.1)
+  final bool disconnect;
 }
 
 /// Parses `chuanyun://import?url=…&name=…`, `chuanyun://install-config?url=…`,
@@ -147,6 +150,8 @@ MuseDeepLink? museParseDeepLink(String raw) {
   switch (action) {
     case 'connect':
       return MuseDeepLink(connect: true, node: q['node']);
+    case 'disconnect':
+      return const MuseDeepLink(disconnect: true);
     case 'import':
     case 'install-config':
     case 'install-sub':
@@ -194,5 +199,22 @@ String museMaskSubUrl(String url) {
     return '${u.scheme}://${u.host}$path${u.hasQuery ? '?••••' : ''}';
   } catch (_) {
     return '••••';
+  }
+}
+
+/// 1.4.1: node names in a stored subscription config (sing-box JSON: proxy outbounds; groups,
+/// direct / block / dns left out). Empty when it isn't JSON.
+List<String> museConfigNodeNames(String raw) {
+  const skip = {'selector', 'urltest', 'direct', 'block', 'dns', 'loadbalance'};
+  try {
+    final j = jsonDecode(raw);
+    final outs = j is Map ? j['outbounds'] : null;
+    if (outs is! List) return const [];
+    return [
+      for (final o in outs)
+        if (o is Map && o['tag'] is String && !skip.contains('${o['type']}'.toLowerCase())) o['tag'] as String,
+    ];
+  } catch (_) {
+    return const [];
   }
 }

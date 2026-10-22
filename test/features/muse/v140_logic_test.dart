@@ -171,7 +171,7 @@ void main() {
       final raw = musePresetChoiceToRaw({'ai': Outbound.proxy, 'apple': Outbound.direct});
       expect(museParsePresetChoice(raw), {'ai': Outbound.proxy, 'apple': Outbound.direct});
       expect(museParsePresetChoice('{"nope": "proxy", "telegram": "weird"}'), {'telegram': Outbound.proxy});
-      expect(museRulePresets.length, 10);
+      expect(museRulePresets.length, greaterThanOrEqualTo(25)); // 1.4.1: more presets
     });
     test('tester walks the list like the core', () {
       final rules = museApplyPresets([
@@ -269,7 +269,8 @@ void main() {
     });
     test('session counter turns totals into deltas', () {
       final c = MuseTrafficCounter();
-      expect(c.delta(100, 200), (100, 200));
+      // 1.4.1: the first sample is the baseline (a running session was counted before)
+      expect(c.delta(100, 200), (0, 0));
       expect(c.delta(150, 260), (50, 60));
       expect(c.delta(10, 20), (10, 20)); // new session
     });
@@ -318,10 +319,13 @@ void main() {
     });
     test('schedule fires once per minute mark', () {
       final s = MuseSchedule.parse(const MuseSchedule(connectAt: 8 * 60, disconnectAt: 23 * 60).toRaw());
-      expect(museScheduleDue(s, DateTime(2026, 1, 1, 8), lastMinute: -1, running: false), MuseWifiAction.connect);
-      expect(museScheduleDue(s, DateTime(2026, 1, 1, 8), lastMinute: 480, running: false), MuseWifiAction.none);
-      expect(museScheduleDue(s, DateTime(2026, 1, 1, 23), lastMinute: -1, running: true), MuseWifiAction.disconnect);
-      expect(museScheduleDue(s, DateTime(2026, 1, 1, 23), lastMinute: -1, running: false), MuseWifiAction.none);
+      expect(museScheduleDue(s, DateTime(2026, 1, 1, 8), lastFired: -1, running: false), MuseWifiAction.connect);
+      expect(
+        museScheduleDue(s, DateTime(2026, 1, 1, 8), lastFired: museEpochMinute(DateTime(2026, 1, 1, 8)), running: false),
+        MuseWifiAction.none,
+      );
+      expect(museScheduleDue(s, DateTime(2026, 1, 1, 23), lastFired: -1, running: true), MuseWifiAction.disconnect);
+      expect(museScheduleDue(s, DateTime(2026, 1, 1, 23), lastFired: -1, running: false), MuseWifiAction.none);
       expect(MuseSchedule.parse('').isOff, isTrue);
       expect(museMinuteLabel(8 * 60 + 5), '08:05');
     });

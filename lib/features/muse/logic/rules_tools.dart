@@ -8,19 +8,46 @@ import 'dart:convert';
 
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 
+/// 1.4.1: where a preset is listed on the 分流 page (the list order, not the rule order).
+enum MusePresetGroup {
+  ai('AI 与搜索'),
+  streaming('流媒体'),
+  social('社交'),
+  dev('开发与学术'),
+  shopping('购物与支付'),
+  games('游戏'),
+  domestic('国内直连'),
+  download('下载'),
+  privacy('隐私');
+
+  const MusePresetGroup(this.title);
+
+  final String title;
+}
+
+/// Where the bundled rule-sets come from (the core keeps them updated in the background; the
+/// copies in assets/rule-sets are used at connect, so nothing is downloaded then).
+const museGeositeBase = 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/';
+
+String museGeositeUrl(String name) => '${museGeositeBase}geosite-$name.srs';
+
 class MuseRulePreset {
   const MuseRulePreset({
     required this.key,
     required this.title,
     required this.outbound,
+    this.group = MusePresetGroup.ai,
     this.domainSuffixes = const [],
     this.domainKeywords = const [],
     this.ipCidrs = const [],
     this.processNames = const [],
+    this.packageNames = const [],
+    this.geosites = const [],
   });
 
   final String key;
   final String title;
+  final MusePresetGroup group;
 
   /// the default way; the user can change it
   final Outbound outbound;
@@ -29,10 +56,35 @@ class MuseRulePreset {
   final List<String> ipCidrs;
   final List<String> processNames;
 
+  /// Android apps (1.4.1)
+  final List<String> packageNames;
+
+  /// bundled geosite rule-sets (assets/rule-sets/geosite-<name>.srs) (1.4.1)
+  final List<String> geosites;
+
   String get ruleName => 'preset:$key';
+
+  List<String> get ruleSetUrls => [for (final g in geosites) museGeositeUrl(g)];
+
+  /// Text the 分流 page search looks in.
+  String get searchText => '$title $key ${domainSuffixes.join(' ')} ${geosites.join(' ')}'.toLowerCase();
 }
 
+/// All presets, in the order their rules are checked: specific services before the broader
+/// lists that also contain them (YouTube before Google and 其他流媒体, 隐私拦截 first so blocking
+/// wins over a proxied Google), so a service set on its own overrides the broad preset.
 const museRulePresets = <MuseRulePreset>[
+  MuseRulePreset(
+    key: 'privacy',
+    title: '隐私拦截（追踪与统计）',
+    group: MusePresetGroup.privacy,
+    outbound: Outbound.block,
+    domainSuffixes: [
+      'doubleclick.net', 'google-analytics.com', 'googletagmanager.com', 'app-measurement.com',
+      'scorecardresearch.com', 'hotjar.com', 'mixpanel.com', 'segment.io', 'adjust.com', 'appsflyer.com',
+      'branch.io', 'umeng.com', 'growingio.com', 'sensorsdata.cn',
+    ],
+  ),
   MuseRulePreset(
     key: 'ai',
     title: 'AI（ChatGPT / Claude / Gemini 等）',
@@ -45,8 +97,51 @@ const museRulePresets = <MuseRulePreset>[
     ],
   ),
   MuseRulePreset(
+    key: 'academic',
+    title: '学术（Google 学术 / 期刊）',
+    group: MusePresetGroup.dev,
+    outbound: Outbound.proxy,
+    domainSuffixes: [
+      'scholar.google.com', 'scholar.googleusercontent.com', 'sci-hub.se', 'researchgate.net', 'arxiv.org',
+      'sciencedirect.com', 'springer.com', 'nature.com', 'ieee.org', 'acm.org', 'jstor.org', 'wiley.com',
+    ],
+  ),
+  MuseRulePreset(
+    key: 'youtube',
+    title: 'YouTube',
+    group: MusePresetGroup.streaming,
+    outbound: Outbound.proxy,
+    geosites: ['youtube'],
+    domainSuffixes: ['youtube.com', 'googlevideo.com', 'ytimg.com', 'youtu.be', 'youtube-nocookie.com', 'youtubei.googleapis.com'],
+  ),
+  MuseRulePreset(
+    key: 'netflix',
+    title: 'Netflix',
+    group: MusePresetGroup.streaming,
+    outbound: Outbound.proxy,
+    geosites: ['netflix'],
+    domainSuffixes: ['netflix.com', 'netflix.net', 'nflxvideo.net', 'nflximg.net', 'nflxext.com', 'nflxso.net'],
+  ),
+  MuseRulePreset(
+    key: 'spotify',
+    title: 'Spotify',
+    group: MusePresetGroup.streaming,
+    outbound: Outbound.proxy,
+    geosites: ['spotify'],
+    domainSuffixes: ['spotify.com', 'scdn.co', 'spotifycdn.com', 'spoti.fi'],
+  ),
+  MuseRulePreset(
+    key: 'tiktok',
+    title: 'TikTok',
+    group: MusePresetGroup.streaming,
+    outbound: Outbound.proxy,
+    geosites: ['tiktok'],
+    domainSuffixes: ['tiktok.com', 'tiktokv.com', 'tiktokcdn.com', 'byteoversea.com', 'ibytedtos.com', 'muscdn.com'],
+  ),
+  MuseRulePreset(
     key: 'streaming',
-    title: '流媒体（Netflix / Disney+ / YouTube 等）',
+    title: '其他流媒体（Disney+ / HBO / Prime Video 等）',
+    group: MusePresetGroup.streaming,
     outbound: Outbound.proxy,
     domainSuffixes: [
       'netflix.com', 'netflix.net', 'nflxvideo.net', 'nflximg.net', 'nflxext.com', 'nflxso.net',
@@ -57,8 +152,16 @@ const museRulePresets = <MuseRulePreset>[
     ],
   ),
   MuseRulePreset(
+    key: 'google',
+    title: 'Google',
+    outbound: Outbound.proxy,
+    geosites: ['google'],
+    domainSuffixes: ['google.com', 'googleapis.com', 'gstatic.com', 'gmail.com', 'googleusercontent.com', 'ggpht.com', 'gvt1.com'],
+  ),
+  MuseRulePreset(
     key: 'telegram',
     title: 'Telegram',
+    group: MusePresetGroup.social,
     outbound: Outbound.proxy,
     domainSuffixes: ['telegram.org', 't.me', 'telegram.me', 'tdesktop.com', 'telegra.ph', 'telesco.pe'],
     ipCidrs: [
@@ -68,48 +171,90 @@ const museRulePresets = <MuseRulePreset>[
     ],
   ),
   MuseRulePreset(
-    key: 'games',
-    title: '游戏下载直连',
-    outbound: Outbound.direct,
-    domainSuffixes: [
-      'steamcontent.com', 'steamserver.net', 'dl.steam.clngaa.com', 'epicgames-download1.akamaized.net',
-      'download.epicgames.com', 'blzddist1-a.akamaihd.net', 'gamecdn.blizzard.com', 'origin-a.akamaihd.net',
-      'xboxlive.com', 'playstation.net', 'nintendo.net',
-    ],
+    key: 'twitter',
+    title: 'X / Twitter',
+    group: MusePresetGroup.social,
+    outbound: Outbound.proxy,
+    geosites: ['twitter'],
+    domainSuffixes: ['x.com', 'twitter.com', 'twimg.com', 't.co', 'twttr.com'],
   ),
   MuseRulePreset(
-    key: 'apple',
-    title: '苹果服务直连',
-    outbound: Outbound.direct,
-    domainSuffixes: ['apple.com', 'icloud.com', 'icloud-content.com', 'mzstatic.com', 'cdn-apple.com', 'apple-cloudkit.com', 'aaplimg.com'],
+    key: 'meta',
+    title: 'Meta（Facebook / Instagram / WhatsApp）',
+    group: MusePresetGroup.social,
+    outbound: Outbound.proxy,
+    geosites: ['facebook', 'instagram', 'whatsapp'],
+    domainSuffixes: ['facebook.com', 'fbcdn.net', 'fb.com', 'messenger.com', 'instagram.com', 'cdninstagram.com', 'whatsapp.com', 'whatsapp.net'],
   ),
   MuseRulePreset(
-    key: 'microsoft',
-    title: '微软服务直连',
-    outbound: Outbound.direct,
+    key: 'discord',
+    title: 'Discord',
+    group: MusePresetGroup.social,
+    outbound: Outbound.proxy,
+    geosites: ['discord'],
+    domainSuffixes: ['discord.com', 'discord.gg', 'discordapp.com', 'discordapp.net', 'discord.media'],
+  ),
+  MuseRulePreset(
+    key: 'dev',
+    title: 'GitHub / 开发者（GitHub、npm、PyPI、Docker Hub）',
+    group: MusePresetGroup.dev,
+    outbound: Outbound.proxy,
+    geosites: ['github', 'npmjs', 'docker'],
     domainSuffixes: [
-      'microsoft.com', 'windowsupdate.com', 'office.com', 'office.net', 'live.com', 'msftconnecttest.com',
-      'msftncsi.com', 'onedrive.com', 'sharepoint.com', 'outlook.com', 'microsoftonline.com',
+      'github.com', 'githubusercontent.com', 'githubassets.com', 'github.io', 'ghcr.io',
+      'npmjs.org', 'npmjs.com', 'pypi.org', 'pythonhosted.org', 'docker.com', 'docker.io',
     ],
   ),
   MuseRulePreset(
     key: 'steam',
     title: 'Steam 商店走代理',
+    group: MusePresetGroup.games,
     outbound: Outbound.proxy,
     domainSuffixes: ['steampowered.com', 'steamcommunity.com', 'steamstatic.com', 'steam-chat.com'],
   ),
   MuseRulePreset(
-    key: 'academic',
-    title: '学术（Google 学术 / 期刊）',
+    key: 'payments',
+    title: '海外支付（PayPal / Stripe）',
+    group: MusePresetGroup.shopping,
     outbound: Outbound.proxy,
+    geosites: ['paypal', 'stripe'],
+    domainSuffixes: ['paypal.com', 'paypalobjects.com', 'paypal.me', 'stripe.com', 'stripe.network', 'stripecdn.com'],
+  ),
+  MuseRulePreset(
+    key: 'crypto',
+    title: '加密货币交易所',
+    group: MusePresetGroup.shopping,
+    outbound: Outbound.proxy,
+    geosites: ['category-cryptocurrency'],
+    domainSuffixes: ['binance.com', 'okx.com', 'coinbase.com', 'bybit.com', 'kraken.com', 'bitget.com', 'gate.io', 'kucoin.com'],
+  ),
+  MuseRulePreset(
+    key: 'amazon',
+    title: 'Amazon',
+    group: MusePresetGroup.shopping,
+    outbound: Outbound.proxy,
+    geosites: ['amazon'],
+    domainSuffixes: ['amazon.com', 'amazon.co.jp', 'amazon.co.uk', 'amazon.de', 'media-amazon.com', 'ssl-images-amazon.com'],
+  ),
+  MuseRulePreset(
+    key: 'cnapps',
+    title: '国内常用 App 直连（微信 / QQ / 淘宝 / 支付宝 / 抖音 / B 站 / 网易云）',
+    group: MusePresetGroup.domestic,
+    outbound: Outbound.direct,
+    geosites: ['tencent', 'alibaba', 'douyin', 'bilibili', 'netease'],
     domainSuffixes: [
-      'scholar.google.com', 'scholar.googleusercontent.com', 'sci-hub.se', 'researchgate.net', 'arxiv.org',
-      'sciencedirect.com', 'springer.com', 'nature.com', 'ieee.org', 'acm.org', 'jstor.org', 'wiley.com',
+      'qq.com', 'weixin.qq.com', 'wechat.com', 'gtimg.com', 'qpic.cn', 'taobao.com', 'tmall.com', 'alicdn.com',
+      'alipay.com', 'douyin.com', 'douyinvod.com', 'bilibili.com', 'hdslb.com', 'biliapi.net', 'music.163.com', '126.net',
+    ],
+    packageNames: [
+      'com.tencent.mm', 'com.tencent.mobileqq', 'com.taobao.taobao', 'com.eg.android.AlipayGphone',
+      'com.ss.android.ugc.aweme', 'tv.danmaku.bili', 'com.netease.cloudmusic',
     ],
   ),
   MuseRulePreset(
     key: 'banks',
     title: '国内银行与支付直连',
+    group: MusePresetGroup.domestic,
     outbound: Outbound.direct,
     domainSuffixes: [
       'icbc.com.cn', 'ccb.com', 'abchina.com', 'boc.cn', 'bankcomm.com', 'cmbchina.com', 'psbc.com',
@@ -118,16 +263,71 @@ const museRulePresets = <MuseRulePreset>[
     ],
   ),
   MuseRulePreset(
-    key: 'privacy',
-    title: '隐私拦截（追踪与统计）',
-    outbound: Outbound.block,
+    key: 'apple',
+    title: '苹果服务直连',
+    group: MusePresetGroup.domestic,
+    outbound: Outbound.direct,
+    domainSuffixes: ['apple.com', 'icloud.com', 'icloud-content.com', 'mzstatic.com', 'cdn-apple.com', 'apple-cloudkit.com', 'aaplimg.com'],
+  ),
+  MuseRulePreset(
+    key: 'microsoft',
+    title: '微软服务直连',
+    group: MusePresetGroup.domestic,
+    outbound: Outbound.direct,
     domainSuffixes: [
-      'doubleclick.net', 'google-analytics.com', 'googletagmanager.com', 'app-measurement.com',
-      'scorecardresearch.com', 'hotjar.com', 'mixpanel.com', 'segment.io', 'adjust.com', 'appsflyer.com',
-      'branch.io', 'umeng.com', 'growingio.com', 'sensorsdata.cn',
+      'microsoft.com', 'windowsupdate.com', 'office.com', 'office.net', 'live.com', 'msftconnecttest.com',
+      'msftncsi.com', 'onedrive.com', 'sharepoint.com', 'outlook.com', 'microsoftonline.com',
+    ],
+  ),
+  MuseRulePreset(
+    key: 'games',
+    title: '游戏下载直连',
+    group: MusePresetGroup.games,
+    outbound: Outbound.direct,
+    domainSuffixes: [
+      'steamcontent.com', 'steamserver.net', 'dl.steam.clngaa.com', 'epicgames-download1.akamaized.net',
+      'download.epicgames.com', 'blzddist1-a.akamaihd.net', 'gamecdn.blizzard.com', 'origin-a.akamaihd.net',
+      'xboxlive.com', 'playstation.net', 'nintendo.net',
+    ],
+  ),
+  MuseRulePreset(
+    key: 'cncdn',
+    title: '国内 CDN / 游戏下载直连',
+    group: MusePresetGroup.domestic,
+    outbound: Outbound.direct,
+    geosites: ['category-cdn-cn', 'category-games@cn', 'steam@cn', 'category-game-platforms-download'],
+    domainSuffixes: ['steamcontent.com', 'dl.steam.clngaa.com', 'alicdn.com', 'bdstatic.com', 'qcloudcdn.com', 'myqcloud.com'],
+  ),
+  MuseRulePreset(
+    key: 'bt',
+    title: '下载 / BT 直连',
+    group: MusePresetGroup.download,
+    outbound: Outbound.direct,
+    geosites: ['category-public-tracker', 'category-pt'],
+    processNames: [
+      'qbittorrent.exe', 'BitComet.exe', 'Thunder.exe', 'uTorrent.exe', 'BitTorrent.exe', 'aria2c.exe',
+      'IDMan.exe', 'transmission-qt.exe', 'Motrix.exe', 'NDM.exe',
+    ],
+    packageNames: [
+      'com.xunlei.downloadprovider', 'org.proninyaroslav.libretorrent', 'com.utorrent.client', 'com.bittorrent.client',
+      'idm.internet.download.manager',
     ],
   ),
 ];
+
+/// Presets by their page section, in page order (the section order follows [MusePresetGroup]).
+Map<MusePresetGroup, List<MuseRulePreset>> musePresetsByGroup({String query = ''}) {
+  final q = query.trim().toLowerCase();
+  final out = <MusePresetGroup, List<MuseRulePreset>>{};
+  for (final g in MusePresetGroup.values) {
+    final items = [for (final p in museRulePresets) if (p.group == g && (q.isEmpty || p.searchText.contains(q) || g.title.contains(q))) p];
+    if (items.isNotEmpty) out[g] = items;
+  }
+  return out;
+}
+
+/// Every bundled geosite the presets use (each must be in assets/rule-sets).
+Set<String> get musePresetGeosites => {for (final p in museRulePresets) ...p.geosites};
 
 MuseRulePreset? museRulePreset(String key) => museRulePresets.where((p) => p.key == key).firstOrNull;
 
@@ -185,24 +385,36 @@ Map<String, String> museParseHosts(String text) {
 
 bool _isIp(String s) => RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(s) || (s.contains(':') && RegExp(r'^[0-9a-fA-F:]+$').hasMatch(s));
 
+/// The core rules for one preset. Destinations (domains / IPs / rule-sets) and apps
+/// (processes / Android packages) are separate rules, since the core requires every kind of
+/// condition in one rule to match (1.4.1: apps are new; a mixed rule would match nothing).
+List<Rule> musePresetRules(MuseRulePreset p, Outbound way) => [
+  if (p.domainSuffixes.isNotEmpty || p.domainKeywords.isNotEmpty || p.ipCidrs.isNotEmpty || p.geosites.isNotEmpty)
+    Rule(
+      name: p.ruleName,
+      enabled: true,
+      outbound: way,
+      domainSuffixes: p.domainSuffixes,
+      domainKeywords: p.domainKeywords,
+      ipCidrs: p.ipCidrs,
+      ruleSets: p.ruleSetUrls,
+    ),
+  if (p.processNames.isNotEmpty || p.packageNames.isNotEmpty) ...[
+    if (p.processNames.isNotEmpty) Rule(name: '${p.ruleName}:apps', enabled: true, outbound: way, processNames: p.processNames),
+    if (p.packageNames.isNotEmpty) Rule(name: '${p.ruleName}:android', enabled: true, outbound: way, packageNames: p.packageNames),
+  ],
+];
+
 /// The rule list sent to the core: the user's own rules first, then the enabled presets, then the
 /// built-in rules (国内直连 / 局域网 / 去广告); list_order follows this order.
-List<Rule> museApplyPresets(List<Rule> rules, Map<String, Outbound> enabled) {
-  if (enabled.isEmpty) return rules;
+List<Rule> museApplyPresets(List<Rule> rules, Map<String, Outbound> enabled, {List<MuseRemoteRuleSet> remote = const []}) {
+  if (enabled.isEmpty && remote.isEmpty) return rules;
   final own = rules.where((r) => !r.name.startsWith('builtin:')).toList();
   final builtin = rules.where((r) => r.name.startsWith('builtin:')).toList();
   final presets = <Rule>[
     for (final p in museRulePresets)
-      if (enabled.containsKey(p.key))
-        Rule(
-          name: p.ruleName,
-          enabled: true,
-          outbound: enabled[p.key],
-          domainSuffixes: p.domainSuffixes,
-          domainKeywords: p.domainKeywords,
-          ipCidrs: p.ipCidrs,
-          processNames: p.processNames,
-        ),
+      if (enabled.containsKey(p.key)) ...musePresetRules(p, enabled[p.key]!),
+    ...museRemoteRuleSetRules(remote),
   ];
   final out = <Rule>[];
   for (final r in [...own, ...presets, ...builtin]) {
@@ -357,4 +569,125 @@ const museOverseasApps = [
   'com.twitter.android', 'com.instagram.android', 'com.facebook.katana', 'com.whatsapp', 'com.discord',
   'com.netflix.mediaclient', 'com.spotify.music', 'com.openai.chatgpt', 'com.anthropic.claude',
   'com.google.android.apps.bard', 'com.reddit.frontpage', 'com.zhiliaoapp.musically', 'com.github.android',
+];
+
+// ---------------------------------------------------------------- 1.4.1: sites / apps → one node
+
+/// 「指定节点」: sites (domain suffixes) and apps (Windows process / Android package) sent
+/// through one chosen node, whatever the route mode (core option `muse-node-rules`; a rule whose
+/// node is gone is dropped by the core instead of failing the connection).
+class MuseNodeRule {
+  const MuseNodeRule({required this.node, this.domains = const [], this.processes = const [], this.packages = const []});
+
+  /// the node's tag
+  final String node;
+  final List<String> domains;
+  final List<String> processes;
+  final List<String> packages;
+
+  bool get isEmpty => node.trim().isEmpty || (domains.isEmpty && processes.isEmpty && packages.isEmpty);
+
+  /// What it covers, for the list.
+  String get summary => [...domains, ...processes, ...packages].join('、');
+
+  Map<String, dynamic> toJson() => {
+    if (domains.isNotEmpty) 'domain_suffix': domains,
+    if (processes.isNotEmpty) 'process_name': processes,
+    if (packages.isNotEmpty) 'package_name': packages,
+    'outbound': node,
+  };
+
+  static MuseNodeRule? fromJson(Object? j) {
+    if (j is! Map) return null;
+    List<String> list(String k) => [for (final v in (j[k] as List? ?? const [])) if ('$v'.trim().isNotEmpty) '$v'.trim()];
+    final r = MuseNodeRule(node: '${j['outbound'] ?? ''}', domains: list('domain_suffix'), processes: list('process_name'), packages: list('package_name'));
+    return r.isEmpty ? null : r;
+  }
+}
+
+List<MuseNodeRule> museParseNodeRules(String raw) {
+  try {
+    final j = jsonDecode(raw);
+    if (j is! List) return const [];
+    return [for (final e in j) ?MuseNodeRule.fromJson(e)];
+  } catch (_) {
+    return const [];
+  }
+}
+
+String museNodeRulesToRaw(List<MuseNodeRule> rules) => jsonEncode([for (final r in rules) if (!r.isEmpty) r.toJson()]);
+
+/// One typed entry (a site or an app) sorted into its kind: `*.exe` = Windows process,
+/// `com.x.y` without a TLD-looking last part… is ambiguous, so a package must contain no dot-TLD:
+/// anything with a known site ending is a domain, `a.b.c` with ≥ 2 dots and no known ending is a
+/// package. Returns null for junk.
+({String kind, String value})? museClassifyTarget(String raw) {
+  var v = raw.trim().toLowerCase();
+  if (v.isEmpty) return null;
+  if (v.contains('://')) {
+    final u = Uri.tryParse(v);
+    if (u == null || u.host.isEmpty) return null;
+    v = u.host;
+  }
+  v = v.replaceFirst(RegExp(r'^\*?\.'), '').split('/').first;
+  if (v.endsWith('.exe')) return (kind: 'process', value: raw.trim().split(RegExp(r'[\\/]')).last);
+  if (!RegExp(r'^[a-z0-9_\-]+(\.[a-z0-9_\-]+)+$').hasMatch(v)) return null;
+  final last = v.split('.').last;
+  const tlds = {
+    'com', 'net', 'org', 'io', 'ai', 'cn', 'jp', 'hk', 'tw', 'uk', 'de', 'me', 'tv', 'co', 'app', 'dev', 'gg', 'so',
+    'xyz', 'info', 'edu', 'gov', 'us', 'sg', 'kr', 'fr', 'ru', 'cc', 'to', 'im', 'fm', 'ly', 'be', 'eu', 'ca', 'au',
+  };
+  if (tlds.contains(last)) return (kind: 'domain', value: v);
+  if (v.split('.').length >= 3) return (kind: 'package', value: raw.trim());
+  return (kind: 'domain', value: v);
+}
+
+/// A node rule from typed lines (one site / app per line or comma-separated).
+MuseNodeRule museNodeRuleFromText(String node, String text) {
+  final domains = <String>[];
+  final processes = <String>[];
+  final packages = <String>[];
+  for (final part in text.split(RegExp(r'[\n,，;；\s]+'))) {
+    final c = museClassifyTarget(part);
+    if (c == null) continue;
+    final list = switch (c.kind) {
+      'process' => processes,
+      'package' => packages,
+      _ => domains,
+    };
+    if (!list.contains(c.value)) list.add(c.value);
+  }
+  return MuseNodeRule(node: node, domains: domains, processes: processes, packages: packages);
+}
+
+// ---------------------------------------------------------------- 1.4.1: remote rule-sets
+
+/// A rule-set the user subscribed to by link, with its way.
+class MuseRemoteRuleSet {
+  const MuseRemoteRuleSet(this.url, this.outbound);
+
+  final String url;
+  final Outbound outbound;
+
+  Map<String, dynamic> toJson() => {'url': url, 'outbound': museOutboundKey(outbound)};
+}
+
+List<MuseRemoteRuleSet> museParseRemoteRuleSets(String raw) {
+  try {
+    final j = jsonDecode(raw);
+    if (j is! List) return const [];
+    return [
+      for (final e in j)
+        if (e is Map && museIsRuleSetUrl('${e['url']}')) MuseRemoteRuleSet('${e['url']}'.trim(), museOutboundFromKey('${e['outbound']}') ?? Outbound.proxy),
+    ];
+  } catch (_) {
+    return const [];
+  }
+}
+
+String museRemoteRuleSetsToRaw(List<MuseRemoteRuleSet> l) => jsonEncode([for (final r in l) r.toJson()]);
+
+/// The core rules for the remote rule-sets (checked after the presets, before the built-ins).
+List<Rule> museRemoteRuleSetRules(List<MuseRemoteRuleSet> sets) => [
+  for (var i = 0; i < sets.length; i++) Rule(name: 'remote:$i', enabled: true, outbound: sets[i].outbound, ruleSets: [sets[i].url]),
 ];

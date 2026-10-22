@@ -11,6 +11,8 @@ final museCoreExtrasProvider = Provider<Map<String, dynamic>>((ref) {
     ...museTestExtras(workers: ref.watch(MusePrefs.testWorkers), timeoutSec: ref.watch(MusePrefs.testTimeoutSec)),
     // 1.4.0: custom hosts (设置 › 分流 › hosts), answered by the core's static DNS
     ...museHostsExtras(museParseHosts(ref.watch(MusePrefs.hosts))),
+    // 1.4.1: 指定节点 (设置 › 分流)
+    ...museNodeRulesExtras([for (final r in museParseNodeRules(ref.watch(MusePrefs.nodeRules))) r.toJson()]),
   };
   museCoreExtras = extras;
   return extras;
