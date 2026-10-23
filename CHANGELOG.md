@@ -4,6 +4,18 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.4.1 - 2026-10-23
+
+- 修复 2026 年 9 月以后新开服务器上的 REALITY 节点连不上：内核升级到 5.0.0-muse.15，恢复 REALITY 的抗量子密钥交换（X25519MLKEM768）
+- 局域网扫码同步：同一网络下两台设备扫码即可同步订阅与设置；坚果云 WebDAV 移到「更多」
+- 分流预设增至 25 个：新增 Google、YouTube、Netflix、Spotify、TikTok、X、Meta、Discord、GitHub 开发者、海外支付、加密货币、Amazon、国内 App 直连、BT 直连、游戏下载直连；预设分组并支持搜索
+- 应用内更新：多个镜像自动选最快，新增 Beta 通道
+- 连接诊断向导与一键修复；电脑睡眠唤醒后自动重新检测连接
+- Windows：修复异常退出后残留系统代理导致没网
+- 安卓：检测应用在后台被系统杀掉，并给出保活设置指南
+- 节点多选、指定节点、远程规则集、订阅 UA、订阅更新差异、流量提醒、定时连接、连接质量提醒、命令行参数与 `chuanyun://` 链接、崩溃日志导出
+- 修复：流量重复统计、定时连接第二天不触发、同步覆盖本地或已删除的订阅复活、弹窗泄漏、大字号下首页卡片溢出、更新包安全校验
+
 ### 1.2.9 - 2026-10-21
 
 - 修复 Cloudflare Workers/Pages 自建 VLESS/Trojan 节点（edgetunnel、CF-Workers-SUB 等「CF官方优选」订阅）开启 ECH 后在穿云里全部测速超时、显示「INVALID INITIALIZE OUTBOUND…」的问题：链接里的 `ech=cloudflare-ech.com+https://dns.alidns.com/dns-query` 现在按 Xray 的含义处理（向 DNS 查询 ECH 配置），查询走直连 DNS，查不到时不带 ECH 继续连接
