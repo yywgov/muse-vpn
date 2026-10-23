@@ -12,10 +12,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
-import 'package:hiddify/features/muse/logic/stats_tools.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/data/lan_sync_service.dart';
-import 'package:hiddify/features/settings/overview/settings_page.dart';
 import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
@@ -27,6 +25,7 @@ import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
 import 'package:hiddify/features/muse/nodes/muse_nodes_page.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/hiddifycore/generated/google/protobuf/timestamp.pb.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -207,18 +206,6 @@ Future<void> _done(WidgetTester tester) async {
 }
 
 
-Map<String, Object> _statsPrefs() {
-  var log = MuseTrafficLog.empty;
-  final now = DateTime.now();
-  for (var i = 0; i < 14; i++) {
-    log = log.add(DateTime(now.year, now.month, now.day - i), (40 + i * 7) * 1024 * 1024, (300 + (i * 97) % 900) * 1024 * 1024);
-  }
-  for (var m = 1; m < 5; m++) {
-    log = log.add(DateTime(now.year, now.month - m, 10), 2 * 1024 * 1024 * 1024, (12 + m * 3) * 1024 * 1024 * 1024);
-  }
-  return {'muse_traffic_log': log.toRaw()};
-}
-
 void main() {
   setUpAll(_loadFonts);
   const phone = Size(412, 915);
@@ -342,5 +329,33 @@ void main() {
       await _shot(tester, 'windows-${w.width.toInt()}-large-text-home');
       await _done(tester);
     });
+  }
+
+  // regression: the tile grid with 网速 + 本次流量 merged into 「流量」 must not overflow at large
+  // text in a narrow window (title trailing, 剩余流量 caption, tile height).
+  for (final w in [const Size(320, 800), const Size(360, 800), const Size(600, 720), const Size(760, 720)]) {
+    for (final scale in [1.5, 1.75, 2.0]) {
+      testWidgets('MuseTileGrid(mergeFlow) no overflow at text ${scale}x, ${w.width.toInt()} wide', (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await _pump(
+          tester,
+          page: const Scaffold(
+            body: SingleChildScrollView(
+              padding: EdgeInsets.all(MuseSpace.s16),
+              child: MuseTileGrid(mergeFlow: true),
+            ),
+          ),
+          brightness: Brightness.light,
+          size: w,
+        );
+        expect(tester.takeException(), isNull);
+        expect(find.byKey(const ValueKey('tile_flow')), findsOneWidget);
+        expect(find.byKey(const ValueKey('tile_speed')), findsNothing);
+        expect(find.byKey(const ValueKey('tile_traffic')), findsNothing);
+        await _shot(tester, 'tiles-merge-${w.width.toInt()}-x$scale');
+        await _done(tester);
+      });
+    }
   }
 }

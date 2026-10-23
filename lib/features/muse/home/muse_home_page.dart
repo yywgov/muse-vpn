@@ -585,7 +585,9 @@ class MuseTileGrid extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = museTileColumnsFor(constraints.maxWidth, tiles.length);
-        final height = constraints.maxWidth >= 600 ? tileHeightDesktop : tileHeight;
+        final base = constraints.maxWidth >= 600 ? tileHeightDesktop : tileHeight;
+        // 1.4.1: large text grows the row instead of overflowing the fixed tile height
+        final height = math.max(base, museTileHeightFor(MediaQuery.textScalerOf(context)));
         final rows = <Widget>[];
         for (final idx in museTileRows(tiles.length, columns)) {
           if (rows.isNotEmpty) rows.add(const SizedBox(height: MuseSpace.s12));
@@ -619,6 +621,17 @@ class MuseTileGrid extends ConsumerWidget {
     MuseHomeTile.flow => const _FlowTile(key: ValueKey('tile_flow')),
   };
 }
+
+/// 1.4.1: height a tile needs at [scaler]: padding + title caption + big number + bottom element
+/// (all scaled with the text) + a little slack.
+double museTileHeightFor(TextScaler scaler) {
+  const caption = 12 * 1.3; // MuseType.caption line
+  const number = 24 * 1.2; // MuseType.number line
+  return MuseSpace.s16 * 2 + scaler.scale(caption + number + MuseSize.tileBottom) + MuseSpace.s8;
+}
+
+/// Max share of a tile row a trailing caption may take before it ellipsizes.
+const _trailingShare = 0.6;
 
 bool museHasTrafficCap(SubscriptionInfo? info) => info != null && info.total > 0 && !info.total.isInfinitSize();
 
@@ -658,11 +671,25 @@ class _Tile extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(title, maxLines: 1, style: MuseType.caption(context))),
-                    if (titleTrailing != null) museMaybeMask(masked, titleTrailing!),
-                  ],
+                // 1.4.1: the trailing caption ellipsizes in a narrow tile / at large text
+                LayoutBuilder(
+                  builder: (context, c) => Row(
+                    children: [
+                      Expanded(
+                        child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
+                      ),
+                      if (titleTrailing != null)
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: c.maxWidth * _trailingShare),
+                          child: DefaultTextStyle.merge(
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                            child: museMaybeMask(masked, titleTrailing!),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 AnimatedSwitcher(
                   duration: MuseMotion.fast,
@@ -680,7 +707,16 @@ class _Tile extends ConsumerWidget {
                     ),
                   ),
                 ),
-                SizedBox(height: MuseSize.tileBottom, child: museMaybeMask(masked, bottom)),
+                SizedBox(
+                  height: MediaQuery.textScalerOf(context).scale(MuseSize.tileBottom),
+                  // one line: a caption never wraps into a clipped second line
+                  child: DefaultTextStyle.merge(
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    child: museMaybeMask(masked, bottom),
+                  ),
+                ),
               ],
             ),
           ),
@@ -826,26 +862,37 @@ class _RemainingTile extends ConsumerWidget {
       title: '剩余流量',
       value: remaining <= 0 ? '已用完' : museBytes(remaining),
       valueColor: remaining <= 0 ? MusePalette.red : null,
-      bottom: Row(
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: MuseRadius.fullAll,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(end: share),
-                duration: MuseMotion.fast,
-                builder: (_, v, _) => LinearProgressIndicator(
-                  value: v,
-                  minHeight: MuseSize.progressBar,
-                  backgroundColor: mt.inner,
-                  color: low ? MusePalette.orange : MusePalette.brand,
+      bottom: LayoutBuilder(
+        builder: (context, c) => Row(
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: MuseRadius.fullAll,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: share),
+                  duration: MuseMotion.fast,
+                  builder: (_, v, _) => LinearProgressIndicator(
+                    value: v,
+                    minHeight: MuseSize.progressBar,
+                    backgroundColor: mt.inner,
+                    color: low ? MusePalette.orange : MusePalette.brand,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: MuseSpace.s8),
-          Text('共 ${museBytes(info.total)}', style: MuseType.caption(context)),
-        ],
+            const SizedBox(width: MuseSpace.s8),
+            // 1.4.1: ellipsizes instead of overflowing in a narrow tile / at large text
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: c.maxWidth * _trailingShare),
+              child: Text(
+                '共 ${museBytes(info.total)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: MuseType.caption(context),
+              ),
+            ),
+          ],
+        ),
       ),
       onTap: () => context.goNamed('config'),
     );
