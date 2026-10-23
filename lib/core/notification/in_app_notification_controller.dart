@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/notification/toast_hover_pause.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -47,10 +48,13 @@ class InAppNotificationController with AppLogger {
                 ),
         ),
         // the button's own padding stands in for the toast's at the end
-        padding: action == null ? null : const EdgeInsetsDirectional.fromSTEB(20, 16, 4, 16),
+        padding: action == null ? null : const EdgeInsetsDirectional.fromSTEB(MuseSpace.s16 + MuseSpace.s4, MuseSpace.s16, MuseSpace.s4, MuseSpace.s16),
         type: type._toastificationType,
-        alignment: AlignmentDirectional.bottomCenter,
-        margin: const EdgeInsets.only(bottom: 64 + 16, right: 16, left: 16),
+        // 穿云 1.5.0: one place (bottom centre, above the tab bar) and one colour per kind —
+        // error red, success green, info brand blue (the app's palette, not the package's)
+        primaryColor: type.museColor,
+        alignment: MuseToast.alignment,
+        margin: MuseToast.margin,
         // 4 s, a Material 3 snackbar's time; 8 s with a button, to read it and reach the button
         autoCloseDuration: action == null ? const Duration(seconds: 4) : const Duration(seconds: 8),
         style: ToastificationStyle.flat,
@@ -79,6 +83,13 @@ class InAppNotificationController with AppLogger {
 }
 
 extension NotificationTypeX on NotificationType {
+  /// 穿云 1.5.0: the toast's accent colour.
+  Color get museColor => switch (this) {
+    NotificationType.success => MuseToast.success,
+    NotificationType.error => MuseToast.error,
+    NotificationType.info => MuseToast.info,
+  };
+
   ToastificationType get _toastificationType => switch (this) {
     NotificationType.success => ToastificationType.success,
     NotificationType.error => ToastificationType.error,

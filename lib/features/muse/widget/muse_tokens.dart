@@ -32,7 +32,16 @@ abstract final class MuseRadius {
 abstract final class MuseMotion {
   static const fast = Duration(milliseconds: 200);
   static const curve = Curves.easeOutCubic;
+
+  /// 1.5.0: one half of a skeleton's pulse
+  static const skeletonPulse = Duration(milliseconds: 900);
 }
+
+/// 1.5.0: whether the system asks for reduced motion (Android 「移除动画」, Windows 「动画效果」 off).
+bool museReduceMotion(BuildContext context) => MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+/// 1.5.0: [MuseMotion.fast], or no animation at all when the system asks for reduced motion.
+Duration museMotion(BuildContext context) => museReduceMotion(context) ? Duration.zero : MuseMotion.fast;
 
 /// Icon sizes (one rounded line-icon set).
 abstract final class MuseIconSize {
@@ -110,6 +119,9 @@ abstract final class MuseSize {
 
   /// 隐私模式 blur strength
   static const privacyBlur = 6.0;
+
+  /// 1.5.0: height of the bottom tab bar (toasts sit above it)
+  static const tabBar = 64.0;
 }
 
 /// 1.4.0: accent colours to pick from (one at a time; brand blue by default).
@@ -154,8 +166,8 @@ abstract final class MusePalette {
   static const lightBgBottom = Color(0xFFF6F8FC);
   static const lightCard = Color(0xFFFFFFFF);
   static const lightText1 = Color(0xFF111827);
-  static const lightText2 = Color(0xFF6B7280);
-  static const lightText3 = Color(0xFF9CA3AF);
+  static const lightText2 = Color(0xFF5B6472);
+  static const lightText3 = Color(0xFF7C8494);
   static const lightHairline = Color(0xFFE5E7EB);
   static const lightSelected = Color(0xFFEAF1FF);
   static const lightInner = Color(0xFFF1F4F9);
@@ -170,7 +182,7 @@ abstract final class MusePalette {
   static const darkCard = Color(0xFF17213B);
   static const darkText1 = Color(0xFFE8ECF5);
   static const darkText2 = Color(0xFF94A0BC);
-  static const darkText3 = Color(0xFF66728F);
+  static const darkText3 = Color(0xFF7A85A0);
   static const darkHairline = Color(0x14FFFFFF);
   static const darkSelected = Color(0xFF1D3166);
   static const darkInner = Color(0xFF1F2B4A);
@@ -182,6 +194,15 @@ abstract final class MusePalette {
   static const white = Color(0xFFFFFFFF);
   static const black = Color(0xFF000000);
   static const transparent = Color(0x00000000);
+}
+
+/// 1.5.0: every toast — one place (bottom centre, above the tab bar) and one colour per kind.
+abstract final class MuseToast {
+  static const margin = EdgeInsets.only(bottom: MuseSize.tabBar + MuseSpace.s16, right: MuseSpace.s16, left: MuseSpace.s16);
+  static const alignment = AlignmentDirectional.bottomCenter;
+  static const error = MusePalette.red;
+  static const success = MusePalette.green;
+  static Color get info => MusePalette.brand;
 }
 
 /// The palette resolved for the current brightness.
@@ -254,6 +275,9 @@ class MuseTheme {
 abstract final class MuseType {
   static const tabular = [FontFeature.tabularFigures()];
 
+  /// size of the big tile number ([number])
+  static const numberSize = 24.0;
+
   static TextStyle largeTitle(BuildContext context) =>
       TextStyle(fontSize: 28, height: 1.2, fontWeight: FontWeight.w700, color: MuseTheme.of(context).text1, letterSpacing: 0.5);
 
@@ -262,7 +286,7 @@ abstract final class MuseType {
 
   /// 1.4.0: the big number on a 首页 tile (one weight for every value, digits tabular).
   static TextStyle number(BuildContext context) => TextStyle(
-    fontSize: 24,
+    fontSize: numberSize,
     height: 1.2,
     fontWeight: FontWeight.w700,
     color: MuseTheme.of(context).text1,

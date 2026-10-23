@@ -2,6 +2,7 @@
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/features/muse/logic/latency.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
@@ -38,7 +39,7 @@ abstract final class MuseColors {
     MuseLatencyLevel.good => MusePalette.green,
     MuseLatencyLevel.fair => MusePalette.orange,
     MuseLatencyLevel.bad => MusePalette.red,
-    MuseLatencyLevel.unknown => MuseTheme.of(context).text3,
+    MuseLatencyLevel.unknown => MuseTheme.of(context).text2,
   };
 }
 
@@ -110,8 +111,9 @@ class MuseGroupedBody extends StatelessWidget {
 }
 
 /// One rounded card with an optional small header above and footer below (iOS-like group).
+/// 1.5.0: the footer (an explanation) is folded behind an ⓘ on the header row.
 /// Rows are separated by hairline dividers inset to the label column.
-class MuseSection extends StatelessWidget {
+class MuseSection extends HookWidget {
   const MuseSection({
     super.key,
     this.header,
@@ -133,6 +135,7 @@ class MuseSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = MuseTheme.of(context);
     final margin = MuseSpace.page(context);
+    final open = useState(false);
     final items = <Widget>[];
     for (var i = 0; i < children.length; i++) {
       items.add(children[i]);
@@ -145,13 +148,15 @@ class MuseSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (header != null || headerTrailing != null)
+          if (header != null || headerTrailing != null || footer != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(MuseSpace.s16, MuseSpace.s4, 0, MuseSpace.s8),
               child: Row(
                 children: [
                   Expanded(child: Text(header ?? '', style: MuseType.caption(context))),
                   ?headerTrailing,
+                  // 1.5.0: the explanation stays folded behind ⓘ
+                  if (footer != null) MuseInfoButton(key: const ValueKey('section_info'), open: open.value, onTap: () => open.value = !open.value),
                 ],
               ),
             ),
@@ -166,9 +171,15 @@ class MuseSection extends StatelessWidget {
             ),
           ),
           if (footer != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(MuseSpace.s16, MuseSpace.s8, MuseSpace.s16, 0),
-              child: Text(footer!, style: MuseType.caption(context)),
+            AnimatedSize(
+              duration: museMotion(context),
+              alignment: Alignment.topCenter,
+              child: open.value
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(MuseSpace.s16, MuseSpace.s8, MuseSpace.s16, 0),
+                      child: Text(footer!, key: const ValueKey('section_info_text'), style: MuseType.caption(context)),
+                    )
+                  : const SizedBox(width: double.infinity),
             ),
         ],
       ),
@@ -203,6 +214,7 @@ class MuseTile extends StatelessWidget {
     this.onTap,
     this.chevron = false,
     this.subtitleMaxLines = 3,
+    this.info,
   });
 
   final String title;
@@ -213,6 +225,9 @@ class MuseTile extends StatelessWidget {
   final bool chevron;
   final int subtitleMaxLines;
 
+  /// 1.5.0: an explanation, folded behind ⓘ next to the title
+  final String? info;
+
   @override
   Widget build(BuildContext context) {
     final theme = MuseTheme.of(context);
@@ -222,7 +237,7 @@ class MuseTile extends StatelessWidget {
       horizontalTitleGap: MuseSpace.s16,
       minVerticalPadding: MuseSpace.s12,
       leading: _leadingOf(leading),
-      title: Text(title, style: MuseType.body(context)),
+      title: info == null ? Text(title, style: MuseType.body(context)) : MuseInfoTitle(title: title, info: info!),
       subtitle: subtitle == null
           ? null
           : Text(subtitle!, maxLines: subtitleMaxLines, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
@@ -234,7 +249,7 @@ class MuseTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ?trailing,
-                  if (chevron) Icon(Icons.chevron_right_rounded, size: MuseIconSize.small, color: theme.text3),
+                  if (chevron) Icon(Icons.chevron_right_outlined, size: MuseIconSize.small, color: theme.text3),
                 ],
               ),
             ),
@@ -252,6 +267,7 @@ class MuseSwitchTile extends StatelessWidget {
     this.leading,
     required this.value,
     required this.onChanged,
+    this.info,
   });
 
   final String title;
@@ -260,12 +276,15 @@ class MuseSwitchTile extends StatelessWidget {
   final bool value;
   final ValueChanged<bool>? onChanged;
 
+  /// 1.5.0: an explanation, folded behind ⓘ next to the title
+  final String? info;
+
   @override
   Widget build(BuildContext context) {
     return SwitchListTile.adaptive(
       contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
       secondary: _leadingOf(leading),
-      title: Text(title, style: MuseType.body(context)),
+      title: info == null ? Text(title, style: MuseType.body(context)) : MuseInfoTitle(title: title, info: info!),
       subtitle: subtitle == null ? null : Text(subtitle!, style: MuseType.caption(context)),
       activeTrackColor: MusePalette.brand,
       value: value,
@@ -282,22 +301,81 @@ class MuseChoiceTile extends StatelessWidget {
     this.subtitle,
     required this.selected,
     required this.onTap,
+    this.info,
   });
 
   final String title;
   final String? subtitle;
   final bool selected;
   final VoidCallback onTap;
+  final String? info;
 
   @override
   Widget build(BuildContext context) {
     return MuseTile(
       title: title,
       subtitle: subtitle,
+      info: info,
       onTap: onTap,
       trailing: selected
-          ? Icon(Icons.check_rounded, size: MuseIconSize.small, color: MusePalette.brand)
+          ? Icon(Icons.check_outlined, size: MuseIconSize.small, color: MusePalette.brand)
           : const SizedBox(width: MuseIconSize.small),
+    );
+  }
+}
+
+/// 1.5.0: the ⓘ that unfolds an explanation (long hint texts are no longer always on screen).
+class MuseInfoButton extends StatelessWidget {
+  const MuseInfoButton({super.key, required this.open, required this.onTap});
+
+  final bool open;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: open ? '收起说明' : '说明',
+    child: InkResponse(
+      onTap: onTap,
+      radius: MuseIconSize.small,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8),
+        child: Icon(
+          open ? Icons.info_outlined : Icons.info_outlined,
+          size: MuseIconSize.tiny,
+          color: open ? MusePalette.brand : MuseTheme.of(context).text2,
+        ),
+      ),
+    ),
+  );
+}
+
+/// A row title with an ⓘ; tapping it unfolds [info] under the title.
+class MuseInfoTitle extends HookWidget {
+  const MuseInfoTitle({super.key, required this.title, required this.info});
+
+  final String title;
+  final String info;
+
+  @override
+  Widget build(BuildContext context) {
+    final open = useState(false);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Flexible(child: Text(title, style: MuseType.body(context))),
+            MuseInfoButton(key: const ValueKey('row_info'), open: open.value, onTap: () => open.value = !open.value),
+          ],
+        ),
+        if (open.value)
+          Padding(
+            padding: const EdgeInsets.only(top: MuseSpace.s4),
+            child: Text(info, key: const ValueKey('row_info_text'), style: MuseType.caption(context)),
+          ),
+      ],
     );
   }
 }
