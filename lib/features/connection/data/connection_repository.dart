@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/model/directories.dart';
+import 'package:hiddify/features/muse/logic/connect_flow.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
@@ -86,7 +89,8 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
 
   @override
   TaskEither<ConnectionFailure, Unit> connect(ProfileEntity activeProfile, bool disableMemoryLimit) => setup().flatMap(
-    (_) => applyConfigOption(activeProfile).flatMap(
+    // 穿云 1.5.0: check the config first; a sure failure names the setting instead of starting the core
+    (_) => precheck(activeProfile).flatMap((_) => applyConfigOption(activeProfile)).flatMap(
       (_) => singbox.start(profilePathResolver.file(activeProfile.id).path, activeProfile.name, disableMemoryLimit),
       // .mapLeft(UnexpectedConnectionFailure.new),
     ),
@@ -103,6 +107,34 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
             .reload(profilePathResolver.file(activeProfile.id).path, activeProfile.name, disableMemoryLimit)
             .mapLeft(UnexpectedConnectionFailure.new),
       );
+
+  /// 穿云 1.5.0: [museConfigPrecheck] on the options the core is about to get.
+  @visibleForTesting
+  TaskEither<ConnectionFailure, Unit> precheck(ProfileEntity prof) => TaskEither(() async {
+    final either = configOptionRepository.fullOptionsOverrided(prof.profileOverride());
+    final options = either.toNullable();
+    if (options == null) return right(unit); // reported by applyConfigOption
+    int? bytes;
+    try {
+      final f = File(profilePathResolver.file(prof.id).path);
+      bytes = await f.exists() ? await f.length() : null;
+    } catch (_) {
+      bytes = -1; // could not look: not a reason to refuse
+    }
+    final issues = museConfigPrecheck(
+      profileBytes: bytes == -1 ? 1 : bytes,
+      mixedPort: options.mixedPort,
+      clashApi: options.enableClashApi,
+      clashApiPort: options.clashApiPort,
+      tun: options.enableTun,
+      mtu: options.mtu,
+      remoteDns: options.remoteDnsAddress,
+      testUrl: options.connectionTestUrl,
+    );
+    if (issues.isEmpty) return right(unit);
+    loggy.warning("config pre-check failed: ${issues.join('; ')}");
+    return left(ConnectionFailure.invalidConfigOption(issues.join('\n')));
+  });
 
   @visibleForTesting
   TaskEither<ConnectionFailure, Unit> applyConfigOption(ProfileEntity prof) =>

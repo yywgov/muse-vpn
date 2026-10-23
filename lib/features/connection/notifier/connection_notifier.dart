@@ -9,6 +9,7 @@ import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/model/startup_connection.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/logic/connect_flow.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/hiddifycore/init_signal.dart';
@@ -91,6 +92,11 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       await _connect();
     } else if (state case AsyncData(:final value)) {
       switch (value) {
+        case Disconnected() when _preparing:
+          // 穿云 1.5.0: tapped again while the config is still being prepared: stop before the
+          // core is asked to start
+          loggy.info("connect tapped while preparing: cancelling");
+          await _cancelConnect();
         case Disconnected():
           intentGeneration++;
           await ref.read(Preferences.startedByUser.notifier).update(true);
@@ -100,17 +106,38 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
           intentGeneration++;
           await ref.read(Preferences.startedByUser.notifier).update(false);
           await _disconnect();
-        case Connecting() when _recoveryInFlight != null:
-          // 穿云 1.2.2: a tap while the connection keeper is reconnecting cancels the recovery
-          // (it used to be ignored as "debounce", and the recovery connected again anyway)
-          loggy.info("connect tapped during recovery: stopping");
-          intentGeneration++;
-          await ref.read(Preferences.startedByUser.notifier).update(false);
-          await _disconnect();
-        default:
-          loggy.warning("switching status, debounce");
+        case Connecting():
+          // 穿云 1.2.2: a tap while the connection keeper is reconnecting cancels the recovery.
+          // 1.5.0: a tap while connecting cancels any connect (state machine in
+          // logic/connect_flow.dart); a connect that finishes after that is undone.
+          loggy.info(_recoveryInFlight != null ? "connect tapped during recovery: stopping" : "connect cancelled");
+          await _cancelConnect();
+        case Disconnecting():
+          // 1.5.0: 断开中 ignores taps (the button is disabled meanwhile)
+          loggy.debug("disconnecting, tap ignored");
       }
     }
+  }
+
+  Future<void> _cancelConnect() async {
+    intentGeneration++;
+    await ref.read(Preferences.startedByUser.notifier).update(false);
+    _setPreparing(false);
+    await _disconnect();
+  }
+
+  /// 1.5.0: true while the app builds and checks the config, before the core is asked to start
+  /// (the status is still 未连接 then). Shown as 「准备配置」.
+  bool _preparing = false;
+
+  bool get preparing => _preparing;
+
+  void _setPreparing(bool v) {
+    if (_preparing == v) return;
+    _preparing = v;
+    try {
+      ref.read(museConnectPreparingProvider.notifier).state = v;
+    } catch (_) {}
   }
 
   Future<void> reconnect(ProfileEntity? profile) async {
@@ -127,7 +154,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
         state = AsyncError(err, StackTrace.current);
         await ref
             .read(dialogNotifierProvider.notifier)
-            .showCustomAlertFromErr(err.present(ref.read(translationsProvider).requireValue));
+            .showCustomAlertFromErr(museFriendlyPresent(err.present(ref.read(translationsProvider).requireValue)));
       }).run();
     }
   }
@@ -246,23 +273,40 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   }
 
   Future<void> _connectThrottled() async {
+    final generation = intentGeneration;
+    _setPreparing(true);
     final activeProfile = await ref.read(activeProfileProvider.future);
     if (activeProfile == null) {
+      _setPreparing(false);
       loggy.info("no active profile, not connecting");
       return;
     }
-    await _connectionRepo.connect(activeProfile, ref.read(Preferences.disableMemoryLimit)).mapLeft((
-      ConnectionFailure err,
-    ) async {
+    // cancelled while preparing: the core was never asked
+    if (generation != intentGeneration) {
+      _setPreparing(false);
+      return;
+    }
+    final result = await _connectionRepo
+        .connect(activeProfile, ref.read(Preferences.disableMemoryLimit))
+        .run();
+    _setPreparing(false);
+    await result.match((ConnectionFailure err) async {
+      if (generation != intentGeneration) return; // cancelled: no error dialog for it
       loggy.warning("error connecting", err);
       //Go err is not normal object to see the go errors are string and need to be dumped
       await ref
           .read(dialogNotifierProvider.notifier)
-          .showCustomAlertFromErr(err.present(ref.read(translationsProvider).requireValue));
+          .showCustomAlertFromErr(museFriendlyPresent(err.present(ref.read(translationsProvider).requireValue)));
       loggy.warning(err);
       await ref.read(Preferences.startedByUser.notifier).update(false);
       state = AsyncError(err, StackTrace.current);
-    }).run();
+    }, (_) async {
+      // 1.5.0: the user cancelled while the core was starting: undo the connect
+      if (generation != intentGeneration && !ref.read(Preferences.startedByUser)) {
+        loggy.info("connect finished after it was cancelled: stopping again");
+        await _disconnect();
+      }
+    });
   }
 
   Future<void> _disconnect() async {
@@ -276,6 +320,9 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     }).run();
   }
 }
+
+/// 穿云 1.5.0: the app is building / checking the config before the core starts (「准备配置」).
+final museConnectPreparingProvider = StateProvider<bool>((ref) => false);
 
 @Riverpod(keepAlive: true)
 bool serviceRunning(Ref ref) {

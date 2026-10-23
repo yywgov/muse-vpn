@@ -81,7 +81,9 @@ abstract final class MuseSmokeControl {
         if (list.isNotEmpty && !list.any((p) => p.active)) await repo.setAsActive(list.first.id).run();
         return {'ok': true, 'profiles': list.length};
       case '/connect':
-        if (c.read(connectionNotifierProvider).valueOrNull is! Connected) await notifier.toggleConnection();
+        // 1.5.0: a tap while connecting now cancels; only start from 未连接
+        final v = c.read(connectionNotifierProvider).valueOrNull;
+        if (!(v?.isConnected ?? false) && !(v?.isSwitching ?? false) && !notifier.preparing) await notifier.toggleConnection();
         return {'ok': true};
       case '/disconnect':
         if (c.read(connectionNotifierProvider).valueOrNull is Connected) await notifier.toggleConnection();
