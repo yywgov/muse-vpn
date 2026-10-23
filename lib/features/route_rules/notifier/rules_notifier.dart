@@ -8,6 +8,7 @@ import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -141,10 +142,13 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
         rules.add(builtin.rule..enabled = rule.enabled);
       }
     }
-    return _updateListOrder([
-      for (final builtin in missing) builtin.rule..enabled = builtin.enabledByDefault,
-      ...rules,
-    ]);
+    // 1.5.0: 局域网 is always on and first (musePinLanRule)
+    return musePinLanRule(
+      _updateListOrder([
+        for (final builtin in missing) builtin.rule..enabled = builtin.enabledByDefault,
+        ...rules,
+      ]),
+    );
   }
 
   /// A new rule goes first, so it's checked before every other rule.
@@ -174,13 +178,16 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
     final current = state;
     final rule = current.removeAt(oldIndex);
     current.insert(oldIndex < newIndex ? newIndex - 1 : newIndex, rule);
-    state = _updateListOrder(current).toList();
+    state = musePinLanRule(_updateListOrder(current).toList());
     await _updateFile();
   }
 
   Future<void> updateEnabled(bool enabled, int listOrder) async {
     final current = state;
-    current.firstWhere((rule) => rule.listOrder == listOrder).enabled = enabled;
+    final rule = current.firstWhere((rule) => rule.listOrder == listOrder);
+    // 1.5.0: the 局域网 rule can't be switched off
+    if (BuiltinRule.of(rule) == BuiltinRule.bypassLan) return;
+    rule.enabled = enabled;
     state = current.toList();
     await _updateFile();
   }

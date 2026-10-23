@@ -8,7 +8,9 @@ import 'dart:io';
 
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/logger/logger_setup.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/features/muse/logic/redact.dart';
 import 'package:hiddify/utils/uri_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -50,11 +52,23 @@ abstract final class MuseDiagnostics {
       ..writeln('===== 内核崩溃输出 =====')
       ..writeln((native?['crash'] as String?)?.trim().isNotEmpty == true ? native!['crash'] : '(无)')
       ..writeln()
+      ..writeln('===== 内核上次出错前的日志（最近 200 行）=====')
+      ..writeln(_coreTail(ref).isNotEmpty ? _coreTail(ref) : '(无)')
+      ..writeln()
       ..writeln('===== 最近日志（应用 + 内核）=====');
     for (final r in logRing.records) {
       b.writeln(formatRecord(r));
     }
     return b.toString();
+  }
+
+  static String _coreTail(WidgetRef ref) {
+    try {
+      final prefs = ref.read(sharedPreferencesProvider).requireValue;
+      return MuseCrashRecorder.coreTailText(prefs).trim();
+    } catch (_) {
+      return '';
+    }
   }
 
   static Future<void> _export(WidgetRef ref) async {

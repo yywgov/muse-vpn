@@ -250,7 +250,13 @@ class ProfileParser {
     Map<String, dynamic>? remoteHeaders,
   }) => Either.tryCatch(() {
     final contentHeaders = _parseHeadersFromContent(content);
-    return _mergeAndValidateHeaders(contentHeaders, remoteHeaders ?? {});
+    final merged = _mergeAndValidateHeaders(contentHeaders, remoteHeaders ?? {});
+    // 穿云 1.5.0: no header — the 「剩余流量 / 到期」 entries or a STATUS= line may say it instead
+    if (!merged.containsKey('subscription-userinfo')) {
+      final fromNames = museSubInfoFromContent(content);
+      if (fromNames != null) merged['subscription-userinfo'] = fromNames;
+    }
+    return merged;
   }, ProfileFailure.unexpected);
 
   static Map<String, dynamic> _mergeAndValidateHeaders(
@@ -309,6 +315,10 @@ class ProfileParser {
       if (key.isEmpty) continue;
       map[key] = num.tryParse(parts[1].trim())?.toInt();
     }
+    // 穿云 1.5.0: some panels leave out upload (or send it empty)
+    map["upload"] ??= 0;
+    map.putIfAbsent("total", () => null);
+    map.putIfAbsent("expire", () => null);
     if (map case {"upload": final upload?, "download": final download?, "total": final total, "expire": var expire}) {
       final total1 = (total == null || total == 0) ? infiniteTrafficThreshold + 1 : total;
       expire = (expire == null || expire == 0) ? infiniteTimeThreshold : expire;

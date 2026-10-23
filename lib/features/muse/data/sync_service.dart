@@ -48,6 +48,8 @@ final museSyncedPrefs = <String, ProviderOrFamily>{
   'muse_node_rules': MusePrefs.nodeRules,
   'muse_remote_rule_sets': MusePrefs.remoteRuleSets,
   'muse_sub_user_agent': MusePrefs.subUserAgent,
+  // 1.5.0
+  'muse_sub_fetch': MusePrefs.subFetch,
 };
 
 const museSyncFileName = 'chuanyun-sync.json';

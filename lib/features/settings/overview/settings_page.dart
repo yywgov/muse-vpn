@@ -13,7 +13,9 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/changelog_dialog.dart';
+import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
@@ -40,6 +42,7 @@ class SettingsPage extends HookConsumerWidget {
     final shownTheme = themeMode == AppThemeMode.black ? AppThemeMode.dark : themeMode;
     final balancer = ref.watch(ConfigOptions.balancerStrategy);
     final advancedOpen = useState(false);
+    final ipv6 = MuseIpv6Policy.fromKey(ref.watch(MusePrefs.ipv6Policy));
 
     return MuseScaffold(
       large: true,
@@ -199,6 +202,32 @@ class SettingsPage extends HookConsumerWidget {
                   title: 'TLS 分片',
                   chevron: true,
                   onTap: () => context.goNamed('tlsTricks'),
+                ),
+                // 1.5.0: network options that can break a working setup, all off by default
+                MuseTile(
+                  key: const ValueKey('ipv6_policy'),
+                  leading: const Icon(Icons.language_outlined),
+                  title: 'IPv6',
+                  info: '只在本地网络和节点都支持 IPv6 时开启，否则可能打不开网页',
+                  trailing: Text(ipv6.title),
+                  chevron: true,
+                  onTap: () async {
+                    final picked = await museSettingPick<MuseIpv6Policy>(
+                      context,
+                      'IPv6',
+                      [for (final p in MuseIpv6Policy.values) (p, p.title)],
+                      ipv6,
+                    );
+                    if (picked != null) await ref.read(MusePrefs.ipv6Policy.notifier).update(picked.key);
+                  },
+                ),
+                MuseSwitchTile(
+                  key: const ValueKey('fake_ip'),
+                  leading: const Icon(Icons.dns_outlined),
+                  title: 'Fake-IP',
+                  info: '仅 TUN 模式生效：域名先拿到虚拟地址，打开网页更快；局域网、对时和联网检测仍用真实地址。个别 App 或游戏异常时请关闭',
+                  value: ref.watch(ConfigOptions.enableFakeDns),
+                  onChanged: (v) => ref.read(ConfigOptions.enableFakeDns.notifier).update(v),
                 ),
                 MuseTile(
                   leading: const Icon(Icons.insights_outlined),

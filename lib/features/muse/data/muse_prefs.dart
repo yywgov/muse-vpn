@@ -131,6 +131,19 @@ abstract final class MusePrefs {
   /// last window bounds "x,y,w,h"
   static final windowBounds = PreferencesNotifier.create<String, String>("muse_window_bounds", "");
   static final proxyBypass = PreferencesNotifier.create<String, String>("muse_proxy_bypass", "");
+
+  // ---- 1.5.0 (chunk 2); network-affecting ones start off and sit under 设置 › 高级
+  /// IPv6: off / prefer_v4 / prefer_v6 (logic/net_tools.dart MuseIpv6Policy)
+  static final ipv6Policy = PreferencesNotifier.create<String, String>("muse_ipv6_policy", "off");
+
+  /// subscription download: auto / proxy / direct (logic/sub_tools.dart MuseSubFetch)
+  static final subFetch = PreferencesNotifier.create<String, String>("muse_sub_fetch", "auto");
+
+  /// 只显示 / 排除 per subscription: JSON {profileId: {include, exclude}}
+  static final subFilters = PreferencesNotifier.create<String, String>("muse_sub_filters", "{}");
+
+  /// the core's last log lines when it stopped with an error (redacted), for 诊断
+  static final coreTail = PreferencesNotifier.create<String, String>("muse_core_tail", "");
 }
 
 /// 字体大小 choices.
@@ -173,4 +186,5 @@ const museSyncedPrefKeys = [
   'muse_home_tile_order',
   'muse_home_tiles_hidden',
   'muse_route_mode',
+  'muse_sub_fetch',
 ];

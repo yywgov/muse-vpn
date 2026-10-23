@@ -3,6 +3,8 @@
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/foundation.dart';
+import 'package:hiddify/core/logger/logger_setup.dart';
+import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/redact.dart';
 import 'package:hiddify/features/muse/logic/stats_tools.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,4 +39,21 @@ abstract final class MuseCrashRecorder {
       for (final c in log.reversed) '[${c.at.toIso8601String()}] ${museRedact(c.message)}\n${museRedact(c.stack)}',
     ].join('\n\n');
   }
+
+  // 1.5.0 #15: the core's own log right before it stopped with an error
+  static const coreTailKey = 'muse_core_tail';
+  static const coreLoggers = {'core.core', 'core.service', 'core.config'};
+
+  /// Keeps the newest 200 lines the core logged (redacted), with when and why, for 诊断.
+  static void recordCoreTail(String reason) {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    try {
+      final lines = museTailLines(logRing.records.where((r) => coreLoggers.contains(r.loggerName)).map(formatRecord));
+      final text = '[${DateTime.now().toIso8601String()}] ${museRedact(reason)}\n${museRedact(lines.join('\n'))}';
+      prefs.setString(coreTailKey, text);
+    } catch (_) {}
+  }
+
+  static String coreTailText(SharedPreferences prefs) => prefs.getString(coreTailKey) ?? '';
 }

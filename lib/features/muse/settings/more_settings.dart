@@ -366,8 +366,8 @@ class MuseRoutingPage extends HookConsumerWidget {
       title: '分流',
       body: MuseGroupedBody(
         children: [
+          // 1.5.0: changes reach a running connection by themselves (hot reload)
           MuseSection(
-            footer: '修改后重新连接生效',
             children: [
               MuseTile(
                 key: const ValueKey('routing_presets'),
@@ -594,7 +594,7 @@ class MuseNodeRulesPage extends HookConsumerWidget {
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            footer: '这些网站或应用总走所选节点（规则、全局模式都生效）；节点不在当前订阅时该条不生效。修改后重新连接生效',
+            footer: '这些网站或应用总走所选节点（规则、全局模式都生效）；节点不在当前订阅时该条不生效',
             children: [
               if (rules.isEmpty)
                 MuseTile(key: const ValueKey('node_rule_empty'), leading: const Icon(Icons.add_outlined), title: '添加', onTap: () => edit()),
@@ -647,7 +647,7 @@ class MuseRemoteRuleSetsPage extends HookConsumerWidget {
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            footer: '首次连接时下载（最多等 5 秒，失败不影响连接），之后在后台更新。修改后重新连接生效',
+            footer: '首次连接时下载（最多等 5 秒，失败不影响连接），之后在后台更新',
             children: [
               if (sets.isEmpty) MuseTile(key: const ValueKey('remote_set_empty'), leading: const Icon(Icons.add_outlined), title: '添加', onTap: add),
               for (var i = 0; i < sets.length; i++)
@@ -771,7 +771,6 @@ class MuseNetworkPage extends HookConsumerWidget {
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            footer: '修改后重新连接生效',
             children: [
               MuseTile(
                 key: const ValueKey('network_dns'),

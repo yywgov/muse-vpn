@@ -691,3 +691,161 @@ String museRemoteRuleSetsToRaw(List<MuseRemoteRuleSet> l) => jsonEncode([for (fi
 List<Rule> museRemoteRuleSetRules(List<MuseRemoteRuleSet> sets) => [
   for (var i = 0; i < sets.length; i++) Rule(name: 'remote:$i', enabled: true, outbound: sets[i].outbound, ruleSets: [sets[i].url]),
 ];
+
+// ---------------------------------------------------------------- 1.5.0 (chunk 2)
+
+const museGeoipBase = 'https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/';
+
+String museGeoipUrl(String name) => '${museGeoipBase}geoip-$name.srs';
+
+const museLanRuleName = 'builtin:bypassLan';
+
+/// #57: 局域网 / 私有地址 always go direct: the built-in rule is switched on and checked before
+/// every other rule (the user's own rules and presets included). A list without it is unchanged.
+List<Rule> musePinLanRule(List<Rule> rules) {
+  final i = rules.indexWhere((r) => r.name == museLanRuleName);
+  if (i < 0) return rules;
+  final lan = rules[i].deepCopy()..enabled = true;
+  final out = <Rule>[lan];
+  for (var k = 0; k < rules.length; k++) {
+    if (k != i) out.add(rules[k]);
+  }
+  for (var k = 0; k < out.length; k++) {
+    if (out[k].listOrder != k) out[k] = out[k].deepCopy()..listOrder = k;
+  }
+  return out;
+}
+
+/// #14: names that must get real addresses under Fake-IP — local networks, time servers and the
+/// systems' connectivity checks (a fake address breaks them). They go direct, which is also where
+/// they belong.
+const museFakeIpExcludeSuffixes = [
+  'lan', 'local', 'localdomain', 'localhost', 'home.arpa', 'internal',
+  'msftconnecttest.com', 'msftncsi.com', 'time.windows.com', 'time.nist.gov',
+  'pool.ntp.org', 'ntp.org', 'time.apple.com', 'time.android.com', 'time.google.com',
+  'ntp.aliyun.com', 'ntp.tencent.com', 'ntp1.aliyun.com', 'cn.ntp.org.cn',
+  'connectivitycheck.platform.hicloud.com', 'connect.rom.miui.com', 'wifi.vivo.com.cn',
+  'stun.l.google.com', 'stun.miwifi.com', 'stun.qq.com',
+];
+
+const museFakeIpExcludeRuleName = 'muse:fakeip-exclude';
+
+/// The rules with the Fake-IP exclusions first (after the 局域网 rule) when [fakeIp] is on.
+List<Rule> museApplyFakeIpExclusions(List<Rule> rules, {required bool fakeIp}) {
+  if (!fakeIp) return rules;
+  final lanFirst = rules.isNotEmpty && rules.first.name == museLanRuleName;
+  final exclude = Rule(
+    name: museFakeIpExcludeRuleName,
+    enabled: true,
+    outbound: Outbound.direct,
+    domainSuffixes: museFakeIpExcludeSuffixes,
+  );
+  final list = lanFirst ? [rules.first, exclude, ...rules.skip(1)] : [exclude, ...rules];
+  return [for (var k = 0; k < list.length; k++) list[k].deepCopy()..listOrder = k];
+}
+
+/// #59: the result of converting pasted Clash / Surge rule lines.
+class MuseRuleConversion {
+  const MuseRuleConversion(this.rules, this.converted, this.skipped);
+
+  final List<Rule> rules;
+
+  /// lines turned into conditions
+  final int converted;
+
+  /// rule lines that can't be expressed (AND / OR / RULE-SET / USER-AGENT …); MATCH / FINAL are
+  /// the default anyway and not counted
+  final int skipped;
+}
+
+Outbound _policyOf(String p) {
+  final u = p.trim().toUpperCase();
+  if (u == 'DIRECT') return Outbound.direct;
+  if (u.startsWith('REJECT')) return Outbound.block;
+  return Outbound.proxy;
+}
+
+/// #59: turns Clash (`- DOMAIN-SUFFIX,google.com,Proxy`) / Surge (`DOMAIN-SUFFIX,google.com,Proxy`)
+/// rule lines into rules. DIRECT → 直连, REJECT* → 拦截, any other policy → 走节点. Consecutive lines
+/// with the same way and kind are merged into one rule, so the order (priority) is kept.
+MuseRuleConversion museConvertClashRules(String text, {String prefix = '导入'}) {
+  final rules = <Rule>[];
+  var converted = 0;
+  var skipped = 0;
+  String? lastKey;
+  for (var raw in text.split(RegExp(r'\r?\n'))) {
+    var line = raw.trim();
+    if (line.isEmpty || line.startsWith('#') || line.startsWith('//') || line.startsWith(';')) continue;
+    if (RegExp(r'^[\w-]+\s*:\s*$').hasMatch(line) || line.startsWith('[')) continue; // `rules:` / `[Rule]`
+    if (line.startsWith('- ')) line = line.substring(2).trim();
+    line = line.replaceAll(RegExp(r'''^['"]|['"]$'''), '');
+    final parts = line.split(',').map((e) => e.trim()).toList();
+    final kind = parts.first.toUpperCase();
+    if (kind == 'MATCH' || kind == 'FINAL') continue;
+    if (parts.length < 3) {
+      skipped++;
+      continue;
+    }
+    final value = parts[1];
+    final way = _policyOf(parts[2]);
+    final String group;
+    void Function(Rule) apply;
+    switch (kind) {
+      case 'DOMAIN':
+        group = 'dest';
+        apply = (r) => r.domains.add(value.toLowerCase());
+      case 'DOMAIN-SUFFIX':
+        group = 'dest';
+        apply = (r) => r.domainSuffixes.add(value.toLowerCase().replaceFirst(RegExp(r'^\.'), ''));
+      case 'DOMAIN-KEYWORD':
+        group = 'dest';
+        apply = (r) => r.domainKeywords.add(value.toLowerCase());
+      case 'DOMAIN-REGEX':
+        group = 'dest';
+        apply = (r) => r.domainRegexes.add(value);
+      case 'IP-CIDR' || 'IP-CIDR6':
+        if (!value.contains('/')) {
+          skipped++;
+          continue;
+        }
+        group = 'dest';
+        apply = (r) => r.ipCidrs.add(value);
+      case 'SRC-IP-CIDR':
+        group = 'src';
+        apply = (r) => r.sourceIpCidrs.add(value);
+      case 'DST-PORT' || 'DEST-PORT':
+        group = 'port';
+        apply = (r) => r.portRanges.add(value.replaceAll('-', ':'));
+      case 'SRC-PORT':
+        group = 'sport';
+        apply = (r) => r.sourcePortRanges.add(value.replaceAll('-', ':'));
+      case 'PROCESS-NAME':
+        group = 'proc';
+        apply = (r) => r.processNames.add(value);
+      case 'PROCESS-PATH':
+        group = 'path';
+        apply = (r) => r.processPaths.add(value);
+      case 'GEOSITE':
+        group = 'set';
+        apply = (r) => r.ruleSets.add(museGeositeUrl(value.toLowerCase()));
+      case 'GEOIP':
+        if (value.toUpperCase() == 'LAN' || value.toUpperCase() == 'PRIVATE') continue; // the built-in 局域网 rule
+        group = 'set';
+        apply = (r) => r.ruleSets.add(museGeoipUrl(value.toLowerCase()));
+      default:
+        skipped++;
+        continue;
+    }
+    final key = '${way.value}/$group';
+    if (key != lastKey || rules.isEmpty) {
+      rules.add(Rule(name: '$prefix ${rules.length + 1} · ${museOutboundTitle(way)}', enabled: true, outbound: way));
+      lastKey = key;
+    }
+    apply(rules.last);
+    converted++;
+  }
+  for (var k = 0; k < rules.length; k++) {
+    rules[k].listOrder = k;
+  }
+  return MuseRuleConversion(rules, converted, skipped);
+}

@@ -491,6 +491,10 @@ abstract class ConfigOptions {
         ? ServiceMode.systemProxy
         : chosenMode;
     // final reg = ref.watch(Preferences.region.notifier).raw();
+    // 1.5.0: IPv6 (设置 › 高级); 关闭 keeps what the app did before
+    final ipv6 = museIpv6Options(MuseIpv6Policy.fromKey(ref.watch(MusePrefs.ipv6Policy)));
+    // 1.5.0: Fake-IP (设置 › 高级, off by default); it only changes anything in TUN mode
+    final fakeIp = ref.watch(enableFakeDns);
     return SingboxConfigOption(
       region: ref.watch(region).name,
       balancerStrategy: ref.watch(balancerStrategy),
@@ -499,14 +503,14 @@ abstract class ConfigOptions {
       executeConfigAsIs: false,
       logLevel: ref.watch(logLevel),
       resolveDestination: ref.watch(resolveDestination),
-      ipv6Mode: ref.watch(ipv6Mode),
+      ipv6Mode: ipv6?.mode ?? ref.watch(ipv6Mode),
       // 1.4.0: DNS preset (设置 › 网络); 默认 keeps the built-in address
       remoteDnsAddress: museDnsPreset(ref.watch(MusePrefs.dnsPreset)).address.isNotEmpty
           ? museDnsPreset(ref.watch(MusePrefs.dnsPreset)).address
           : ref.watch(remoteDnsAddress),
-      remoteDnsDomainStrategy: ref.watch(remoteDnsDomainStrategy),
+      remoteDnsDomainStrategy: ipv6?.strategy ?? ref.watch(remoteDnsDomainStrategy),
       directDnsAddress: 'udp://223.5.5.5', // 穿云: fixed on every platform
-      directDnsDomainStrategy: ref.watch(directDnsDomainStrategy),
+      directDnsDomainStrategy: ipv6?.strategy ?? ref.watch(directDnsDomainStrategy),
       mixedPort: ref.watch(mixedPort),
       tproxyPort: ref.watch(tproxyPort),
       directPort: ref.watch(directPort),
@@ -529,7 +533,7 @@ abstract class ConfigOptions {
       // bypassLan: ref.watch(bypassLan),
       allowConnectionFromLan: false, // 穿云: loopback only on every platform (no LAN access to the proxy port)
       lanSharingPassword: ref.watch(lanSharingPassword),
-      enableFakeDns: ref.watch(enableFakeDns),
+      enableFakeDns: fakeIp,
       // enableDnsRouting: ref.watch(enableDnsRouting),
       independentDnsCache: ref.watch(independentDnsCache),
       // mux: SingboxMuxOption(
@@ -575,7 +579,10 @@ abstract class ConfigOptions {
       ),
       routeRule:
           RouteRule(
-                rules: museApplyAdBlockLevel(
+                // 1.5.0: 局域网 always first and on; Fake-IP exclusions right after it
+                rules: museApplyFakeIpExclusions(
+                  musePinLanRule(
+                    museApplyAdBlockLevel(
                   // 1.4.0: 分流 presets sit between the user's rules and the built-in ones
                   ref
                       .watch(museRouteMode)
@@ -588,6 +595,9 @@ abstract class ConfigOptions {
                         ),
                       ),
                   MuseAdBlockLevel.fromKey(ref.watch(Preferences.museAdBlockLevel)),
+                    ),
+                  ),
+                  fakeIp: fakeIp,
                 ),
               ).toProto3Json()!
               as Map<String, dynamic>,
@@ -613,3 +623,10 @@ class ConfigOptionRepository with ExceptionHandler, InfraLogger {
         }, ConfigOptionFailure.unexpected),
       );
 }
+
+/// 1.5.0 #7: what an IPv6 choice sets; null = 关闭 (the saved ipv6-mode / DNS strategies as before).
+({IPv6Mode mode, DomainStrategy strategy})? museIpv6Options(MuseIpv6Policy policy) => switch (policy) {
+  MuseIpv6Policy.off => null,
+  MuseIpv6Policy.preferV4 => (mode: IPv6Mode.enable, strategy: DomainStrategy.preferIpv4),
+  MuseIpv6Policy.preferV6 => (mode: IPv6Mode.prefer, strategy: DomainStrategy.preferIpv6),
+};

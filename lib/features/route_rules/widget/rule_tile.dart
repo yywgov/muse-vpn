@@ -101,11 +101,15 @@ class RuleTile extends HookConsumerWidget {
                 style: Theme.of(context).textTheme.labelMedium,
               ),
               subtitle: Text(builtin?.present(t, region) ?? rule.name, style: Theme.of(context).textTheme.bodyLarge),
-              leading: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle_outlined)),
+              // 1.5.0: 局域网 stays first and on — no handle, a lock instead of the switch
+              leading: builtin == BuiltinRule.bypassLan
+                  ? const Icon(Icons.lock_outlined, key: ValueKey('lan_rule_locked'))
+                  : ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle_outlined)),
               trailing: Switch(
-                value: rule.enabled,
-                onChanged: (value) async =>
-                    await ref.read(rulesNotifierProvider.notifier).updateEnabled(value, rule.listOrder),
+                value: builtin == BuiltinRule.bypassLan || rule.enabled,
+                onChanged: builtin == BuiltinRule.bypassLan
+                    ? null
+                    : (value) async => await ref.read(rulesNotifierProvider.notifier).updateEnabled(value, rule.listOrder),
               ),
             ),
             SettingDetailChips<MapEntry>(

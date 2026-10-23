@@ -9,6 +9,7 @@ import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/model/startup_connection.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/features/muse/logic/connect_flow.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
@@ -53,6 +54,8 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
         loggy.error(status);
         // 穿云: also into the disconnect log kept by the VPN service (导出诊断)
         ChuanyunPlatform.recordDisconnect("界面收到断开及错误: $failure");
+        // 1.5.0: keep the core's last log lines for 诊断 before newer lines push them out
+        MuseCrashRecorder.recordCoreTail('$failure');
       } else {
         loggy.info(status);
       }

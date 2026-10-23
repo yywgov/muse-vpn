@@ -3,6 +3,7 @@
 // proxy bypass list and command-line arguments, and the release asset for this device.
 // Part of 穿云 (GPLv3).
 
+import 'dart:async';
 import 'dart:convert';
 
 // ---------------------------------------------------------------- DNS
@@ -326,5 +327,49 @@ abstract final class HttpDateParse {
     final month = _months.indexOf(m.group(2)!) + 1;
     if (month == 0) throw const FormatException('bad month');
     return DateTime.utc(int.parse(m.group(3)!), month, int.parse(m.group(1)!), int.parse(m.group(4)!), int.parse(m.group(5)!), int.parse(m.group(6)!));
+  }
+}
+
+// ---------------------------------------------------------------- 1.5.0 (chunk 2)
+
+/// #7: IPv6 — 关闭 keeps the tunnel IPv4-only (the default, as before); 优先 IPv4 / 优先 IPv6 give
+/// the tunnel an IPv6 address and make DNS prefer that family.
+enum MuseIpv6Policy {
+  off('off', '关闭'),
+  preferV4('prefer_v4', '优先 IPv4'),
+  preferV6('prefer_v6', '优先 IPv6');
+
+  const MuseIpv6Policy(this.key, this.title);
+
+  final String key;
+  final String title;
+
+  static MuseIpv6Policy fromKey(String key) => values.firstWhere((e) => e.key == key, orElse: () => off);
+}
+
+/// #15: the newest [max] lines of the core's log, kept when the core stops with an error.
+List<String> museTailLines(Iterable<String> lines, {int max = 200}) {
+  final list = lines.toList();
+  return list.length <= max ? list : list.sublist(list.length - max);
+}
+
+/// #56: runs [action] once changes stop arriving for [delay] — the last change always lands (the
+/// old 100 ms guard dropped a second change made right after the first).
+class MuseDebouncer {
+  MuseDebouncer(this.delay);
+
+  final Duration delay;
+  Timer? _timer;
+
+  bool get pending => _timer?.isActive ?? false;
+
+  void call(void Function() action) {
+    _timer?.cancel();
+    _timer = Timer(delay, action);
+  }
+
+  void cancel() {
+    _timer?.cancel();
+    _timer = null;
   }
 }

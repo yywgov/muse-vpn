@@ -319,3 +319,134 @@ bool museRegionMismatch({required String? nameRegion, required String? exitRegio
   if (nameRegion == null || exitRegion == null || exitRegion.isEmpty) return false;
   return nameRegion.toUpperCase() != exitRegion.toUpperCase();
 }
+
+// ---------------------------------------------------------------- 1.5.0 (chunk 2)
+
+/// #25: 测速 progress — how many of [testedAt] (one entry per node, null = never tested) have an
+/// answer from the run that started at [started].
+({int done, int total}) museTestProgress(Iterable<DateTime?> testedAt, DateTime started) {
+  var done = 0;
+  var total = 0;
+  final from = started.subtract(const Duration(seconds: 1));
+  for (final t in testedAt) {
+    total++;
+    if (t != null && !t.isBefore(from)) done++;
+  }
+  return (done: done, total: total);
+}
+
+/// #26 / #10: one node's settings as the subscription gave them (from the saved config).
+class MuseOutboundDetail {
+  const MuseOutboundDetail({
+    this.type = '',
+    this.transport = '',
+    this.tls = '',
+    this.sni = '',
+    this.alpn = const [],
+    this.fingerprint = '',
+    this.ports = '',
+    this.bandwidth = '',
+    this.flow = '',
+  });
+
+  final String type;
+
+  /// ws / grpc / http / httpupgrade / xhttp / quic; '' = plain TCP
+  final String transport;
+
+  /// 'TLS' / 'REALITY' / ''
+  final String tls;
+  final String sni;
+  final List<String> alpn;
+  final String fingerprint;
+
+  /// Hysteria2 port hopping range(s), e.g. 「20000-30000」
+  final String ports;
+
+  /// Hysteria / Hysteria2 / TUIC declared bandwidth, e.g. 「↑ 50 · ↓ 200 Mbps」
+  final String bandwidth;
+  final String flow;
+
+  /// rows for the detail sheet, in order
+  List<(String, String)> get rows => [
+    if (transport.isNotEmpty) ('传输', transport),
+    if (tls.isNotEmpty) ('安全', tls),
+    if (sni.isNotEmpty) ('SNI', sni),
+    if (alpn.isNotEmpty) ('ALPN', alpn.join(', ')),
+    if (fingerprint.isNotEmpty) ('指纹', fingerprint),
+    if (flow.isNotEmpty) ('流控', flow),
+    if (ports.isNotEmpty) ('端口跳跃', ports),
+    if (bandwidth.isNotEmpty) ('带宽', bandwidth),
+  ];
+}
+
+String _transportLabel(String t) => switch (t.toLowerCase()) {
+  'ws' => 'WebSocket',
+  'grpc' => 'gRPC',
+  'http' => 'HTTP/2',
+  'httpupgrade' => 'HTTPUpgrade',
+  'xhttp' => 'XHTTP',
+  'quic' => 'QUIC',
+  '' => '',
+  _ => t,
+};
+
+List<String> _strings(Object? v) => [
+  if (v is List) for (final e in v) if ('$e'.isNotEmpty) '$e',
+  if (v is String && v.isNotEmpty) v,
+];
+
+/// The node [tag] of a saved config (sing-box JSON, as the core wrote it); falls back to the one
+/// at [host]:[port] when the tag isn't there. Null when it can't be read or isn't found.
+MuseOutboundDetail? museOutboundDetail(String raw, String tag, {String host = '', int port = 0}) {
+  try {
+    final j = jsonDecode(raw);
+    if (j is! Map) return null;
+    final all = [...((j['outbounds'] as List?) ?? const []), ...((j['endpoints'] as List?) ?? const [])].whereType<Map>().toList();
+    Map? o = all.where((e) => e['tag'] == tag).firstOrNull;
+    if (o == null && host.isNotEmpty) {
+      o = all.where((e) => e['server'] == host && (port == 0 || e['server_port'] == port)).firstOrNull;
+    }
+    if (o == null) return null;
+    final type = '${o['type'] ?? ''}'.toLowerCase();
+    final tls = o['tls'] is Map ? o['tls'] as Map : const {};
+    final transport = o['transport'] is Map ? '${(o['transport'] as Map)['type'] ?? ''}' : '';
+    final utls = tls['utls'] is Map ? tls['utls'] as Map : const {};
+    final reality = tls['reality'] is Map && (tls['reality'] as Map)['enabled'] == true;
+    final quicBased = type == 'hysteria2' || type == 'hysteria' || type == 'tuic';
+    final tlsLabel = reality
+        ? 'REALITY'
+        : tls['enabled'] == true
+        ? (tls['insecure'] == true ? 'TLS（跳过证书验证）' : 'TLS')
+        : '';
+    final ports = _strings(o['server_ports']).map((p) => p.replaceAll(':', '-')).join(', ');
+    final up = o['up_mbps'];
+    final down = o['down_mbps'];
+    final bw = (up is num && up > 0) || (down is num && down > 0)
+        ? [if (up is num && up > 0) '↑ $up', if (down is num && down > 0) '↓ $down'].join(' · ') + ' Mbps'
+        : '';
+    return MuseOutboundDetail(
+      type: type,
+      transport: quicBased ? 'QUIC' : _transportLabel(transport),
+      tls: tlsLabel,
+      sni: '${tls['server_name'] ?? ''}',
+      alpn: _strings(tls['alpn']),
+      fingerprint: utls['enabled'] == true ? '${utls['fingerprint'] ?? ''}' : '',
+      ports: ports,
+      bandwidth: bw,
+      flow: '${o['flow'] ?? ''}',
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+/// #24: a download speed in plain words (bytes per second).
+String museSpeedText(double bytesPerSecond) {
+  if (bytesPerSecond <= 0) return '—';
+  final mbps = bytesPerSecond * 8 / 1e6;
+  final mbs = bytesPerSecond / (1024 * 1024);
+  if (mbs >= 1) return '${mbs.toStringAsFixed(mbs >= 10 ? 0 : 1)} MB/s（${mbps.toStringAsFixed(0)} Mbps）';
+  final kbs = bytesPerSecond / 1024;
+  return '${kbs.toStringAsFixed(0)} KB/s（${mbps.toStringAsFixed(1)} Mbps）';
+}
