@@ -101,7 +101,7 @@ class RuleTile extends HookConsumerWidget {
                 style: Theme.of(context).textTheme.labelMedium,
               ),
               subtitle: Text(builtin?.present(t, region) ?? rule.name, style: Theme.of(context).textTheme.bodyLarge),
-              leading: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle_rounded)),
+              leading: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle_outlined)),
               trailing: Switch(
                 value: rule.enabled,
                 onChanged: (value) async =>

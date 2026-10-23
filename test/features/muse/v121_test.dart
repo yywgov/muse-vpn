@@ -53,7 +53,8 @@ void main() {
       expect(museGroupIconKind(type: 'URLTest', name: 'auto'), MuseGroupIcon.autoFastest);
       expect(museGroupIconKind(type: 'Selector', name: 'select'), MuseGroupIcon.manual);
       final home = File('lib/features/muse/nodes/node_list.dart').readAsStringSync();
-      expect(home, contains('MuseGroupIcon.loadBalance => Icons.balance_rounded'));
+      // 1.5.0: one line-icon set (outlined)
+      expect(home, contains('MuseGroupIcon.loadBalance => Icons.balance_outlined'));
     });
     test('负载均衡 subtitle no longer repeats its name', () {
       final s = museGroupSubtitle(type: 'Balancer', name: 'balance', selectedDisplay: 'round-robin', nodeCount: 23);

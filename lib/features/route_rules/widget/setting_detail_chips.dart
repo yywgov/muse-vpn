@@ -237,7 +237,7 @@ class ScrollBtn extends ConsumerWidget {
             boxShadow: [BoxShadow(color: theme.colorScheme.shadow, blurRadius: 12, offset: const Offset(0, 3))],
           ),
           child: Icon(
-            isStart ? Icons.arrow_left_rounded : Icons.arrow_right_rounded,
+            isStart ? Icons.arrow_left_outlined : Icons.arrow_right_outlined,
             color: theme.colorScheme.onPrimaryContainer,
           ),
         ),

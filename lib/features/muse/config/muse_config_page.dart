@@ -8,6 +8,7 @@ import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
+import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
 import 'package:hiddify/features/profile/widget/profile_tile.dart';
@@ -28,14 +29,14 @@ class MuseConfigPage extends HookConsumerWidget {
       actions: [
           IconButton(
             onPressed: () => ref.read(foregroundProfilesUpdateNotifierProvider.notifier).trigger(),
-            icon: const Icon(Icons.sync_rounded),
+            icon: const Icon(Icons.sync_outlined),
             tooltip: t.pages.profiles.updateSubscriptions,
           ),
           IconButton(
             key: const ValueKey('profile_add_button'),
             onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
             // a subscription link waits on the clipboard
-            icon: Badge(isLabelVisible: offer, smallSize: 8, backgroundColor: MusePalette.brand, child: const Icon(Icons.add_rounded)),
+            icon: Badge(isLabelVisible: offer, smallSize: 8, backgroundColor: MusePalette.brand, child: const Icon(Icons.add_outlined)),
             tooltip: '添加',
           ),
           const SizedBox(width: MuseSpace.s8),
@@ -58,7 +59,7 @@ class MuseConfigPage extends HookConsumerWidget {
                 data: (profiles) => profiles.isEmpty
                     ? [
                         MuseTile(
-                          leading: const Icon(Icons.add_circle_outline_rounded),
+                          leading: const Icon(Icons.add_circle_outlined),
                           title: '添加订阅',
                           chevron: true,
                           onTap: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
@@ -71,12 +72,8 @@ class MuseConfigPage extends HookConsumerWidget {
                             child: ProfileTile(key: ValueKey(profile.id), profile: profile),
                           ),
                       ],
-                loading: () => [
-                  const Padding(
-                    padding: EdgeInsets.all(MuseSpace.s24),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                ],
+                // 1.5.0: skeleton rows instead of a spinner
+                loading: () => [MuseSkeleton.rows(rows: 2)],
                 error: (error, _) => [MuseTile(title: '读取订阅失败', subtitle: t.presentShortError(error))],
               ),
             ],
@@ -84,7 +81,7 @@ class MuseConfigPage extends HookConsumerWidget {
           MuseSection(
             children: [
               MuseTile(
-                leading: const Icon(Icons.route_rounded),
+                leading: const Icon(Icons.route_outlined),
                 title: '路由规则',
                 chevron: true,
                 onTap: () => context.goNamed('routingOptions'),

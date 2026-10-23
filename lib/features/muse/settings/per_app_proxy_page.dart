@@ -33,7 +33,7 @@ class PerAppProxyPage extends ConsumerWidget {
           MuseSection(
             children: [
               MuseSwitchTile(
-                leading: const Icon(Icons.apps_rounded),
+                leading: const Icon(Icons.apps_outlined),
                 title: '分应用代理',
                 value: mode != null,
                 onChanged: service.setEnabled,
@@ -47,13 +47,13 @@ class PerAppProxyPage extends ConsumerWidget {
               children: [
                 MuseChoiceTile(
                   title: '以下 App 不走代理',
-                  subtitle: '除了列表里的 App，其余都经过穿云（推荐）',
+                  info: '除了列表里的 App，其余都经过穿云（推荐）',
                   selected: savedMode == AppProxyMode.exclude,
                   onTap: () => service.changeMode(AppProxyMode.exclude),
                 ),
                 MuseChoiceTile(
                   title: '仅以下 App 走代理',
-                  subtitle: '只有列表里的 App 经过穿云，其余全部直连',
+                  info: '只有列表里的 App 经过穿云，其余全部直连',
                   selected: savedMode == AppProxyMode.include,
                   onTap: () => service.changeMode(AppProxyMode.include),
                 ),
@@ -91,7 +91,7 @@ class _AppListRow extends ConsumerWidget {
       titleTextStyle: theme.textTheme.bodyMedium,
       leading: leading,
       title: title,
-      trailing: const Icon(Icons.chevron_right_rounded),
+      trailing: const Icon(Icons.chevron_right_outlined),
       onTap: () => context.goNamed('appList'),
     );
 
@@ -123,7 +123,7 @@ class _AppListRow extends ConsumerWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: color, width: 1.5),
               ),
-              child: Icon(Icons.add_rounded, size: MuseIconSize.tiny, color: color),
+              child: Icon(Icons.add_outlined, size: MuseIconSize.tiny, color: color),
             ),
           ],
         ),
@@ -143,7 +143,7 @@ class _AppListRow extends ConsumerWidget {
                 child: Image.memory(icon, width: MuseSize.appIcon, height: MuseSize.appIcon, cacheWidth: logoPx, cacheHeight: logoPx),
               ),
               AsyncLoading() => _loadingLogo,
-              _ => const Icon(Icons.android_rounded),
+              _ => const Icon(Icons.android_outlined),
             },
         ],
       ),
@@ -214,12 +214,12 @@ class _AutoSelection extends HookConsumerWidget {
 
     final Widget? status = switch (issue) {
       AutoSelectionResult.notFound => _AutoSelectionIssue(
-        icon: Icons.cloud_off_rounded,
+        icon: Icons.cloud_off_outlined,
         text: autoSelection.noList,
         color: theme.colorScheme.onSurfaceVariant,
       ),
       AutoSelectionResult.failure => _AutoSelectionIssue(
-        icon: Icons.error_outline_rounded,
+        icon: Icons.error_outlined,
         text: autoSelection.loadFailed,
         color: theme.colorScheme.error,
       ),

@@ -24,6 +24,7 @@ import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
+import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -206,7 +207,7 @@ class MuseNodeList extends HookConsumerWidget {
               key: const ValueKey('node_select_button'),
               tooltip: selecting.value ? '完成' : '多选',
               visualDensity: VisualDensity.compact,
-              icon: Icon(selecting.value ? Icons.close_rounded : Icons.checklist_rounded, size: MuseIconSize.small),
+              icon: Icon(selecting.value ? Icons.close_outlined : Icons.checklist_outlined, size: MuseIconSize.small),
               onPressed: () {
                 selecting.value = !selecting.value;
                 picked.value = const {};
@@ -217,7 +218,7 @@ class MuseNodeList extends HookConsumerWidget {
               key: const ValueKey('node_search_button'),
               tooltip: searching.value ? '关闭搜索' : '搜索节点',
               visualDensity: VisualDensity.compact,
-              icon: Icon(searching.value ? Icons.search_off_rounded : Icons.search_rounded, size: MuseIconSize.small),
+              icon: Icon(searching.value ? Icons.search_off_outlined : Icons.search_outlined, size: MuseIconSize.small),
               onPressed: () {
                 searching.value = !searching.value;
                 if (!searching.value) {
@@ -230,7 +231,7 @@ class MuseNodeList extends HookConsumerWidget {
             PopupMenuButton<MuseNodeSort>(
               key: const ValueKey('node_sort_button'),
               tooltip: '排序：${sortMode.title}',
-              icon: const Icon(Icons.sort_rounded, size: MuseIconSize.small),
+              icon: const Icon(Icons.sort_outlined, size: MuseIconSize.small),
               style: const ButtonStyle(visualDensity: VisualDensity.compact),
               initialValue: sortMode,
               onSelected: (m) => ref.read(Preferences.museNodeSort.notifier).update(m.key),
@@ -280,7 +281,7 @@ class MuseNodeList extends HookConsumerWidget {
             decoration: InputDecoration(
               isDense: true,
               hintText: '搜索节点，如 日本、HK、IPLC',
-              prefixIcon: const Icon(Icons.search_rounded, size: MuseIconSize.small),
+              prefixIcon: const Icon(Icons.search_outlined, size: MuseIconSize.small),
               filled: true,
               fillColor: mt.card,
               border: const OutlineInputBorder(borderRadius: MuseRadius.fullAll, borderSide: BorderSide.none),
@@ -292,7 +293,8 @@ class MuseNodeList extends HookConsumerWidget {
     }
 
     if (proxies.isLoading && group == null) {
-      children.add(const Padding(padding: EdgeInsets.all(MuseSpace.s24), child: Center(child: CircularProgressIndicator())));
+      // 1.5.0: skeleton rows instead of a spinner
+      children.add(MuseSection(dividerIndent: MuseSize.rowIndent, children: [MuseSkeleton.rows()]));
     } else if (group == null || group.items.isEmpty) {
       children.add(
         MuseSection(
@@ -422,7 +424,7 @@ class MuseNodeList extends HookConsumerWidget {
                       Icon(icon, size: MuseIconSize.small, color: mt.text3),
                       const SizedBox(width: MuseSpace.s12),
                       Expanded(child: Text(label, style: MuseType.body(context).copyWith(color: mt.text2))),
-                      Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: mt.text3),
+                      Icon(open ? Icons.expand_less_outlined : Icons.expand_more_outlined, color: mt.text3),
                     ],
                   ),
                 ),
@@ -474,7 +476,7 @@ class MuseNodeList extends HookConsumerWidget {
         children.add(
           foldToggle(
             key: const ValueKey('hidden_nodes_toggle'),
-            icon: Icons.block_rounded,
+            icon: Icons.block_outlined,
             label: '不可用 · ${folded.length}',
             open: showHidden.value,
             onTap: () => showHidden.value = !showHidden.value,
@@ -552,11 +554,11 @@ class MuseNodeList extends HookConsumerWidget {
                     onPressed: () => picked.value = sel.length == allNodes.length ? const {} : allNodes.toSet(),
                     child: Text(sel.length == allNodes.length ? '全不选' : '全选'),
                   ),
-                  action('test', Icons.speed_rounded, '测速', running ? () async {
+                  action('test', Icons.speed_outlined, '测速', running ? () async {
                     await museTestNodes(ref, sel);
                     await done('已开始测速 ${sel.length} 个节点');
                   } : null),
-                  action('favorite', Icons.star_outline_rounded, '收藏', () async {
+                  action('favorite', Icons.star_outlined, '收藏', () async {
                     var raw = ref.read(Preferences.museFavoriteNodes);
                     for (final t in sel) {
                       if (!museParseFavorites(raw).contains(t)) raw = museToggleFavorite(raw, t);
@@ -569,7 +571,7 @@ class MuseNodeList extends HookConsumerWidget {
                     await ref.read(MusePrefs.nodeMeta.notifier).update(metas.setHidden(sel.where((t) => t != group.selected), true).toRaw());
                     await done(sel.contains(group.selected) ? '已隐藏（正在使用的节点除外）' : '已隐藏 ${sel.length} 个');
                   }),
-                  action('copy', Icons.copy_rounded, '复制', () async {
+                  action('copy', Icons.copy_outlined, '复制', () async {
                     final names = [for (final e in group.items) if (sel.contains(e.tag)) museNodeName(e)];
                     await Clipboard.setData(ClipboardData(text: names.join('\n')));
                     await done('已复制 ${names.length} 个名称');
@@ -620,7 +622,7 @@ class _NodeSection extends StatelessWidget {
                     Expanded(child: Text(header!, style: MuseType.caption(context))),
                     if (collapsed != null)
                       Icon(
-                        collapsed! ? Icons.expand_more_rounded : Icons.expand_less_rounded,
+                        collapsed! ? Icons.expand_more_outlined : Icons.expand_less_outlined,
                         size: MuseIconSize.tiny,
                         color: mt.text3,
                       ),
@@ -694,7 +696,8 @@ class MuseNodeRow extends StatelessWidget {
     final Color delayColor = switch (view.kind) {
       MuseDelayKind.live => MuseColors.delay(context, view.delay),
       MuseDelayKind.timeout => MusePalette.red,
-      _ => mt.text3,
+      // 1.5.0: untested / cached delays in the secondary grey (tertiary is for icons only)
+      _ => mt.text2,
     };
     final fullName = displayName ?? museNodeName(proxy);
     final rawName = proxy.isGroup ? fullName.split(' → ').first.trim() : fullName;
@@ -709,13 +712,13 @@ class MuseNodeRow extends StatelessWidget {
         : museProtocolName(proxy.type);
     final groupIcon = proxy.isGroup
         ? switch (museGroupIconKind(type: proxy.type, name: rawName, selectedDisplay: proxy.groupSelectedTagDisplay)) {
-            MuseGroupIcon.autoFastest => Icons.bolt_rounded,
-            MuseGroupIcon.loadBalance => Icons.balance_rounded,
-            MuseGroupIcon.manual => Icons.touch_app_rounded,
-            MuseGroupIcon.fallback => Icons.alt_route_rounded,
-            MuseGroupIcon.other => Icons.folder_rounded,
+            MuseGroupIcon.autoFastest => Icons.bolt_outlined,
+            MuseGroupIcon.loadBalance => Icons.balance_outlined,
+            MuseGroupIcon.manual => Icons.touch_app_outlined,
+            MuseGroupIcon.fallback => Icons.alt_route_outlined,
+            MuseGroupIcon.other => Icons.folder_outlined,
           }
-        : Icons.public_rounded;
+        : Icons.public_outlined;
     final flag = proxy.isGroup ? null : (museFlagEmoji(name) ?? museFlagEmoji(museNodeName(proxy)));
 
     final row = Material(
@@ -735,7 +738,7 @@ class MuseNodeRow extends StatelessWidget {
                       width: MuseSize.flagBox,
                       height: MuseSize.flagBox,
                       child: Icon(
-                        checked! ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                        checked! ? Icons.check_circle_outlined : Icons.radio_button_unchecked_outlined,
                         color: checked! ? MusePalette.brand : mt.text3,
                       ),
                     )
@@ -771,7 +774,7 @@ class MuseNodeRow extends StatelessWidget {
                   ),
                   const SizedBox(width: MuseSpace.s8),
                   AnimatedContainer(
-                    duration: MuseMotion.fast,
+                    duration: museMotion(context),
                     width: MuseSize.dot,
                     height: MuseSize.dot,
                     decoration: BoxDecoration(color: delayColor, shape: BoxShape.circle),
@@ -779,7 +782,7 @@ class MuseNodeRow extends StatelessWidget {
                   SizedBox(
                     width: MuseSize.latencyColumn,
                     child: AnimatedSwitcher(
-                      duration: MuseMotion.fast,
+                      duration: museMotion(context),
                       transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
                       layoutBuilder: (current, previous) =>
                           Stack(alignment: Alignment.centerRight, children: [...previous, ?current]),
@@ -787,7 +790,7 @@ class MuseNodeRow extends StatelessWidget {
                         delayText,
                         key: ValueKey(delayText),
                         textAlign: TextAlign.right,
-                        style: MuseType.body(context).copyWith(color: stale ? mt.text3 : mt.text1, fontFeatures: MuseType.tabular),
+                        style: MuseType.body(context).copyWith(color: stale ? mt.text2 : mt.text1, fontFeatures: MuseType.tabular),
                       ),
                     ),
                   ),
@@ -811,7 +814,7 @@ class MuseNodeRow extends StatelessWidget {
 
 /// 32 dp rounded square with a flag emoji (or an icon for groups).
 class MuseFlagBox extends StatelessWidget {
-  const MuseFlagBox({super.key, this.flag, this.icon = Icons.public_rounded, this.onBrand = false});
+  const MuseFlagBox({super.key, this.flag, this.icon = Icons.public_outlined, this.onBrand = false});
 
   final String? flag;
   final IconData icon;
@@ -941,7 +944,7 @@ Future<void> showMuseNodeDetails(
                 const SizedBox(height: MuseSpace.s8),
                 OutlinedButton.icon(
                   key: const ValueKey('node_copy_error'),
-                  icon: const Icon(Icons.copy_all_rounded, size: MuseIconSize.small),
+                  icon: const Icon(Icons.copy_all_outlined, size: MuseIconSize.small),
                   label: const Text('复制错误详情'),
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: '$name\n$invalidError'));
@@ -957,7 +960,7 @@ Future<void> showMuseNodeDetails(
                     Expanded(
                       child: OutlinedButton.icon(
                         key: const ValueKey('node_favorite'),
-                        icon: Icon(isFavorite ? Icons.star_rounded : Icons.star_outline_rounded, size: MuseIconSize.small),
+                        icon: Icon(isFavorite ? Icons.star_rounded : Icons.star_outlined, size: MuseIconSize.small),
                         label: Text(isFavorite ? '取消收藏' : '收藏'),
                         onPressed: () async {
                           Navigator.of(sheetContext).pop();
@@ -970,7 +973,7 @@ Future<void> showMuseNodeDetails(
                     Expanded(
                       child: OutlinedButton.icon(
                         key: const ValueKey('node_test_one'),
-                        icon: const Icon(Icons.speed_rounded, size: MuseIconSize.small),
+                        icon: const Icon(Icons.speed_outlined, size: MuseIconSize.small),
                         label: const Text('只测这个节点'),
                         onPressed: !running
                             ? null
@@ -1036,7 +1039,7 @@ Future<void> showMuseNodeDetails(
                   Expanded(
                     child: OutlinedButton.icon(
                       key: const ValueKey('node_copy_name'),
-                      icon: const Icon(Icons.copy_rounded, size: MuseIconSize.small),
+                      icon: const Icon(Icons.copy_outlined, size: MuseIconSize.small),
                       label: const Text('复制名称'),
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(text: name));
@@ -1049,7 +1052,7 @@ Future<void> showMuseNodeDetails(
                   Expanded(
                     child: FilledButton.icon(
                       key: const ValueKey('node_use'),
-                      icon: const Icon(Icons.check_rounded, size: MuseIconSize.small),
+                      icon: const Icon(Icons.check_outlined, size: MuseIconSize.small),
                       label: const Text('使用此节点'),
                       onPressed: () async {
                         Navigator.of(sheetContext).pop();

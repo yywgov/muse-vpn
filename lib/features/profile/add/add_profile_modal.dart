@@ -65,21 +65,21 @@ class AddProfileOptions extends HookConsumerWidget {
       horizontalTitleGap: MuseSpace.s16,
       leading: Icon(icon, size: MuseIconSize.regular, color: mt.text2),
       title: Text(title, style: MuseType.body(context)),
-      trailing: Icon(Icons.chevron_right_rounded, size: MuseIconSize.small, color: mt.text3),
+      trailing: Icon(Icons.chevron_right_outlined, size: MuseIconSize.small, color: mt.text3),
       onTap: onTap,
     );
     final options = <Widget>[
-      option(const ValueKey('add_from_clipboard_button'), Icons.content_paste_rounded, '粘贴链接', () async {
+      option(const ValueKey('add_from_clipboard_button'), Icons.content_paste_outlined, '粘贴链接', () async {
         final cr = await Clipboard.getData(Clipboard.kTextPlain).then((value) => value?.text ?? '');
         ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
       }),
       if (!PlatformUtils.isDesktop)
-        option(const ValueKey('add_by_qr_code_button'), Icons.qr_code_scanner_rounded, '扫描二维码', () async {
+        option(const ValueKey('add_by_qr_code_button'), Icons.qr_code_scanner_outlined, '扫描二维码', () async {
           final cr = await ref.read(dialogNotifierProvider.notifier).showQrScanner();
           if (cr == null) return;
           ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
         }),
-      option(const ValueKey('add_from_file_button'), Icons.insert_drive_file_rounded, '从文件导入', () async {
+      option(const ValueKey('add_from_file_button'), Icons.insert_drive_file_outlined, '从文件导入', () async {
         final result = await FilePicker.platform.pickFiles(
           type: FileType.custom,
           allowedExtensions: ['txt', 'json', 'yaml', 'yml', 'conf', 'ovpn'],
@@ -96,7 +96,7 @@ class AddProfileOptions extends HookConsumerWidget {
         }
         ref.read(addProfileNotifierProvider.notifier).addClipboard(decodeTextBytes(bytes));
       }),
-      option(const ValueKey('add_manually_button'), Icons.edit_rounded, '手动输入链接', () {
+      option(const ValueKey('add_manually_button'), Icons.edit_outlined, '手动输入链接', () {
         ref.read(addProfilePageNotifierProvider.notifier).goManual();
       }),
     ];
@@ -176,7 +176,7 @@ class AddProfileManual extends HookConsumerWidget {
               children: [
                 Expanded(child: Text(t.common.manually, style: theme.textTheme.headlineMedium)),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(Icons.close_outlined),
                   onPressed: () => ref.read(addProfilePageNotifierProvider.notifier).goOptions(),
                 ),
               ],

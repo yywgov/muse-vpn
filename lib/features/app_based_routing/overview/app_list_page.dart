@@ -1,6 +1,5 @@
 import 'package:dartx/dartx.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -166,7 +165,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
               Center(
                 child: ActionChip(
                   padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s8),
-                  avatar: const Icon(Icons.undo_rounded),
+                  avatar: const Icon(Icons.undo_outlined),
                   label: Text(appBasedRouting.autoSelection.restore(n: removed.length)),
                   onPressed: restoreRemoved,
                 ),
@@ -200,7 +199,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
                   searchQuery.value = "";
                   isSearching.value = false;
                 },
-                icon: const Icon(Icons.close),
+                icon: const Icon(Icons.close_outlined),
                 tooltip: localizations.cancelButtonLabel,
               ),
               bottom: chips,
@@ -209,7 +208,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
               title: Text(mode?.listTitle(t) ?? t.pages.settings.routing.appBasedRouting.title),
               actions: [
                 IconButton(
-                  icon: const Icon(FluentIcons.search_24_regular),
+                  icon: const Icon(Icons.search_outlined),
                   onPressed: () => isSearching.value = true,
                   tooltip: localizations.searchFieldLabel,
                 ),
@@ -228,7 +227,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
                         controller.open();
                       }
                     },
-                    icon: const Icon(Icons.more_vert_rounded),
+                    icon: const Icon(Icons.more_vert_outlined),
                   ),
                 ),
               ],
@@ -238,7 +237,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
           ? FloatingActionButton(
               onPressed: () =>
                   scrollController.animateTo(0.0, duration: const Duration(milliseconds: 500), curve: Curves.easeOut),
-              child: const Icon(Icons.keyboard_arrow_up_rounded),
+              child: const Icon(Icons.keyboard_arrow_up_outlined),
             )
           : null,
       body: displayedApps.when(

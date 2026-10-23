@@ -38,10 +38,10 @@ class WindowsSettingsSection extends ConsumerWidget {
       header: '电脑',
       children: [
         MuseTile(
-          leading: const Icon(Icons.swap_horiz_rounded),
+          leading: const Icon(Icons.swap_horiz_outlined),
           title: '运行模式',
           trailing: tunNeedsAdmin
-              ? const Icon(Icons.error_rounded, color: MusePalette.orange, size: MuseIconSize.small)
+              ? const Icon(Icons.error_outlined, color: MusePalette.orange, size: MuseIconSize.small)
               : Text(mode == ServiceMode.tun ? 'TUN' : '系统代理'),
           chevron: true,
           onTap: () async {
@@ -82,7 +82,7 @@ class WindowsSettingsSection extends ConsumerWidget {
         ),
         // 1.2.2: same switch tile as every other 设置 row
         MuseSwitchTile(
-          leading: const Icon(Icons.power_settings_new_rounded),
+          leading: const Icon(Icons.power_settings_new_outlined),
           title: '开机自启',
           value: autoStart,
           onChanged: (value) async {
@@ -91,7 +91,7 @@ class WindowsSettingsSection extends ConsumerWidget {
           },
         ),
         MuseTile(
-          leading: const Icon(Icons.close_rounded),
+          leading: const Icon(Icons.close_outlined),
           title: '关闭窗口时',
           trailing: Text(closing.present(t)),
           chevron: true,

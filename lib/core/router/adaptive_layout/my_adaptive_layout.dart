@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/core/model/constants.dart';
@@ -116,8 +117,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
 /// 穿云 1.3.0: 首页 / 节点 / 订阅 / 设置 (icon + label; the selected one only changes colour).
 final museShellActions = [
   ShellRouteAction(Icons.home_outlined, '首页'),
-  ShellRouteAction(Icons.language_rounded, '节点'),
-  ShellRouteAction(Icons.link_rounded, '订阅'),
+  ShellRouteAction(Icons.language_outlined, '节点'),
+  ShellRouteAction(Icons.link_outlined, '订阅'),
   ShellRouteAction(Icons.settings_outlined, '设置'),
 ];
 
@@ -143,10 +144,13 @@ class MuseShellFrame extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // a subscription link waits on the clipboard: dot on 订阅
     final offer = ref.watch(museClipboardOfferProvider) != null;
+    // 1.5.0: unread 更新内容 after a small update: red dot on 设置
+    final changelogDot = ref.watch(museChangelogDotProvider);
     Widget icon(int i) {
       final a = museShellActions[i];
       final ic = Icon(a.icon);
-      return i == 2 && offer ? Badge(smallSize: 8, backgroundColor: MusePalette.brand, child: ic) : ic;
+      if (i == 3) return MuseDot(show: changelogDot, child: ic);
+      return i == 2 && offer ? Badge(smallSize: MuseSize.dot, backgroundColor: MusePalette.brand, child: ic) : ic;
     }
 
     final index = currentIndex < museShellActions.length ? currentIndex : 0;
@@ -196,7 +200,7 @@ class MuseShellFrame extends ConsumerWidget {
                   child: Align(
                     alignment: Alignment.topCenter,
                     child: AnimatedContainer(
-                      duration: MuseMotion.fast,
+                      duration: museMotion(context),
                       constraints: BoxConstraints(maxWidth: maxWidth),
                       child: child,
                     ),

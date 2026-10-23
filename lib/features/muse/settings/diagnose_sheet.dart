@@ -196,10 +196,10 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
     final connected = ref.watch(serviceRunningProvider);
     final exit = ref.watch(museExitProvider);
     (IconData, Color) icon(MuseDiagLevel l) => switch (l) {
-      MuseDiagLevel.ok => (Icons.check_circle_rounded, MusePalette.green),
-      MuseDiagLevel.warn => (Icons.error_rounded, MusePalette.orange),
-      MuseDiagLevel.fail => (Icons.cancel_rounded, MusePalette.red),
-      MuseDiagLevel.skip => (Icons.remove_circle_outline_rounded, mt.text3),
+      MuseDiagLevel.ok => (Icons.check_circle_outlined, MusePalette.green),
+      MuseDiagLevel.warn => (Icons.error_outlined, MusePalette.orange),
+      MuseDiagLevel.fail => (Icons.cancel_outlined, MusePalette.red),
+      MuseDiagLevel.skip => (Icons.remove_circle_outlined, mt.text3),
     };
     Widget line(Widget leading, String title, Widget value) => Padding(
       padding: const EdgeInsets.symmetric(vertical: MuseSpace.s8),
@@ -234,7 +234,7 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
               if (connected) ...[
                 line(
                   Icon(
-                    info != null ? Icons.check_circle_rounded : Icons.travel_explore_rounded,
+                    info != null ? Icons.check_circle_outlined : Icons.travel_explore_outlined,
                     color: info != null ? MusePalette.green : mt.text3,
                     size: MuseIconSize.small,
                   ),
@@ -294,7 +294,7 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
                   Expanded(
                     child: OutlinedButton.icon(
                       key: const ValueKey('diagnose_copy_log'),
-                      icon: const Icon(Icons.copy_rounded, size: MuseIconSize.small),
+                      icon: const Icon(Icons.copy_outlined, size: MuseIconSize.small),
                       label: const Text('复制日志'),
                       onPressed: () async {
                         final text = await MuseDiagnostics.redactedText(ref);
@@ -308,7 +308,7 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
                   Expanded(
                     child: OutlinedButton.icon(
                       key: const ValueKey('diagnose_export_log'),
-                      icon: const Icon(Icons.ios_share_rounded, size: MuseIconSize.small),
+                      icon: const Icon(Icons.ios_share_outlined, size: MuseIconSize.small),
                       label: const Text('导出日志'),
                       onPressed: () async {
                         if (!await MuseDiagnostics.export(ref)) _toast('导出失败', error: true);

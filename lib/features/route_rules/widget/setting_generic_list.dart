@@ -40,7 +40,7 @@ class SettingGenericList<T extends Object> extends ConsumerWidget {
                       children: [
                         Row(
                           children: [
-                            const Icon(size: MuseIconSize.tiny, Icons.warning_rounded, color: MusePalette.orange),
+                            const Icon(size: MuseIconSize.tiny, Icons.warning_outlined, color: MusePalette.orange),
                             const Gap(2),
                             Text(
                               t.pages.settings.routing.routeRule.rule.notAvailableInThisPlatform,

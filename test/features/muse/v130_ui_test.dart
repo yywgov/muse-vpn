@@ -211,9 +211,11 @@ void main() {
       expect(find.text('已连接'), findsOneWidget);
       expect(find.text('规则模式'), findsOneWidget);
       expect(find.byKey(const ValueKey('home_connect_switch')), findsOneWidget);
-      for (final t in ['网速', '本次流量', '剩余流量', '到期', '出口 IP', '去广告']) {
+      for (final t in ['网速', '本次流量', '剩余流量', '到期', '出口 IP']) {
         expect(find.text(t), findsOneWidget, reason: t);
       }
+      // 1.5.0: 去广告 is hidden by default
+      expect(find.text('去广告'), findsNothing);
       expect(find.text('45.76.*.*'), findsOneWidget);
       expect(find.text('29 天'), findsOneWidget);
       // the node list is not on 首页 any more

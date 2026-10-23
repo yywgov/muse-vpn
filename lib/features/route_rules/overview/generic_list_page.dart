@@ -45,17 +45,17 @@ class GenericListPage extends HookConsumerWidget {
                         );
                     if (result == true) ref.read(provider.notifier).reset();
                   },
-            icon: const Icon(Icons.clear_all),
+            icon: const Icon(Icons.clear_all_outlined),
           ),
           const Gap(8),
         ],
       ),
       floatingActionButton: list.isNotEmpty
-          ? FloatingActionButton(onPressed: addNewValue, child: const Icon(Icons.add_rounded))
+          ? FloatingActionButton(onPressed: addNewValue, child: const Icon(Icons.add_outlined))
           : FloatingActionButton.extended(
               onPressed: addNewValue,
               label: Text(t.pages.settings.routing.routeRule.genericList.addNew),
-              icon: const Icon(Icons.add_rounded),
+              icon: const Icon(Icons.add_outlined),
             ),
       body: ListView.builder(
         itemBuilder: (context, index) => GenericListTile(
@@ -96,7 +96,7 @@ class GenericListTile extends ConsumerWidget {
         pauseOnBounce: const Duration(seconds: 2),
         pauseBetween: const Duration(seconds: 2),
       ),
-      trailing: IconButton(onPressed: onRemove, icon: const Icon(Icons.remove)),
+      trailing: IconButton(onPressed: onRemove, icon: const Icon(Icons.remove_outlined)),
     );
   }
 }

@@ -189,7 +189,9 @@ void main() {
 
   group('更新说明', () {
     test('once per version, not on a fresh install', () {
-      expect(museChangelogToShow(version: '1.2.8', shown: '1.2.7', introDone: true), isNotEmpty);
+      expect(museChangelogToShow(version: '1.4.0', shown: '1.3.0', introDone: true), isNotEmpty);
+      // 1.5.0: a patch release only shows a dot
+      expect(museChangelogToShow(version: '1.2.8', shown: '1.2.7', introDone: true), isNull);
       expect(museChangelogToShow(version: '1.2.8', shown: '1.2.8', introDone: true), isNull);
       expect(museChangelogToShow(version: '1.2.8', shown: '', introDone: false), isNull);
       expect(museChangelogToShow(version: '9.9.9', shown: '', introDone: true), isNull);

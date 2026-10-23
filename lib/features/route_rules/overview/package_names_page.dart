@@ -1,6 +1,6 @@
 import 'package:dartx/dartx.dart';
+import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -130,7 +130,7 @@ class PackageNamesPage extends HookConsumerWidget {
                   searchQuery.value = '';
                   isSearching.value = false;
                 },
-                icon: const Icon(Icons.close),
+                icon: const Icon(Icons.close_outlined),
                 tooltip: localizations.cancelButtonLabel,
               ),
               bottom: chips,
@@ -139,12 +139,12 @@ class PackageNamesPage extends HookConsumerWidget {
               title: Text(RuleEnum.packageName.present(t)),
               actions: [
                 IconButton(
-                  icon: const Icon(FluentIcons.search_24_regular),
+                  icon: const Icon(Icons.search_outlined),
                   onPressed: () => isSearching.value = true,
                   tooltip: localizations.searchFieldLabel,
                 ),
                 PopupMenuButton<void>(
-                  icon: const Icon(Icons.more_vert_rounded),
+                  icon: const Icon(Icons.more_vert_outlined),
                   itemBuilder: (_) => <PopupMenuEntry<void>>[
                     PopupMenuItem(
                       enabled: selected.isNotEmpty,
@@ -157,7 +157,8 @@ class PackageNamesPage extends HookConsumerWidget {
               bottom: chips,
             ),
       body: shownRows == null
-          ? const Center(child: CircularProgressIndicator())
+          // 穿云 1.5.0: skeleton rows instead of a spinner
+          ? SingleChildScrollView(child: MuseSkeleton.rows(rows: 10))
           : ListView.builder(
               itemCount: shownRows.length,
               itemBuilder: (context, index) {
@@ -170,7 +171,7 @@ class PackageNamesPage extends HookConsumerWidget {
                   value: isSelected,
                   onChanged: (_) => save(isSelected ? [...selected.where((e) => e != pkg)] : [...selected, pkg]),
                   secondary: app?.icon == null
-                      ? const SizedBox.square(dimension: 48, child: Icon(Icons.android_rounded))
+                      ? const SizedBox.square(dimension: 48, child: Icon(Icons.android_outlined))
                       : Image.memory(app!.icon!, width: MuseSize.appIconLarge, height: MuseSize.appIconLarge, cacheWidth: 48, cacheHeight: 48),
                   title: Row(
                     children: [

@@ -36,7 +36,7 @@ class RulePage extends HookConsumerWidget {
                     if (context.mounted) context.pop();
                   }
                 : null,
-            icon: const Icon(Icons.check),
+            icon: const Icon(Icons.check_outlined),
           ),
           const Gap(8),
         ],

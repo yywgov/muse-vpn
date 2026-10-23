@@ -8,6 +8,9 @@ import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+/// 1.5.0: tiles hidden until the user shows them (logic/home_tiles.dart keys).
+const museDefaultHiddenTiles = 'adblock';
+
 abstract class Preferences {
   // 穿云: no first-run intro (region is fixed to cn, language to 简体中文)
   static final introCompleted = PreferencesNotifier.create("intro_completed", true, overrideValue: true);
@@ -46,7 +49,11 @@ abstract class Preferences {
 
   // 穿云 1.3.0: 首页 dashboard tiles — order and hidden ones (comma lists, logic/home_tiles.dart)
   static final museHomeTileOrder = PreferencesNotifier.create<String, String>("muse_home_tile_order", "");
-  static final museHomeTilesHidden = PreferencesNotifier.create<String, String>("muse_home_tiles_hidden", "");
+  // 1.5.0: 去广告 is hidden by default (rarely changed; it stays in 设置); a saved choice is kept
+  static final museHomeTilesHidden = PreferencesNotifier.create<String, String>(
+    "muse_home_tiles_hidden",
+    museDefaultHiddenTiles,
+  );
 
   // 穿云 1.3.0: last node list of the active subscription, for picking nodes while disconnected
   static final museNodeCache = PreferencesNotifier.create<String, String>("muse_node_cache", "");

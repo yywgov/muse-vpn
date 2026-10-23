@@ -14,8 +14,10 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
+import 'package:hiddify/features/settings/overview/settings_page.dart' show MuseStatusDot;
 import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -104,7 +106,7 @@ class AboutPage extends HookConsumerWidget {
           MuseSection(
             children: [
               MuseTile(
-                leading: const Icon(Icons.system_update_rounded),
+                leading: const Icon(Icons.system_update_outlined),
                 title: '检查更新',
                 subtitle: updateStatus,
                 trailing: update is MuseUpdateIdle
@@ -118,12 +120,21 @@ class AboutPage extends HookConsumerWidget {
                 key: const ValueKey('about_beta'),
                 leading: const Icon(Icons.science_outlined),
                 title: 'Beta 通道',
-                subtitle: '也接收测试版更新，可能不稳定',
+                info: '也接收测试版更新，可能不稳定',
                 value: ref.watch(MusePrefs.betaChannel),
                 onChanged: (v) => ref.read(MusePrefs.betaChannel.notifier).update(v),
               ),
+              // 1.5.0: 更新内容 lives here (a small update only shows a dot, no dialog)
               MuseTile(
-                leading: const Icon(Icons.code_rounded),
+                key: const ValueKey('about_changelog'),
+                leading: const Icon(Icons.article_outlined),
+                title: '更新内容',
+                trailing: ref.watch(museChangelogDotProvider) ? const MuseStatusDot(color: MusePalette.red) : null,
+                chevron: true,
+                onTap: () => showMuseChangelogDialog(context, ref, version: appInfo.version),
+              ),
+              MuseTile(
+                leading: const Icon(Icons.code_outlined),
                 title: '开源许可 · 源代码',
                 chevron: true,
                 onTap: () => context.goNamed('openSource'),

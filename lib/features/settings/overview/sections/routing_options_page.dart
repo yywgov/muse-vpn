@@ -31,7 +31,7 @@ class RoutingOptionsPage extends HookConsumerWidget {
         title: Text(t.pages.settings.routing.title),
         actions: [
           PopupMenuButton(
-            icon: const Icon(Icons.more_vert_rounded),
+            icon: const Icon(Icons.more_vert_outlined),
             itemBuilder: (_) {
               final notifier = ref.read(rulesNotifierProvider.notifier);
               final options = t.pages.settings.routing.routeRule.options;
@@ -53,7 +53,7 @@ class RoutingOptionsPage extends HookConsumerWidget {
       floatingActionButton: FloatingActionButton(
         tooltip: t.pages.settings.routing.routeRule.add,
         onPressed: () => context.goNamed('rule', pathParameters: {'orderId': 'new'}),
-        child: const Icon(Icons.add_rounded),
+        child: const Icon(Icons.add_outlined),
       ),
     );
   }

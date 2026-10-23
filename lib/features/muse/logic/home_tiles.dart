@@ -97,8 +97,14 @@ List<MuseHomeTile> museMergeFlowTiles(List<MuseHomeTile> tiles) {
 /// 1.4.0: columns for [count] tiles at [width] so no row is left with a lone tile: the widest
 /// column count that divides the tiles evenly, else the one that fills the last row best
 /// (the last row's tiles then stretch to the full width).
-int museTileColumnsFor(double width, int count) {
-  final max = museTileColumns(width);
+int museTileColumnsFor(double width, int count, {double textScale = 1, double gap = 12}) {
+  var max = museTileColumns(width);
+  // 1.5.0: each tile keeps room for its number at the current text size (320 px + 2× text
+  // ends up as one column instead of two squeezed ones)
+  while (max > 1 && (width - gap * (max - 1)) / max < museTileMinWidth * textScale) {
+    max--;
+  }
+  if (max == 1) return 1;
   if (count <= 0) return max;
   if (count <= max) return count == 1 ? max.clamp(1, 2) : count;
   var best = 2;
@@ -114,6 +120,9 @@ int museTileColumnsFor(double width, int count) {
   }
   return best;
 }
+
+/// 1.5.0: narrowest a tile may get at 1× text (scaled with the text size).
+const museTileMinWidth = 120.0;
 
 /// Rows of tile indexes for [count] tiles in [columns] columns (the last row may be shorter;
 /// its tiles stretch).

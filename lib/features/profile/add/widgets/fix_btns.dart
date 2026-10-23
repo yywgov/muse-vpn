@@ -28,7 +28,7 @@ class FixBtns extends ConsumerWidget {
           key: const ValueKey('add_from_clipboard_button'),
           height: height,
           title: t.common.clipboard,
-          icon: Icons.content_paste,
+          icon: Icons.content_paste_outlined,
           onTap: () async {
             final cr = await Clipboard.getData(Clipboard.kTextPlain).then((value) => value?.text ?? '');
             ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
@@ -39,7 +39,7 @@ class FixBtns extends ConsumerWidget {
           key: const ValueKey('add_from_file_button'),
           height: height,
           title: t.common.file,
-          icon: Icons.insert_drive_file,
+          icon: Icons.insert_drive_file_outlined,
           onTap: () async {
             final result = await FilePicker.platform.pickFiles(
               type: FileType.custom,
@@ -64,7 +64,7 @@ class FixBtns extends ConsumerWidget {
             key: const ValueKey('add_by_qr_code_button'),
             height: height,
             title: t.common.scanQr,
-            icon: Icons.qr_code_scanner,
+            icon: Icons.qr_code_scanner_outlined,
             onTap: () async {
               final cr = await ref.read(dialogNotifierProvider.notifier).showQrScanner();
               if (cr == null) return;
@@ -77,7 +77,7 @@ class FixBtns extends ConsumerWidget {
           key: const ValueKey('add_manually_button'),
           height: height,
           title: t.common.manually,
-          icon: Icons.add,
+          icon: Icons.add_outlined,
           onTap: () {
             ref.read(addProfilePageNotifierProvider.notifier).goManual();
           },

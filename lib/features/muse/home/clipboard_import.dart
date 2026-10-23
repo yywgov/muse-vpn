@@ -106,12 +106,12 @@ class MuseClipboardOfferTile extends ConsumerWidget {
         clipBehavior: Clip.antiAlias,
         child: ListTile(
           key: const ValueKey('clipboard_offer'),
-          leading: Icon(Icons.content_paste_rounded, color: MusePalette.brand, size: MuseIconSize.regular),
+          leading: Icon(Icons.content_paste_outlined, color: MusePalette.brand, size: MuseIconSize.regular),
           title: Text('导入剪贴板里的订阅', style: MuseType.body(context).copyWith(fontWeight: FontWeight.w600)),
           subtitle: host.isEmpty ? null : Text(host, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
           trailing: IconButton(
             tooltip: '忽略',
-            icon: Icon(Icons.close_rounded, size: MuseIconSize.small, color: mt.text3),
+            icon: Icon(Icons.close_outlined, size: MuseIconSize.small, color: mt.text3),
             onPressed: done,
           ),
           onTap: () async {

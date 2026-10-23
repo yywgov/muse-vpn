@@ -230,7 +230,7 @@ class ProfileActionButton extends HookConsumerWidget {
           label: success ? t.pages.profiles.msg.update.success : t.pages.profiles.msg.update.failure,
           liveRegion: true,
           child: Icon(
-            success ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
+            success ? Icons.check_circle_outlined : Icons.error_outlined,
             color: success ? MusePalette.green : Theme.of(context).colorScheme.error,
           ),
         );
@@ -247,7 +247,7 @@ class ProfileActionButton extends HookConsumerWidget {
               onTap: () => ref
                   .read(updateProfileNotifierProvider(profile.id).notifier)
                   .updateProfile(profile as RemoteProfileEntity),
-              child: const Icon(Icons.sync_rounded),
+              child: const Icon(Icons.sync_outlined),
             ),
           ),
         );
@@ -292,7 +292,7 @@ class _UpdatingIndicatorState extends State<_UpdatingIndicator> with SingleTicke
   Widget build(BuildContext context) {
     return RotationTransition(
       turns: ReverseAnimation(_controller),
-      child: Icon(Icons.sync_rounded, color: Theme.of(context).colorScheme.onSurface),
+      child: Icon(Icons.sync_outlined, color: Theme.of(context).colorScheme.onSurface),
     );
   }
 }
@@ -312,7 +312,7 @@ class ProfileActionsMenu extends HookConsumerWidget {
       if (profile case RemoteProfileEntity())
         AdaptiveMenuItem(
           title: t.common.update,
-          leadingIcon: const Icon(Icons.sync_rounded),
+          leadingIcon: const Icon(Icons.sync_outlined),
           onTap: () {
             if (ref.read(updateProfileNotifierProvider(profile.id)).isLoading) {
               return;
@@ -323,7 +323,7 @@ class ProfileActionsMenu extends HookConsumerWidget {
       // 1.4.0: QR code of the subscription (scanned by another phone, opens 穿云 to import)
       if (profile case final RemoteProfileEntity remote)
         AdaptiveMenuItem(
-          leadingIcon: const Icon(Icons.qr_code_2_rounded),
+          leadingIcon: const Icon(Icons.qr_code_2_outlined),
           title: '二维码分享',
           onTap: () => showMuseQrDialog(
             context,
@@ -333,13 +333,13 @@ class ProfileActionsMenu extends HookConsumerWidget {
           ),
         ),
       AdaptiveMenuItem(
-        leadingIcon: const Icon(Icons.edit_rounded),
+        leadingIcon: const Icon(Icons.edit_outlined),
         title: '编辑',
         // MenuAnchor closes itself; popping here would pop the 配置 tab root and swallow the tap.
         onTap: () => context.pushNamed('profileDetails', pathParameters: {'id': profile.id}),
       ),
       AdaptiveMenuItem(
-        leadingIcon: const Icon(Icons.delete_outline_rounded),
+        leadingIcon: const Icon(Icons.delete_outlined),
         title: t.common.delete,
         onTap: () async => await ref
             .read(dialogNotifierProvider.notifier)

@@ -20,6 +20,7 @@ import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/changelog.dart';
+import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
 import 'package:hiddify/features/muse/home/exit_card.dart';
@@ -28,6 +29,7 @@ import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/home/reachability.dart';
+import 'package:hiddify/features/muse/logic/connect_flow.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
 import 'package:hiddify/features/muse/logic/home_tiles.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
@@ -37,6 +39,7 @@ import 'package:hiddify/features/muse/nodes/node_list.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
+import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/gen/assets.gen.dart';
@@ -54,34 +57,25 @@ class MuseHomePage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hasProfile = ref.watch(museHasProfileProvider);
 
-    // 1.2.8: 更新说明, once per new version
+    // 1.2.8: 更新说明, once per new version. 1.5.0: only for a feature release (x.Y); a small
+    // update leaves a dot on 设置 › 关于 › 更新内容 instead.
     final appVersion = ref.watch(museAppVersionProvider);
     useEffect(() {
       if (hasProfile == null || appVersion == null) return null;
       final shown = ref.read(Preferences.museChangelogShown);
-      if (shown == appVersion) return null;
+      final seen = ref.read(MusePrefs.changelogSeen);
+      if (shown == appVersion) {
+        // shown by a version before 1.5.0, which didn't record it as seen
+        if (seen.isEmpty) Future.microtask(() => ref.read(MusePrefs.changelogSeen.notifier).update(appVersion));
+        return null;
+      }
       final notes = museChangelogToShow(version: appVersion, shown: shown, introDone: hasProfile);
       Future.microtask(() async {
         await ref.read(Preferences.museChangelogShown.notifier).update(appVersion);
+        // a new user has nothing to compare with: nothing unread
+        if (!hasProfile) await ref.read(MusePrefs.changelogSeen.notifier).update(appVersion);
         if (notes == null || !context.mounted) return;
-        await showDialog<void>(
-          context: context,
-          builder: (c) => AlertDialog(
-            key: const ValueKey('changelog_dialog'),
-            title: Text('穿云 $appVersion 更新内容'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final n in notes)
-                    Padding(padding: const EdgeInsets.symmetric(vertical: MuseSpace.s4), child: Text('· $n')),
-                ],
-              ),
-            ),
-            actions: [TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('知道了'))],
-          ),
-        );
+        await showMuseChangelogDialog(context, ref, version: appVersion, notes: notes);
       });
       return null;
     }, [hasProfile, appVersion]);
@@ -131,7 +125,13 @@ class _Dashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final margin = MuseSpace.page(context);
-    if (hasProfile == null) return const SizedBox.shrink();
+    // 1.5.0: the dashboard's outline while the subscriptions are read
+    if (hasProfile == null) {
+      return ListView(
+        padding: EdgeInsets.fromLTRB(margin, MuseSpace.s4, margin, MuseSpace.s32),
+        children: [MuseSkeleton.dashboard()],
+      );
+    }
     if (hasProfile == false) return const _EmptyState();
     return RefreshIndicator(
       key: const ValueKey('home_pull_refresh'),
@@ -153,6 +153,15 @@ class _Dashboard extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------- hero card
+
+/// 1.5.0: the core's status as the connect button sees it; [preparing] (config being built, the
+/// core not asked yet) counts as connecting.
+MuseLinkState museLinkStateOf(ConnectionStatus? status, {bool preparing = false}) => switch (status) {
+  Connected() => MuseLinkState.connected,
+  Connecting() => MuseLinkState.connecting,
+  Disconnecting() => MuseLinkState.disconnecting,
+  _ => preparing ? MuseLinkState.connecting : MuseLinkState.disconnected,
+};
 
 enum _HeroState { idle, connecting, connected }
 
@@ -192,27 +201,34 @@ class MuseHeroCard extends HookConsumerWidget {
 
     final status = connection.valueOrNull;
     final connected = status is Connected;
-    final busy = status?.isSwitching ?? false;
-    // Windows: while the keeper reconnects, the switch cancels the recovery
-    final canCancelRecovery = PlatformUtils.isWindows && recovering && status is Connecting;
-    final failed = connection.hasError && !connected;
+    // 1.5.0: 准备配置 (the core not asked yet) already counts as connecting
+    final preparing = ref.watch(museConnectPreparingProvider) && !(status?.isConnected ?? false) && !(status?.isSwitching ?? false);
+    final link = museLinkStateOf(status, preparing: preparing);
+    final busy = link == MuseLinkState.connecting || link == MuseLinkState.disconnecting;
+    final recoveringNow = PlatformUtils.isWindows && recovering && status is Connecting;
+    final failed = connection.hasError && !connected && !busy;
     final state = connected ? _HeroState.connected : (busy ? _HeroState.connecting : _HeroState.idle);
-    final label = switch (status) {
-      Connected() => '已连接',
-      Connecting() when canCancelRecovery => '正在恢复',
-      Connecting() => '连接中',
-      Disconnecting() => '断开中',
+    final reach = ref.watch(museReachProvider);
+    final stage = museConnectStageFor(
+      link,
+      preparing: preparing,
+      reachChecking: reach == MuseReach.checking || reach == MuseReach.unknown,
+    );
+    final label = switch (link) {
+      MuseLinkState.connected => '已连接',
+      MuseLinkState.connecting when recoveringNow => '正在恢复',
+      MuseLinkState.connecting => '连接中',
+      MuseLinkState.disconnecting => '断开中',
       _ when failed => '连接失败',
       _ => '未连接',
     };
+    // 1.5.0: the button as a state machine — 连接中 cancels, 断开中 ignores taps
+    final action = museConnectActionFor(link);
 
     Future<void> toggle() async {
       final notifier = ref.read(connectionNotifierProvider.notifier);
-      if (status is Connected || canCancelRecovery) {
-        await notifier.toggleConnection();
-        return;
-      }
-      if (ref.read(museActiveProfileIdProvider) == null) {
+      if (action == MuseConnectAction.ignore) return;
+      if (action == MuseConnectAction.connect && ref.read(museActiveProfileIdProvider) == null) {
         await ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile();
         return;
       }
@@ -224,10 +240,10 @@ class MuseHeroCard extends HookConsumerWidget {
     final heroPad = MediaQuery.sizeOf(context).width >= 720 ? MuseSpace.s24 : MuseSpace.s16;
     final fg = onBrand ? MusePalette.white : mt.text1;
     final fg2 = onBrand ? MusePalette.white.withValues(alpha: 0.78) : mt.text2;
-    final switchEnabled = !busy || canCancelRecovery;
+    final switchEnabled = action != MuseConnectAction.ignore;
 
     final card = AnimatedContainer(
-      duration: MuseMotion.fast,
+      duration: museMotion(context),
       curve: MuseMotion.curve,
       decoration: switch (state) {
         _HeroState.idle => mt.cardDecoration(color: mt.heroIdle),
@@ -249,7 +265,8 @@ class MuseHeroCard extends HookConsumerWidget {
         borderRadius: MuseRadius.cardAll,
         child: Stack(
           children: [
-            if (state == _HeroState.connecting) const Positioned.fill(child: _Shimmer()),
+            // 1.5.0: no moving shimmer when the system asks for reduced motion
+            if (state == _HeroState.connecting && !museReduceMotion(context)) const Positioned.fill(child: _Shimmer()),
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -257,7 +274,7 @@ class MuseHeroCard extends HookConsumerWidget {
               type: MaterialType.transparency,
               child: InkWell(
                 // the whole card connects while disconnected
-                onTap: state == _HeroState.idle && !busy ? toggle : null,
+                onTap: state == _HeroState.idle && action == MuseConnectAction.connect ? toggle : null,
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(heroPad, heroPad, heroPad, 0),
                   child: Column(
@@ -273,7 +290,7 @@ class MuseHeroCard extends HookConsumerWidget {
                                   children: [
                                     Flexible(
                                       child: AnimatedSwitcher(
-                                        duration: MuseMotion.fast,
+                                        duration: museMotion(context),
                                         child: Text(
                                           label,
                                           key: ValueKey(label),
@@ -285,30 +302,52 @@ class MuseHeroCard extends HookConsumerWidget {
                                     if (connected && recovering)
                                       Padding(
                                         padding: const EdgeInsets.only(left: MuseSpace.s8),
-                                        child: Icon(Icons.autorenew_rounded, key: const ValueKey('watchdog_icon'), size: MuseIconSize.small, color: fg2),
+                                        child: Icon(Icons.autorenew_outlined, key: const ValueKey('watchdog_icon'), size: MuseIconSize.small, color: fg2),
                                       ),
                                     if (connected && failoverFrom != null)
                                       Padding(
                                         padding: const EdgeInsets.only(left: MuseSpace.s8),
-                                        child: Icon(Icons.swap_horiz_rounded, key: const ValueKey('failover_icon'), size: MuseIconSize.small, color: fg2),
+                                        child: Icon(Icons.swap_horiz_outlined, key: const ValueKey('failover_icon'), size: MuseIconSize.small, color: fg2),
                                       ),
                                   ],
                                 ),
                                 const SizedBox(height: MuseSpace.s8),
-                                Row(
+                                // 1.5.0: wraps instead of overflowing (narrow phone, large text)
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: MuseSpace.s8,
+                                  runSpacing: MuseSpace.s4,
                                   children: [
-                                    if (since != null) ...[
+                                    // 1.5.0: 准备配置 → 启动核心 → 测试连通
+                                    if (stage != null && !connected)
+                                      AnimatedSwitcher(
+                                        duration: museMotion(context),
+                                        child: Text(
+                                          '${stage.title}…',
+                                          key: ValueKey('home_stage_${stage.name}'),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: MuseType.body(context).copyWith(color: fg2),
+                                        ),
+                                      )
+                                    else if (since != null) ...[
                                       Text(
                                         museFormatDuration(DateTime.now().difference(since)),
                                         key: const ValueKey('home_timer'),
+                                        maxLines: 1,
                                         style: MuseType.body(context).copyWith(color: fg2, fontFeatures: MuseType.tabular),
                                       ),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8),
-                                        child: Text('·', style: MuseType.caption(context).copyWith(color: fg2)),
-                                      ),
+                                      Text('·', style: MuseType.caption(context).copyWith(color: fg2)),
                                     ],
-                                    _ModePill(mode: mode, onBrand: onBrand),
+                                    if (stage == null || connected) _ModePill(mode: mode, onBrand: onBrand),
+                                    if (stage == MuseConnectStage.testing && connected)
+                                      Text(
+                                        '${stage!.title}…',
+                                        key: const ValueKey('home_stage_testing'),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: MuseType.caption(context).copyWith(color: fg2),
+                                      ),
                                   ],
                                 ),
                               ],
@@ -319,6 +358,11 @@ class MuseHeroCard extends HookConsumerWidget {
                             key: const ValueKey('home_connect_switch'),
                             on: connected || busy,
                             onBrand: onBrand,
+                            semanticLabel: switch (action) {
+                              MuseConnectAction.cancel => '取消连接',
+                              MuseConnectAction.disconnect => '断开',
+                              _ => '连接',
+                            },
                             onTap: switchEnabled ? toggle : null,
                           ),
                         ],
@@ -371,7 +415,7 @@ class _ModePill extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               AnimatedSwitcher(
-                duration: MuseMotion.fast,
+                duration: museMotion(context),
                 child: Text(
                   '${mode.title}模式',
                   key: ValueKey(mode),
@@ -379,7 +423,7 @@ class _ModePill extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: MuseSpace.s4),
-              Icon(Icons.swap_horiz_rounded, size: MuseIconSize.tiny, color: fg.withValues(alpha: 0.8)),
+              Icon(Icons.swap_horiz_outlined, size: MuseIconSize.tiny, color: fg.withValues(alpha: 0.8)),
             ],
           ),
         ),
@@ -390,11 +434,12 @@ class _ModePill extends ConsumerWidget {
 
 /// The large switch on the hero card (64 × 36).
 class _BigSwitch extends StatelessWidget {
-  const _BigSwitch({super.key, required this.on, required this.onBrand, required this.onTap});
+  const _BigSwitch({super.key, required this.on, required this.onBrand, required this.onTap, required this.semanticLabel});
 
   final bool on;
   final bool onBrand;
   final VoidCallback? onTap;
+  final String semanticLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -404,19 +449,20 @@ class _BigSwitch extends StatelessWidget {
     return Semantics(
       button: true,
       toggled: on,
-      label: on ? '断开' : '连接',
+      enabled: onTap != null,
+      label: semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: AnimatedContainer(
-          duration: MuseMotion.fast,
+          duration: museMotion(context),
           curve: MuseMotion.curve,
           width: MuseSize.switchWidth,
           height: MuseSize.switchHeight,
           padding: const EdgeInsets.all(MuseSpace.s4),
           decoration: BoxDecoration(color: track, borderRadius: MuseRadius.fullAll),
           child: AnimatedAlign(
-            duration: MuseMotion.fast,
+            duration: museMotion(context),
             curve: MuseMotion.curve,
             alignment: on ? Alignment.centerRight : Alignment.centerLeft,
             child: Container(
@@ -498,7 +544,7 @@ class _HeroNodeRow extends ConsumerWidget {
     final fg2 = onBrand ? MusePalette.white.withValues(alpha: 0.78) : mt.text2;
     String text = '选择节点';
     String? flag;
-    IconData icon = Icons.public_rounded;
+    IconData icon = Icons.public_outlined;
     if (item != null) {
       final full = museNodeName(item);
       if (item.isGroup) {
@@ -508,7 +554,7 @@ class _HeroNodeRow extends ConsumerWidget {
         final pick = kind == '负载均衡' || sel.toLowerCase() == 'lowest-delay' || museBalanceStrategyName(sel) != null ? '' : sel;
         text = museCurrentNodeText(name: rawName, groupLabel: museGroupName(rawName), groupPick: museGroupName(pick));
         flag = pick.isEmpty ? null : museFlagEmoji(pick);
-        icon = Icons.bolt_rounded;
+        icon = Icons.bolt_outlined;
         text = museStripFlags(text);
       } else {
         flag = museFlagEmoji(full);
@@ -543,7 +589,7 @@ class _HeroNodeRow extends ConsumerWidget {
                     '$delay ms',
                     style: MuseType.body(context).copyWith(color: fg2, fontFeatures: MuseType.tabular),
                   ),
-                Icon(Icons.chevron_right_rounded, size: MuseIconSize.small, color: fg2),
+                Icon(Icons.chevron_right_outlined, size: MuseIconSize.small, color: fg2),
               ],
             ),
           ),
@@ -584,7 +630,11 @@ class MuseTileGrid extends ConsumerWidget {
     if (mergeFlow ?? PlatformUtils.isWindows) tiles = museMergeFlowTiles(tiles);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = museTileColumnsFor(constraints.maxWidth, tiles.length);
+        final columns = museTileColumnsFor(
+          constraints.maxWidth,
+          tiles.length,
+          textScale: MediaQuery.textScalerOf(context).scale(MuseType.numberSize) / MuseType.numberSize,
+        );
         final base = constraints.maxWidth >= 600 ? tileHeightDesktop : tileHeight;
         // 1.4.1: large text grows the row instead of overflowing the fixed tile height
         final height = math.max(base, museTileHeightFor(MediaQuery.textScalerOf(context)));
@@ -692,18 +742,22 @@ class _Tile extends ConsumerWidget {
                   ),
                 ),
                 AnimatedSwitcher(
-                  duration: MuseMotion.fast,
+                  duration: museMotion(context),
                   transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
                   layoutBuilder: (current, previous) =>
                       Stack(alignment: Alignment.centerLeft, children: [...previous, ?current]),
+                  // 1.5.0: a long number shrinks to fit instead of ending in 「…」 (narrow tile, large text)
                   child: museMaybeMask(
                     masked,
-                    Text(
-                      value,
+                    FittedBox(
                       key: ValueKey(value),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: MuseType.number(context).copyWith(color: valueColor),
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        value,
+                        maxLines: 1,
+                        style: MuseType.number(context).copyWith(color: valueColor),
+                      ),
                     ),
                   ),
                 ),
@@ -870,7 +924,7 @@ class _RemainingTile extends ConsumerWidget {
                 borderRadius: MuseRadius.fullAll,
                 child: TweenAnimationBuilder<double>(
                   tween: Tween(end: share),
-                  duration: MuseMotion.fast,
+                  duration: museMotion(context),
                   builder: (_, v, _) => LinearProgressIndicator(
                     value: v,
                     minHeight: MuseSize.progressBar,
@@ -961,7 +1015,7 @@ class _ExitTile extends ConsumerWidget {
                 ref.read(inAppNotificationControllerProvider).showSuccessToast('已复制 IP');
               } catch (_) {}
             },
-            child: Icon(Icons.copy_rounded, size: MuseIconSize.tiny, color: mt.text3),
+            child: Icon(Icons.copy_outlined, size: MuseIconSize.tiny, color: mt.text3),
           ),
         ],
       );
@@ -1024,7 +1078,7 @@ class MuseSegmented<T> extends StatelessWidget {
                 behavior: HitTestBehavior.opaque,
                 onTap: () => onChanged(v),
                 child: AnimatedContainer(
-                  duration: MuseMotion.fast,
+                  duration: museMotion(context),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: v == selected ? (mt.dark ? MusePalette.brand : MusePalette.white) : MusePalette.transparent,
@@ -1142,7 +1196,7 @@ class _TileEditor extends ConsumerWidget {
                   contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
                   leading: ReorderableDragStartListener(
                     index: i,
-                    child: Icon(Icons.drag_indicator_rounded, size: MuseIconSize.small, color: mt.text3),
+                    child: Icon(Icons.drag_indicator_outlined, size: MuseIconSize.small, color: mt.text3),
                   ),
                   title: Text(t.title, style: MuseType.body(context)),
                   trailing: Switch.adaptive(

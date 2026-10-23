@@ -51,7 +51,32 @@ const museChangelog = <String, List<String>>{
 
 /// The notes to show for [version], or null: nothing new, already shown, or a fresh install
 /// ([introDone] false — a new user has nothing to compare with; it is marked shown silently).
+///
+/// 1.5.0: a small update (same major.minor, e.g. 1.5.0 → 1.5.1) no longer pops the dialog; it
+/// only puts a dot on 设置 › 关于 › 更新内容 ([museChangelogUnread]).
 List<String>? museChangelogToShow({required String version, required String shown, required bool introDone}) {
   if (!introDone || shown == version) return null;
+  if (museIsSmallUpdate(version: version, from: shown)) return null;
   return museChangelog[version];
 }
+
+/// 1.5.0: [version] only bumps the patch number of [from] (1.5.0 → 1.5.2). Unknown / empty
+/// [from] is not small.
+bool museIsSmallUpdate({required String version, required String from}) {
+  List<int>? parse(String v) {
+    final parts = v.trim().split('+').first.split('.');
+    if (parts.length < 2) return null;
+    final out = [for (final p in parts) int.tryParse(p)];
+    if (out.any((e) => e == null)) return null;
+    return out.cast<int>();
+  }
+
+  final a = parse(version);
+  final b = parse(from);
+  if (a == null || b == null) return false;
+  return a[0] == b[0] && a[1] == b[1] && version.trim() != from.trim();
+}
+
+/// 1.5.0: whether 「更新内容」 shows a dot: this version has notes the user hasn't opened.
+bool museChangelogUnread({required String version, required String seen}) =>
+    museChangelog.containsKey(version) && seen != version;

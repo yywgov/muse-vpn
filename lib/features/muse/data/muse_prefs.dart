@@ -27,6 +27,9 @@ abstract final class MusePrefs {
   static final holidayClouds = PreferencesNotifier.create<bool, bool>("muse_holiday_clouds", true);
   static final onboardingDone = PreferencesNotifier.create<bool, bool>("muse_onboarding_done", false);
 
+  /// 1.5.0: the version whose 更新内容 the user has seen (dialog or 关于 › 更新内容)
+  static final changelogSeen = PreferencesNotifier.create<String, String>("muse_changelog_seen", "");
+
   /// Android: a short vibration when connected (off: 震动 was removed on request in 1.1)
   static final haptics = PreferencesNotifier.create<bool, bool>("muse_haptics", false);
 

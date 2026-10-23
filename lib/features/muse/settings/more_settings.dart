@@ -20,6 +20,7 @@ import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/lan_sync_service.dart';
 import 'package:hiddify/features/muse/data/sync_service.dart';
 import 'package:hiddify/features/muse/logic/lan_sync.dart';
+import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
@@ -61,7 +62,7 @@ Future<T?> musePick<T>(BuildContext context, String title, List<(T, String)> opt
         ListTile(
           key: ValueKey('pick_$label'),
           title: Text(label),
-          trailing: value == current ? Icon(Icons.check_rounded, color: MusePalette.brand, size: MuseIconSize.small) : null,
+          trailing: value == current ? Icon(Icons.check_outlined, color: MusePalette.brand, size: MuseIconSize.small) : null,
           onTap: () => Navigator.of(c).pop(value),
         ),
     ],
@@ -125,7 +126,7 @@ class MuseAppearancePage extends HookConsumerWidget {
                               border: a == accent ? Border.all(color: MuseTheme.of(context).text1, width: 2) : null,
                             ),
                             child: a == accent
-                                ? const Icon(Icons.check_rounded, size: MuseIconSize.tiny, color: MusePalette.white)
+                                ? const Icon(Icons.check_outlined, size: MuseIconSize.tiny, color: MusePalette.white)
                                 : null,
                           ),
                         ),
@@ -135,7 +136,7 @@ class MuseAppearancePage extends HookConsumerWidget {
               ),
               MuseTile(
                 key: const ValueKey('appearance_text_size'),
-                leading: const Icon(Icons.format_size_rounded),
+                leading: const Icon(Icons.format_size_outlined),
                 title: '字体大小',
                 trailing: Text(museTextSizes.firstWhere((e) => e.$1 == textSize, orElse: () => museTextSizes[1]).$2),
                 chevron: true,
@@ -150,9 +151,9 @@ class MuseAppearancePage extends HookConsumerWidget {
             children: [
               MuseSwitchTile(
                 key: const ValueKey('appearance_privacy'),
-                leading: const Icon(Icons.blur_on_rounded),
+                leading: const Icon(Icons.blur_on_outlined),
                 title: '隐私模式',
-                subtitle: '首页的流量、IP 等数字打码',
+                info: '首页的流量、IP 等数字打码',
                 value: ref.watch(MusePrefs.privacyMask),
                 onChanged: (v) => ref.read(MusePrefs.privacyMask.notifier).update(v),
               ),
@@ -173,8 +174,6 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final include = ref.watch(MusePrefs.includeRegex);
     final exclude = ref.watch(MusePrefs.excludeRegex);
-    final workers = ref.watch(MusePrefs.testWorkers);
-    final timeout = ref.watch(MusePrefs.testTimeoutSec);
     final metas = MuseNodeMetas.parse(ref.watch(MusePrefs.nodeMeta));
     final hiddenCount = metas.hiddenTags.length;
     final ua = ref.watch(MusePrefs.subUserAgent);
@@ -198,14 +197,14 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
             children: [
               MuseSwitchTile(
                 key: const ValueKey('node_beautify'),
-                leading: const Icon(Icons.auto_fix_high_rounded),
+                leading: const Icon(Icons.auto_fix_high_outlined),
                 title: '节点名美化',
                 value: ref.watch(MusePrefs.beautifyNames),
                 onChanged: (v) => ref.read(MusePrefs.beautifyNames.notifier).update(v),
               ),
               MuseSwitchTile(
                 key: const ValueKey('node_hide_duplicates'),
-                leading: const Icon(Icons.filter_none_rounded),
+                leading: const Icon(Icons.filter_none_outlined),
                 title: '隐藏重复节点',
                 value: ref.watch(MusePrefs.hideDuplicates),
                 onChanged: (v) => ref.read(MusePrefs.hideDuplicates.notifier).update(v),
@@ -255,11 +254,46 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
             ],
           ),
           MuseSection(
-            header: '测速（高级）',
+            header: '测速',
+            children: [
+              MuseTile(
+                key: const ValueKey('node_clear_cache'),
+                leading: const Icon(Icons.cleaning_services_outlined),
+                title: '清除测速记录',
+                onTap: () async {
+                  await ref.read(MusePrefs.latencyCache.notifier).update(MuseLatencyCache.empty.toRaw());
+                  await ref.read(MusePrefs.delayHistory.notifier).update('');
+                  _toast(ref, '已清除');
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ======================================================================= 开发者选项
+
+/// 1.5.0: tuning nobody needs day to day (测速 并发数 / 超时 moved here from 设置 › 节点).
+class MuseDeveloperPage extends HookConsumerWidget {
+  const MuseDeveloperPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final workers = ref.watch(MusePrefs.testWorkers);
+    final timeout = ref.watch(MusePrefs.testTimeoutSec);
+    return MuseScaffold(
+      title: '开发者选项',
+      body: MuseGroupedBody(
+        children: [
+          MuseSection(
+            header: '测速',
             children: [
               MuseTile(
                 key: const ValueKey('node_test_workers'),
-                leading: const Icon(Icons.speed_rounded),
+                leading: const Icon(Icons.speed_outlined),
                 title: '并发数',
                 trailing: Text('$workers'),
                 chevron: true,
@@ -280,13 +314,13 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
                 },
               ),
               MuseTile(
-                key: const ValueKey('node_clear_cache'),
-                leading: const Icon(Icons.cleaning_services_outlined),
-                title: '清除测速记录',
+                key: const ValueKey('dev_reset_test'),
+                leading: const Icon(Icons.restart_alt_outlined),
+                title: '恢复默认',
                 onTap: () async {
-                  await ref.read(MusePrefs.latencyCache.notifier).update(MuseLatencyCache.empty.toRaw());
-                  await ref.read(MusePrefs.delayHistory.notifier).update('');
-                  _toast(ref, '已清除');
+                  await ref.read(MusePrefs.testWorkers.notifier).update(museTestWorkersDefault);
+                  await ref.read(MusePrefs.testTimeoutSec.notifier).update(museTestTimeoutDefault);
+                  _toast(ref, '已恢复默认');
                 },
               ),
             ],
@@ -337,7 +371,7 @@ class MuseRoutingPage extends HookConsumerWidget {
             children: [
               MuseTile(
                 key: const ValueKey('routing_presets'),
-                leading: const Icon(Icons.playlist_add_check_rounded),
+                leading: const Icon(Icons.playlist_add_check_outlined),
                 title: '预设',
                 trailing: Text(choice.isEmpty ? '未开启' : '已开启 ${choice.length} 个'),
                 chevron: true,
@@ -345,7 +379,7 @@ class MuseRoutingPage extends HookConsumerWidget {
               ),
               MuseTile(
                 key: const ValueKey('routing_node_rules'),
-                leading: const Icon(Icons.call_split_rounded),
+                leading: const Icon(Icons.call_split_outlined),
                 title: '指定节点',
                 trailing: Text(nodeRules.isEmpty ? '无' : '${nodeRules.length} 条'),
                 chevron: true,
@@ -389,7 +423,7 @@ class MuseRoutingPage extends HookConsumerWidget {
               ),
               MuseTile(
                 key: const ValueKey('routing_export'),
-                leading: const Icon(Icons.ios_share_rounded),
+                leading: const Icon(Icons.ios_share_outlined),
                 title: '导出规则',
                 onTap: () async {
                   final text = museExportRules(ref.read(rulesNotifierProvider));
@@ -454,7 +488,7 @@ class MusePresetsPage extends HookConsumerWidget {
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
                 hintText: '搜索，如 YouTube、github.com',
-                prefixIcon: const Icon(Icons.search_rounded),
+                prefixIcon: const Icon(Icons.search_outlined),
                 filled: true,
                 fillColor: mt.card,
                 isDense: true,
@@ -465,7 +499,7 @@ class MusePresetsPage extends HookConsumerWidget {
           if (groups.isEmpty)
             Padding(
               padding: const EdgeInsets.all(MuseSpace.s24),
-              child: Center(child: Text('没有匹配的预设', style: MuseType.body(context).copyWith(color: mt.text3))),
+              child: Center(child: Text('没有匹配的预设', style: MuseType.body(context).copyWith(color: mt.text2))),
             ),
           for (final g in groups.entries)
             MuseSection(
@@ -556,24 +590,24 @@ class MuseNodeRulesPage extends HookConsumerWidget {
 
     return MuseScaffold(
       title: '指定节点',
-      actions: [IconButton(key: const ValueKey('node_rule_add'), icon: const Icon(Icons.add_rounded), onPressed: () => edit())],
+      actions: [IconButton(key: const ValueKey('node_rule_add'), icon: const Icon(Icons.add_outlined), onPressed: () => edit())],
       body: MuseGroupedBody(
         children: [
           MuseSection(
             footer: '这些网站或应用总走所选节点（规则、全局模式都生效）；节点不在当前订阅时该条不生效。修改后重新连接生效',
             children: [
               if (rules.isEmpty)
-                MuseTile(key: const ValueKey('node_rule_empty'), leading: const Icon(Icons.add_rounded), title: '添加', onTap: () => edit()),
+                MuseTile(key: const ValueKey('node_rule_empty'), leading: const Icon(Icons.add_outlined), title: '添加', onTap: () => edit()),
               for (var i = 0; i < rules.length; i++)
                 MuseTile(
                   key: ValueKey('node_rule_$i'),
-                  leading: const Icon(Icons.call_split_rounded),
+                  leading: const Icon(Icons.call_split_outlined),
                   title: nodeName(rules[i].node),
                   subtitle: rules[i].summary,
                   subtitleMaxLines: 2,
                   trailing: IconButton(
                     key: ValueKey('node_rule_delete_$i'),
-                    icon: const Icon(Icons.delete_outline_rounded),
+                    icon: const Icon(Icons.delete_outlined),
                     onPressed: () => save([...rules]..removeAt(i)),
                   ),
                   onTap: () => edit(index: i),
@@ -609,13 +643,13 @@ class MuseRemoteRuleSetsPage extends HookConsumerWidget {
 
     return MuseScaffold(
       title: '远程规则集',
-      actions: [IconButton(key: const ValueKey('remote_set_add'), icon: const Icon(Icons.add_rounded), onPressed: add)],
+      actions: [IconButton(key: const ValueKey('remote_set_add'), icon: const Icon(Icons.add_outlined), onPressed: add)],
       body: MuseGroupedBody(
         children: [
           MuseSection(
             footer: '首次连接时下载（最多等 5 秒，失败不影响连接），之后在后台更新。修改后重新连接生效',
             children: [
-              if (sets.isEmpty) MuseTile(key: const ValueKey('remote_set_empty'), leading: const Icon(Icons.add_rounded), title: '添加', onTap: add),
+              if (sets.isEmpty) MuseTile(key: const ValueKey('remote_set_empty'), leading: const Icon(Icons.add_outlined), title: '添加', onTap: add),
               for (var i = 0; i < sets.length; i++)
                 MuseTile(
                   key: ValueKey('remote_set_$i'),
@@ -624,7 +658,7 @@ class MuseRemoteRuleSetsPage extends HookConsumerWidget {
                   subtitle: '${museOutboundTitle(sets[i].outbound)} · ${Uri.tryParse(sets[i].url)?.host ?? ''}',
                   trailing: IconButton(
                     key: ValueKey('remote_set_delete_$i'),
-                    icon: const Icon(Icons.delete_outline_rounded),
+                    icon: const Icon(Icons.delete_outlined),
                     onPressed: () => save([...sets]..removeAt(i)),
                   ),
                 ),
@@ -667,7 +701,7 @@ class MuseRuleTesterPage extends HookConsumerWidget {
                 filled: true,
                 fillColor: mt.card,
                 border: const OutlineInputBorder(borderRadius: MuseRadius.cardAll, borderSide: BorderSide.none),
-                suffixIcon: IconButton(key: const ValueKey('rule_test_go'), icon: const Icon(Icons.arrow_forward_rounded), onPressed: run),
+                suffixIcon: IconButton(key: const ValueKey('rule_test_go'), icon: const Icon(Icons.arrow_forward_outlined), onPressed: run),
               ),
             ),
           ),
@@ -679,7 +713,7 @@ class MuseRuleTesterPage extends HookConsumerWidget {
                   leading: Icon(
                     switch (r.outbound) {
                       Outbound.direct || Outbound.direct_with_fragment => Icons.near_me_outlined,
-                      Outbound.block => Icons.block_rounded,
+                      Outbound.block => Icons.block_outlined,
                       _ => Icons.vpn_lock_outlined,
                     },
                   ),
@@ -759,7 +793,7 @@ class MuseNetworkPage extends HookConsumerWidget {
             children: [
               MuseTile(
                 key: const ValueKey('network_schedule_connect'),
-                leading: const Icon(Icons.alarm_on_rounded),
+                leading: const Icon(Icons.alarm_on_outlined),
                 title: '每天定时连接',
                 trailing: Text(museMinuteLabel(schedule.connectAt)),
                 chevron: true,
@@ -767,7 +801,7 @@ class MuseNetworkPage extends HookConsumerWidget {
               ),
               MuseTile(
                 key: const ValueKey('network_schedule_disconnect'),
-                leading: const Icon(Icons.alarm_off_rounded),
+                leading: const Icon(Icons.alarm_off_outlined),
                 title: '每天定时断开',
                 trailing: Text(museMinuteLabel(schedule.disconnectAt)),
                 chevron: true,
@@ -779,9 +813,9 @@ class MuseNetworkPage extends HookConsumerWidget {
             children: [
               MuseSwitchTile(
                 key: const ValueKey('network_quality_alert'),
-                leading: const Icon(Icons.network_check_rounded),
+                leading: const Icon(Icons.network_check_outlined),
                 title: '连接质量提醒',
-                subtitle: '当前节点延迟持续偏高或超时时通知（每分钟测一次）',
+                info: '当前节点延迟持续偏高或超时时通知（每分钟测一次）',
                 value: ref.watch(MusePrefs.qualityAlert),
                 onChanged: (v) => ref.read(MusePrefs.qualityAlert.notifier).update(v),
               ),
@@ -883,7 +917,7 @@ class MuseSyncPage extends HookConsumerWidget {
             children: [
               MuseTile(
                 key: const ValueKey('lan_host'),
-                leading: const Icon(Icons.qr_code_2_rounded),
+                leading: const Icon(Icons.qr_code_2_outlined),
                 title: '显示配对码',
                 subtitle: '在另一台设备上扫码或输入',
                 chevron: true,
@@ -898,7 +932,7 @@ class MuseSyncPage extends HookConsumerWidget {
                           height: MuseIconSize.small,
                           child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke),
                         )
-                      : const Icon(Icons.qr_code_scanner_rounded),
+                      : const Icon(Icons.qr_code_scanner_outlined),
                   title: '扫码配对',
                   chevron: true,
                   onTap: busy.value ? null : () async => join(await ref.read(dialogNotifierProvider.notifier).showQrScanner()),
@@ -913,7 +947,7 @@ class MuseSyncPage extends HookConsumerWidget {
               if (lastAt != 0)
                 MuseTile(
                   key: const ValueKey('sync_last'),
-                  leading: const Icon(Icons.history_rounded),
+                  leading: const Icon(Icons.history_outlined),
                   title: '上次同步',
                   trailing: Text(museUpdatedAgo(DateTime.fromMillisecondsSinceEpoch(lastAt), now: DateTime.now()).replaceAll('更新', '')),
                 ),
@@ -924,7 +958,7 @@ class MuseSyncPage extends HookConsumerWidget {
             children: [
               MuseTile(
                 key: const ValueKey('backup_export'),
-                leading: const Icon(Icons.save_alt_rounded),
+                leading: const Icon(Icons.save_alt_outlined),
                 title: '导出备份',
                 onTap: () async {
                   final pw = await askPassword('备份密码');
@@ -951,7 +985,7 @@ class MuseSyncPage extends HookConsumerWidget {
               ),
               MuseTile(
                 key: const ValueKey('backup_import'),
-                leading: const Icon(Icons.restore_rounded),
+                leading: const Icon(Icons.restore_outlined),
                 title: '从备份恢复',
                 onTap: () async {
                   final text = await museOpenTextFile();
@@ -1062,9 +1096,10 @@ class _MuseLanHostSheetState extends ConsumerState<MuseLanHostSheet> {
     final left = p == null ? Duration.zero : Duration(milliseconds: p.expiresAt - DateTime.now().millisecondsSinceEpoch);
     final secs = left.isNegative ? 0 : left.inSeconds;
     final Widget body = switch (_host.state) {
+      // 1.5.0: the QR code's place, pulsing, instead of a spinner
       MuseLanHostState.starting => const Padding(
         padding: EdgeInsets.all(MuseSpace.s32),
-        child: Center(child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke)),
+        child: Center(child: MuseSkeleton(child: MuseSkeletonBox(width: MuseSize.qrCode, height: MuseSize.qrCode, radius: MuseRadius.cardAll))),
       ),
       MuseLanHostState.waiting when p != null => Column(
         mainAxisSize: MainAxisSize.min,
@@ -1106,7 +1141,7 @@ class _MuseLanHostSheetState extends ConsumerState<MuseLanHostSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              _host.state == MuseLanHostState.done ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+              _host.state == MuseLanHostState.done ? Icons.check_circle_outlined : Icons.error_outlined,
               color: _host.state == MuseLanHostState.done ? MusePalette.green : MusePalette.orange,
               size: MuseSize.emptyIcon,
             ),
@@ -1132,7 +1167,7 @@ class _MuseLanHostSheetState extends ConsumerState<MuseLanHostSheet> {
               Text(
                 '同步：订阅、节点重命名 / 备注 / 隐藏、收藏、分流和设置',
                 textAlign: TextAlign.center,
-                style: MuseType.caption(context).copyWith(color: mt.text3),
+                style: MuseType.caption(context).copyWith(color: mt.text2),
               ),
             ],
           ),
@@ -1189,7 +1224,7 @@ class MuseWebdavPage extends HookConsumerWidget {
               ),
               MuseTile(
                 key: const ValueKey('sync_user'),
-                leading: const Icon(Icons.person_outline_rounded),
+                leading: const Icon(Icons.person_outlined),
                 title: '账号',
                 trailing: Text(user.isEmpty ? '未填写' : user, overflow: TextOverflow.ellipsis),
                 chevron: true,
@@ -1211,7 +1246,7 @@ class MuseWebdavPage extends HookConsumerWidget {
               ),
               MuseTile(
                 key: const ValueKey('sync_passphrase'),
-                leading: const Icon(Icons.lock_outline_rounded),
+                leading: const Icon(Icons.lock_outlined),
                 title: '同步密码',
                 trailing: Text(passphrase.isEmpty ? '同登录密码' : '已设置'),
                 chevron: true,
@@ -1228,7 +1263,7 @@ class MuseWebdavPage extends HookConsumerWidget {
                         height: MuseIconSize.small,
                         child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke),
                       )
-                    : const Icon(Icons.sync_rounded),
+                    : const Icon(Icons.sync_outlined),
                 title: '立即同步',
                 subtitle: lastAt == 0 ? null : '上次：${museUpdatedAgo(DateTime.fromMillisecondsSinceEpoch(lastAt), now: DateTime.now()).replaceAll('更新', '')}',
                 onTap: busy.value ? null : syncNow,
@@ -1289,7 +1324,7 @@ class MuseStatsPage extends HookConsumerWidget {
                 child: SizedBox(
                   height: MuseSize.chartHeight,
                   child: bars.every((b) => b.$2 == 0)
-                      ? Center(child: Text('还没有流量记录', style: MuseType.body(context).copyWith(color: mt.text3)))
+                      ? Center(child: Text('还没有流量记录', style: MuseType.body(context).copyWith(color: mt.text2)))
                       : _MuseBarChart(bars: bars),
                 ),
               ),

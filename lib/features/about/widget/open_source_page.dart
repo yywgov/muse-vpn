@@ -32,13 +32,13 @@ class OpenSourcePage extends ConsumerWidget {
           MuseSection(
             children: [
               MuseTile(
-                leading: const Icon(Icons.code_rounded),
+                leading: const Icon(Icons.code_outlined),
                 title: '穿云源代码',
                 chevron: true,
                 onTap: () => open(Constants.githubUrl),
               ),
               MuseTile(
-                leading: const Icon(Icons.memory_rounded),
+                leading: const Icon(Icons.memory_outlined),
                 title: '穿云内核源代码',
                 chevron: true,
                 onTap: () => open('https://github.com/yywgov/muse-core'),
@@ -50,7 +50,7 @@ class OpenSourcePage extends ConsumerWidget {
                 onTap: () => open(Constants.licenseUrl),
               ),
               MuseTile(
-                leading: const Icon(Icons.favorite_outline_rounded),
+                leading: const Icon(Icons.favorite_outlined),
                 title: 'Hiddify',
                 chevron: true,
                 onTap: () => open('https://github.com/hiddify/hiddify-app'),

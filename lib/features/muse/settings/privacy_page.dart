@@ -57,17 +57,17 @@ class MusePrivacySection extends HookConsumerWidget {
       children: [
         if (needsBattery)
           MuseTile(
-            leading: const MuseRowIcon(Icons.battery_alert_rounded, color: MusePalette.orange),
+            leading: const MuseRowIcon(Icons.battery_alert_outlined, color: MusePalette.orange),
             title: '允许后台运行',
-            trailing: const Icon(Icons.error_rounded, color: MusePalette.orange, size: MuseIconSize.small),
+            trailing: const Icon(Icons.error_outlined, color: MusePalette.orange, size: MuseIconSize.small),
             chevron: true,
             onTap: () => ref.read(batteryOptimizationNotifierProvider.notifier).requestToIgnore(),
           ),
         if (needsAutostart)
           MuseTile(
-            leading: const MuseRowIcon(Icons.rocket_launch_rounded, color: MusePalette.orange),
+            leading: const MuseRowIcon(Icons.rocket_launch_outlined, color: MusePalette.orange),
             title: '自启动',
-            trailing: const Icon(Icons.error_rounded, color: MusePalette.orange, size: MuseIconSize.small),
+            trailing: const Icon(Icons.error_outlined, color: MusePalette.orange, size: MuseIconSize.small),
             chevron: true,
             onTap: () async {
               await ChuanyunPlatform.openAutostartSettings();
@@ -84,13 +84,13 @@ class MusePrivacySection extends HookConsumerWidget {
           onTap: () => showMuseBackgroundGuide(context),
         ),
         MuseSwitchTile(
-          leading: const Icon(Icons.visibility_off_rounded),
+          leading: const Icon(Icons.visibility_off_outlined),
           title: '隐藏桌面图标',
           value: iconHidden.value ?? false,
           onChanged: iconHidden.value == null ? null : toggleIcon,
         ),
         MuseSwitchTile(
-          leading: const Icon(Icons.layers_clear_rounded),
+          leading: const Icon(Icons.layers_clear_outlined),
           title: '不在最近任务显示',
           value: excludeRecents,
           onChanged: (value) async {
@@ -99,7 +99,7 @@ class MusePrivacySection extends HookConsumerWidget {
           },
         ),
         MuseSwitchTile(
-          leading: const Icon(Icons.notifications_off_rounded),
+          leading: const Icon(Icons.notifications_off_outlined),
           title: '隐藏通知',
           value: hideNotification,
           onChanged: ref.read(Preferences.hideNotification.notifier).update,

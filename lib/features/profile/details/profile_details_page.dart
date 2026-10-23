@@ -1,4 +1,3 @@
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -73,7 +72,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                               });
                             }
                           },
-                    icon: const Icon(Icons.check),
+                    icon: const Icon(Icons.check_outlined),
                     label: Text(t.common.save),
                   ),
                   const Gap(8),
@@ -186,7 +185,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                         ],
                         ListTile(
                           title: Text(t.pages.profileDetails.lastUpdate),
-                          leading: const Icon(FluentIcons.history_24_regular),
+                          leading: const Icon(Icons.history_outlined),
                           subtitle: Text(data.profile.lastUpdate.format()),
                           dense: true,
                         ),
@@ -204,19 +203,19 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                                     TextSpan(
                                       children: [
                                         _buildSubProp(
-                                          FluentIcons.arrow_upload_16_regular,
+                                          Icons.upload_outlined,
                                           subInfo.upload.size(),
                                           t.components.subscriptionInfo.upload,
                                         ),
                                         const TextSpan(text: "     "),
                                         _buildSubProp(
-                                          FluentIcons.arrow_download_16_regular,
+                                          Icons.download_outlined,
                                           subInfo.download.size(),
                                           t.components.subscriptionInfo.download,
                                         ),
                                         const TextSpan(text: "     "),
                                         _buildSubProp(
-                                          FluentIcons.arrow_bidirectional_up_down_16_regular,
+                                          Icons.swap_vert_outlined,
                                           subInfo.total.size(),
                                           t.components.subscriptionInfo.total,
                                         ),
@@ -229,7 +228,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                                     TextSpan(
                                       children: [
                                         _buildSubProp(
-                                          FluentIcons.clock_dismiss_20_regular,
+                                          Icons.timer_off_outlined,
                                           subInfo.expire.format(),
                                           t.components.subscriptionInfo.expireDate,
                                         ),
@@ -254,7 +253,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(FluentIcons.error_circle_12_filled),
+                  const Icon(Icons.error_outlined),
                   Text(t.presentShortError(error)),
                   Text(error.toString()),
                 ],

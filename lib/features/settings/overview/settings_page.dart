@@ -13,6 +13,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
+import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
@@ -58,14 +59,14 @@ class SettingsPage extends HookConsumerWidget {
               // 1.3.0: one switch for reconnect → switch node → restart core (logic/keep_alive.dart)
               MuseSwitchTile(
                 key: const ValueKey('keep_alive'),
-                leading: const Icon(Icons.autorenew_rounded),
+                leading: const Icon(Icons.autorenew_outlined),
                 title: '智能保持连接',
                 value: ref.watch(Preferences.museKeepAlive),
                 onChanged: (v) => ref.read(Preferences.museKeepAlive.notifier).update(v),
               ),
               MuseTile(
                 key: const ValueKey('ad_block_level'),
-                leading: const Icon(Icons.block_rounded),
+                leading: const Icon(Icons.block_outlined),
                 title: '去广告',
                 trailing: Text(adLevel.title),
                 chevron: true,
@@ -81,7 +82,7 @@ class SettingsPage extends HookConsumerWidget {
               ),
               MuseTile(
                 key: const ValueKey('auto_update_hours'),
-                leading: const Icon(Icons.update_rounded),
+                leading: const Icon(Icons.update_outlined),
                 title: '订阅自动更新',
                 trailing: Text(museAutoUpdateLabel(autoHours)),
                 chevron: true,
@@ -97,7 +98,7 @@ class SettingsPage extends HookConsumerWidget {
               ),
               if (android)
                 MuseTile(
-                  leading: const Icon(Icons.apps_rounded),
+                  leading: const Icon(Icons.apps_outlined),
                   title: '分应用代理',
                   trailing: perAppOn ? const MuseStatusDot() : null,
                   chevron: true,
@@ -110,14 +111,14 @@ class SettingsPage extends HookConsumerWidget {
             children: [
               MuseTile(
                 key: const ValueKey('settings_nodes'),
-                leading: const Icon(Icons.public_rounded),
+                leading: const Icon(Icons.public_outlined),
                 title: '节点',
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseNodeSettingsPage()),
               ),
               MuseTile(
                 key: const ValueKey('settings_routing'),
-                leading: const Icon(Icons.alt_route_rounded),
+                leading: const Icon(Icons.alt_route_outlined),
                 title: '分流',
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseRoutingPage()),
@@ -138,7 +139,7 @@ class SettingsPage extends HookConsumerWidget {
               ),
               MuseTile(
                 key: const ValueKey('settings_stats'),
-                leading: const Icon(Icons.bar_chart_rounded),
+                leading: const Icon(Icons.bar_chart_outlined),
                 title: '统计',
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseStatsPage()),
@@ -157,26 +158,29 @@ class SettingsPage extends HookConsumerWidget {
                 onTap: () => showMuseDiagnoseSheet(context),
               ),
               MuseTile(
-                leading: const Icon(Icons.info_outline_rounded),
+                key: const ValueKey('settings_about'),
+                leading: const Icon(Icons.info_outlined),
                 title: '关于',
+                // 1.5.0: unread 更新内容 after a small update
+                trailing: ref.watch(museChangelogDotProvider) ? const MuseStatusDot(color: MusePalette.red) : null,
                 chevron: true,
                 onTap: () => context.goNamed('about'),
               ),
               MuseTile(
                 key: const ValueKey('advanced_toggle'),
-                leading: const Icon(Icons.tune_rounded),
+                leading: const Icon(Icons.tune_outlined),
                 title: '高级',
                 trailing: AnimatedRotation(
                   turns: advancedOpen.value ? 0.5 : 0,
-                  duration: MuseMotion.fast,
-                  child: Icon(Icons.expand_more_rounded, size: MuseIconSize.small, color: MuseTheme.of(context).text3),
+                  duration: museMotion(context),
+                  child: Icon(Icons.expand_more_outlined, size: MuseIconSize.small, color: MuseTheme.of(context).text3),
                 ),
                 onTap: () => advancedOpen.value = !advancedOpen.value,
               ),
               if (advancedOpen.value) ...[
                 MuseTile(
                   key: const ValueKey('balancer_strategy'),
-                  leading: const Icon(Icons.balance_rounded),
+                  leading: const Icon(Icons.balance_outlined),
                   title: '负载均衡策略',
                   trailing: Text(balancer.present(t)),
                   chevron: true,
@@ -191,16 +195,24 @@ class SettingsPage extends HookConsumerWidget {
                   },
                 ),
                 MuseTile(
-                  leading: const Icon(Icons.call_split_rounded),
+                  leading: const Icon(Icons.call_split_outlined),
                   title: 'TLS 分片',
                   chevron: true,
                   onTap: () => context.goNamed('tlsTricks'),
                 ),
                 MuseTile(
-                  leading: const Icon(Icons.insights_rounded),
+                  leading: const Icon(Icons.insights_outlined),
                   title: '连接信息',
                   chevron: true,
                   onTap: () => context.goNamed('connections'),
+                ),
+                // 1.5.0: 测速 并发数 / 超时
+                MuseTile(
+                  key: const ValueKey('settings_developer'),
+                  leading: const Icon(Icons.developer_mode_outlined),
+                  title: '开发者选项',
+                  chevron: true,
+                  onTap: () => musePushPage(context, const MuseDeveloperPage()),
                 ),
               ],
             ],
@@ -223,7 +235,7 @@ Future<T?> museSettingPick<T>(BuildContext context, String title, List<(T, Strin
               key: ValueKey('pick_$label'),
               title: Text(label),
               trailing: value == current
-                  ? Icon(Icons.check_rounded, color: MusePalette.brand, size: MuseIconSize.small)
+                  ? Icon(Icons.check_outlined, color: MusePalette.brand, size: MuseIconSize.small)
                   : null,
               onTap: () => Navigator.of(c).pop(value),
             ),
@@ -233,13 +245,15 @@ Future<T?> museSettingPick<T>(BuildContext context, String title, List<(T, Strin
 
 /// A green dot at the end of a row whose feature is on.
 class MuseStatusDot extends StatelessWidget {
-  const MuseStatusDot({super.key});
+  const MuseStatusDot({super.key, this.color = MusePalette.green});
+
+  final Color color;
 
   @override
   Widget build(BuildContext context) => Container(
     width: MuseSize.dot,
     height: MuseSize.dot,
     margin: const EdgeInsets.only(right: MuseSpace.s8),
-    decoration: const BoxDecoration(color: MusePalette.green, shape: BoxShape.circle),
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
   );
 }

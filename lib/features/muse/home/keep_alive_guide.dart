@@ -55,7 +55,7 @@ class _KeepAliveGuideDialog extends ConsumerWidget {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(
-              ignored ? Icons.check_circle_rounded : Icons.battery_alert_rounded,
+              ignored ? Icons.check_circle_outlined : Icons.battery_alert_outlined,
               color: ignored ? MusePalette.green : MusePalette.orange,
             ),
             title: const Text('允许后台运行'),
@@ -64,7 +64,7 @@ class _KeepAliveGuideDialog extends ConsumerWidget {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(
-              autostartVisited ? Icons.check_circle_rounded : Icons.rocket_launch_rounded,
+              autostartVisited ? Icons.check_circle_outlined : Icons.rocket_launch_outlined,
               color: autostartVisited ? MusePalette.green : MusePalette.orange,
             ),
             title: const Text('自启动'),
