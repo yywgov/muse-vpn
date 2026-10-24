@@ -147,3 +147,41 @@ String museProtocolName(String type, {bool isGroup = false}) {
     _ => museProtocolLabel(type, isGroup: isGroup),
   };
 }
+
+/// 1.5.0 #187: a subscription link shown with its secret parts hidden until the eye is tapped.
+class MuseMaskedUrl extends StatefulWidget {
+  const MuseMaskedUrl({super.key, required this.url, required this.masked, this.style});
+
+  final String url;
+
+  /// the link with its token hidden (from museMaskSubUrl)
+  final String masked;
+  final TextStyle? style;
+
+  @override
+  State<MuseMaskedUrl> createState() => _MuseMaskedUrlState();
+}
+
+class _MuseMaskedUrlState extends State<MuseMaskedUrl> {
+  bool _shown = false;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(
+        child: _shown
+            ? SelectableText(widget.url, key: const ValueKey('masked_url_full'), style: widget.style)
+            : Text(widget.masked, key: const ValueKey('masked_url_hidden'), style: widget.style),
+      ),
+      IconButton(
+        key: const ValueKey('masked_url_toggle'),
+        tooltip: _shown ? '隐藏' : '显示完整链接',
+        iconSize: MuseIconSize.small,
+        visualDensity: VisualDensity.compact,
+        icon: Icon(_shown ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+        onPressed: () => setState(() => _shown = !_shown),
+      ),
+    ],
+  );
+}

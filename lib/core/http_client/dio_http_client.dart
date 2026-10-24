@@ -111,10 +111,16 @@ class DioHttpClient with InfraLogger {
     String? userAgent,
     ({String username, String password})? credentials,
     bool proxyOnly = false,
+    // 穿云 1.5.0 #41: 'proxy' / 'direct' / 'both' chosen by the caller (null = automatic)
+    String? Function(bool proxyUp)? pickMode,
   }) async {
-    final mode = proxyOnly
+    final proxyUp = proxyOnly || pickMode != null ? await isPortOpen("127.0.0.1", port, timeout: const Duration(seconds: 1)) : false;
+    final picked = pickMode?.call(proxyUp);
+    final mode = picked != null && _dio.containsKey(picked)
+        ? picked
+        : proxyOnly
         ? "proxy"
-        : await isPortOpen("127.0.0.1", port)
+        : (pickMode != null ? proxyUp : await isPortOpen("127.0.0.1", port))
         ? "both"
         : "direct";
     final dio = _dio[mode]!;

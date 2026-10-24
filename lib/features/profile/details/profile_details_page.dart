@@ -1,3 +1,5 @@
+import 'package:hiddify/features/muse/logic/sub_tools.dart';
+import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -111,8 +113,10 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 const Gap(4),
-                                SelectableText(
-                                  url,
+                                // 穿云 1.5.0 #187: the token stays hidden until asked for
+                                MuseMaskedUrl(
+                                  url: url,
+                                  masked: museMaskSubUrl(url),
                                   style: theme.textTheme.bodySmall!.copyWith(color: theme.colorScheme.onSurfaceVariant),
                                 ),
                               ],

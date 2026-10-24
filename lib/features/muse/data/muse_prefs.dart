@@ -136,6 +136,9 @@ abstract final class MusePrefs {
   /// IPv6: off / prefer_v4 / prefer_v6 (logic/net_tools.dart MuseIpv6Policy)
   static final ipv6Policy = PreferencesNotifier.create<String, String>("muse_ipv6_policy", "off");
 
+  /// 1.5.0 #9: refuse QUIC (UDP 443) so sites fall back to TCP; off by default.
+  static final blockQuic = PreferencesNotifier.create<bool, bool>("muse_block_quic", false);
+
   /// subscription download: auto / proxy / direct (logic/sub_tools.dart MuseSubFetch)
   static final subFetch = PreferencesNotifier.create<String, String>("muse_sub_fetch", "auto");
 

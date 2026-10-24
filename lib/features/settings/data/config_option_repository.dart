@@ -580,7 +580,7 @@ abstract class ConfigOptions {
       routeRule:
           RouteRule(
                 // 1.5.0: 局域网 always first and on; Fake-IP exclusions right after it
-                rules: museApplyFakeIpExclusions(
+                rules: museApplyBlockQuic(museApplyFakeIpExclusions(
                   musePinLanRule(
                     museApplyAdBlockLevel(
                   // 1.4.0: 分流 presets sit between the user's rules and the built-in ones
@@ -598,7 +598,7 @@ abstract class ConfigOptions {
                     ),
                   ),
                   fakeIp: fakeIp,
-                ),
+                ), block: ref.watch(MusePrefs.blockQuic)),
               ).toProto3Json()!
               as Map<String, dynamic>,
     );

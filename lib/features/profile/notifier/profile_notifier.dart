@@ -56,6 +56,14 @@ class AddProfileNotifier extends _$AddProfileNotifier with AppLogger {
   ProfileRepository get _profilesRepo => ref.read(profileRepositoryProvider).requireValue;
   CancelToken? _cancelToken;
 
+  // 穿云 1.5.0 #186
+  void _warnPlainHttp(String url) {
+    if (!museIsPlainHttpSub(url)) return;
+    try {
+      ref.read(inAppNotificationControllerProvider).showInfoToast(musePlainHttpWarning);
+    } catch (_) {}
+  }
+
   Future<void> addClipboard(String rawInput) async {
     if (state.isLoading) return;
     state = const AsyncLoading();
@@ -65,6 +73,7 @@ class AddProfileNotifier extends _$AddProfileNotifier with AppLogger {
       final TaskEither<ProfileFailure, Unit> task;
       if (LinkParser.parse(rawInput) case (final rs)?) {
         loggy.debug("adding profile, url: [${rs.url}]");
+        _warnPlainHttp(rs.url);
         task = _profilesRepo.upsertRemote(
           rs.url,
           userOverride: rs.name.isNotEmpty ? UserOverride(name: rs.name) : null,
@@ -92,6 +101,7 @@ class AddProfileNotifier extends _$AddProfileNotifier with AppLogger {
   Future<void> addManual({required String url, required UserOverride userOverride}) async {
     if (state.isLoading) return;
     state = const AsyncLoading();
+    _warnPlainHttp(url);
     state = await AsyncValue.guard(() async {
       final task = _profilesRepo.upsertRemote(url, userOverride: userOverride);
       return await task

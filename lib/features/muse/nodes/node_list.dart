@@ -26,6 +26,7 @@ import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/muse/data/speed_test.dart';
+import 'package:hiddify/features/muse/settings/sub_filter_dialog.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -174,6 +175,8 @@ class MuseNodeList extends HookConsumerWidget {
     final beautify = ref.watch(MusePrefs.beautifyNames);
     final includeRe = ref.watch(MusePrefs.includeRegex);
     final excludeRe = ref.watch(MusePrefs.excludeRegex);
+    // 1.5.0 #43: the active subscription's own 只显示 / 排除
+    final subFilter = museSubFilterOf(ref.watch(MusePrefs.subFilters), ref.watch(museActiveProfileIdProvider));
     final hideDuplicates = ref.watch(MusePrefs.hideDuplicates);
     final collapsedRaw = ref.watch(MusePrefs.collapsedRegions);
     final collapsed = collapsedRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
@@ -347,7 +350,8 @@ class MuseNodeList extends HookConsumerWidget {
                 e.tag == group.selected ||
                 (!museIsInfoNode(museNodeName(e)) &&
                     !duplicates.contains(e.tag) &&
-                    museNodeNamePasses(museNodeName(e), include: includeRe, exclude: excludeRe)),
+                    museNodeNamePasses(museNodeName(e), include: includeRe, exclude: excludeRe) &&
+                    museNodeNamePasses(museNodeName(e), include: subFilter.include, exclude: subFilter.exclude)),
           )
           .toList();
       final userHidden = {for (final t in metas.hiddenTags) if (t != group.selected) t};

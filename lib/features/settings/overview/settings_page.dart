@@ -229,6 +229,15 @@ class SettingsPage extends HookConsumerWidget {
                   value: ref.watch(ConfigOptions.enableFakeDns),
                   onChanged: (v) => ref.read(ConfigOptions.enableFakeDns.notifier).update(v),
                 ),
+                // 1.5.0 #9
+                MuseSwitchTile(
+                  key: const ValueKey('block_quic'),
+                  leading: const Icon(Icons.block_outlined),
+                  title: '屏蔽 QUIC',
+                  info: '节点 UDP 不稳时打开：YouTube 等网站改走 TCP，播放更稳',
+                  value: ref.watch(MusePrefs.blockQuic),
+                  onChanged: (v) => ref.read(MusePrefs.blockQuic.notifier).update(v),
+                ),
                 MuseTile(
                   leading: const Icon(Icons.insights_outlined),
                   title: '连接信息',

@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/settings/sub_filter_dialog.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:flutter/material.dart';
@@ -332,6 +333,12 @@ class ProfileActionsMenu extends HookConsumerWidget {
             copyText: remote.url,
           ),
         ),
+      // 1.5.0 #43: 只显示 / 排除 for this subscription alone
+      AdaptiveMenuItem(
+        leadingIcon: const Icon(Icons.filter_alt_outlined),
+        title: '节点筛选',
+        onTap: () => museEditSubFilter(context, ref, profile.id),
+      ),
       AdaptiveMenuItem(
         leadingIcon: const Icon(Icons.edit_outlined),
         title: '编辑',

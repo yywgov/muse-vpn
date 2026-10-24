@@ -27,7 +27,8 @@ sealed class ProfileFailure with _$ProfileFailure, Failure {
   @override
   ({String type, String? message}) present(Translations t) {
     return switch (this) {
-      ProfileUnexpectedFailure() => (type: t.errors.profiles.unexpected, message: null),
+      // 穿云 1.5.0 #45: a plain-words download error travels as a String
+      ProfileUnexpectedFailure(:final error) => (type: t.errors.profiles.unexpected, message: error is String ? error : null),
       ProfileNotFoundFailure() => (type: t.errors.profiles.notFound, message: null),
       ProfileInvalidUrlFailure(:final message) => (type: t.errors.profiles.invalidUrl, message: message),
       ProfileInvalidConfigFailure(:final message, :final configOptionFailure) =>

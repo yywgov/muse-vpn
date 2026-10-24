@@ -158,6 +158,8 @@ class ProfileParser {
           url.trim(),
           tempFilePath,
           cancelToken: cancelToken,
+          // 穿云 1.5.0 #41: 设置 › 节点 › 订阅更新方式
+          pickMode: (proxyUp) => museSubFetchMode(MuseSubFetch.fromKey(_ref.read(MusePrefs.subFetch)), proxyUp: proxyUp),
           // 穿云 1.4.1: 设置 › 节点 › 订阅 UA ('auto' keeps the app's own)
           userAgent:
               museUserAgentFor(_ref.read(MusePrefs.subUserAgent), appVersion: '') ??
@@ -169,6 +171,13 @@ class ProfileParser {
           if (CancelToken.isCancel(err as DioException)) {
             throw const ProfileFailure.cancelByUser('HTTP request for getting profile content canceled by user.');
           }
+          // 穿云 1.5.0 #45: the status code / cause in plain words with what to try
+          final plain = museSubFetchError(
+            status: err.response?.statusCode,
+            kind: err.type.name,
+            detail: '${err.error ?? err.message ?? ''}',
+          );
+          if (plain.isNotEmpty) throw ProfileFailure.unexpected(plain, err.stackTrace);
           throw err;
         });
     await expandRemoteLinesInParallel(

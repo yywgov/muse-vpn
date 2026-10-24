@@ -462,3 +462,15 @@ Map<String, MuseSubFilter> museParseSubFilters(String raw) {
 
 String museSubFiltersToRaw(Map<String, MuseSubFilter> filters) =>
     jsonEncode({for (final e in filters.entries) if (!e.value.isEmpty) e.key: e.value.toJson()});
+
+/// #186: a subscription fetched over plain http (anyone on the path can read the link and the nodes).
+bool museIsPlainHttpSub(String url) {
+  final u = Uri.tryParse(url.trim());
+  if (u == null || u.scheme.toLowerCase() != 'http') return false;
+  final h = u.host.toLowerCase();
+  // the user's own machine or LAN is fine
+  if (h == 'localhost' || h == '127.0.0.1' || h.startsWith('192.168.') || h.startsWith('10.') || h.endsWith('.local')) return false;
+  return true;
+}
+
+const musePlainHttpWarning = '这是明文 http 订阅，链接和节点可能被他人看到，建议向服务商要 https 链接';

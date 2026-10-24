@@ -52,6 +52,27 @@ void _toast(WidgetRef ref, String text, {bool error = false}) {
   } catch (_) {}
 }
 
+/// 1.5.0 #59: this app's rule file, or else Clash / Surge rule lines converted.
+Future<void> _importRulesText(WidgetRef ref, String text) async {
+  List<Rule>? rules;
+  var skipped = 0;
+  try {
+    rules = museImportRules(text);
+  } catch (_) {
+    final conv = museConvertClashRules(text);
+    if (conv.converted > 0) {
+      rules = conv.rules;
+      skipped = conv.skipped;
+    }
+  }
+  if (rules == null || rules.isEmpty) {
+    _toast(ref, '没有可导入的规则', error: true);
+    return;
+  }
+  await ref.read(rulesNotifierProvider.notifier).museImport(rules);
+  _toast(ref, '已导入 ${rules.length} 条规则${skipped > 0 ? '，$skipped 行无法转换已跳过' : ''}');
+}
+
 /// A one-of-N choice as a dialog; null when dismissed.
 Future<T?> musePick<T>(BuildContext context, String title, List<(T, String)> options, T current) => showDialog<T>(
   context: context,
@@ -177,6 +198,7 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
     final metas = MuseNodeMetas.parse(ref.watch(MusePrefs.nodeMeta));
     final hiddenCount = metas.hiddenTags.length;
     final ua = ref.watch(MusePrefs.subUserAgent);
+    final fetch = MuseSubFetch.fromKey(ref.watch(MusePrefs.subFetch));
 
     Future<void> editRegex(String title, String current, Future<void> Function(String) save) async {
       final v = await museAskText(context, title, initial: current, hint: '正则，如 香港|日本');
@@ -249,6 +271,19 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
                 onTap: () async {
                   final picked = await musePick<String>(context, '订阅 UA', museUserAgents, ua);
                   if (picked != null) await ref.read(MusePrefs.subUserAgent.notifier).update(picked);
+                },
+              ),
+              // 1.5.0 #41
+              MuseTile(
+                key: const ValueKey('node_sub_fetch'),
+                leading: const Icon(Icons.alt_route_outlined),
+                title: '订阅更新方式',
+                info: '自动：已连接时先走代理，失败再直连；未连接时总是直连',
+                trailing: Text(fetch.title),
+                chevron: true,
+                onTap: () async {
+                  final picked = await musePick<MuseSubFetch>(context, '订阅更新方式', [for (final f in MuseSubFetch.values) (f, f.title)], fetch);
+                  if (picked != null) await ref.read(MusePrefs.subFetch.notifier).update(picked.key);
                 },
               ),
             ],
@@ -438,13 +473,19 @@ class MuseRoutingPage extends HookConsumerWidget {
                 onTap: () async {
                   final text = await museOpenTextFile();
                   if (text == null) return;
-                  try {
-                    final rules = museImportRules(text);
-                    await ref.read(rulesNotifierProvider.notifier).museImport(rules);
-                    _toast(ref, '已导入 ${rules.length} 条规则');
-                  } catch (_) {
-                    _toast(ref, '不是有效的规则文件', error: true);
-                  }
+                  await _importRulesText(ref, text);
+                },
+              ),
+              // 1.5.0 #59: Clash / Surge rule lines pasted as text
+              MuseTile(
+                key: const ValueKey('routing_paste_rules'),
+                leading: const Icon(Icons.content_paste_outlined),
+                title: '粘贴规则',
+                info: '支持本应用导出的规则文件，以及 Clash / Surge 的规则行（如 DOMAIN-SUFFIX,google.com,Proxy）',
+                onTap: () async {
+                  final text = await museAskText(context, '粘贴规则', hint: 'DOMAIN-SUFFIX,google.com,Proxy', maxLines: 8);
+                  if (text == null || text.trim().isEmpty) return;
+                  await _importRulesText(ref, text);
                 },
               ),
             ],

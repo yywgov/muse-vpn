@@ -849,3 +849,15 @@ MuseRuleConversion museConvertClashRules(String text, {String prefix = '导入'}
   }
   return MuseRuleConversion(rules, converted, skipped);
 }
+
+/// #9: 屏蔽 QUIC — UDP 443 refused, so YouTube and other sites fall back to HTTP/2 over TCP
+/// (steadier on nodes with poor UDP). Sits right after the 局域网 rule.
+const museBlockQuicRuleName = 'muse:block-quic';
+
+List<Rule> museApplyBlockQuic(List<Rule> rules, {required bool block}) {
+  if (!block) return rules;
+  final lanFirst = rules.isNotEmpty && rules.first.name == museLanRuleName;
+  final quic = Rule(name: museBlockQuicRuleName, enabled: true, outbound: Outbound.block, network: Network.udp, portRanges: ['443']);
+  final list = lanFirst ? [rules.first, quic, ...rules.skip(1)] : [quic, ...rules];
+  return [for (var k = 0; k < list.length; k++) list[k].deepCopy()..listOrder = k];
+}
