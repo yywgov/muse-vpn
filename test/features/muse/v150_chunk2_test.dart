@@ -3,8 +3,10 @@
 // subscription fetch mode / preview / errors / traffic from entry names / per-subscription
 // filters, Clash / Surge rule conversion.
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/features/muse/data/speed_test.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
@@ -14,6 +16,11 @@ import 'package:hiddify/features/profile/data/profile_parser.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
+
+/// The real HttpClient (the widget-test binding replaces it with one that answers 400).
+class _RealHttp extends HttpOverrides {}
+
+Future<T> _real<T>(Future<T> Function() body) => HttpOverrides.runWithHttpOverrides(body, _RealHttp());
 
 Rule _r(String name, {Outbound o = Outbound.proxy, int order = 0, bool enabled = true}) =>
     Rule(name: name, outbound: o, listOrder: order, enabled: enabled, domainSuffixes: ['$name.com']);
@@ -329,6 +336,39 @@ rules:
       expect(museProtocolName('anytls'), 'AnyTLS');
       expect(museProtocolName('shadowtls'), 'ShadowTLS');
       expect(museProtocolName('hysteria2'), 'Hysteria2');
+    });
+  });
+
+  group('#24 下载测速 through the local port', () {
+    Future<HttpServer> proxy({int status = 200, int bytes = 1024 * 1024}) async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((req) async {
+        req.response.statusCode = status;
+        if (status == 200) {
+          final chunk = List<int>.filled(64 * 1024, 7);
+          for (var sent = 0; sent < bytes; sent += chunk.length) {
+            req.response.add(chunk);
+          }
+        }
+        await req.response.close();
+      });
+      return server;
+    }
+
+    test('measures what arrives through the proxy port', () async {
+      final server = await proxy();
+      addTearDown(server.close);
+      final bps = await _real(() => MuseSpeedTest(port: server.port, url: 'http://speed.invalid/x').run());
+      expect(bps, greaterThan(0));
+    });
+    test('HTTP error and nothing listening are reported, never thrown raw', () async {
+      final server = await proxy(status: 503);
+      addTearDown(server.close);
+      await expectLater(_real(() => MuseSpeedTest(port: server.port, url: 'http://speed.invalid/x').run()), throwsA(isA<MuseSpeedTestException>()));
+      final dead = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final port = dead.port;
+      await dead.close();
+      await expectLater(_real(() => MuseSpeedTest(port: port, url: 'http://speed.invalid/x').run()), throwsA(isA<MuseSpeedTestException>()));
     });
   });
 }

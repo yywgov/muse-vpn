@@ -25,10 +25,21 @@ import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
+import 'package:hiddify/features/muse/data/speed_test.dart';
+import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
+import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+/// 1.5.0 #26: the active subscription's saved config (sing-box JSON) for the node detail sheet.
+final museActiveConfigProvider = FutureProvider<String>((ref) async {
+  final id = ref.watch(museActiveProfileIdProvider);
+  if (id == null) return '';
+  final repo = await ref.watch(profileRepositoryProvider.future);
+  return repo.getRawConfig(id).getOrElse((_) => '').run();
+});
 
 /// When the running 测速 started (null = none). Shared by the 测速 button, pull-to-test and the
 /// 首页 pull-down, so the list keeps its order while results stream in wherever it was started.
@@ -183,6 +194,12 @@ class MuseNodeList extends HookConsumerWidget {
     }
 
     final nodeTotal = group?.items.where((e) => !e.isGroup).length ?? 0;
+    final progress = testing && running && group != null
+        ? museTestProgress([
+            for (final e in group.items)
+              if (!e.isGroup) e.hasUrlTestTime() ? e.urlTestTime.toDateTime() : null,
+          ], testStarted)
+        : null;
     bool matches(OutboundInfo e) {
       final q = query.value;
       if (!searching.value || q.trim().isEmpty) return true;
@@ -197,7 +214,14 @@ class MuseNodeList extends HookConsumerWidget {
         children: [
           Expanded(
             child: Text(
-              group == null ? '' : (selecting.value ? '已选 ${picked.value.length} 个' : '$nodeTotal 个节点'),
+              group == null
+                  ? ''
+                  : selecting.value
+                  ? '已选 ${picked.value.length} 个'
+                  : progress != null
+                  // 1.5.0 #25: 测速 progress (stop with the button next to it)
+                  ? '已测 ${progress.done} / ${progress.total}'
+                  : '$nodeTotal 个节点',
               key: const ValueKey('node_count_label'),
               style: MuseType.caption(context),
             ),
@@ -498,12 +522,20 @@ class MuseNodeList extends HookConsumerWidget {
       }
     }
 
-    final list = ListView(
+    // 1.5.0 #22: rows are built lazily (a subscription with a thousand nodes scrolls smoothly);
+    // each section is one sliver, its card painted behind the rows
+    final list = CustomScrollView(
       key: listKey,
       controller: controller,
-      padding: EdgeInsets.only(top: MuseSpace.s4, bottom: embedded ? MuseSpace.s16 : MuseSpace.s32),
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-      children: children,
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.only(top: MuseSpace.s4, bottom: embedded ? MuseSpace.s16 : MuseSpace.s32),
+          sliver: SliverMainAxisGroup(
+            slivers: [for (final c in children) c is _NodeSection ? c.buildSliver(context) : SliverToBoxAdapter(child: c)],
+          ),
+        ),
+      ],
     );
     if (embedded) return list;
     final refresh = RefreshIndicator(
@@ -597,6 +629,71 @@ class _NodeSection extends StatelessWidget {
   /// null = not foldable
   final bool? collapsed;
   final VoidCallback? onHeaderTap;
+
+  Widget _header(BuildContext context) {
+    final mt = MuseTheme.of(context);
+    return InkWell(
+      onTap: onHeaderTap,
+      borderRadius: MuseRadius.smallAll,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(MuseSpace.s16, MuseSpace.s4, MuseSpace.s16, MuseSpace.s8),
+        child: Row(
+          children: [
+            Expanded(child: Text(header!, style: MuseType.caption(context))),
+            if (collapsed != null)
+              Icon(
+                collapsed! ? Icons.expand_more_outlined : Icons.expand_less_outlined,
+                size: MuseIconSize.tiny,
+                color: mt.text3,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 1.5.0 #22: the same section as a sliver whose rows are built only when scrolled into view.
+  Widget buildSliver(BuildContext context) {
+    final mt = MuseTheme.of(context);
+    final last = children.length - 1;
+    const top = BorderRadius.vertical(top: Radius.circular(MuseRadius.card));
+    const bottom = BorderRadius.vertical(bottom: Radius.circular(MuseRadius.card));
+    return SliverPadding(
+      key: key,
+      padding: EdgeInsets.fromLTRB(margin, MuseSpace.s8, margin, 0),
+      sliver: SliverMainAxisGroup(
+        slivers: [
+          if (header != null) SliverToBoxAdapter(child: _header(context)),
+          if (children.isNotEmpty)
+            DecoratedSliver(
+              decoration: mt.cardDecoration(),
+              sliver: SliverList.builder(
+                itemCount: children.length,
+                itemBuilder: (context, i) {
+                  Widget row = Material(
+                    type: MaterialType.transparency,
+                    child: i == last
+                        ? children[i]
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              children[i],
+                              Divider(height: MuseSize.hairline, thickness: MuseSize.hairline, indent: MuseSize.rowIndent, color: mt.hairline),
+                            ],
+                          ),
+                  );
+                  // the first / last row keeps the card's rounded corners (selected background, splash)
+                  if (i == 0 || i == last) {
+                    row = ClipRRect(borderRadius: i == 0 && i == last ? MuseRadius.cardAll : (i == 0 ? top : bottom), child: row);
+                  }
+                  return row;
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -871,6 +968,18 @@ Future<void> showMuseNodeDetails(
   final exitCode = proxy.hasIpinfo() ? proxy.ipinfo.countryCode : '';
   final mismatch = museRegionMismatch(nameRegion: region, exitRegion: exitCode);
   final invalidError = proxy.isGroup ? '' : museInvalidNodeError(proxy.type);
+  // 1.5.0 #26 / #10: transport, TLS, ALPN, fingerprint, port hopping from the saved config
+  MuseOutboundDetail? detail;
+  if (!proxy.isGroup && invalidError.isEmpty) {
+    try {
+      final raw = await ref.refresh(museActiveConfigProvider.future).timeout(const Duration(seconds: 2));
+      detail = museOutboundDetail(raw, proxy.tag, host: proxy.host, port: proxy.port);
+    } catch (_) {}
+  }
+  // 1.5.0 #24: 下载测速 for the node (or group) in use
+  final inUse = running && ref.read(museNodeGroupProvider).valueOrNull?.selected == proxy.tag;
+  final mixedPort = ref.read(ConfigOptions.mixedPort);
+  if (!context.mounted) return;
   final rows = <(String, String)>[
     (
       '类型',
@@ -884,6 +993,7 @@ Future<void> showMuseNodeDetails(
     ('延迟', delayText),
     if (testedAt != null && delay != 0) ('测速时间', museUpdatedAgo(testedAt, now: DateTime.now()).replaceAll('更新', '')),
     if (!proxy.isGroup && proxy.host.isNotEmpty) ('地址', '${proxy.host}${proxy.port > 0 ? ':${proxy.port}' : ''}'),
+    ...?detail?.rows,
     if (proxy.hasIpinfo() && proxy.ipinfo.ip.isNotEmpty)
       ('落地', '${proxy.ipinfo.ip} ${museCountryFlag(exitCode) ?? exitCode}${mismatch ? ' · 名不符实' : ''}'.trim()),
     if (history.samples.length >= 2)
@@ -912,7 +1022,8 @@ Future<void> showMuseNodeDetails(
     builder: (sheetContext) {
       final mt = MuseTheme.of(sheetContext);
       return SafeArea(
-        child: Padding(
+        // 1.5.0: scrolls when the rows don't fit (small phones, large text)
+        child: SingleChildScrollView(
           key: const ValueKey('node_detail_sheet'),
           padding: const EdgeInsets.fromLTRB(MuseSpace.s24, 0, MuseSpace.s24, MuseSpace.s16),
           child: Column(
@@ -925,6 +1036,7 @@ Future<void> showMuseNodeDetails(
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: MuseSpace.s4),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(width: MuseSize.labelColumn, child: Text(k, style: MuseType.body(sheetContext).copyWith(color: mt.text2))),
                       Expanded(child: Text(v, style: MuseType.body(sheetContext))),
@@ -952,6 +1064,10 @@ Future<void> showMuseNodeDetails(
                     toast('已复制');
                   },
                 ),
+              ],
+              if (inUse) ...[
+                const SizedBox(height: MuseSpace.s8),
+                MuseDownloadTestRow(port: mixedPort),
               ],
               const SizedBox(height: MuseSpace.s16),
               if (!proxy.isGroup) ...[
@@ -1175,4 +1291,75 @@ class _MuseAskTextDialogState extends State<_MuseAskTextDialog> {
       ),
     ],
   );
+}
+
+/// 1.5.0 #24: 下载测速 (5 MB through the node in use) inside the node detail sheet; closing the
+/// sheet stops it.
+class MuseDownloadTestRow extends StatefulWidget {
+  const MuseDownloadTestRow({super.key, required this.port});
+
+  final int port;
+
+  @override
+  State<MuseDownloadTestRow> createState() => _MuseDownloadTestRowState();
+}
+
+class _MuseDownloadTestRowState extends State<MuseDownloadTestRow> {
+  MuseSpeedTest? _test;
+  String? _result;
+  bool _failed = false;
+
+  Future<void> _run() async {
+    final test = MuseSpeedTest(port: widget.port);
+    setState(() {
+      _test = test;
+      _result = null;
+      _failed = false;
+    });
+    try {
+      final bps = await test.run();
+      if (!mounted) return;
+      setState(() => _result = museSpeedText(bps));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _failed = true;
+        _result = '下载测速失败：$e';
+      });
+    } finally {
+      if (mounted) setState(() => _test = null);
+    }
+  }
+
+  @override
+  void dispose() {
+    _test?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mt = MuseTheme.of(context);
+    final running = _test != null;
+    return Row(
+      key: const ValueKey('node_download_test'),
+      children: [
+        Expanded(
+          child: Text(
+            running ? '正在下载 5 MB…' : (_result ?? '下载测速（约 5 MB 流量）'),
+            style: MuseType.body(context).copyWith(
+              color: _failed ? MusePalette.red : (_result == null || running ? mt.text2 : null),
+              fontFeatures: MuseType.tabular,
+            ),
+          ),
+        ),
+        const SizedBox(width: MuseSpace.s8),
+        TextButton(
+          key: const ValueKey('node_download_test_button'),
+          onPressed: running ? () => _test?.cancel() : _run,
+          child: Text(running ? '停止' : (_result == null ? '开始' : '再测')),
+        ),
+      ],
+    );
+  }
 }

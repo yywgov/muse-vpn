@@ -281,14 +281,19 @@ class MuseSwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SwitchListTile.adaptive(
+    // 1.5.0: the same ListTile geometry as MuseTile, so switch rows line up with the others
+    // (SwitchListTile put the title 8 px further right)
+    return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
-      secondary: _leadingOf(leading),
+      minLeadingWidth: MuseIconSize.small,
+      horizontalTitleGap: MuseSpace.s16,
+      minVerticalPadding: MuseSpace.s12,
+      leading: _leadingOf(leading),
       title: info == null ? Text(title, style: MuseType.body(context)) : MuseInfoTitle(title: title, info: info!),
       subtitle: subtitle == null ? null : Text(subtitle!, style: MuseType.caption(context)),
-      activeTrackColor: MusePalette.brand,
-      value: value,
-      onChanged: onChanged,
+      trailing: Switch.adaptive(activeTrackColor: MusePalette.brand, value: value, onChanged: onChanged),
+      enabled: onChanged != null,
+      onTap: onChanged == null ? null : () => onChanged!(!value),
     );
   }
 }
