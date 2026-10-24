@@ -4,6 +4,8 @@
 // Opened from the 首页 出口 IP tile and from 设置.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/utils/uri_utils.dart';
+import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -318,9 +320,28 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
                 ],
               ),
               // 1.4.1: the local crash log, redacted (nothing is uploaded)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
+              Wrap(
+                spacing: MuseSpace.s8,
+                children: [
+                  // 1.5.0 #233: diagnosis + crash log copied, an issue opened with version / system
+                  TextButton.icon(
+                    key: const ValueKey('diagnose_feedback'),
+                    icon: const Icon(Icons.feedback_outlined, size: MuseIconSize.small),
+                    label: const Text('反馈问题'),
+                    onPressed: () async {
+                      final log = await MuseDiagnostics.redactedText(ref) ?? '';
+                      final crashes = MuseCrashRecorder.exportText(ref.read(sharedPreferencesProvider).requireValue);
+                      await Clipboard.setData(ClipboardData(text: [log, if (crashes.isNotEmpty) crashes].join('\n\n')));
+                      final info = ref.read(appInfoProvider).valueOrNull;
+                      final uri = museFeedbackIssueUri(
+                        version: info == null ? '未知' : '${info.version} (${info.buildNumber})',
+                        system: '${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+                      );
+                      _toast('诊断信息已复制，请粘贴到反馈里');
+                      await UriUtils.tryLaunch(uri);
+                    },
+                  ),
+                  TextButton.icon(
                   key: const ValueKey('diagnose_export_crashes'),
                   icon: const Icon(Icons.bug_report_outlined, size: MuseIconSize.small),
                   label: const Text('导出崩溃记录'),
@@ -332,6 +353,7 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
                     if (ok) _toast('已导出（已脱敏）');
                   },
                 ),
+                ],
               ),
             ],
           ),

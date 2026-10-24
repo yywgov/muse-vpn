@@ -20,6 +20,25 @@ env:
   FLUTTER_VERSION: '3.38.5'
 
 jobs:
+  # 1.5.0 #188: known vulnerabilities in the Dart / Go dependencies, reported as warnings (it never
+  # blocks a build: advisories appear without any change here)
+  deps-audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - name: Dependency vulnerability scan
+        run: |
+          curl -fsSL -o osv-scanner https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 || { echo "::warning title=Dependency scan::scanner download failed"; exit 0; }
+          chmod +x osv-scanner
+          if ./osv-scanner scan source --lockfile=pubspec.lock --format=table > osv.txt 2>&1; then
+            echo "No known vulnerabilities" >> "$GITHUB_STEP_SUMMARY"
+          else
+            n=$(grep -c "https://osv.dev/" osv.txt || true)
+            echo "::warning title=Dependency scan::$n known vulnerabilities in pubspec.lock (see step summary)"
+            { echo '```'; cat osv.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   apk:
     runs-on: ubuntu-latest
     permissions:
@@ -93,6 +112,13 @@ jobs:
             echo "arm64 APK not found"; ls -R build/app/outputs; exit 1
           fi
           cp "$apk" out/Chuanyun-Android-arm64.apk
+          # 1.5.0 #219: APK size recorded on every run; 1.4.1 was 45.4 MB. Warn past 60 MB, fail past 80 MB
+          size=$(stat -c %s out/Chuanyun-Android-arm64.apk)
+          mb=$(awk "BEGIN{printf \"%.1f\", $size/1048576}")
+          echo "::notice title=APK size::$mb MB"
+          echo "APK size: $mb MB" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$size" -gt 83886080 ]; then echo "::error title=APK size::$mb MB is over the 80 MB limit"; exit 1; fi
+          if [ "$size" -gt 62914560 ]; then echo "::warning title=APK size::$mb MB is over 60 MB"; fi
           # 1.5.0 #208: a checksum file next to the APK (verify with sha256sum -c)
           (cd out && sha256sum Chuanyun-Android-arm64.apk > Chuanyun-Android-arm64.apk.sha256)
           ls -la out

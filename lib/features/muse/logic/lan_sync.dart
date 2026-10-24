@@ -227,3 +227,9 @@ MuseSnapshot museLanMerge(MuseSnapshot host, MuseLanMessage client) {
   }
   return museMergeSnapshots(host, remote);
 }
+
+/// 1.5.0 #195: what to check when the other device can't be reached.
+const museLanChecks =
+    '① 两台设备连着同一个 Wi‑Fi（访客网络、手机热点的「AP 隔离」会挡住设备互访）；② Windows 防火墙允许穿云访问专用网络；③ 对方没有开着其他 VPN';
+const museLanUnreachableHint = '连不上对方，请检查：$museLanChecks';
+const museLanNoAnswerHint = '对方没有回应：确认对方已打开配对码并点了同意；还不行请检查：$museLanChecks';

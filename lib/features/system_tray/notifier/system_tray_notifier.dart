@@ -11,6 +11,7 @@ import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/muse/home/node_memory.dart';
+import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart' show Notifier, NotifierProvider;
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -52,7 +53,11 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
     final urlTestDelay = ref.watch(activeProxyNotifierProvider).valueOrNull?.urlTestDelay ?? 0;
     final speed = ref.watch(museTraySpeedProvider);
 
-    final icon = _trayIconPath(museTrayIconStatus(connection));
+    // 1.5.0 #144: orange while connected but the internet can't be reached through the node
+    final reach = ref.watch(museReachProvider);
+    final icon = museTrayWarning(connection, reach)
+        ? (PlatformUtils.isWindows ? museTrayWarningIco : museTrayWarningPng)
+        : _trayIconPath(museTrayIconStatus(connection));
     if (icon != _lastIcon) {
       _lastIcon = icon;
       await trayManager.setIcon(icon, isTemplate: PlatformUtils.isMacOS);
@@ -447,6 +452,13 @@ List<MuseTrayItem> museTrayMenuSpec(
   const MuseTrayItem('dashboard', '显示窗口'),
   const MuseTrayItem('quit', '退出'),
 ];
+
+/// 1.5.0 #144: the tray has three looks: grey (off / switching), blue (connected), orange
+/// (connected, but the post-connect check found no internet through the node).
+const museTrayWarningIco = 'assets/images/tray_icon_warning.ico';
+const museTrayWarningPng = 'assets/images/tray_icon_warning.png';
+
+bool museTrayWarning(ConnectionStatus connection, MuseReach reach) => connection is Connected && reach == MuseReach.failed;
 
 /// 穿云 1.2.8: the tray icon is blue as soon as the tunnel is really up (no delay needed).
 ConnectionStatus museTrayIconStatus(ConnectionStatus connection) => connection;

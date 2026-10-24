@@ -145,6 +145,8 @@ flutter:
     - assets/images/tray_icon_connected.png
     - assets/images/tray_icon_disconnected.ico
     - assets/images/tray_icon_disconnected.png
+    - assets/images/tray_icon_warning.ico
+    - assets/images/tray_icon_warning.png
 
   fonts:
     # - family: Roboto

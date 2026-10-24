@@ -210,11 +210,11 @@ Future<MuseSyncResult> museLanSyncWith(MuseSyncService sync, MuseLanPairing p, {
     status = res.statusCode;
     body = await res.transform(utf8.decoder).join().timeout(const Duration(seconds: 20));
   } on TimeoutException {
-    throw const MuseLanException('对方没有回应（确认对方已打开配对码并点了同意）');
+    throw const MuseLanException(museLanNoAnswerHint);
   } on HttpException {
     throw const MuseLanException('连接被对方中断，请重新扫码');
   } on SocketException {
-    throw const MuseLanException('连不上对方：确认两台设备在同一网络，Windows 需在防火墙中允许穿云（专用网络）');
+    throw const MuseLanException(museLanUnreachableHint);
   } finally {
     client.close(force: true);
   }

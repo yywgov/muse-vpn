@@ -16,6 +16,8 @@ import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
+import 'package:hiddify/features/muse/logic/settings_index.dart';
+import 'package:hiddify/features/muse/settings/settings_search.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
@@ -44,9 +46,51 @@ class SettingsPage extends HookConsumerWidget {
     final advancedOpen = useState(false);
     final ipv6 = MuseIpv6Policy.fromKey(ref.watch(MusePrefs.ipv6Policy));
 
+    // 1.5.0 #101: jump to a setting found by search
+    void openEntry(MuseSettingEntry e) {
+      switch (e.page) {
+        case MuseSettingPage.main:
+          break;
+        case MuseSettingPage.advanced:
+          advancedOpen.value = true;
+        case MuseSettingPage.appearance:
+          musePushPage(context, const MuseAppearancePage());
+        case MuseSettingPage.nodes:
+          musePushPage(context, const MuseNodeSettingsPage());
+        case MuseSettingPage.routing:
+          musePushPage(context, const MuseRoutingPage());
+        case MuseSettingPage.network:
+          musePushPage(context, const MuseNetworkPage());
+        case MuseSettingPage.sync:
+          musePushPage(context, const MuseSyncPage());
+        case MuseSettingPage.stats:
+          musePushPage(context, const MuseStatsPage());
+        case MuseSettingPage.developer:
+          advancedOpen.value = true;
+          musePushPage(context, const MuseDeveloperPage());
+        case MuseSettingPage.perApp:
+          context.goNamed('perAppProxy');
+        case MuseSettingPage.diagnose:
+          showMuseDiagnoseSheet(context);
+        case MuseSettingPage.about:
+          context.goNamed('about');
+      }
+    }
+
     return MuseScaffold(
       large: true,
       title: '设置',
+      actions: [
+        IconButton(
+          key: const ValueKey('settings_search'),
+          tooltip: '搜索设置',
+          icon: const Icon(Icons.search_outlined),
+          onPressed: () async {
+            final picked = await showMuseSettingsSearch(context);
+            if (picked != null && context.mounted) openEntry(picked);
+          },
+        ),
+      ],
       body: MuseGroupedBody(
         children: [
           MuseSection(

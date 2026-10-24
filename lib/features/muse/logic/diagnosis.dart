@@ -120,3 +120,14 @@ List<MuseDiagAction> museDiagActions(List<MuseDiagItem> items, {required bool co
   }
   return out.toSet().take(3).toList();
 }
+
+/// 1.5.0 #233: a new GitHub issue with the version and system filled in; the redacted
+/// diagnosis is on the clipboard for the user to paste (a long body would not fit in a link).
+const museIssuesUrl = 'https://github.com/yywgov/muse-vpn/issues/new';
+
+Uri museFeedbackIssueUri({required String version, required String system}) => Uri.parse(museIssuesUrl).replace(
+  queryParameters: {
+    'title': '[反馈] ',
+    'body': '版本：$version\n系统：$system\n\n问题描述：\n\n复现步骤：\n\n诊断信息（已复制到剪贴板，已脱敏，请粘贴在下面）：\n',
+  },
+);
