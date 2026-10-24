@@ -3,6 +3,9 @@
 
 /// version → what changed, newest first. Keep each line short.
 const museChangelog = <String, List<String>>{
+  '1.5.2': [
+    '修复：新版服务器拒绝 REALITY 节点连接（内核 muse.17 上报新版客户端版本号）',
+  ],
   '1.5.1': [
     '首页去广告「关 / 温和 / 强力」和统计「日 / 周 / 月」切换：三段等宽、文字上下左右居中，选中块更饱满，大字号不溢出',
     '移除「关于」里的 Beta 通道开关（不发布测试版，应用内更新只取正式版）',
