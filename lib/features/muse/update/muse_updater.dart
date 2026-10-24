@@ -6,6 +6,8 @@
 
 import 'dart:io';
 
+import 'package:hiddify/features/muse/data/sync_service.dart';
+
 import 'package:crypto/crypto.dart';
 
 import 'package:dio/dio.dart';
@@ -426,6 +428,7 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
           existing.lengthSync() == release.apkSize &&
           (release.sha256 == null || await museFileSha256(existing) == release.sha256)) {
         if (await ChuanyunPlatform.apkSignatureMatches(path) == false) throw MuseSignatureChanged(path);
+        await _backupBeforeUpdate();
         return await ChuanyunPlatform.installApk(path);
       }
       if (dir.existsSync()) dir.deleteSync(recursive: true);
@@ -441,7 +444,8 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
         throw const FileSystemException('SHA-256 mismatch');
       }
       if (await ChuanyunPlatform.apkSignatureMatches(path) == false) throw MuseSignatureChanged(path);
-      return await ChuanyunPlatform.installApk(path);
+      await _backupBeforeUpdate();
+        return await ChuanyunPlatform.installApk(path);
     } catch (e, st) {
       loggy.warning('update download failed', e, st);
       rethrow;
@@ -449,6 +453,13 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
       _cancel = null;
       state = const MuseUpdateIdle();
     }
+  }
+
+  /// 1.5.0 #206: settings and subscriptions saved before the new version installs.
+  Future<void> _backupBeforeUpdate() async {
+    try {
+      await ref.read(museSyncServiceProvider).autoBackup('update').timeout(const Duration(seconds: 5));
+    } catch (_) {}
   }
 
   /// 穿云 Windows: downloads the Setup.exe, starts it silently (UAC prompt; /RELAUNCH opens the
@@ -471,6 +482,7 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
         file.deleteSync();
         throw FileSystemException('SHA-256 mismatch (expected ${release.sha256}, got $actual)');
       }
+      await _backupBeforeUpdate();
       await Process.start(path, const [
         '/SILENT',
         '/SUPPRESSMSGBOXES',

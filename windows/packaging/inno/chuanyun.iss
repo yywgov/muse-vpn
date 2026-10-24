@@ -64,7 +64,7 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 Type: files; Name: "{app}\HiddifyCli.exe"
 
 [Icons]
-Name: "{autoprograms}\穿云"; Filename: "{app}\Chuanyun.exe"
+Name: "{autoprograms}\穿云"; Filename: "{app}\Chuanyun.exe"; AppUserModelID: "Chuanyun.App"
 Name: "{autodesktop}\穿云"; Filename: "{app}\Chuanyun.exe"; Tasks: desktopicon
 
 [Run]

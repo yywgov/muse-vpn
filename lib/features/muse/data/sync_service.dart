@@ -20,6 +20,7 @@ import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Settings that go into 同步 / 备份, with the provider to refresh after a change.
 final museSyncedPrefs = <String, ProviderOrFamily>{
@@ -313,8 +314,45 @@ class MuseSyncService {
       throw const MuseSyncException('不是穿云的备份文件');
     }
     if (snap.entries.isEmpty) throw const MuseSyncException('备份里没有内容');
+    // 1.5.0 #197: what is there now is kept first, so a wrong file can be undone
+    await autoBackup('restore');
     final current = await localValues();
     return apply(museSyncChanges(current, snap));
+  }
+
+  /// 1.5.0 #197 / #206: the current settings and subscriptions saved as an automatic backup
+  /// (newest 5 kept). Null when it could not be written; never throws.
+  Future<File?> autoBackup(String reason) async {
+    try {
+      final dir = await museAutoBackupDir();
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+      final file = File('${dir.path}${Platform.pathSeparator}${museAutoBackupName(reason, DateTime.now())}');
+      await file.writeAsString(await exportBackup());
+      final names = [for (final f in dir.listSync().whereType<File>()) f.uri.pathSegments.last];
+      for (final old in museAutoBackupsToPrune(names)) {
+        try {
+          File('${dir.path}${Platform.pathSeparator}$old').deleteSync();
+        } catch (_) {}
+      }
+      return file;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+Future<Directory> museAutoBackupDir() async => Directory('${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}backups');
+
+/// The automatic backups, newest first.
+Future<List<File>> museListAutoBackups() async {
+  try {
+    final dir = await museAutoBackupDir();
+    if (!dir.existsSync()) return const [];
+    final files = [for (final f in dir.listSync().whereType<File>()) if (museParseAutoBackupName(f.uri.pathSegments.last) != null) f];
+    files.sort((a, b) => museParseAutoBackupName(b.uri.pathSegments.last)!.at.compareTo(museParseAutoBackupName(a.uri.pathSegments.last)!.at));
+    return files;
+  } catch (_) {
+    return const [];
   }
 }
 

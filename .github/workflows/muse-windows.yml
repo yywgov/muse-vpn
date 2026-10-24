@@ -168,7 +168,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          files="out/Chuanyun-Windows-x64-Setup.exe out/Chuanyun-Windows-x64.zip"
+          # 1.5.0 #208: checksum files next to the downloads (verify with sha256sum -c)
+          (cd out && for f in Chuanyun-Windows-x64-Setup.exe Chuanyun-Windows-x64.zip; do sha256sum "$f" > "$f.sha256"; done)
+          files="out/Chuanyun-Windows-x64-Setup.exe out/Chuanyun-Windows-x64.zip out/Chuanyun-Windows-x64-Setup.exe.sha256 out/Chuanyun-Windows-x64.zip.sha256"
           pre=""
           case "$TAG" in *-*) pre="--prerelease";; esac
           for i in 1 2 3 4 5 6; do

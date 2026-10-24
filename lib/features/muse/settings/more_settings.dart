@@ -30,7 +30,7 @@ import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:hiddify/features/muse/logic/stats_tools.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
-import 'package:hiddify/features/muse/logic/sync_core.dart' show museIsEncrypted;
+import 'package:hiddify/features/muse/logic/sync_core.dart' show museIsEncrypted, museParseAutoBackupName, museAutoBackupReasonTitle, museShortDateTime;
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart' show museAskText, museNodeName;
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -1036,6 +1036,29 @@ class MuseSyncPage extends HookConsumerWidget {
                     if (pw.isEmpty) return;
                   }
                   await run(() async => (await ref.read(museSyncServiceProvider).importBackup(text, password: pw)).summary);
+                },
+              ),
+              // 1.5.0 #197 / #206: taken by itself before a restore or an app update
+              MuseTile(
+                key: const ValueKey('backup_auto'),
+                leading: const Icon(Icons.history_toggle_off_outlined),
+                title: '自动备份',
+                info: '恢复备份或更新 App 前自动保存当前配置，保留最近 5 份',
+                chevron: true,
+                onTap: () async {
+                  final files = await museListAutoBackups();
+                  if (!context.mounted) return;
+                  if (files.isEmpty) {
+                    _toast(ref, '还没有自动备份');
+                    return;
+                  }
+                  final picked = await musePick<File>(context, '恢复到', [
+                    for (final f in files)
+                      if (museParseAutoBackupName(f.uri.pathSegments.last) case final meta?)
+                        (f, '${museAutoBackupReasonTitle(meta.reason)} · ${museShortDateTime(meta.at)}'),
+                  ], files.first);
+                  if (picked == null) return;
+                  await run(() async => (await ref.read(museSyncServiceProvider).importBackup(await picked.readAsString())).summary);
                 },
               ),
             ],

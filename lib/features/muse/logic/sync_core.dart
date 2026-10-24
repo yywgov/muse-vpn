@@ -224,3 +224,38 @@ Future<String> museEncryptAsync(String plain, String password, {int iterations =
     Isolate.run(() => museEncrypt(plain, password, iterations: iterations));
 
 Future<String> museDecryptAsync(String envelope, String password) => Isolate.run(() => museDecrypt(envelope, password));
+
+/// 1.5.0 #197 / #206: automatic backups taken before a restore or an app update.
+const museAutoBackupKeep = 5;
+
+String museAutoBackupName(String reason, DateTime at) {
+  String two(int v) => v.toString().padLeft(2, '0');
+  return 'auto-$reason-${at.year}${two(at.month)}${two(at.day)}-${two(at.hour)}${two(at.minute)}${two(at.second)}.json';
+}
+
+/// The reason and time an automatic backup's file name carries; null for other files.
+({String reason, DateTime at})? museParseAutoBackupName(String name) {
+  final m = RegExp(r'^auto-([a-z]+)-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})\.json$').firstMatch(name);
+  if (m == null) return null;
+  int g(int i) => int.parse(m.group(i)!);
+  return (reason: m.group(1)!, at: DateTime(g(2), g(3), g(4), g(5), g(6), g(7)));
+}
+
+String museAutoBackupReasonTitle(String reason) => switch (reason) {
+  'restore' => '恢复前',
+  'update' => '更新前',
+  _ => '自动',
+};
+
+/// Automatic backups to delete so only the newest [keep] stay (other files are left alone).
+List<String> museAutoBackupsToPrune(Iterable<String> names, {int keep = museAutoBackupKeep}) {
+  final autos = [for (final n in names) if (museParseAutoBackupName(n) != null) n]
+    ..sort((a, b) => museParseAutoBackupName(a)!.at.compareTo(museParseAutoBackupName(b)!.at));
+  return autos.length <= keep ? const [] : autos.sublist(0, autos.length - keep);
+}
+
+/// 10-24 17:05
+String museShortDateTime(DateTime t) {
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(t.month)}-${two(t.day)} ${two(t.hour)}:${two(t.minute)}';
+}
