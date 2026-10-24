@@ -95,6 +95,17 @@ class MuseNodeMetas {
     if (own.isNotEmpty) return own;
     return beautify ? museBeautifyNodeName(original) : original;
   }
+
+  /// 1.5.3: the name to show for a group's pick (自动最快 → its node), given by the core as the
+  /// node's raw name: looked up among [items] (tag, raw name) so it reads exactly like its row.
+  String pickName(String raw, Iterable<(String, String)> items, {bool beautify = false}) {
+    final r = raw.trim();
+    if (r.isEmpty) return r;
+    for (final (tag, name) in items) {
+      if (name == r || tag == r) return displayName(tag, name, beautify: beautify);
+    }
+    return beautify ? museBeautifyNodeName(r) : r;
+  }
 }
 
 // ---------------------------------------------------------------- names

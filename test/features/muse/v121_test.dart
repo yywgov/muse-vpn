@@ -61,9 +61,9 @@ void main() {
       expect(s, '23 个节点');
       expect(s, isNot(contains('负载均衡')));
     });
-    test('node subtitles keep the protocol name', () {
+    test('node rows keep the protocol name', () {
       final home = File('lib/features/muse/nodes/node_list.dart').readAsStringSync();
-      expect(home, contains(': museProtocolName(proxy.type)'));
+      expect(home, contains('museProtocolShort(proxy.type)')); // 1.5.3: as a small tag
     });
   });
 

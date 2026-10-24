@@ -120,6 +120,18 @@ Future<void> musePickNode(WidgetRef ref, String groupTag, String tag) async {
 
 String museNodeName(OutboundInfo e) => e.tagDisplay.isNotEmpty ? e.tagDisplay : e.tag;
 
+/// 1.5.3: a group's pick (raw name from the core) as its own row shows it (renamed / tidied),
+/// so 自动最快, the 首页 and the list never disagree.
+final museShownPickProvider = Provider<String Function(String raw)>((ref) {
+  final metas = MuseNodeMetas.parse(ref.watch(MusePrefs.nodeMeta));
+  final beautify = ref.watch(MusePrefs.beautifyNames);
+  final items = [
+    for (final e in ref.watch(museNodeGroupProvider).valueOrNull?.items ?? const <OutboundInfo>[])
+      if (!e.isGroup) (e.tag, museNodeName(e)),
+  ];
+  return (raw) => metas.pickName(raw, items, beautify: beautify);
+});
+
 final _flagRun = RegExp('[\u{1F1E6}-\u{1F1FF}]{2}\\s*', unicode: true);
 
 /// [name] without flag emoji (the flag is shown in its own box next to it).
@@ -182,6 +194,8 @@ class MuseNodeList extends HookConsumerWidget {
     final collapsed = collapsedRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
     final showUserHidden = useState(false);
     String shownName(OutboundInfo e) => metas.displayName(e.tag, museNodeName(e), beautify: beautify);
+    final shownPick = ref.watch(museShownPickProvider);
+    final profileName = ref.watch(museActiveProfileNameProvider)?.trim() ?? '';
 
     // every node answered (or timed out) since 测速 started: end the test
     if (testing && group != null) {
@@ -224,8 +238,10 @@ class MuseNodeList extends HookConsumerWidget {
                   : progress != null
                   // 1.5.0 #25: 测速 progress (stop with the button next to it)
                   ? '已测 ${progress.done} / ${progress.total}'
-                  : '$nodeTotal 个节点',
+                  : '${profileName.isEmpty ? '' : '$profileName · '}$nodeTotal 个节点',
               key: const ValueKey('node_count_label'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: MuseType.caption(context),
             ),
           ),
@@ -328,7 +344,8 @@ class MuseNodeList extends HookConsumerWidget {
           dividerIndent: MuseSpace.s16,
           children: [
             MuseTile(
-              title: proxies.hasError ? '读取节点失败' : (hasProfile ? '暂无节点' : '还没有订阅'),
+              // 1.5.3: a subscription never connected has no saved list yet
+              title: proxies.hasError ? '读取节点失败' : (!hasProfile ? '还没有订阅' : (running ? '暂无节点' : '连接后显示节点')),
             ),
           ],
         ),
@@ -398,6 +415,7 @@ class MuseNodeList extends HookConsumerWidget {
         favorite: favorites.contains(proxy.tag),
         displayName: proxy.isGroup ? null : shownName(proxy),
         note: proxy.isGroup ? '' : metas.of(proxy.tag).note,
+        shownPick: shownPick,
         checked: selecting.value && !proxy.isGroup ? picked.value.contains(proxy.tag) : null,
         onLongPress: selecting.value ? null : () => showMuseNodeDetails(context, ref, proxy, since: since, groupTag: group.tag),
         onTap: selecting.value
@@ -763,7 +781,11 @@ class MuseNodeRow extends StatelessWidget {
     this.displayName,
     this.note = '',
     this.checked,
+    this.shownPick,
   });
+
+  /// 1.5.3: a group's pick as its row shows it
+  final String Function(String raw)? shownPick;
 
   /// 1.4.0: the user's own name (or the tidied one) instead of the subscription's
   final String? displayName;
@@ -804,13 +826,20 @@ class MuseNodeRow extends StatelessWidget {
     final rawName = proxy.isGroup ? fullName.split(' → ').first.trim() : fullName;
     final type = proxy.type.toLowerCase();
     final name = proxy.isGroup || type == 'direct' || type == 'block' ? museGroupName(rawName) : rawName;
+    final invalid = !proxy.isGroup && museIsInvalidNodeType(proxy.type);
+    // 1.5.3: the protocol is a small tag after the name; the second line only says something new
+    final protocolTag = proxy.isGroup || invalid || type == 'direct' || type == 'block' ? null : museProtocolShort(proxy.type);
     final subtitle = proxy.isGroup
-        ? museGroupSubtitle(type: proxy.type, name: rawName, selectedDisplay: proxy.groupSelectedTagDisplay, nodeCount: nodeCount)
-        : museIsInvalidNodeType(proxy.type)
+        ? museGroupSubtitle(
+            type: proxy.type,
+            name: rawName,
+            selectedDisplay: proxy.groupSelectedTagDisplay,
+            nodeCount: nodeCount,
+            shown: shownPick == null ? null : (raw) => museStripFlags(shownPick!(raw)),
+          )
+        : invalid
         ? museInvalidNodeSubtitle(proxy.type)
-        : note.isNotEmpty
-        ? '${museProtocolName(proxy.type)} · $note'
-        : museProtocolName(proxy.type);
+        : note;
     final groupIcon = proxy.isGroup
         ? switch (museGroupIconKind(type: proxy.type, name: rawName, selectedDisplay: proxy.groupSelectedTagDisplay)) {
             MuseGroupIcon.autoFastest => Icons.bolt_outlined,
@@ -844,33 +873,48 @@ class MuseNodeRow extends StatelessWidget {
                       ),
                     )
                   else
-                    MuseFlagBox(flag: flag, icon: groupIcon),
+                    MuseFlagBox(flag: flag, icon: groupIcon, neutral: !proxy.isGroup),
                   const SizedBox(width: MuseSpace.s12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
+                    // 1.5.3: the tag only when the name keeps most of the row (narrow + large
+                    // text: the protocol goes back to the second line)
+                    child: LayoutBuilder(
+                      builder: (context, box) {
+                        final tagWidth = protocolTag == null ? 0.0 : MuseProtocolTag.widthOf(context, protocolTag);
+                        final showTag = protocolTag != null && tagWidth <= box.maxWidth * MuseSize.protocolTagShare;
+                        final line2 = protocolTag != null && !showTag
+                            ? (subtitle.isEmpty ? protocolTag : '$protocolTag · $subtitle')
+                            : subtitle;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (favorite)
-                              const Padding(
-                                padding: EdgeInsets.only(right: MuseSpace.s4),
-                                child: Icon(Icons.star_rounded, size: MuseIconSize.tiny, color: MusePalette.star, key: ValueKey('node_star')),
-                              ),
-                            Flexible(
-                              child: Text(
-                                flag == null ? name : museStripFlags(name),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: MuseType.body(context).copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w400),
-                              ),
+                            Row(
+                              children: [
+                                if (favorite)
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: MuseSpace.s4),
+                                    child: Icon(Icons.star_rounded, size: MuseIconSize.tiny, color: MusePalette.star, key: ValueKey('node_star')),
+                                  ),
+                                Flexible(
+                                  child: Text(
+                                    flag == null ? name : museStripFlags(name),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: MuseType.body(context).copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w400),
+                                  ),
+                                ),
+                                if (showTag) ...[
+                                  const SizedBox(width: MuseSpace.s8),
+                                  MuseProtocolTag(text: protocolTag),
+                                ],
+                              ],
                             ),
+                            if (line2.isNotEmpty)
+                              Text(line2, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
                           ],
-                        ),
-                        if (subtitle.isNotEmpty)
-                          Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
-                      ],
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: MuseSpace.s8),
@@ -913,12 +957,46 @@ class MuseNodeRow extends StatelessWidget {
   }
 }
 
+/// 1.5.3: the protocol as a small grey tag (instead of a whole second line).
+class MuseProtocolTag extends StatelessWidget {
+  const MuseProtocolTag({super.key, required this.text});
+
+  final String text;
+
+  /// laid-out width at the current text scale
+  static double widthOf(BuildContext context, String text) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: MuseType.caption(context)),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final w = tp.width + MuseSpace.s4 * 2 + MuseSpace.s8;
+    tp.dispose();
+    return w;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mt = MuseTheme.of(context);
+    return Container(
+      key: const ValueKey('node_protocol_tag'),
+      padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s4),
+      decoration: BoxDecoration(color: mt.inner, borderRadius: MuseRadius.smallAll),
+      child: Text(text, maxLines: 1, softWrap: false, style: MuseType.caption(context)),
+    );
+  }
+}
+
 /// 32 dp rounded square with a flag emoji (or an icon for groups).
 class MuseFlagBox extends StatelessWidget {
-  const MuseFlagBox({super.key, this.flag, this.icon = Icons.public_outlined, this.onBrand = false});
+  const MuseFlagBox({super.key, this.flag, this.icon = Icons.public_outlined, this.onBrand = false, this.neutral = false});
 
   final String? flag;
   final IconData icon;
+
+  /// 1.5.3: a node without a known region: grey icon (the brand colour is for groups)
+  final bool neutral;
 
   /// on the blue hero card
   final bool onBrand;
@@ -936,7 +1014,12 @@ class MuseFlagBox extends StatelessWidget {
       ),
       child: flag != null
           ? Text(flag!, style: const TextStyle(fontSize: MuseIconSize.flag, height: 1.1))
-          : Icon(icon, size: MuseIconSize.small, color: onBrand ? MusePalette.white : MusePalette.brand),
+          : Icon(
+              icon,
+              key: neutral ? const ValueKey('flag_box_neutral') : null,
+              size: MuseIconSize.small,
+              color: onBrand ? MusePalette.white : (neutral ? mt.text3 : MusePalette.brand),
+            ),
     );
   }
 }

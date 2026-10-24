@@ -148,6 +148,9 @@ abstract final class MusePrefs {
 
   /// the core's last log lines when it stopped with an error (redacted), for 诊断
   static final coreTail = PreferencesNotifier.create<String, String>("muse_core_tail", "");
+
+  /// 1.5.3: last 出口 results (logic/exit_check.dart MuseExitCache); local only, never synced
+  static final exitCache = PreferencesNotifier.create<String, String>("muse_exit_cache", "");
 }
 
 /// 字体大小 choices.

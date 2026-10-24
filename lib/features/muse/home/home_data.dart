@@ -20,6 +20,7 @@ import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:hiddify/features/muse/home/core_profile.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// The app version (null until known).
@@ -65,15 +66,21 @@ class MuseSpeedHistory extends Notifier<List<int>> {
 final museSpeedHistoryProvider = NotifierProvider<MuseSpeedHistory, List<int>>(MuseSpeedHistory.new);
 
 /// The main node group: live while connected, the cached list of the active subscription
-/// otherwise (no delays then; picking only remembers the node).
+/// otherwise (no delays then; picking only remembers the node). 1.5.3: while the core is still
+/// being reloaded with a newly picked subscription, the old core's groups are never shown.
 final museNodeGroupProvider = Provider<AsyncValue<OutboundGroup?>>((ref) {
-  if (ref.watch(museRunningProvider)) return ref.watch(proxiesOverviewNotifierProvider);
+  final running = ref.watch(museRunningProvider);
   final profileId = ref.watch(museActiveProfileIdProvider);
-  final cache = MuseNodeCache.parse(ref.watch(Preferences.museNodeCache)).forProfile(profileId);
-  if (cache.isEmpty || profileId == null) return const AsyncData(null);
+  final source = museNodeSource(running: running, activeProfileId: profileId, coreProfileId: ref.watch(museCoreProfileIdProvider));
+  if (source == MuseNodeSource.live) return ref.watch(proxiesOverviewNotifierProvider);
+  final cache = MuseNodeCaches.parse(ref.watch(Preferences.museNodeCache)).of(profileId);
+  if (cache.isEmpty || profileId == null) return source == MuseNodeSource.switching ? const AsyncLoading() : const AsyncData(null);
   final remembered = museParseLastNodes(ref.watch(Preferences.museLastNodes))[profileId];
   return AsyncData(museGroupFromCache(cache, remembered: remembered));
 });
+
+/// 1.5.3: the active subscription's name (节点 header).
+final museActiveProfileNameProvider = Provider<String?>((ref) => ref.watch(activeProfileProvider).valueOrNull?.name);
 
 OutboundGroup museGroupFromCache(MuseNodeCache cache, {String? remembered}) => OutboundGroup(
   tag: cache.groupTag,
@@ -86,14 +93,18 @@ OutboundGroup museGroupFromCache(MuseNodeCache cache, {String? remembered}) => O
 );
 
 /// Saves the main group's node list (names and types, no delays) whenever it changes, so it can
-/// be shown and picked from while disconnected.
+/// be shown and picked from while disconnected. 1.5.3: one list per subscription, and only when
+/// the running core belongs to the active subscription (switching used to file the old
+/// subscription's nodes under the new one).
 final museNodeCacheWriterProvider = Provider<void>((ref) {
   String? last;
   ref.listen<AsyncValue<OutboundGroup?>>(proxiesOverviewNotifierProvider, (_, next) {
     final group = next.valueOrNull;
     final profileId = ref.read(museActiveProfileIdProvider);
     if (group == null || group.items.isEmpty || profileId == null || !ref.read(serviceRunningProvider)) return;
-    final raw = MuseNodeCache(
+    final source = museNodeSource(running: true, activeProfileId: profileId, coreProfileId: ref.read(museCoreProfileIdProvider));
+    if (source != MuseNodeSource.live) return;
+    final cache = MuseNodeCache(
       profileId: profileId,
       groupTag: group.tag,
       selected: group.selected,
@@ -106,10 +117,13 @@ final museNodeCacheWriterProvider = Provider<void>((ref) {
             isGroup: e.isGroup,
           ),
       ],
-    ).toRaw();
-    if (raw == last) return;
-    last = raw;
-    if (ref.read(Preferences.museNodeCache) != raw) ref.read(Preferences.museNodeCache.notifier).update(raw);
+    );
+    final one = cache.toRaw();
+    if (one == last) return;
+    last = one;
+    final cur = ref.read(Preferences.museNodeCache);
+    final raw = MuseNodeCaches.parse(cur).put(cache).toRaw();
+    if (cur != raw) ref.read(Preferences.museNodeCache.notifier).update(raw);
   });
 });
 

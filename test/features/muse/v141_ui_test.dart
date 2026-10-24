@@ -123,6 +123,7 @@ Future<void> _pump(
       museRunningProvider.overrideWithValue(connected),
       museHasProfileProvider.overrideWithValue(true),
       museActiveProfileIdProvider.overrideWithValue('p1'),
+      museActiveProfileNameProvider.overrideWithValue('机场订阅'),
       museAppVersionProvider.overrideWithValue(null),
       museSubInfoProvider.overrideWithValue(
         SubscriptionInfo(

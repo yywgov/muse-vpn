@@ -10,9 +10,11 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/model/startup_connection.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/crash_recorder.dart';
+import 'package:hiddify/features/muse/home/core_profile.dart';
 import 'package:hiddify/features/muse/logic/connect_flow.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/hiddifycore/init_signal.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -41,6 +43,8 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     ref.watch(coreRestartSignalProvider);
 
     yield* _connectionRepo.watchConnectionStatus().doOnData((event) {
+      // 1.5.3: a stopped core runs no subscription (a restart by the tile / watchdog is then trusted)
+      if (event is Disconnected) Future.microtask(() => ref.read(museCoreProfileIdProvider.notifier).state = null);
       // 穿云 Windows 1.2.1: a failure no longer drops the user's intent on Windows; the connection
       // keeper retries with backoff and gives up (startedByUser = false) itself.
       if (event case Disconnected(connectionFailure: final _?) when PlatformUtils.isDesktop && !PlatformUtils.isWindows) {
@@ -152,7 +156,12 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       loggy.info("active profile changed, reconnecting");
       intentGeneration++;
       await ref.read(Preferences.startedByUser.notifier).update(true);
-      await _connectionRepo.reconnect(profile, ref.read(Preferences.disableMemoryLimit)).mapLeft((err) async {
+      await _connectionRepo.reconnect(profile, ref.read(Preferences.disableMemoryLimit)).map((done) {
+        // 1.5.3: the node list follows the new subscription (fresh group stream from the reloaded core)
+        ref.read(museCoreProfileIdProvider.notifier).state = profile.id;
+        ref.invalidate(proxiesOverviewNotifierProvider);
+        return done;
+      }).mapLeft((err) async {
         loggy.warning("error reconnecting", err);
         state = AsyncError(err, StackTrace.current);
         await ref
@@ -304,6 +313,13 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       await ref.read(Preferences.startedByUser.notifier).update(false);
       state = AsyncError(err, StackTrace.current);
     }, (_) async {
+      ref.read(museCoreProfileIdProvider.notifier).state = activeProfile.id;
+      // 1.5.3: the subscription was switched while the core was starting: reload with the new one
+      final now = ref.read(activeProfileProvider).valueOrNull;
+      if (generation == intentGeneration && now != null && now.id != activeProfile.id) {
+        loggy.info("active profile changed while connecting, reloading");
+        Future.microtask(() => reconnect(now));
+      }
       // 1.5.0: the user cancelled while the core was starting: undo the connect
       if (generation != intentGeneration && !ref.read(Preferences.startedByUser)) {
         loggy.info("connect finished after it was cancelled: stopping again");

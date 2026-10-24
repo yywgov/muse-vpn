@@ -65,7 +65,8 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
   Future<void> _run() async {
     final connected = ref.read(serviceRunningProvider);
     // 出口 / services: checked alongside, shown live below
-    if (connected) unawaited(ref.read(museExitProvider.notifier).check());
+    // 1.5.3: the saved result when it is still fresh (刷新 next to 出口 asks again)
+    if (connected) unawaited(ref.read(museExitProvider.notifier).ensure().catchError((_) {}));
     // 网络: a domestic site, straight out (not through the proxy); its Date header checks the clock
     final direct = await _get('http://www.baidu.com/', direct: true);
     _add(museDiagNetwork(directOk: direct != null));
@@ -241,14 +242,41 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
                     size: MuseIconSize.small,
                   ),
                   '出口',
-                  Text(
-                    key: const ValueKey('diagnose_exit'),
-                    info != null
-                        ? '${museCountryFlag(info.country) ?? ''} ${museCountryLabel(info.country)} · ${museMaskIp(info.ip)}'.trim()
-                        : (exit?.infoFailed ?? false)
-                        ? '获取出口失败'
-                        : '检测中…',
-                    style: MuseType.body(context).copyWith(fontFeatures: MuseType.tabular),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                        key: const ValueKey('diagnose_exit'),
+                        info != null
+                            ? '${museCountryFlag(info.country) ?? ''} ${museCountryLabel(info.country)} · ${museMaskIp(info.ip)}'.trim()
+                            : (exit?.infoFailed ?? false)
+                            ? '获取出口失败'
+                            : '检测中…',
+                        style: MuseType.body(context).copyWith(fontFeatures: MuseType.tabular),
+                        ),
+                      ),
+                      SizedBox(
+                        width: MuseSize.flagBox,
+                        height: MuseIconSize.small,
+                        child: exit?.refreshing ?? false
+                            ? Center(
+                                key: const ValueKey('diagnose_exit_refreshing'),
+                                child: SizedBox(
+                                  width: MuseIconSize.tiny,
+                                  height: MuseIconSize.tiny,
+                                  child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke, color: mt.text2),
+                                ),
+                              )
+                            : IconButton(
+                                key: const ValueKey('diagnose_exit_refresh'),
+                                tooltip: '刷新',
+                                padding: EdgeInsets.zero,
+                                iconSize: MuseIconSize.small,
+                                icon: Icon(Icons.refresh_outlined, color: mt.text3),
+                                onPressed: () => unawaited(ref.read(museExitProvider.notifier).check().catchError((_) {})),
+                              ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: MuseSpace.s4),

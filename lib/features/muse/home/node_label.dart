@@ -144,12 +144,19 @@ String museGroupName(String name) => museKnownGroupName(name) ?? name;
 /// Subtitle of a group row on the 首页: the node 自动最快 picked (just its name), the node count
 /// for a balancer (1.2.1: 「负载均衡 · 轮询」 only repeated the row title), 「手动选择 → 节点」
 /// for a selector.
-String museGroupSubtitle({required String type, required String name, String? selectedDisplay, int? nodeCount}) {
+String museGroupSubtitle({
+  required String type,
+  required String name,
+  String? selectedDisplay,
+  int? nodeCount,
+  String Function(String raw)? shown,
+}) {
   final kind = museGroupKind(type: type, name: name, selectedDisplay: selectedDisplay) ?? '分组';
   final sel = selectedDisplay?.trim() ?? '';
   if (kind == '负载均衡') return nodeCount != null && nodeCount > 0 ? '$nodeCount 个节点' : '';
   if (sel.isEmpty || sel.toLowerCase() == 'lowest-delay') return kind;
-  final node = museKnownGroupName(sel) ?? sel;
+  // 1.5.3: the pick reads like its own row (renamed / tidied)
+  final node = museKnownGroupName(sel) ?? (shown == null ? sel : shown(sel));
   // 1.1: 「自动最快 → 节点」 repeated the row title; only the node is shown
   if (kind == '自动最快') return node;
   return '$kind → $node';

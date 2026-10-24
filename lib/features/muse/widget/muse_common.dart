@@ -148,6 +148,16 @@ String museProtocolName(String type, {bool isGroup = false}) {
   };
 }
 
+/// 1.5.3: the short protocol tag on a node row (VLESS, HY2, SS…).
+String museProtocolShort(String type) => switch (museProtocolName(type)) {
+  'Shadowsocks' => 'SS',
+  'ShadowsocksR' => 'SSR',
+  'Hysteria2' => 'HY2',
+  'Hysteria' => 'HY',
+  'WireGuard' => 'WG',
+  final n => n,
+};
+
 /// 1.5.0 #187: a subscription link shown with its secret parts hidden until the eye is tapped.
 class MuseMaskedUrl extends StatefulWidget {
   const MuseMaskedUrl({super.key, required this.url, required this.masked, this.style});

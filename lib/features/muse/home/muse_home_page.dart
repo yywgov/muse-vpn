@@ -541,6 +541,7 @@ class _HeroNodeRow extends ConsumerWidget {
     final group = ref.watch(museNodeGroupProvider).valueOrNull;
     final since = ref.watch(museConnectedSinceProvider).valueOrNull;
     final item = group?.items.where((e) => e.tag == group.selected).firstOrNull;
+    final shown = ref.watch(museShownPickProvider);
     final fg = onBrand ? MusePalette.white : mt.text1;
     final fg2 = onBrand ? MusePalette.white.withValues(alpha: 0.78) : mt.text2;
     String text = '选择节点';
@@ -552,14 +553,17 @@ class _HeroNodeRow extends ConsumerWidget {
         final rawName = full.split(' → ').first.trim();
         final kind = museGroupKind(type: item.type, name: rawName, selectedDisplay: item.groupSelectedTagDisplay);
         final sel = item.groupSelectedTagDisplay.trim();
-        final pick = kind == '负载均衡' || sel.toLowerCase() == 'lowest-delay' || museBalanceStrategyName(sel) != null ? '' : sel;
+        final rawPick = kind == '负载均衡' || sel.toLowerCase() == 'lowest-delay' || museBalanceStrategyName(sel) != null ? '' : sel;
+        // 1.5.3: the pick reads like its row on 节点 (renamed / tidied)
+        final pick = rawPick.isEmpty || museKnownGroupName(rawPick) != null ? rawPick : shown(rawPick);
         text = museCurrentNodeText(name: rawName, groupLabel: museGroupName(rawName), groupPick: museGroupName(pick));
         flag = pick.isEmpty ? null : museFlagEmoji(pick);
         icon = Icons.bolt_outlined;
         text = museStripFlags(text);
       } else {
-        flag = museFlagEmoji(full);
-        text = museStripFlags(full);
+        final name = shown(full);
+        flag = museFlagEmoji(name) ?? museFlagEmoji(full);
+        text = museStripFlags(name);
       }
     }
     final delay = item == null ? 0 : museFreshDelay(item, since);
@@ -1021,6 +1025,16 @@ class _ExitTile extends ConsumerWidget {
               style: MuseType.caption(context).copyWith(color: reach == MuseReach.failed ? MusePalette.orange : null),
             ),
           ),
+          // 1.5.3: re-checking in the background; the last result stays
+          if (result?.refreshing ?? false) ...[
+            SizedBox(
+              key: const ValueKey('exit_refreshing'),
+              width: MuseSpace.s12,
+              height: MuseSpace.s12,
+              child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke, color: mt.text2),
+            ),
+            const SizedBox(width: MuseSpace.s8),
+          ],
           InkResponse(
             key: const ValueKey('exit_copy'),
             radius: 16,

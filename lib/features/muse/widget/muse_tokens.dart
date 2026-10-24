@@ -90,6 +90,9 @@ abstract final class MuseSize {
   /// flag / icon box in front of a row
   static const flagBox = 32.0;
 
+  /// 1.5.3: a node row shows its protocol tag only while it takes at most this share of the name column
+  static const protocolTagShare = 0.4;
+
   /// divider indent under a row with a flag box (16 + 32 + 12)
   static const rowIndent = 60.0;
 

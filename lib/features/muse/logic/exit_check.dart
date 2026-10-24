@@ -3,6 +3,8 @@
 // home/exit_card.dart.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
+import 'dart:convert';
+
 /// One service's verdict from the current exit.
 enum MuseServiceState {
   /// still checking
@@ -172,4 +174,106 @@ bool museNodeMatches(String name, String query, {String? Function(String)? regio
     return false;
   }
   return true;
+}
+
+// ---------------------------------------------------------------- 1.5.3 cache
+
+/// A saved 出口 result is reused this long for the same key.
+const museExitMaxAge = Duration(minutes: 10);
+
+/// What a result depends on: the subscription, the node in use, the route mode and the local
+/// network (see [museNetworkFingerprint]).
+String museExitKey({required String profileId, required String node, required String routeMode, required String network}) =>
+    [profileId, node, routeMode, network].join('\u0001');
+
+class MuseExitCached {
+  const MuseExitCached({
+    required this.key,
+    required this.ip,
+    required this.country,
+    required this.at,
+    this.google = MuseServiceState.checking,
+    this.chatGpt = MuseServiceState.checking,
+    this.netflix = MuseServiceState.checking,
+  });
+
+  final String key;
+  final String ip;
+  final String country;
+  final DateTime at;
+  final MuseServiceState google;
+  final MuseServiceState chatGpt;
+  final MuseServiceState netflix;
+
+  /// young enough to show without asking again (a clock moved backwards counts as stale)
+  bool freshAt(DateTime now) {
+    final age = now.difference(at);
+    return !age.isNegative && age < museExitMaxAge;
+  }
+
+  Map<String, dynamic> toMap() => {
+    'k': key,
+    'ip': ip,
+    'c': country,
+    't': at.millisecondsSinceEpoch,
+    's': [google.index, chatGpt.index, netflix.index],
+  };
+
+  static MuseExitCached? fromMap(Object? m) {
+    if (m is! Map) return null;
+    final ip = m['ip'], key = m['k'], t = m['t'];
+    if (ip is! String || ip.isEmpty || key is! String || t is! int) return null;
+    MuseServiceState st(int i) {
+      final s = m['s'];
+      final v = s is List && s.length > i ? s[i] : null;
+      return v is int && v >= 0 && v < MuseServiceState.values.length ? MuseServiceState.values[v] : MuseServiceState.checking;
+    }
+
+    return MuseExitCached(
+      key: key,
+      ip: ip,
+      country: m['c'] is String ? m['c'] as String : '',
+      at: DateTime.fromMillisecondsSinceEpoch(t),
+      google: st(0),
+      chatGpt: st(1),
+      netflix: st(2),
+    );
+  }
+}
+
+/// The last results by key (newest first, at most [max]: switching back to a node is instant).
+class MuseExitCache {
+  const MuseExitCache(this.items);
+
+  static const max = 16;
+  final List<MuseExitCached> items;
+
+  static MuseExitCache parse(String raw) {
+    if (raw.trim().isEmpty) return const MuseExitCache([]);
+    try {
+      final l = jsonDecode(raw);
+      if (l is! List) return const MuseExitCache([]);
+      return MuseExitCache([for (final e in l) ?MuseExitCached.fromMap(e)]);
+    } catch (_) {
+      return const MuseExitCache([]);
+    }
+  }
+
+  MuseExitCached? of(String key) => items.where((e) => e.key == key).firstOrNull;
+
+  MuseExitCache put(MuseExitCached e) => MuseExitCache([e, ...items.where((x) => x.key != e.key)].take(max).toList());
+
+  String toRaw() => jsonEncode([for (final e in items) e.toMap()]);
+}
+
+final _tunnelIf = RegExp(r'^(tun|utun|wintun|tap|ppp|ipsec|wg)|singbox|sing-box|chuanyun|穿云', caseSensitive: false);
+
+/// The local network as a short stable string: the non-loopback addresses of the real
+/// interfaces (the VPN's own tunnel ignored), sorted. A Wi‑Fi ↔ mobile switch changes it.
+String museNetworkFingerprint(Iterable<(String name, String address)> interfaces) {
+  final out = <String>{
+    for (final (name, address) in interfaces)
+      if (!_tunnelIf.hasMatch(name) && address != '127.0.0.1' && address != '::1' && !address.startsWith('fe80')) address,
+  }.toList()..sort();
+  return out.join(',');
 }

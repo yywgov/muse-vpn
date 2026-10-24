@@ -26,19 +26,28 @@ class MuseNodeCache {
 
   bool get isEmpty => nodes.isEmpty;
 
-  String toRaw() => jsonEncode({
+  String toRaw() => jsonEncode(toMap());
+
+  Map<String, dynamic> toMap() => {
     'p': profileId,
     'g': groupTag,
     's': selected,
     'n': [
       for (final n in nodes) [n.tag, n.name == n.tag ? '' : n.name, n.type, if (n.isGroup) 1],
     ],
-  });
+  };
 
   static MuseNodeCache parse(String raw) {
     if (raw.trim().isEmpty) return empty;
     try {
-      final m = jsonDecode(raw) as Map<String, dynamic>;
+      return fromMap(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return empty;
+    }
+  }
+
+  static MuseNodeCache fromMap(Map<String, dynamic> m) {
+    try {
       final nodes = <MuseCachedNode>[];
       for (final e in (m['n'] as List? ?? const [])) {
         final l = e as List;
@@ -59,4 +68,63 @@ class MuseNodeCache {
   /// The node shown as current while disconnected: the remembered pick, else the last selected.
   String currentTag(String? remembered) =>
       remembered != null && nodes.any((n) => n.tag == remembered) ? remembered : selected;
+}
+
+/// 1.5.3: one cached list per subscription (newest first, at most [max]), so switching the
+/// active subscription while disconnected shows that subscription's own nodes. Reads the
+/// single-list format of 1.3.0–1.5.2 too.
+class MuseNodeCaches {
+  const MuseNodeCaches(this.items);
+
+  static const max = 8;
+  final List<MuseNodeCache> items;
+
+  static MuseNodeCaches parse(String raw) {
+    if (raw.trim().isEmpty) return const MuseNodeCaches([]);
+    try {
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      final list = m['c'];
+      if (list is! List) {
+        final one = MuseNodeCache.fromMap(m);
+        return MuseNodeCaches([if (!one.isEmpty) one]);
+      }
+      return MuseNodeCaches([
+        for (final e in list)
+          if (e is Map<String, dynamic>) MuseNodeCache.fromMap(e),
+      ].where((c) => !c.isEmpty && c.profileId.isNotEmpty).toList());
+    } catch (_) {
+      return const MuseNodeCaches([]);
+    }
+  }
+
+  MuseNodeCache of(String? profileId) =>
+      items.where((c) => profileId != null && c.profileId == profileId).firstOrNull ?? MuseNodeCache.empty;
+
+  MuseNodeCaches put(MuseNodeCache cache) =>
+      MuseNodeCaches([cache, ...items.where((c) => c.profileId != cache.profileId)].take(max).toList());
+
+  String toRaw() => jsonEncode({
+    'c': [for (final c in items) c.toMap()],
+  });
+}
+
+/// 1.5.3: where the 节点 list comes from.
+enum MuseNodeSource {
+  /// the running core's groups (they belong to the active subscription)
+  live,
+
+  /// the saved list of the active subscription (disconnected)
+  cache,
+
+  /// connected, but the core still runs another subscription (being reloaded): its groups
+  /// must not be shown, nor saved under the new subscription
+  switching,
+}
+
+/// [coreProfileId] = the subscription the core was last started / reloaded with (null when
+/// unknown, e.g. the app was reopened while the Android VPN kept running: trusted as live).
+MuseNodeSource museNodeSource({required bool running, required String? activeProfileId, required String? coreProfileId}) {
+  if (!running) return MuseNodeSource.cache;
+  if (coreProfileId != null && activeProfileId != null && coreProfileId != activeProfileId) return MuseNodeSource.switching;
+  return MuseNodeSource.live;
 }
