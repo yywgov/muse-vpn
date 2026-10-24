@@ -1347,14 +1347,17 @@ class MuseStatsPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final log = MuseTrafficLog.parse(ref.watch(MusePrefs.trafficLog));
-    final monthly = useState(false);
+    // 1.5.0 #172: 日 / 周 / 月
+    final range = useState(0);
     final now = DateTime.now();
     final days = log.lastDays(now, 14);
     final months = log.months();
     final shownMonths = months.length > 12 ? months.sublist(months.length - 12) : months;
-    final bars = monthly.value
-        ? [for (final m in shownMonths) (m.$1.substring(5), m.$2 + m.$3)]
-        : [for (final d in days) (d.$1.substring(8), d.$2 + d.$3)];
+    final bars = switch (range.value) {
+      2 => [for (final m in shownMonths) (m.$1.substring(5), m.$2 + m.$3)],
+      1 => [for (final w in log.lastWeeks(now, 8)) ('${int.parse(w.$1.substring(5, 7))}/${int.parse(w.$1.substring(8))}', w.$2 + w.$3)],
+      _ => [for (final d in days) (d.$1.substring(8), d.$2 + d.$3)],
+    };
     final today = days.isEmpty ? 0 : days.last.$2 + days.last.$3;
     final thisMonth = months.isEmpty || months.last.$1 != museMonthKey(now) ? 0 : months.last.$2 + months.last.$3;
     final report = museMonthlyReport(log, museMonthKey(now), bytes: museBytes);
@@ -1372,14 +1375,22 @@ class MuseStatsPage extends HookConsumerWidget {
             ],
           ),
           MuseSection(
-            header: monthly.value ? '每月流量' : '近 14 天流量',
-            headerTrailing: SegmentedButton<bool>(
+            header: switch (range.value) {
+              2 => '每月流量',
+              1 => '近 8 周流量',
+              _ => '近 14 天流量',
+            },
+            headerTrailing: SegmentedButton<int>(
               key: const ValueKey('stats_range'),
               showSelectedIcon: false,
               style: const ButtonStyle(visualDensity: VisualDensity.compact, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-              segments: const [ButtonSegment(value: false, label: Text('日')), ButtonSegment(value: true, label: Text('月'))],
-              selected: {monthly.value},
-              onSelectionChanged: (s) => monthly.value = s.first,
+              segments: const [
+                ButtonSegment(value: 0, label: Text('日')),
+                ButtonSegment(value: 1, label: Text('周')),
+                ButtonSegment(value: 2, label: Text('月')),
+              ],
+              selected: {range.value},
+              onSelectionChanged: (s) => range.value = s.first,
             ),
             children: [
               Padding(

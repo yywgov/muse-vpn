@@ -36,6 +36,16 @@ const museReleaseDownloadPrefix = 'https://github.com/yywgov/muse-vpn/releases/d
 /// Release asset the app updates from (signed with the fixed 穿云 key).
 const museApkAssetName = 'Chuanyun-Android-arm64.apk';
 
+/// 1.5.0 #207: whether [path] already holds the whole byte range [range] (inclusive).
+bool museRangePartDone(String path, (int, int) range) {
+  try {
+    final f = File(path);
+    return f.existsSync() && f.lengthSync() == range.$2 - range.$1 + 1;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// 穿云 Windows: the installer the Windows workflow publishes (preferred) ...
 const museWindowsSetupAssetName = 'Chuanyun-Windows-x64-Setup.exe';
 
@@ -255,6 +265,13 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
         if (e is DioException && e.type == DioExceptionType.cancel) rethrow;
       }
     }
+    // nothing worked: no half-downloaded parts left behind
+    for (var i = 0; i < 8; i++) {
+      try {
+        final f = File('$path.part$i');
+        if (f.existsSync()) f.deleteSync();
+      } catch (_) {}
+    }
     throw lastError ?? const FileSystemException('download failed');
   }
 
@@ -314,11 +331,16 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
       );
       return;
     }
-    final got = List<int>.filled(ranges.length, 0);
     final parts = <String>[for (var i = 0; i < ranges.length; i++) '$path.part$i'];
+    // 1.5.0 #207: parts finished by an earlier source are kept (the whole file's SHA-256 is still
+    // checked at the end), so a switch to the next mirror only fetches what is missing
+    final done = [for (var i = 0; i < ranges.length; i++) museRangePartDone(parts[i], ranges[i])];
+    final got = [for (var i = 0; i < ranges.length; i++) done[i] ? ranges[i].$2 - ranges[i].$1 + 1 : 0];
+    var ok = false;
     try {
       await Future.wait([
         for (var i = 0; i < ranges.length; i++)
+          if (!done[i])
           dio
               .download(
                 url,
@@ -342,11 +364,15 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
         await out.addStream(File(p).openRead());
       }
       await out.close();
+      ok = true;
     } finally {
-      for (final p in parts) {
-        try {
-          File(p).deleteSync();
-        } catch (_) {}
+      // a failed part is dropped; finished ones stay for the next source (see museRangePartDone)
+      for (var i = 0; i < parts.length; i++) {
+        if (ok || !museRangePartDone(parts[i], ranges[i])) {
+          try {
+            File(parts[i]).deleteSync();
+          } catch (_) {}
+        }
       }
     }
   }

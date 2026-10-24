@@ -59,6 +59,27 @@ class MuseTrafficLog {
       }(),
   ];
 
+  /// 1.5.0 #172: the last [n] weeks (Monday to Sunday) ending with the week of [today], oldest
+  /// first: (that Monday's day key, up, down).
+  List<(String, int, int)> lastWeeks(DateTime today, int n) {
+    final monday = DateTime(today.year, today.month, today.day - (today.weekday - DateTime.monday));
+    return [
+      for (var w = n - 1; w >= 0; w--)
+        () {
+          final start = DateTime(monday.year, monday.month, monday.day - 7 * w);
+          var up = 0;
+          var down = 0;
+          for (var i = 0; i < 7; i++) {
+            final v = days[museDayKey(DateTime(start.year, start.month, start.day + i))];
+            if (v == null) continue;
+            up += v.$1;
+            down += v.$2;
+          }
+          return (museDayKey(start), up, down);
+        }(),
+    ];
+  }
+
   /// Totals per month, oldest first: (month, up, down).
   List<(String, int, int)> months() {
     final m = <String, (int, int)>{};
