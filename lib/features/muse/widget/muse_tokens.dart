@@ -111,6 +111,9 @@ abstract final class MuseSize {
   static const emptyIcon = 40.0;
   static const segmented = 32.0;
 
+  /// 1.5.1: width of a three-segment control in a section header (统计 日 / 周 / 月)
+  static const segmentedRange = 132.0;
+
   /// 1.4.0: 统计 chart height, gap between its bars, minimum bar, QR code
   static const chartHeight = 160.0;
   static const barGap = 2.0;

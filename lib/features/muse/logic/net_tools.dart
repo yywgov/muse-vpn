@@ -230,12 +230,11 @@ List<String> museApkAssetsFor(String abi) {
   return ['Chuanyun-Android-universal.apk'];
 }
 
-/// The newest release out of a GitHub release list: stable only, or (beta channel) prereleases
-/// too. Drafts are never used. The list is newest first as GitHub returns it.
-Map<String, dynamic>? musePickRelease(List<Map<String, dynamic>> releases, {required bool beta}) {
+/// The newest stable release out of a GitHub release list (1.5.1: prereleases and drafts are never
+/// used). The list is newest first as GitHub returns it.
+Map<String, dynamic>? musePickRelease(List<Map<String, dynamic>> releases) {
   for (final r in releases) {
-    if (r['draft'] == true) continue;
-    if (r['prerelease'] == true && !beta) continue;
+    if (r['draft'] == true || r['prerelease'] == true) continue;
     return r;
   }
   return null;

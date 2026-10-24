@@ -439,12 +439,10 @@ void main() {
       };
       expect(museParseRelease(rel('${museReleaseDownloadPrefix}v1.5.0/Chuanyun-Android-arm64.apk')), isNotNull);
       expect(museParseRelease(rel('https://evil.example/Chuanyun-Android-arm64.apk')), isNull);
-      // Beta 通道
+      // 1.5.1: prereleases are never offered (Beta 通道 removed)
       final pre = rel('${museReleaseDownloadPrefix}v1.5.0/Chuanyun-Android-arm64.apk', pre: true);
       expect(museParseRelease(pre), isNull);
-      expect(museParseRelease(pre, allowPrerelease: true)!.version, '1.5.0');
-      expect(musePickRelease([pre, rel('x')], beta: false)!['prerelease'], false);
-      expect(musePickRelease([pre, rel('x')], beta: true)!['prerelease'], true);
+      expect(musePickRelease([pre, rel('x')])!['prerelease'], false);
     });
 
     test('Windows installs silently only with info straight from GitHub', () {

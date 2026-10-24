@@ -20,6 +20,7 @@ import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/lan_sync_service.dart';
 import 'package:hiddify/features/muse/data/sync_service.dart';
 import 'package:hiddify/features/muse/logic/lan_sync.dart';
+import 'package:hiddify/features/muse/widget/muse_segmented.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';
@@ -1380,17 +1381,16 @@ class MuseStatsPage extends HookConsumerWidget {
               1 => '近 8 周流量',
               _ => '近 14 天流量',
             },
-            headerTrailing: SegmentedButton<int>(
-              key: const ValueKey('stats_range'),
-              showSelectedIcon: false,
-              style: const ButtonStyle(visualDensity: VisualDensity.compact, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-              segments: const [
-                ButtonSegment(value: 0, label: Text('日')),
-                ButtonSegment(value: 1, label: Text('周')),
-                ButtonSegment(value: 2, label: Text('月')),
-              ],
-              selected: {range.value},
-              onSelectionChanged: (s) => range.value = s.first,
+            // 1.5.1: the same pill control as 首页 去广告
+            headerTrailing: SizedBox(
+              width: MuseSize.segmentedRange,
+              child: MuseSegmented<int>(
+                key: const ValueKey('stats_range'),
+                values: const [0, 1, 2],
+                selected: range.value,
+                label: (v) => const ['日', '周', '月'][v],
+                onChanged: (v) => range.value = v,
+              ),
             ),
             children: [
               Padding(

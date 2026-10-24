@@ -346,7 +346,7 @@ void main() {
       expect(museParseCliArgs(['--disconnect']).disconnect, isTrue);
       expect(museParseCliArgs(const []).isEmpty, isTrue);
     });
-    test('update asset per ABI and beta channel', () {
+    test('update asset per ABI and stable releases only', () {
       expect(museApkAssetsFor('arm64-v8a').first, 'Chuanyun-Android-arm64.apk');
       expect(museApkAssetsFor('armeabi-v7a'), ['Chuanyun-Android-universal.apk']);
       final list = [
@@ -354,9 +354,9 @@ void main() {
         {'tag_name': 'v1.4.1', 'draft': true},
         {'tag_name': 'v1.4.0'},
       ];
-      expect(musePickRelease(list, beta: false)!['tag_name'], 'v1.4.0');
-      expect(musePickRelease(list, beta: true)!['tag_name'], 'v1.5.0-beta1');
-      expect(musePickRelease(const [], beta: true), isNull);
+      // 1.5.1: no Beta 通道 — a prerelease is never picked
+      expect(musePickRelease(list)!['tag_name'], 'v1.4.0');
+      expect(musePickRelease(const []), isNull);
     });
   });
 }

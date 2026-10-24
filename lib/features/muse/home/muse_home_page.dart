@@ -38,6 +38,7 @@ import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
+import 'package:hiddify/features/muse/widget/muse_segmented.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
@@ -637,7 +638,9 @@ class MuseTileGrid extends ConsumerWidget {
         );
         final base = constraints.maxWidth >= 600 ? tileHeightDesktop : tileHeight;
         // 1.4.1: large text grows the row instead of overflowing the fixed tile height
-        final height = math.max(base, museTileHeightFor(MediaQuery.textScalerOf(context)));
+        // 1.5.1: the 去广告 tile's segmented control needs a taller bottom slot
+        final bottom = tiles.contains(MuseHomeTile.adBlock) ? MuseSize.segmented : MuseSize.tileBottom;
+        final height = math.max(base, museTileHeightFor(MediaQuery.textScalerOf(context), bottom: bottom));
         final rows = <Widget>[];
         for (final idx in museTileRows(tiles.length, columns)) {
           if (rows.isNotEmpty) rows.add(const SizedBox(height: MuseSpace.s12));
@@ -674,10 +677,11 @@ class MuseTileGrid extends ConsumerWidget {
 
 /// 1.4.1: height a tile needs at [scaler]: padding + title caption + big number + bottom element
 /// (all scaled with the text) + a little slack.
-double museTileHeightFor(TextScaler scaler) {
+/// 1.5.1: [bottom] is the tallest bottom element in the grid ([MuseSize.segmented] with 去广告).
+double museTileHeightFor(TextScaler scaler, {double bottom = MuseSize.tileBottom}) {
   const caption = 12 * 1.3; // MuseType.caption line
   const number = 24 * 1.2; // MuseType.number line
-  return MuseSpace.s16 * 2 + scaler.scale(caption + number + MuseSize.tileBottom) + MuseSpace.s8;
+  return MuseSpace.s16 * 2 + scaler.scale(caption + number + bottom) + MuseSpace.s8;
 }
 
 /// Max share of a tile row a trailing caption may take before it ellipsizes.
@@ -693,13 +697,24 @@ bool museHasExpiry(SubscriptionInfo? info) {
 
 /// One tile: small title (+ optional trailing) → big number → bottom element.
 class _Tile extends ConsumerWidget {
-  const _Tile({required this.title, this.titleTrailing, required this.value, this.valueColor, required this.bottom, this.onTap});
+  const _Tile({
+    required this.title,
+    this.titleTrailing,
+    required this.value,
+    this.valueColor,
+    required this.bottom,
+    this.bottomHeight = MuseSize.tileBottom,
+    this.onTap,
+  });
 
   final String title;
   final Widget? titleTrailing;
   final String value;
   final Color? valueColor;
   final Widget bottom;
+
+  /// 1.5.1: height of the bottom slot before text scaling
+  final double bottomHeight;
   final VoidCallback? onTap;
 
   @override
@@ -762,7 +777,7 @@ class _Tile extends ConsumerWidget {
                   ),
                 ),
                 SizedBox(
-                  height: MediaQuery.textScalerOf(context).scale(MuseSize.tileBottom),
+                  height: MediaQuery.textScalerOf(context).scale(bottomHeight),
                   // one line: a caption never wraps into a clipped second line
                   child: DefaultTextStyle.merge(
                     maxLines: 1,
@@ -1044,61 +1059,13 @@ class _AdBlockTile extends ConsumerWidget {
     return _Tile(
       title: '去广告',
       value: level.title,
+      bottomHeight: MuseSize.segmented,
       bottom: MuseSegmented<MuseAdBlockLevel>(
         key: const ValueKey('adblock_segmented'),
         values: MuseAdBlockLevel.values,
         selected: level,
         label: (l) => l.title,
         onChanged: (l) => ref.read(Preferences.museAdBlockLevel.notifier).update(l.key),
-      ),
-    );
-  }
-}
-
-/// A small pill segmented control (关 / 温和 / 强力).
-class MuseSegmented<T> extends StatelessWidget {
-  const MuseSegmented({super.key, required this.values, required this.selected, required this.label, required this.onChanged});
-
-  final List<T> values;
-  final T selected;
-  final String Function(T) label;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final mt = MuseTheme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(MuseSpace.s4),
-      decoration: BoxDecoration(color: mt.inner, borderRadius: MuseRadius.fullAll),
-      child: Row(
-        children: [
-          for (final v in values)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onChanged(v),
-                child: AnimatedContainer(
-                  duration: museMotion(context),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: v == selected ? (mt.dark ? MusePalette.brand : MusePalette.white) : MusePalette.transparent,
-                    borderRadius: MuseRadius.fullAll,
-                    boxShadow: v == selected && !mt.dark
-                        ? const [BoxShadow(color: MusePalette.lightShadow, blurRadius: 4, offset: Offset(0, 1))]
-                        : null,
-                  ),
-                  child: Text(
-                    label(v),
-                    style: MuseType.caption(context).copyWith(
-                      height: 1.2,
-                      fontWeight: v == selected ? FontWeight.w600 : FontWeight.w500,
-                      color: v == selected ? (mt.dark ? MusePalette.white : MusePalette.brand) : mt.text2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

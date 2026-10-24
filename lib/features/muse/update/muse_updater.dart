@@ -14,7 +14,6 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
-import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
@@ -26,9 +25,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:version/version.dart';
 
 const museLatestReleaseApi = 'https://api.github.com/repos/yywgov/muse-vpn/releases/latest';
-
-/// 1.4.1 Beta 通道: the newest releases including prereleases.
-const museReleasesApi = 'https://api.github.com/repos/yywgov/muse-vpn/releases?per_page=10';
 
 /// The only place an update file may come from (a mirror only relays this URL).
 const museReleaseDownloadPrefix = 'https://github.com/yywgov/muse-vpn/releases/download/';
@@ -101,12 +97,13 @@ class MuseUpdateDownloading extends MuseUpdateState {
 
 /// Picks the arm64 APK (or with [windows] the Windows zip) out of a GitHub release
 /// (JSON of the releases API), or null.
-/// 1.4.1: [allowPrerelease] for the Beta 通道. Asset URLs outside this repository's release
-/// downloads are ignored (release info that came through a mirror can't point elsewhere).
-MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false, bool allowPrerelease = false}) {
+/// Prereleases and drafts are never used (1.5.1: stable releases only). Asset URLs outside this
+/// repository's release downloads are ignored (release info that came through a mirror can't
+/// point elsewhere).
+MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false}) {
   final tag = json['tag_name'] as String? ?? '';
   final version = tag.replaceFirst(RegExp('^v'), '').split('+').first;
-  if (version.isEmpty || (json['prerelease'] == true && !allowPrerelease) || json['draft'] == true) return null;
+  if (version.isEmpty || json['prerelease'] == true || json['draft'] == true) return null;
   final assets = (json['assets'] as List? ?? const []).whereType<Map<String, dynamic>>().toList();
   final pageUrl = json['html_url'] as String? ?? 'https://github.com/yywgov/muse-vpn/releases/latest';
   if (windows) {
@@ -381,13 +378,12 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
   bool lastCheckViaMirror = false;
 
   /// The latest release when it is newer than this build, null when up to date. Throws on failure.
-  /// 1.4.1: Beta 通道 (prereleases too) and, when GitHub can't be reached, the API mirrors.
+  /// The latest stable release (1.5.1: no Beta 通道) and, when GitHub can't be reached, the API mirrors.
   Future<MuseRelease?> check() async {
     if (state is! MuseUpdateIdle) return null;
     state = const MuseUpdateChecking();
     try {
-      final beta = ref.read(MusePrefs.betaChannel);
-      final api = beta ? museReleasesApi : museLatestReleaseApi;
+      const api = museLatestReleaseApi;
       final port = await _proxyPort();
       Object? data;
       lastCheckViaMirror = false;
@@ -416,10 +412,11 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
       final windows = PlatformUtils.isWindows;
       MuseRelease? release;
       if (data is List) {
-        final picked = musePickRelease([for (final e in data) if (e is Map<String, dynamic>) e], beta: beta);
-        release = picked == null ? null : museParseRelease(picked, windows: windows, allowPrerelease: beta);
+        // a mirror that answers with a release list: its newest stable entry
+        final picked = musePickRelease([for (final e in data) if (e is Map<String, dynamic>) e]);
+        release = picked == null ? null : museParseRelease(picked, windows: windows);
       } else if (data is Map<String, dynamic>) {
-        release = museParseRelease(data, windows: windows, allowPrerelease: beta);
+        release = museParseRelease(data, windows: windows);
       }
       final current = ref.read(appInfoProvider).requireValue.version;
       if (release == null || !museIsNewer(release.version, current)) return null;

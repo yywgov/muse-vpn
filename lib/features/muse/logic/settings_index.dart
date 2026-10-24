@@ -74,7 +74,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('允许后台运行', MuseSettingPage.main, keywords: ['保活', '电池', '后台'], androidOnly: true),
   MuseSettingEntry('自启动', MuseSettingPage.main, keywords: ['开机', '保活'], androidOnly: true),
   MuseSettingEntry('隐藏桌面图标 / 最近任务 / 通知', MuseSettingPage.main, keywords: ['隐私', '隐藏'], androidOnly: true),
-  MuseSettingEntry('检查更新', MuseSettingPage.about, keywords: ['版本', '更新内容', 'Beta']),
+  MuseSettingEntry('检查更新', MuseSettingPage.about, keywords: ['版本', '更新内容']),
 ];
 
 /// Settings matching [query] (title, keywords or page; case-insensitive, every word must match),

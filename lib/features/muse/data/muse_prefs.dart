@@ -123,7 +123,8 @@ abstract final class MusePrefs {
   static final scheduleLastFired = PreferencesNotifier.create<int, int>("muse_schedule_last_fired", -1);
 
   // ---- 更新
-  static final betaChannel = PreferencesNotifier.create<bool, bool>("muse_beta_channel", false);
+  // 1.5.1: the 1.4.1 Beta 通道 switch is gone (no prereleases are published); a stored
+  // "muse_beta_channel" value is simply no longer read.
 
   // ---- Windows
   static final alwaysOnTop = PreferencesNotifier.create<bool, bool>("muse_always_on_top", false);
