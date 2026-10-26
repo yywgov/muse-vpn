@@ -258,7 +258,7 @@ class _AutoSelection extends HookConsumerWidget {
               if (loading)
                 const SizedBox(
                   width: 52,
-                  child: LinearProgressIndicator(borderRadius: BorderRadius.all(Radius.circular(2))),
+                  child: LinearProgressIndicator(borderRadius: BorderRadius.all(Radius.circular(MuseSize.barGap))),
                 ),
             ],
           ),

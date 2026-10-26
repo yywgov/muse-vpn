@@ -886,7 +886,7 @@ class _NodeSection extends StatelessWidget {
                   );
                   // the first / last row keeps the card's rounded corners (selected background, splash)
                   if (i == 0 || i == last) {
-                    row = ClipRRect(borderRadius: i == 0 && i == last ? MuseRadius.cardAll : (i == 0 ? top : bottom), child: row);
+                    row = ClipRSuperellipse(borderRadius: i == 0 && i == last ? MuseRadius.cardAll : (i == 0 ? top : bottom), child: row);
                   }
                   return row;
                 },
@@ -932,7 +932,7 @@ class _NodeSection extends StatelessWidget {
           if (items.isNotEmpty)
           DecoratedBox(
             decoration: mt.cardDecoration(),
-            child: ClipRRect(
+            child: ClipRSuperellipse(
               borderRadius: MuseRadius.cardAll,
               child: Material(type: MaterialType.transparency, child: Column(children: items)),
             ),

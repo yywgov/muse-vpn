@@ -162,7 +162,7 @@ class MuseSection extends HookWidget {
             ),
           DecoratedBox(
             decoration: theme.cardDecoration(),
-            child: ClipRRect(
+            child: ClipRSuperellipse(
               borderRadius: MuseRadius.cardAll,
               child: Material(
                 type: MaterialType.transparency,

@@ -91,7 +91,7 @@ class AboutPage extends HookConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: MuseSpace.s24),
             child: Column(
               children: [
-                ClipRRect(
+                ClipRSuperellipse(
                   borderRadius: MuseRadius.cardAll,
                   child: Assets.images.logo.svg(width: MuseSize.emptyArt, height: MuseSize.emptyArt),
                 ),

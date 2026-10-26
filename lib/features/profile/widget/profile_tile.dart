@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/muse/settings/sub_filter_dialog.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
@@ -64,7 +65,7 @@ class ProfileTile extends HookConsumerWidget {
       color: profile.active ? mt.selected : MusePalette.transparent,
       surfaceTintColor: MusePalette.transparent,
       shadowColor: MusePalette.transparent,
-      shape: const RoundedRectangleBorder(borderRadius: ProfileTileConst.cardBorderRadius),
+      shape: MuseShape.radius(ProfileTileConst.cardBorderRadius),
       elevation: 0,
       child: IntrinsicHeight(
         child: ConstrainedBox(

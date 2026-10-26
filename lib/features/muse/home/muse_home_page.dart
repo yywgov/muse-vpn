@@ -3,6 +3,7 @@
 // Long-press a tile to reorder / hide. On a wide window the node list sits in a right column.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
@@ -262,7 +263,7 @@ class MuseHeroCard extends HookConsumerWidget {
           boxShadow: mt.cardDecoration().boxShadow,
         ),
       },
-      child: ClipRRect(
+      child: ClipRSuperellipse(
         borderRadius: MuseRadius.cardAll,
         child: Stack(
           children: [
@@ -403,10 +404,10 @@ class _ModePill extends ConsumerWidget {
     final fg = onBrand ? MusePalette.white : mt.text1;
     return Material(
       color: onBrand ? MusePalette.white.withValues(alpha: 0.18) : mt.inner,
-      shape: const StadiumBorder(),
+      shape: MuseShape.full,
       child: InkWell(
         key: const ValueKey('home_mode_pill'),
-        customBorder: const StadiumBorder(),
+        customBorder: MuseShape.full,
         onTap: () => ref
             .read(ConfigOptions.museRouteMode.notifier)
             .update(mode == MuseRouteMode.rule ? MuseRouteMode.global : MuseRouteMode.rule),
@@ -939,7 +940,7 @@ class _RemainingTile extends ConsumerWidget {
         builder: (context, c) => Row(
           children: [
             Expanded(
-              child: ClipRRect(
+              child: ClipRSuperellipse(
                 borderRadius: MuseRadius.fullAll,
                 child: TweenAnimationBuilder<double>(
                   tween: Tween(end: share),
@@ -1241,7 +1242,7 @@ class _EmptyState extends ConsumerWidget {
                   height: MuseSize.button,
                   child: FilledButton(
                     key: const ValueKey('empty_add_button'),
-                    style: FilledButton.styleFrom(backgroundColor: MusePalette.brand, shape: const StadiumBorder()),
+                    style: FilledButton.styleFrom(backgroundColor: MusePalette.brand, shape: MuseShape.full),
                     onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
                     child: const Text('添加订阅'),
                   ),

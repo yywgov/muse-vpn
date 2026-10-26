@@ -219,7 +219,7 @@ class ScrollBtn extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    const radius = Radius.circular(4);
+    const radius = Radius.circular(MuseRadiusScale.xs);
     final borderRadius = isStart
         ? const BorderRadiusDirectional.only(topEnd: radius, bottomEnd: radius)
         : const BorderRadiusDirectional.only(topStart: radius, bottomStart: radius);

@@ -31,7 +31,7 @@ class BottomSheetsNotifier extends _$BottomSheetsNotifier {
             modalBarrierColor: barrier,
             constraints: BottomSheetConst.boxConstraints,
             isScrollControlled: isScrollControlled,
-            builder: (context) => ClipRRect(
+            builder: (context) => ClipRSuperellipse(
               borderRadius: BottomSheetConst.borderRadius,
               child: Material(
                 child: Padding(

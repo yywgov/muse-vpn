@@ -3,6 +3,7 @@
 // link, and never for a link that is already one of the user's subscriptions.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
+import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -102,7 +103,7 @@ class MuseClipboardOfferTile extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s8),
       child: Material(
         color: mt.selected,
-        shape: const RoundedRectangleBorder(borderRadius: MuseRadius.cardAll),
+        shape: MuseShape.radius(MuseRadius.cardAll),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
           key: const ValueKey('clipboard_offer'),

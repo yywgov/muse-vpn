@@ -181,6 +181,23 @@ abstract final class MuseSize {
 
   /// 1.5.0: height of the bottom tab bar (toasts sit above it)
   static const tabBar = 64.0;
+
+  /// 1.6.0 C1: toolbars, rows, sheets, title bar
+  static const toolbar = 72.0;
+  static const rowMin = 56.0;
+  static const rowPadV = 10.0;
+  static const sheetToolbar = 48.0;
+  static const sheetAppBar = 68.0;
+  static const titleBar = 32.0;
+  static const captionButton = 46.0;
+  static const pinIcon = 16.0;
+  static const navRailCollapsed = 80.0;
+  static const navSidebarExpanded = 220.0;
+  static const dockHeight = 64.0;
+  static const sheetHandle = 36.0;
+  static const sheetHandleThickness = 4.0;
+  static const menuWidth = 240.0;
+  static const badge = 20.0;
 }
 
 /// 1.4.0: accent colours to pick from (one at a time; brand blue by default).
@@ -357,6 +374,39 @@ abstract final class MuseType {
 
   static TextStyle caption(BuildContext context) =>
       TextStyle(fontSize: 12, height: 1.3, fontWeight: FontWeight.w400, color: MuseTheme.of(context).text2, fontFeatures: tabular);
+}
+
+/// 1.6.0 C1: the full type ladder (size / line height in dp). The four 1.4.0 styles above stay
+/// as they are until each page moves to these names.
+enum MuseTextLevel {
+  display(40, 44, FontWeight.w700),
+  largeTitle(34, 41, FontWeight.w700),
+  title1(28, 34, FontWeight.w700),
+  pageTitle(24, 30, FontWeight.w700),
+  title2(22, 28, FontWeight.w600),
+  title3(20, 25, FontWeight.w600),
+  headline(17, 22, FontWeight.w600),
+  body(17, 22, FontWeight.w400),
+  callout(16, 21, FontWeight.w400),
+  subheadline(15, 20, FontWeight.w400),
+  footnote(13, 18, FontWeight.w400),
+  caption1(12, 16, FontWeight.w400),
+  caption2(11, 13, FontWeight.w400);
+
+  const MuseTextLevel(this.size, this.lineHeight, this.weight);
+
+  final double size;
+  final double lineHeight;
+  final FontWeight weight;
+
+  /// The style in [color] (defaults to the theme's onSurface); digits are always tabular.
+  TextStyle style(BuildContext context, {Color? color, FontWeight? weight}) => TextStyle(
+    fontSize: size,
+    height: lineHeight / size,
+    fontWeight: weight ?? this.weight,
+    color: color ?? Theme.of(context).colorScheme.onSurface,
+    fontFeatures: MuseType.tabular,
+  );
 }
 
 /// The page background: night-blue / blue-grey gradient with a few faint clouds. Painted once and

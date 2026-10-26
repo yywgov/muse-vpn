@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -119,7 +120,7 @@ class AddProfileOptions extends HookConsumerWidget {
           padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s24),
           child: Material(
             color: mt.inner,
-            shape: const RoundedRectangleBorder(borderRadius: MuseRadius.cardAll),
+            shape: MuseShape.radius(MuseRadius.cardAll),
             clipBehavior: Clip.antiAlias,
             child: Column(mainAxisSize: MainAxisSize.min, children: items),
           ),
