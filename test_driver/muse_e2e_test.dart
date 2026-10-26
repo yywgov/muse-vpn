@@ -197,7 +197,7 @@ Future<void> pages(String theme) async {
   await driver.scroll(find.byValueKey('home_node_list'), 0, -260, const Duration(milliseconds: 400));
   await shot('$theme-02-home-mid-scroll');
   await driver.scroll(find.byValueKey('home_node_list'), 0, 900, const Duration(milliseconds: 300));
-  for (final (i, page) in ['config', 'settings', 'perAppProxy', 'appList', 'nodes', 'tlsTricks', 'connections', 'about', 'openSource'].indexed) {
+  for (final (i, page) in ['config', 'settings', 'perAppProxy', 'appList', 'nodes', 'tlsTricks', 'connections', 'logs', 'about', 'openSource'].indexed) {
     await cmd('go:$page');
     // the installed-app list loads from the system first
     await shot('$theme-${(i + 3).toString().padLeft(2, '0')}-$page', settleMs: page == 'appList' ? 6000 : 1600);
