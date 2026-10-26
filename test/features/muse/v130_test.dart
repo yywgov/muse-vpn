@@ -186,8 +186,8 @@ void main() {
       expect(AppThemeMode.choices, [AppThemeMode.system, AppThemeMode.light, AppThemeMode.dark]);
       expect(AppThemeMode.black.trueBlack, isFalse);
     });
-    test('四个标签 首页 / 节点 / 订阅 / 设置', () {
-      final layout = File('lib/core/router/adaptive_layout/my_adaptive_layout.dart').readAsStringSync();
+    test('四个标签 首页 / 节点 / 订阅 / 设置 (1.6.0: the shell lives in muse/shell)', () {
+      final layout = File('lib/features/muse/shell/muse_shell.dart').readAsStringSync();
       for (final t in ["'首页'", "'节点'", "'订阅'", "'设置'"]) {
         expect(layout, contains(t));
       }

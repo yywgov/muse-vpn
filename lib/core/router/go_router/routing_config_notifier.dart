@@ -102,10 +102,11 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
       },
       routes: <RouteBase>[
         StatefulShellRoute.indexedStack(
-          builder: (_, _, navigationShell) => MyAdaptiveLayout(
+          builder: (_, state, navigationShell) => MyAdaptiveLayout(
             navigationShell: navigationShell,
             isMobileBreakpoint: isMobileBreakpoint,
             showProfilesAction: false,
+            location: state.uri.path,
           ),
           branches: <StatefulShellBranch>[
             StatefulShellBranch(

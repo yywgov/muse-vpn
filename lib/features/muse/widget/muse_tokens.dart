@@ -409,8 +409,8 @@ enum MuseTextLevel {
   );
 }
 
-/// The page background: night-blue / blue-grey gradient with a few faint clouds. Painted once and
-/// cached (RepaintBoundary + static painter), so scrolling never repaints it.
+/// The page background. 1.6.0: one flat page surface (structure by fill; the gradient and the
+/// clouds are gone). Nested backgrounds paint nothing.
 class MuseBackground extends StatelessWidget {
   const MuseBackground({super.key, required this.child});
 
@@ -418,23 +418,11 @@ class MuseBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // already painted further up (the desktop shell paints one background behind every page)
     if (context.dependOnInheritedWidgetOfExactType<_MuseBackgroundScope>() != null) return child;
-    final theme = MuseTheme.of(context);
-    return Stack(
-      fit: StackFit.passthrough,
-      children: [
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: CustomPaint(
-              key: const ValueKey('muse_background'),
-              isComplex: true,
-              painter: MuseCloudPainter(dark: theme.dark, top: theme.bgTop, bottom: theme.bgBottom),
-            ),
-          ),
-        ),
-        _MuseBackgroundScope(child: child),
-      ],
+    return ColoredBox(
+      key: const ValueKey('muse_background'),
+      color: MuseTheme.of(context).bgBottom,
+      child: _MuseBackgroundScope(child: child),
     );
   }
 }
@@ -444,49 +432,4 @@ class _MuseBackgroundScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(_MuseBackgroundScope oldWidget) => false;
-}
-
-class MuseCloudPainter extends CustomPainter {
-  const MuseCloudPainter({required this.dark, required this.top, required this.bottom});
-
-  final bool dark;
-  final Color top;
-  final Color bottom;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [top, bottom],
-          stops: const [0, 0.6],
-        ).createShader(rect),
-    );
-    final alpha = dark ? 0.035 : 0.6;
-    final paint = Paint()
-      ..color = MusePalette.white.withValues(alpha: alpha)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-    // cloud size follows the width, capped so a wide window doesn't get huge blobs
-    final unit = size.width.clamp(280.0, 520.0) / 10;
-    _cloud(canvas, Offset(size.width - unit * 1.6, unit * 1.2), unit * 1.15, paint);
-    _cloud(canvas, Offset(unit * 0.4, size.height * 0.48), unit * 0.85, paint);
-    _cloud(canvas, Offset(unit * 2.2, size.height - unit * 0.6), unit * 1.0, paint);
-  }
-
-  /// A cloud: a flat base with three puffs on top.
-  static void _cloud(Canvas canvas, Offset c, double r, Paint paint) {
-    final path = Path()
-      ..addRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: c, width: r * 4.2, height: r * 1.3), Radius.circular(r * 0.65)))
-      ..addOval(Rect.fromCircle(center: c.translate(-r * 1.0, -r * 0.45), radius: r * 0.8))
-      ..addOval(Rect.fromCircle(center: c.translate(r * 0.15, -r * 0.8), radius: r * 1.05))
-      ..addOval(Rect.fromCircle(center: c.translate(r * 1.2, -r * 0.35), radius: r * 0.7));
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(MuseCloudPainter old) => old.dark != dark || old.top != top || old.bottom != bottom;
 }

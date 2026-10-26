@@ -80,7 +80,19 @@ Get-Process -Name Chuanyun -ErrorAction SilentlyContinue | Stop-Process -Force
 Write-Host "screen: $([System.Windows.Forms.SystemInformation]::VirtualScreen)"
 
 # ---- launch ----
+# 1.6.0 (#232): the app's smoke control port opens pages by route name, so screenshots don't
+# depend on where the navigation draws its items. Only this first launch gets it.
+$ctlPort = 17391
+$ctlToken = [guid]::NewGuid().ToString("N")
+$env:CHUANYUN_SMOKE_CONTROL = "$ctlPort"
+$env:CHUANYUN_SMOKE_TOKEN = $ctlToken
 $p = Start-Process -FilePath $exe -WorkingDirectory $AppDir -PassThru
+Remove-Item Env:CHUANYUN_SMOKE_CONTROL -ErrorAction SilentlyContinue
+Remove-Item Env:CHUANYUN_SMOKE_TOKEN -ErrorAction SilentlyContinue
+function Ctl([string]$path) {
+  $sep = if ($path.Contains("?")) { "&" } else { "?" }
+  try { return Invoke-RestMethod -TimeoutSec 10 -Uri "http://127.0.0.1:$ctlPort$path${sep}token=$ctlToken" } catch { Write-Host "ctl $path failed: $_"; return $null }
+}
 Start-Sleep -Seconds $StartupWait
 $alive = -not $p.HasExited
 Rec "alive" "Chuanyun.exe still running after ${StartupWait}s" $alive ($(if ($alive) { "pid $($p.Id)" } else { "exit code $($p.ExitCode)" }))
@@ -112,39 +124,33 @@ Rec "window" "main window titled (chuanyun) is visible" $vis "hwnd $h rect $($r.
 Start-Sleep -Seconds 2
 Shot "1-home"
 
-# ---- the three tabs (rail on wide windows: icons at the left; bottom bar on narrow ones) ----
-# Positions come from the layout: NavigationRail 80px wide, destinations from the top.
-# They are best effort: the screenshots show whether the click landed.
+# ---- pages (1.6.0: opened through the control port; one real click checks the sidebar) ----
 $r = WinRect
 $w = $r.R - $r.L
 $scale = if ($dpi) { $dpi / 96.0 } else { 1.0 }
+foreach ($t in @(@{ n = "2-config"; r = "config" }, @{ n = "3-settings"; r = "settings" }, @{ n = "3b-about"; r = "about" }, @{ n = "3c-connections"; r = "connections" })) {
+  $res = Ctl "/go?route=$($t.r)"
+  Rec "go-$($t.r)" "control port opens $($t.r)" ($null -ne $res -and $res.ok) "$($res | ConvertTo-Json -Compress)" $true
+  Start-Sleep -Seconds 3
+  Shot $t.n
+}
+Ctl "/go?route=home" | Out-Null
+Start-Sleep -Seconds 2
 if ($w -ge 600 * $scale) {
-  $x = $r.L + [int](48 * $scale)
-  $tabs = @(@{ n = "2-config"; y = 2 }, @{ n = "3-settings"; y = 3 })
-  foreach ($t in $tabs) {
-    # rail: title bar ~31px, rail top padding 8, each destination 72px tall
-    $y = $r.T + [int]((31 + 8 + 72 * ($t.y - 1) + 36) * $scale)
-    Click $x $y
-    Start-Sleep -Seconds 3
-    Shot $t.n
-  }
-  # settings -> about (version line), 900x680 layout
-  Click ($r.L + [int](490 * $scale)) ($r.T + [int](585 * $scale))
+  # sidebar (lib/features/muse/shell/muse_shell.dart): title bar ~31, header row 56, items 52 tall;
+  # 订阅 is the third item. Best effort: the screenshot shows whether the click landed.
+  $x = $r.L + [int](40 * $scale)
+  Click $x ($r.T + [int]((31 + 56 + 52 * 2 + 26) * $scale))
   Start-Sleep -Seconds 3
-  Shot "3b-about"
-  # tapping the current tab again returns to the settings root
-  Click $x ($r.T + [int]((31 + 8 + 72 * 2 + 36) * $scale))
-  Start-Sleep -Seconds 2
-  $y = $r.T + [int]((31 + 8 + 36) * $scale)
-  Click $x $y
-  Start-Sleep -Seconds 2
-  # home, no profile yet: the add row sits under the connect button (900x680 layout)
-  Click ($r.L + [int](490 * $scale)) ($r.T + [int](493 * $scale))
-  Start-Sleep -Seconds 3
-  Shot "2b-add-profile"
-  [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+  Shot "2c-config-click"
+  Ctl "/go?route=home" | Out-Null
   Start-Sleep -Seconds 2
 }
+$res = Ctl "/sheet?name=add-profile"
+Start-Sleep -Seconds 3
+Shot "2b-add-profile"
+[System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+Start-Sleep -Seconds 2
 
 # ---- maximized (content should stay centered with a max width) ----
 [W]::ShowWindow($h, 3) | Out-Null

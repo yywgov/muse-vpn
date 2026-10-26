@@ -2,19 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hiddify/features/muse/home/changelog_dialog.dart';
-import 'package:hiddify/features/muse/home/home_data.dart';
-import 'package:hiddify/features/muse/widget/grouped_list.dart';
+import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/core/model/constants.dart';
-import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// 穿云 desktop: widest the page column gets on a wide or maximized window.
-const desktopContentMaxWidth = 760.0;
-
-/// 穿云 1.3.0: 首页 gets more room (tile grid + node column).
-const desktopHomeMaxWidth = 1280.0;
+export 'package:hiddify/features/muse/shell/muse_shell.dart';
 
 class MyAdaptiveLayout extends HookConsumerWidget {
   const MyAdaptiveLayout({
@@ -22,11 +15,15 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     required this.navigationShell,
     required this.isMobileBreakpoint,
     required this.showProfilesAction,
+    this.location = '',
   });
   // managed by go router(Shell Route)
   final StatefulNavigationShell navigationShell;
   final bool isMobileBreakpoint;
   final bool showProfilesAction;
+
+  /// 1.6.0: the current location (the sidebar marks 连接 / 日志)
+  final String location;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -101,6 +98,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
           currentIndex: navigationShell.currentIndex,
           navScopeNode: navScopeNode,
           onTap: (index) => _onTap(context, index),
+          location: location,
+          onExtra: (route) => context.goNamed(route),
           child: navigationShell,
         ),
       ),
@@ -114,138 +113,3 @@ class MyAdaptiveLayout extends HookConsumerWidget {
 
 }
 
-/// 穿云 1.3.0: 首页 / 节点 / 订阅 / 设置 (icon + label; the selected one only changes colour).
-final museShellActions = [
-  ShellRouteAction(Icons.home_outlined, '首页'),
-  ShellRouteAction(Icons.language_outlined, '节点'),
-  ShellRouteAction(Icons.link_outlined, '订阅'),
-  ShellRouteAction(Icons.settings_outlined, '设置'),
-];
-
-/// The visible shell: bottom navigation on a phone, a rail plus one background and a centred
-/// content column on the desktop. Split from [MyAdaptiveLayout] so it can be rendered on its own.
-class MuseShellFrame extends ConsumerWidget {
-  const MuseShellFrame({
-    super.key,
-    required this.isMobile,
-    required this.currentIndex,
-    required this.onTap,
-    required this.child,
-    this.navScopeNode,
-  });
-
-  final bool isMobile;
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-  final Widget child;
-  final FocusScopeNode? navScopeNode;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // a subscription link waits on the clipboard: dot on 订阅
-    final offer = ref.watch(museClipboardOfferProvider) != null;
-    // 1.5.0: unread 更新内容 after a small update: red dot on 设置
-    final changelogDot = ref.watch(museChangelogDotProvider);
-    Widget icon(int i) {
-      final a = museShellActions[i];
-      final ic = Icon(a.icon);
-      if (i == 3) return MuseDot(show: changelogDot, child: ic);
-      return i == 2 && offer ? Badge(smallSize: MuseSize.dot, backgroundColor: MusePalette.brand, child: ic) : ic;
-    }
-
-    final index = currentIndex < museShellActions.length ? currentIndex : 0;
-    if (isMobile) {
-      return Material(
-        child: Scaffold(
-          body: child,
-          bottomNavigationBar: FocusScope(
-            node: navScopeNode,
-            child: NavigationBar(
-              selectedIndex: index,
-              destinations: [
-                for (var i = 0; i < museShellActions.length; i++)
-                  NavigationDestination(icon: icon(i), label: museShellActions[i].title),
-              ],
-              onDestinationSelected: onTap,
-            ),
-          ),
-        ),
-      );
-    }
-    // 首页 uses the width for 3–4 tile columns and the side node list; other pages stay readable
-    final maxWidth = index == 0 ? desktopHomeMaxWidth : desktopContentMaxWidth;
-    return Material(
-      child: MuseBackground(
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Row(
-            children: [
-              FocusScope(
-                node: navScopeNode,
-                child: NavigationRail(
-                  labelType: NavigationRailLabelType.all,
-                  minWidth: 80,
-                  groupAlignment: -0.9,
-                  destinations: [
-                    for (var i = 0; i < museShellActions.length; i++)
-                      NavigationRailDestination(icon: icon(i), label: Text(museShellActions[i].title)),
-                  ],
-                  selectedIndex: index,
-                  onDestinationSelected: onTap,
-                ),
-              ),
-              Expanded(
-                // 穿云 1.2: one thin scrollbar at the window's right edge, shown while scrolling
-                child: MuseEdgeScrollbar(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: AnimatedContainer(
-                      duration: museMotion(context),
-                      constraints: BoxConstraints(maxWidth: maxWidth),
-                      child: child,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 穿云 desktop: the scrollbar of whatever page is showing, drawn at the window's right edge.
-/// The pages' own scrollbars (which sat inside the centered column) are switched off; this one
-/// follows the page's vertical scroll notifications, is thin, and fades out when idle.
-class MuseEdgeScrollbar extends StatelessWidget {
-  const MuseEdgeScrollbar({super.key, required this.child});
-
-  final Widget child;
-
-  static const thickness = 4.0;
-
-  static bool _isPageScroll(ScrollNotification n) => n.depth == 0 && n.metrics.axis == Axis.vertical;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35);
-    return RawScrollbar(
-      thumbVisibility: false,
-      trackVisibility: false,
-      interactive: false,
-      thickness: thickness,
-      radius: const Radius.circular(thickness),
-      thumbColor: color,
-      crossAxisMargin: 2,
-      mainAxisMargin: 4,
-      fadeDuration: const Duration(milliseconds: 250),
-      timeToFade: const Duration(milliseconds: 900),
-      notificationPredicate: _isPageScroll,
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-        child: child,
-      ),
-    );
-  }
-}

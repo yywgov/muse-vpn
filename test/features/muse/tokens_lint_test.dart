@@ -12,6 +12,7 @@ const _dirs = [
   'lib/features/about',
   'lib/features/profile',
   'lib/core/router/dialog',
+  'lib/core/router/adaptive_layout',
 ];
 
 final _patterns = <String, RegExp>{

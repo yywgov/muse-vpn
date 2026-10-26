@@ -9,6 +9,8 @@
 //   /core-stop                  the core stops without the app asking for it
 //   /resume                     the window-restore / wake path
 //   /crash                      exit(2), like a Go fatal error in the core
+//   /go?route=<name>            1.6.0: opens a page by route name (config, settings, about, connections…)
+//   /sheet?name=add-profile     1.6.0: opens the 添加订阅 sheet
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'dart:async';
@@ -16,6 +18,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
+import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
@@ -25,6 +29,9 @@ import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+/// Route names the smoke tests may open with /go.
+const museSmokeRoutes = {'home', 'nodes', 'config', 'settings', 'about', 'connections', 'logs', 'perAppProxy'};
+
 abstract final class MuseSmokeControl {
   static final _logger = infraLogger('SmokeControl');
 
@@ -32,7 +39,14 @@ abstract final class MuseSmokeControl {
     final port = int.tryParse(Platform.environment['CHUANYUN_SMOKE_CONTROL'] ?? '');
     final token = Platform.environment['CHUANYUN_SMOKE_TOKEN'] ?? '';
     if (port == null || token.length < 8) return;
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+    final HttpServer server;
+    try {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+    } catch (e) {
+      // a second instance (single-instance check) finds the port taken
+      _logger.warning('smoke control: port $port not available: $e');
+      return;
+    }
     _logger.warning('smoke control listening on 127.0.0.1:$port');
     server.listen((req) async {
       final res = req.response;
@@ -97,6 +111,15 @@ abstract final class MuseSmokeControl {
       case '/resume':
         await service.resume();
         c.read(museConnectionKeeperProvider)?.poke('resume');
+        return {'ok': true};
+      case '/go':
+        final route = uri.queryParameters['route'] ?? '';
+        if (!museSmokeRoutes.contains(route)) return {'ok': false, 'error': 'unknown route $route'};
+        c.read(goRouterNotiferProvider).goNamed(route);
+        return {'ok': true, 'route': route};
+      case '/sheet':
+        if (uri.queryParameters['name'] != 'add-profile') return {'ok': false};
+        unawaited(c.read(bottomSheetsNotifierProvider.notifier).showAddProfile());
         return {'ok': true};
       case '/crash':
         _logger.warning('smoke: simulated crash exit(2)');

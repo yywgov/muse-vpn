@@ -17,7 +17,8 @@ import 'package:window_manager/window_manager.dart';
 part 'window_notifier.g.dart';
 
 // 穿云: the pages are a phone-width column; below ~400x600 rows start to clip
-const minimumWindowSize = Size(400, 600);
+/// 1.6.0 (#152): the narrowest window still lays out (phone layout under 600 dp)
+const minimumWindowSize = Size(360, 560);
 const defaultWindowSize = Size(900, 680);
 
 @Riverpod(keepAlive: true)

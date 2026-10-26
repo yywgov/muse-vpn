@@ -33,6 +33,19 @@ abstract final class MusePrefs {
   /// Android: a short vibration when connected (off: 震动 was removed on request in 1.1)
   static final haptics = PreferencesNotifier.create<bool, bool>("muse_haptics", false);
 
+  // ---- 1.6.0 外壳与外观
+  /// bottom bar on a phone: floating (default) / docked
+  static final dockStyle = PreferencesNotifier.create<String, String>("muse_dock_style", "floating");
+
+  /// tab switch: fade (default) / slide
+  static final tabAnimation = PreferencesNotifier.create<String, String>("muse_tab_animation", "fade");
+
+  /// the wide-window sidebar shows labels
+  static final sidebarExpanded = PreferencesNotifier.create<bool, bool>("muse_sidebar_expanded", true);
+
+  /// 日志记录: live logs are only collected (and 日志 only shown) while this is on
+  static final logCapture = PreferencesNotifier.create<bool, bool>("muse_log_capture", false);
+
   // ---- 节点
   /// rename / note / hidden by tag (logic/node_tools.dart MuseNodeMetas)
   static final nodeMeta = PreferencesNotifier.create<String, String>("muse_node_meta", "");
@@ -200,4 +213,6 @@ const museSyncedPrefKeys = [
   'muse_home_tiles_hidden',
   'muse_route_mode',
   'muse_sub_fetch',
+  'muse_dock_style',
+  'muse_tab_animation',
 ];

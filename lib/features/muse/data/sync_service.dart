@@ -25,6 +25,8 @@ import 'package:path_provider/path_provider.dart';
 /// Settings that go into 同步 / 备份, with the provider to refresh after a change.
 final museSyncedPrefs = <String, ProviderOrFamily>{
   'muse_accent': MusePrefs.accent,
+  'muse_dock_style': MusePrefs.dockStyle,
+  'muse_tab_animation': MusePrefs.tabAnimation,
   'muse_text_size': MusePrefs.textSize,
   'muse_privacy_mask': MusePrefs.privacyMask,
   'muse_node_meta': MusePrefs.nodeMeta,
