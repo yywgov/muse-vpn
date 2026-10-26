@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
@@ -527,6 +528,8 @@ abstract class ConfigOptions {
       urlTestInterval: const Duration(minutes: 5),
       enableClashApi: ref.watch(enableClashApi),
       clashApiPort: ref.watch(clashApiPort),
+      // 1.6.0 C3 (#193): the per-install key of the local control API
+      webSecret: ref.watch(museWebSecretProvider),
       enableTun: mode == ServiceMode.tun,
       // enableTunService: mode == false, //ServiceMode.tunService,
       setSystemProxy: mode == ServiceMode.systemProxy,
@@ -580,7 +583,8 @@ abstract class ConfigOptions {
       routeRule:
           RouteRule(
                 // 1.5.0: 局域网 always first and on; Fake-IP exclusions right after it
-                rules: museApplyBlockQuic(museApplyFakeIpExclusions(
+                // 1.6.0 C3: 屏蔽此域名 (连接) right after 局域网
+                rules: museApplyBlockedHosts(museApplyBlockQuic(museApplyFakeIpExclusions(
                   musePinLanRule(
                     museApplyAdBlockLevel(
                   // 1.4.0: 分流 presets sit between the user's rules and the built-in ones
@@ -598,7 +602,7 @@ abstract class ConfigOptions {
                     ),
                   ),
                   fakeIp: fakeIp,
-                ), block: ref.watch(MusePrefs.blockQuic)),
+                ), block: ref.watch(MusePrefs.blockQuic)), museParseBlockedHosts(ref.watch(MusePrefs.blockedHosts))),
               ).toProto3Json()!
               as Map<String, dynamic>,
     );

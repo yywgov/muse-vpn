@@ -15,7 +15,8 @@ import 'package:hiddify/features/about/widget/about_page.dart';
 import 'package:hiddify/features/about/widget/open_source_page.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
 import 'package:hiddify/features/muse/config/muse_config_page.dart';
-import 'package:hiddify/features/muse/data/muse_data_page.dart';
+import 'package:hiddify/features/muse/connections/connections_page.dart';
+import 'package:hiddify/features/muse/logs/logs_page.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart';
 import 'package:hiddify/features/muse/nodes/muse_nodes_page.dart';
 import 'package:hiddify/features/muse/settings/per_app_proxy_page.dart';
@@ -209,7 +210,9 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                     ),
                     // 1.2.2: 高级 (a page with this one row) is gone; TLS 分片 opens from 设置 directly
                     _slide('tlsTricks', 'tls-tricks', (_) => const TlsTricksPage()),
-                    _slide('connections', 'connections', (_) => const MuseDataPage()),
+                    // 1.6.0 C3: 连接 (live connections + 请求) and 日志; the sidebar opens them on wide windows
+                    _slide('connections', 'connections', (_) => const MuseConnectionsPage()),
+                    _slide('logs', 'logs', (_) => const MuseLogsPage()),
                     _slide(
                       'about',
                       'about',

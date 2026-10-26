@@ -42,6 +42,8 @@ class SingboxConfigOption with _$SingboxConfigOption {
     @IntervalInSecondsConverter() required Duration urlTestInterval,
     required bool enableClashApi,
     required int clashApiPort,
+    // 1.6.0 C3 (#193): the local control API key (random per install), sent as web-secret
+    @Default("") String webSecret,
     required bool enableTun,
     // required bool enableTunService,
     required bool setSystemProxy,

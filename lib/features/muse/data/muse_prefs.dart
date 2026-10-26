@@ -46,6 +46,12 @@ abstract final class MusePrefs {
   /// 日志记录: live logs are only collected (and 日志 only shown) while this is on
   static final logCapture = PreferencesNotifier.create<bool, bool>("muse_log_capture", false);
 
+  /// 1.6.0 C3: hosts blocked from 连接 › 屏蔽此域名 (JSON list), one 拦截 rule
+  static final blockedHosts = PreferencesNotifier.create<String, String>("muse_blocked_hosts", "[]");
+
+  /// 1.6.0 C3 (G72): switching node closes the connections still on the old one
+  static final autoCloseConnections = PreferencesNotifier.create<bool, bool>("muse_auto_close_connections", true);
+
   // ---- 节点
   /// rename / note / hidden by tag (logic/node_tools.dart MuseNodeMetas)
   static final nodeMeta = PreferencesNotifier.create<String, String>("muse_node_meta", "");
@@ -214,5 +220,6 @@ const museSyncedPrefKeys = [
   'muse_route_mode',
   'muse_sub_fetch',
   'muse_dock_style',
+  'muse_blocked_hosts',
   'muse_tab_animation',
 ];

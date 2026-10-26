@@ -861,3 +861,21 @@ List<Rule> museApplyBlockQuic(List<Rule> rules, {required bool block}) {
   final list = lanFirst ? [rules.first, quic, ...rules.skip(1)] : [quic, ...rules];
   return [for (var k = 0; k < list.length; k++) list[k].deepCopy()..listOrder = k];
 }
+
+/// 1.6.0 C3: the rule name of 屏蔽此域名.
+const museBlockedHostsRuleName = 'muse:blocked-hosts';
+
+/// 1.6.0 C3: one 拦截 rule for the hosts blocked from 连接 (domains match their sub-domains, IPs
+/// match exactly), right after 局域网 so it wins over the user's other rules.
+List<Rule> museApplyBlockedHosts(List<Rule> rules, List<String> hosts) {
+  if (hosts.isEmpty) return rules;
+  final ips = [for (final h in hosts) if (_isIp(h)) h.contains(':') ? '$h/128' : '$h/32'];
+  final domains = [for (final h in hosts) if (!_isIp(h)) h];
+  final block = <Rule>[
+    if (domains.isNotEmpty) Rule(name: museBlockedHostsRuleName, enabled: true, outbound: Outbound.block, domainSuffixes: domains),
+    if (ips.isNotEmpty) Rule(name: '$museBlockedHostsRuleName:ip', enabled: true, outbound: Outbound.block, ipCidrs: ips),
+  ];
+  final lanFirst = rules.isNotEmpty && rules.first.name == museLanRuleName;
+  final list = lanFirst ? [rules.first, ...block, ...rules.skip(1)] : [...block, ...rules];
+  return [for (var k = 0; k < list.length; k++) list[k].deepCopy()..listOrder = k];
+}

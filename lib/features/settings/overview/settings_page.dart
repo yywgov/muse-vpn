@@ -282,11 +282,28 @@ class SettingsPage extends HookConsumerWidget {
                   value: ref.watch(MusePrefs.blockQuic),
                   onChanged: (v) => ref.read(MusePrefs.blockQuic.notifier).update(v),
                 ),
+                // 1.6.0 C3: live connections / 请求 and live logs
                 MuseTile(
-                  leading: const Icon(Icons.insights_outlined),
-                  title: '连接信息',
+                  key: const ValueKey('settings_connections'),
+                  leading: const Icon(Icons.swap_vert_outlined),
+                  title: '连接',
                   chevron: true,
                   onTap: () => context.goNamed('connections'),
+                ),
+                MuseSwitchTile(
+                  key: const ValueKey('settings_auto_close'),
+                  title: '切换节点时关闭旧连接',
+                  info: '换节点后，仍走旧节点的连接会立即断开并通过新节点重连',
+                  value: ref.watch(MusePrefs.autoCloseConnections),
+                  onChanged: (v) => ref.read(MusePrefs.autoCloseConnections.notifier).update(v),
+                ),
+                MuseTile(
+                  key: const ValueKey('settings_logs'),
+                  leading: const Icon(Icons.article_outlined),
+                  title: '日志',
+                  subtitle: ref.watch(MusePrefs.logCapture) ? '日志记录已打开' : '日志记录已关闭',
+                  chevron: true,
+                  onTap: () => context.goNamed('logs'),
                 ),
                 // 1.5.0: 测速 并发数 / 超时
                 MuseTile(

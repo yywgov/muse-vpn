@@ -2,7 +2,10 @@
 // subscription, and brought back once per connection when that subscription is connected again.
 // Part of 穿云 (GPLv3).
 
+import 'dart:async';
+
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
@@ -18,6 +21,8 @@ Future<void> museSelectNodeFrom(Ref ref, String groupTag, String tag) => _select
 
 Future<void> _select(T Function<T>(ProviderListenable<T>) read, String groupTag, String tag) async {
   await read(proxiesOverviewNotifierProvider.notifier).changeProxy(groupTag, tag);
+  // 1.6.0 C3: 切换节点时关闭旧连接 (设置 › 通用, on by default)
+  unawaited(museCloseConnectionsAfterSwitch(read));
   final profileId = read(activeProfileProvider).valueOrNull?.id;
   if (profileId == null) return;
   final raw = read(Preferences.museLastNodes);
