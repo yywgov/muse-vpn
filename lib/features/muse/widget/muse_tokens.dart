@@ -28,10 +28,54 @@ abstract final class MuseRadius {
   static const fullAll = BorderRadius.all(Radius.circular(full));
 }
 
+/// 1.6.0 C1: layout breakpoints (dp) of the adaptive shell and the dashboard.
+abstract final class MuseBreak {
+  static const mobile = 600.0;
+  static const laptop = 840.0;
+  static const dashDesktop = 640.0;
+  static const dashFour = 860.0;
+  static const dashStandard = 1040.0;
+  static const dashTall = 824.0;
+  static const dashMobileMax = 560.0;
+  static const dashColumnMax = 440.0;
+  static const profileMin = 300.0;
+  static const proxyColumn = 250.0;
+}
+
+/// 1.6.0 C1: the wider radius scale (xs..full); [card]/[small]/[full] above stay as they are.
+abstract final class MuseRadiusScale {
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 16.0;
+  static const lg = 20.0;
+  static const xl = 24.0;
+  static const xxl = 28.0;
+  static const alert = 34.0;
+
+  /// A radius that never exceeds half of the shortest side.
+  static double fit(double shortestSide, double radius) =>
+      radius > shortestSide / 2 ? shortestSide / 2 : radius;
+}
+
+/// 1.6.0 C1: text-scale aware spacing: [v] scaled by min(1 + (textScale − 1) × 0.5, 1).
+double museAdaptiveSpace(BuildContext context, double v) {
+  final scale = MediaQuery.textScalerOf(context).scale(1.0);
+  final k = 1 + (scale - 1) * 0.5;
+  return v * (k > 1 ? 1.0 : k);
+}
+
 /// Motion: one duration and curve for fades / slides.
 abstract final class MuseMotion {
   static const fast = Duration(milliseconds: 200);
   static const curve = Curves.easeOutCubic;
+
+  /// 1.6.0 C1: FlClash-style durations
+  static const mid = Duration(milliseconds: 200);
+  static const common = Duration(milliseconds: 300);
+  static const tab = Duration(milliseconds: 220);
+  static const pressFeedback = Duration(milliseconds: 150);
+  static const tabCurve = Curves.easeInOut;
+  static const sheetDetents = [9 / 16, 0.9];
 
   /// 1.5.0: one half of a skeleton's pulse
   static const skeletonPulse = Duration(milliseconds: 900);
