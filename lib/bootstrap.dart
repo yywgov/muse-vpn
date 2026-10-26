@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:hiddify/features/muse/data/bundled_rule_sets.dart';
+import 'package:hiddify/features/muse/data/muse_prefs_migration.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -133,6 +134,8 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
       await container.read(sharedPreferencesProvider).requireValue.clear();
     }
   });
+  // 穿云 1.6.0 (#217): versioned migrations of the 穿云 settings (idempotent, never throws)
+  await _init("muse preferences migration", () => musePrefsMigrateStore(container.read(sharedPreferencesProvider).requireValue));
 
   // The log level decides this now. There is no second debug switch to keep in
   // sync, and the core reaches the same conclusion from the same value.

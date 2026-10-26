@@ -5,6 +5,7 @@
 
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
@@ -48,6 +49,16 @@ import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hiddify/utils/number_formatters.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
+import 'package:hiddify/features/muse/logic/service_probe.dart';
+import 'package:hiddify/features/muse/settings/service_mode_switch.dart';
+import 'package:hiddify/features/muse/widget/muse_card.dart';
+import 'package:hiddify/features/muse/widget/muse_sheet.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
+import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
+import 'package:hiddify/singbox/model/singbox_config_enum.dart';
+
+part 'dashboard_cards.dart';
 
 /// Content width from which the node list is shown as a right-hand column.
 const museHomeSideListWidth = 1000.0;
@@ -204,7 +215,8 @@ class MuseHeroCard extends HookConsumerWidget {
     final status = connection.valueOrNull;
     final connected = status is Connected;
     // 1.5.0: 准备配置 (the core not asked yet) already counts as connecting
-    final preparing = ref.watch(museConnectPreparingProvider) && !(status?.isConnected ?? false) && !(status?.isSwitching ?? false);
+    final preparing =
+        ref.watch(museConnectPreparingProvider) && !(status?.isConnected ?? false) && !(status?.isSwitching ?? false);
     final link = museLinkStateOf(status, preparing: preparing);
     final busy = link == MuseLinkState.connecting || link == MuseLinkState.disconnecting;
     final recoveringNow = PlatformUtils.isWindows && recovering && status is Connecting;
@@ -254,7 +266,10 @@ class MuseHeroCard extends HookConsumerWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [mt.heroGradient.colors.first.withValues(alpha: 0.85), mt.heroGradient.colors.last.withValues(alpha: 0.85)],
+            colors: [
+              mt.heroGradient.colors.first.withValues(alpha: 0.85),
+              mt.heroGradient.colors.last.withValues(alpha: 0.85),
+            ],
           ),
         ),
         _HeroState.connected => BoxDecoration(
@@ -272,111 +287,129 @@ class MuseHeroCard extends HookConsumerWidget {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-            Material(
-              type: MaterialType.transparency,
-              child: InkWell(
-                // the whole card connects while disconnected
-                onTap: state == _HeroState.idle && action == MuseConnectAction.connect ? toggle : null,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(heroPad, heroPad, heroPad, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    // the whole card connects while disconnected
+                    onTap: state == _HeroState.idle && action == MuseConnectAction.connect ? toggle : null,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(heroPad, heroPad, heroPad, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Flexible(
-                                      child: AnimatedSwitcher(
-                                        duration: museMotion(context),
-                                        child: Text(
-                                          label,
-                                          key: ValueKey(label),
-                                          maxLines: 1,
-                                          style: MuseType.largeTitle(context).copyWith(color: failed ? MusePalette.red : fg),
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: AnimatedSwitcher(
+                                            duration: museMotion(context),
+                                            child: Text(
+                                              label,
+                                              key: ValueKey(label),
+                                              maxLines: 1,
+                                              style: MuseType.largeTitle(
+                                                context,
+                                              ).copyWith(color: failed ? MusePalette.red : fg),
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        if (connected && recovering)
+                                          Padding(
+                                            padding: const EdgeInsets.only(left: MuseSpace.s8),
+                                            child: Icon(
+                                              Icons.autorenew_outlined,
+                                              key: const ValueKey('watchdog_icon'),
+                                              size: MuseIconSize.small,
+                                              color: fg2,
+                                            ),
+                                          ),
+                                        if (connected && failoverFrom != null)
+                                          Padding(
+                                            padding: const EdgeInsets.only(left: MuseSpace.s8),
+                                            child: Icon(
+                                              Icons.swap_horiz_outlined,
+                                              key: const ValueKey('failover_icon'),
+                                              size: MuseIconSize.small,
+                                              color: fg2,
+                                            ),
+                                          ),
+                                      ],
                                     ),
-                                    if (connected && recovering)
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: MuseSpace.s8),
-                                        child: Icon(Icons.autorenew_outlined, key: const ValueKey('watchdog_icon'), size: MuseIconSize.small, color: fg2),
-                                      ),
-                                    if (connected && failoverFrom != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: MuseSpace.s8),
-                                        child: Icon(Icons.swap_horiz_outlined, key: const ValueKey('failover_icon'), size: MuseIconSize.small, color: fg2),
-                                      ),
+                                    const SizedBox(height: MuseSpace.s8),
+                                    // 1.5.0: wraps instead of overflowing (narrow phone, large text)
+                                    Wrap(
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      spacing: MuseSpace.s8,
+                                      runSpacing: MuseSpace.s4,
+                                      children: [
+                                        // 1.5.0: 准备配置 → 启动核心 → 测试连通
+                                        if (stage != null && !connected)
+                                          AnimatedSwitcher(
+                                            duration: museMotion(context),
+                                            child: Text(
+                                              '${stage.title}…',
+                                              key: ValueKey('home_stage_${stage.name}'),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: MuseType.body(context).copyWith(color: fg2),
+                                            ),
+                                          )
+                                        else if (since != null) ...[
+                                          Text(
+                                            museFormatDuration(DateTime.now().difference(since)),
+                                            key: const ValueKey('home_timer'),
+                                            maxLines: 1,
+                                            style: MuseType.body(
+                                              context,
+                                            ).copyWith(color: fg2, fontFeatures: MuseType.tabular),
+                                          ),
+                                          Text('·', style: MuseType.caption(context).copyWith(color: fg2)),
+                                        ],
+                                        if (stage == null || connected) _ModePill(mode: mode, onBrand: onBrand),
+                                        if (stage == MuseConnectStage.testing && connected)
+                                          Text(
+                                            '${stage!.title}…',
+                                            key: const ValueKey('home_stage_testing'),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: MuseType.caption(context).copyWith(color: fg2),
+                                          ),
+                                      ],
+                                    ),
                                   ],
                                 ),
-                                const SizedBox(height: MuseSpace.s8),
-                                // 1.5.0: wraps instead of overflowing (narrow phone, large text)
-                                Wrap(
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  spacing: MuseSpace.s8,
-                                  runSpacing: MuseSpace.s4,
-                                  children: [
-                                    // 1.5.0: 准备配置 → 启动核心 → 测试连通
-                                    if (stage != null && !connected)
-                                      AnimatedSwitcher(
-                                        duration: museMotion(context),
-                                        child: Text(
-                                          '${stage.title}…',
-                                          key: ValueKey('home_stage_${stage.name}'),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: MuseType.body(context).copyWith(color: fg2),
-                                        ),
-                                      )
-                                    else if (since != null) ...[
-                                      Text(
-                                        museFormatDuration(DateTime.now().difference(since)),
-                                        key: const ValueKey('home_timer'),
-                                        maxLines: 1,
-                                        style: MuseType.body(context).copyWith(color: fg2, fontFeatures: MuseType.tabular),
-                                      ),
-                                      Text('·', style: MuseType.caption(context).copyWith(color: fg2)),
-                                    ],
-                                    if (stage == null || connected) _ModePill(mode: mode, onBrand: onBrand),
-                                    if (stage == MuseConnectStage.testing && connected)
-                                      Text(
-                                        '${stage!.title}…',
-                                        key: const ValueKey('home_stage_testing'),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: MuseType.caption(context).copyWith(color: fg2),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(width: MuseSpace.s12),
+                              _BigSwitch(
+                                key: const ValueKey('home_connect_switch'),
+                                on: connected || busy,
+                                onBrand: onBrand,
+                                semanticLabel: switch (action) {
+                                  MuseConnectAction.cancel => '取消连接',
+                                  MuseConnectAction.disconnect => '断开',
+                                  _ => '连接',
+                                },
+                                onTap: switchEnabled ? toggle : null,
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: MuseSpace.s12),
-                          _BigSwitch(
-                            key: const ValueKey('home_connect_switch'),
-                            on: connected || busy,
-                            onBrand: onBrand,
-                            semanticLabel: switch (action) {
-                              MuseConnectAction.cancel => '取消连接',
-                              MuseConnectAction.disconnect => '断开',
-                              _ => '连接',
-                            },
-                            onTap: switchEnabled ? toggle : null,
+                          SizedBox(height: heroPad),
+                          Divider(
+                            height: MuseSize.hairline,
+                            thickness: MuseSize.hairline,
+                            color: onBrand ? MusePalette.white.withValues(alpha: 0.22) : mt.hairline,
                           ),
                         ],
                       ),
-                      SizedBox(height: heroPad),
-                      Divider(height: MuseSize.hairline, thickness: MuseSize.hairline, color: onBrand ? MusePalette.white.withValues(alpha: 0.22) : mt.hairline),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-            _HeroNodeRow(onBrand: onBrand),
+                _HeroNodeRow(onBrand: onBrand),
               ],
             ),
           ],
@@ -436,7 +469,13 @@ class _ModePill extends ConsumerWidget {
 
 /// The large switch on the hero card (64 × 36).
 class _BigSwitch extends StatelessWidget {
-  const _BigSwitch({super.key, required this.on, required this.onBrand, required this.onTap, required this.semanticLabel});
+  const _BigSwitch({
+    super.key,
+    required this.on,
+    required this.onBrand,
+    required this.onTap,
+    required this.semanticLabel,
+  });
 
   final bool on;
   final bool onBrand;
@@ -473,7 +512,9 @@ class _BigSwitch extends StatelessWidget {
               decoration: BoxDecoration(
                 color: knob,
                 shape: BoxShape.circle,
-                boxShadow: on ? null : const [BoxShadow(color: MusePalette.knobShadow, blurRadius: 4, offset: Offset(0, 1))],
+                boxShadow: on
+                    ? null
+                    : const [BoxShadow(color: MusePalette.knobShadow, blurRadius: 4, offset: Offset(0, 1))],
               ),
             ),
           ),
@@ -554,7 +595,9 @@ class _HeroNodeRow extends ConsumerWidget {
         final rawName = full.split(' → ').first.trim();
         final kind = museGroupKind(type: item.type, name: rawName, selectedDisplay: item.groupSelectedTagDisplay);
         final sel = item.groupSelectedTagDisplay.trim();
-        final rawPick = kind == '负载均衡' || sel.toLowerCase() == 'lowest-delay' || museBalanceStrategyName(sel) != null ? '' : sel;
+        final rawPick = kind == '负载均衡' || sel.toLowerCase() == 'lowest-delay' || museBalanceStrategyName(sel) != null
+            ? ''
+            : sel;
         // 1.5.3: the pick reads like its row on 节点 (renamed / tidied)
         final pick = rawPick.isEmpty || museKnownGroupName(rawPick) != null ? rawPick : shown(rawPick);
         text = museCurrentNodeText(name: rawName, groupLabel: museGroupName(rawName), groupPick: museGroupName(pick));
@@ -622,6 +665,7 @@ class MuseTileGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final info = ref.watch(museSubInfoProvider);
+    final windows = PlatformUtils.isWindows;
     final order = museParseTileOrder(ref.watch(Preferences.museHomeTileOrder));
     final hidden = museParseHiddenTiles(ref.watch(Preferences.museHomeTilesHidden));
     var tiles = museVisibleTiles(
@@ -630,6 +674,7 @@ class MuseTileGrid extends ConsumerWidget {
       hasData: (t) => switch (t) {
         MuseHomeTile.remaining => museHasTrafficCap(info),
         MuseHomeTile.expiry => museHasExpiry(info),
+        MuseHomeTile.takeover => windows,
         _ => true,
       },
     );
@@ -644,7 +689,9 @@ class MuseTileGrid extends ConsumerWidget {
         final base = constraints.maxWidth >= 600 ? tileHeightDesktop : tileHeight;
         // 1.4.1: large text grows the row instead of overflowing the fixed tile height
         // 1.5.1: the 去广告 tile's segmented control needs a taller bottom slot
-        final bottom = tiles.contains(MuseHomeTile.adBlock) ? MuseSize.segmented : MuseSize.tileBottom;
+        final bottom = tiles.contains(MuseHomeTile.adBlock) || tiles.contains(MuseHomeTile.takeover)
+            ? MuseSize.segmented
+            : MuseSize.tileBottom;
         final height = math.max(base, museTileHeightFor(MediaQuery.textScalerOf(context), bottom: bottom));
         final rows = <Widget>[];
         for (final idx in museTileRows(tiles.length, columns)) {
@@ -657,7 +704,7 @@ class MuseTileGrid extends ConsumerWidget {
                 children: [
                   for (var j = 0; j < idx.length; j++) ...[
                     if (j > 0) const SizedBox(width: MuseSpace.s12),
-                    Expanded(child: _tile(tiles[idx[j]])),
+                    Expanded(child: RepaintBoundary(child: _tile(tiles[idx[j]]))),
                   ],
                 ],
               ),
@@ -677,6 +724,12 @@ class MuseTileGrid extends ConsumerWidget {
     MuseHomeTile.exit => const _ExitTile(key: ValueKey('tile_exit')),
     MuseHomeTile.adBlock => const _AdBlockTile(key: ValueKey('tile_adblock')),
     MuseHomeTile.flow => const _FlowTile(key: ValueKey('tile_flow')),
+    MuseHomeTile.services => const _ServicesTile(key: ValueKey('tile_services')),
+    MuseHomeTile.groups => const _GroupsTile(key: ValueKey('tile_groups')),
+    MuseHomeTile.connections => const _ConnectionsTile(key: ValueKey('tile_connections')),
+    MuseHomeTile.lanIp => const _LanIpTile(key: ValueKey('tile_lanip')),
+    MuseHomeTile.memory => const _MemoryTile(key: ValueKey('tile_memory')),
+    MuseHomeTile.takeover => const _TakeoverTile(key: ValueKey('tile_takeover')),
   };
 }
 
@@ -746,7 +799,12 @@ class _Tile extends ConsumerWidget {
                   builder: (context, c) => Row(
                     children: [
                       Expanded(
-                        child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: MuseType.caption(context),
+                        ),
                       ),
                       if (titleTrailing != null)
                         ConstrainedBox(
@@ -773,11 +831,7 @@ class _Tile extends ConsumerWidget {
                       key: ValueKey(value),
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
-                      child: Text(
-                        value,
-                        maxLines: 1,
-                        style: MuseType.number(context).copyWith(color: valueColor),
-                      ),
+                      child: Text(value, maxLines: 1, style: MuseType.number(context).copyWith(color: valueColor)),
                     ),
                   ),
                 ),
@@ -874,7 +928,13 @@ class _SparklinePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final y0 = size.height - 1;
     if (values.length < 2) {
-      canvas.drawLine(Offset(0, y0), Offset(size.width, y0), Paint()..color = baseline..strokeWidth = 1);
+      canvas.drawLine(
+        Offset(0, y0),
+        Offset(size.width, y0),
+        Paint()
+          ..color = baseline
+          ..strokeWidth = 1,
+      );
       return;
     }
     final maxV = math.max(values.reduce(math.max), 1);
@@ -1124,7 +1184,9 @@ class _SessionSheet extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: MuseSpace.s8),
                 child: Row(
                   children: [
-                    Expanded(child: Text(k, style: MuseType.body(context).copyWith(color: mt.text2))),
+                    Expanded(
+                      child: Text(k, style: MuseType.body(context).copyWith(color: mt.text2)),
+                    ),
                     Text(v, style: MuseType.body(context).copyWith(fontFeatures: MuseType.tabular)),
                   ],
                 ),
@@ -1153,6 +1215,11 @@ class _TileEditor extends ConsumerWidget {
     final mt = MuseTheme.of(context);
     final order = museParseTileOrder(ref.watch(Preferences.museHomeTileOrder));
     final hidden = museParseHiddenTiles(ref.watch(Preferences.museHomeTilesHidden));
+    final windows = PlatformUtils.isWindows;
+    final shown = [
+      for (final t in order)
+        if (museTileOnPlatform(t, windows: windows)) t,
+    ];
     return SafeArea(
       child: Column(
         key: const ValueKey('tile_editor'),
@@ -1163,38 +1230,39 @@ class _TileEditor extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(MuseSpace.s24, 0, MuseSpace.s24, MuseSpace.s8),
             child: Text('首页卡片', style: MuseType.title(context)),
           ),
-          ReorderableListView(
-            shrinkWrap: true,
-            buildDefaultDragHandles: false,
-            onReorder: (from, to) {
-              final tile = order[from];
-              final next = museMoveTileTo(order, tile, to > from ? to - 1 : to);
-              ref.read(Preferences.museHomeTileOrder.notifier).update(museTileOrderToRaw(next));
-            },
-            children: [
-              for (final (i, t) in order.indexed)
-                ListTile(
-                  key: ValueKey('tile_edit_${t.key}'),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
-                  leading: ReorderableDragStartListener(
-                    index: i,
-                    child: Icon(Icons.drag_indicator_outlined, size: MuseIconSize.small, color: mt.text3),
+          Flexible(
+            child: ReorderableListView(
+              shrinkWrap: true,
+              buildDefaultDragHandles: false,
+              onReorder: (from, to) {
+                final next = museReorderShownTiles(order, shown, from, to);
+                ref.read(Preferences.museHomeTileOrder.notifier).update(museTileOrderToRaw(next));
+              },
+              children: [
+                for (final (i, t) in shown.indexed)
+                  ListTile(
+                    key: ValueKey('tile_edit_${t.key}'),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
+                    leading: ReorderableDragStartListener(
+                      index: i,
+                      child: Icon(Icons.drag_indicator_outlined, size: MuseIconSize.small, color: mt.text3),
+                    ),
+                    title: Text(t.title, style: MuseType.body(context)),
+                    trailing: Switch.adaptive(
+                      value: !hidden.contains(t),
+                      activeTrackColor: MusePalette.brand,
+                      onChanged: (_) async {
+                        final next = museToggleHiddenTile(hidden, t);
+                        await ref.read(Preferences.museHomeTilesHidden.notifier).update(museHiddenTilesToRaw(next));
+                        // 出口检测 runs only while its tile is shown
+                        if (t == MuseHomeTile.exit) {
+                          await ref.read(Preferences.museExitCheck.notifier).update(!next.contains(t));
+                        }
+                      },
+                    ),
                   ),
-                  title: Text(t.title, style: MuseType.body(context)),
-                  trailing: Switch.adaptive(
-                    value: !hidden.contains(t),
-                    activeTrackColor: MusePalette.brand,
-                    onChanged: (_) async {
-                      final next = museToggleHiddenTile(hidden, t);
-                      await ref.read(Preferences.museHomeTilesHidden.notifier).update(museHiddenTilesToRaw(next));
-                      // 出口检测 runs only while its tile is shown
-                      if (t == MuseHomeTile.exit) {
-                        await ref.read(Preferences.museExitCheck.notifier).update(!next.contains(t));
-                      }
-                    },
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: MuseSpace.s8),
         ],
@@ -1258,5 +1326,9 @@ class _EmptyState extends ConsumerWidget {
 
 /// [child] blurred when [masked] (隐私模式).
 Widget museMaybeMask(bool masked, Widget child) => masked
-    ? ImageFiltered(key: const ValueKey('privacy_mask'), imageFilter: ImageFilter.blur(sigmaX: MuseSize.privacyBlur, sigmaY: MuseSize.privacyBlur), child: child)
+    ? ImageFiltered(
+        key: const ValueKey('privacy_mask'),
+        imageFilter: ImageFilter.blur(sigmaX: MuseSize.privacyBlur, sigmaY: MuseSize.privacyBlur),
+        child: child,
+      )
     : child;

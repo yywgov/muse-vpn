@@ -196,7 +196,7 @@ void main() {
 
   group('#121 去广告 tile', () {
     test('hidden by default', () {
-      expect(museParseHiddenTiles(museDefaultHiddenTiles), {MuseHomeTile.adBlock});
+      expect(museParseHiddenTiles(museDefaultHiddenTiles), {MuseHomeTile.adBlock, ...museNewTiles16}); // 1.6.0: the new cards too
       expect(museVisibleTiles(museParseTileOrder(''), museParseHiddenTiles(museDefaultHiddenTiles), hasData: (_) => true), isNot(contains(MuseHomeTile.adBlock)));
     });
   });

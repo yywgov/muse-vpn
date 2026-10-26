@@ -7,9 +7,9 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/muse/data/windows_admin.dart';
+import 'package:hiddify/features/muse/settings/service_mode_switch.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
-import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -20,11 +20,6 @@ String _modeTitle(ServiceMode mode) => switch (mode) {
 
 class WindowsSettingsSection extends ConsumerWidget {
   const WindowsSettingsSection({super.key});
-
-  Future<void> _relaunchElevated(WidgetRef ref) async {
-    if (!await WindowsAdmin.relaunchElevated()) return;
-    await ref.read(windowNotifierProvider.notifier).exit();
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,30 +49,10 @@ class WindowsSettingsSection extends ConsumerWidget {
             );
             if (picked == null) {
               // tapping the row again while TUN still waits for administrator rights
-              if (tunNeedsAdmin) {
-                final ok = await dialogs.showConfirmation(
-                  title: '需要管理员权限',
-                  message: 'TUN 模式需要以管理员身份运行穿云，现在没有管理员权限，暂时使用系统代理。要以管理员身份重新打开吗？',
-                  positiveBtnTxt: '重新打开',
-                );
-                if (ok) await _relaunchElevated(ref);
-              }
+              if (tunNeedsAdmin) await museOfferElevation(ref);
               return;
             }
-            if (picked == mode) return;
-            if (picked == ServiceMode.tun && !WindowsAdmin.isElevated) {
-              final ok = await dialogs.showConfirmation(
-                title: '需要管理员权限',
-                message: 'TUN 模式需要以管理员身份运行穿云。要以管理员身份重新打开吗？',
-                positiveBtnTxt: '重新打开',
-              );
-              if (!ok) return;
-              await ref.read(ConfigOptions.serviceMode.notifier).update(picked);
-              await _relaunchElevated(ref);
-              return;
-            }
-            // a running connection restarts in the new mode (ConfigOptionNotifier)
-            await ref.read(ConfigOptions.serviceMode.notifier).update(picked);
+            await museSwitchServiceMode(ref, picked);
           },
         ),
         // 1.2.2: same switch tile as every other 设置 row

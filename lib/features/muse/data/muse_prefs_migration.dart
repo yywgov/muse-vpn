@@ -2,13 +2,49 @@
 // and leaves the stored version unchanged.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/logic/home_tiles.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 const musePrefsVersionKey = 'muse_prefs_version';
 const musePrefsVersionCurrent = 2;
 
 typedef MusePrefsStep = void Function(Map<String, Object?> prefs);
 
-/// Steps keyed by the version they migrate FROM. 1→2 is empty for now (C7 fills it).
-final Map<int, MusePrefsStep> musePrefsSteps = {1: (prefs) {}};
+/// Steps keyed by the version they migrate FROM.
+/// 1→2 (1.6.0): the new dashboard cards start hidden for a saved 首页 layout; 字体大小 becomes
+/// 文字缩放 (see C7).
+final Map<int, MusePrefsStep> musePrefsSteps = {1: museMigrate1to2};
+
+void museMigrate1to2(Map<String, Object?> prefs) {
+  final hidden = prefs['muse_home_tiles_hidden'];
+  if (hidden is String) prefs['muse_home_tiles_hidden'] = museHideNewTiles16(hidden);
+}
+
+/// Runs the migrations on [sp] (only muse_* keys are read and written back). Never throws.
+Future<int> musePrefsMigrateStore(SharedPreferences sp) async {
+  try {
+    final keys = sp.getKeys().where((k) => k.startsWith('muse_')).toList();
+    final map = <String, Object?>{for (final k in keys) k: sp.get(k)};
+    final before = Map<String, Object?>.of(map);
+    final v = musePrefsMigrate(map);
+    for (final e in map.entries) {
+      if (before[e.key] == e.value) continue;
+      final val = e.value;
+      if (val is String) {
+        await sp.setString(e.key, val);
+      } else if (val is int) {
+        await sp.setInt(e.key, val);
+      } else if (val is bool) {
+        await sp.setBool(e.key, val);
+      } else if (val is double) {
+        await sp.setDouble(e.key, val);
+      }
+    }
+    return v;
+  } catch (_) {
+    return 0;
+  }
+}
 
 /// Migrates [prefs] in place to [musePrefsVersionCurrent]. Returns the final version.
 /// A missing/corrupt version counts as 1. On error the map is restored and the old version kept.

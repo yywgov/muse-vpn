@@ -2,6 +2,8 @@
 // (pure logic, unit-tested). Saved as comma lists in Preferences.museHomeTileOrder / museHomeTilesHidden.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
+
 enum MuseHomeTile {
   speed('speed', '网速'),
   traffic('traffic', '本次流量'),
@@ -9,6 +11,14 @@ enum MuseHomeTile {
   expiry('expiry', '到期'),
   exit('exit', '出口 IP'),
   adBlock('adblock', '去广告'),
+  // 1.6.0 C4: dashboard cards (hidden by default; added from 编辑首页)
+  services('services', '服务状态'),
+  groups('groups', '代理组'),
+  connections('connections', '连接统计'),
+  lanIp('lanip', '内网 IP'),
+  memory('memory', '内存'),
+  // Windows: 系统代理 / TUN in one tap
+  takeover('takeover', '网络接管'),
   // 穿云 1.4.0 (Windows only): 网速 + 本次流量 in one tile
   flow('flow', '流量');
 
@@ -21,7 +31,10 @@ enum MuseHomeTile {
 }
 
 /// The tiles that are saved / edited (流量 is derived on Windows from 网速 + 本次流量).
-final museStoredTiles = [for (final t in MuseHomeTile.values) if (t != MuseHomeTile.flow) t];
+final museStoredTiles = [
+  for (final t in MuseHomeTile.values)
+    if (t != MuseHomeTile.flow) t,
+];
 
 /// The saved order, completed: unknown keys and duplicates dropped, tiles missing from the saved
 /// list (new in a later version) appended in their default order.
@@ -76,20 +89,54 @@ List<MuseHomeTile> museVisibleTiles(
   List<MuseHomeTile> order,
   Set<MuseHomeTile> hidden, {
   required bool Function(MuseHomeTile) hasData,
-}) => [for (final t in order) if (!hidden.contains(t) && hasData(t)) t];
+}) => [
+  for (final t in order)
+    if (!hidden.contains(t) && hasData(t)) t,
+];
 
-/// Grid columns for a content width: 2 on a phone, 3–4 on the desktop.
+/// Grid columns for a content width. 1.6.0: 2 up to 860 dp, 4 above (fixed columns of the
+/// dashboard).
 int museTileColumns(double width) {
-  if (width >= 1000) return 4;
-  if (width >= 600) return 3;
+  if (width >= MuseBreak.dashFour) return 4;
   return 2;
+}
+
+/// 1.6.0 C4: tiles added in 1.6.0 start hidden (so a dashboard looks as before an update).
+const museNewTiles16 = {
+  MuseHomeTile.services,
+  MuseHomeTile.groups,
+  MuseHomeTile.connections,
+  MuseHomeTile.lanIp,
+  MuseHomeTile.memory,
+  MuseHomeTile.takeover,
+};
+
+/// 1.6.0 C4: [raw] hidden list with the 1.6.0 tiles added (the 1→2 preference migration).
+String museHideNewTiles16(String raw) => museHiddenTilesToRaw({...museParseHiddenTiles(raw), ...museNewTiles16});
+
+/// 1.6.0 C4: tiles that only make sense on one platform.
+bool museTileOnPlatform(MuseHomeTile t, {required bool windows}) => t != MuseHomeTile.takeover || windows;
+
+/// 1.6.0 C4: drag [from] → [to] (ReorderableListView indexes) in the editor's [shown] list (the
+/// tiles of this platform); tiles of other platforms keep their place at the end.
+List<MuseHomeTile> museReorderShownTiles(List<MuseHomeTile> order, List<MuseHomeTile> shown, int from, int to) {
+  if (from < 0 || from >= shown.length) return order;
+  final moved = museMoveTileTo(shown, shown[from], to > from ? to - 1 : to);
+  return [
+    ...moved,
+    for (final t in order)
+      if (!shown.contains(t)) t,
+  ];
 }
 
 /// 1.4.0 (Windows): 网速 and 本次流量 become one 「流量」 tile where the first of them was.
 List<MuseHomeTile> museMergeFlowTiles(List<MuseHomeTile> tiles) {
   final i = tiles.indexWhere((t) => t == MuseHomeTile.speed || t == MuseHomeTile.traffic);
   if (i < 0) return tiles;
-  final out = [for (final t in tiles) if (t != MuseHomeTile.speed && t != MuseHomeTile.traffic) t];
+  final out = [
+    for (final t in tiles)
+      if (t != MuseHomeTile.speed && t != MuseHomeTile.traffic) t,
+  ];
   out.insert(i.clamp(0, out.length), MuseHomeTile.flow);
   return out;
 }

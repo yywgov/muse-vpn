@@ -244,7 +244,7 @@ void main() {
   const small = Size(320, 640);
   const narrow = Size(900, 720);
   const wide = Size(1280, 800);
-  const showAdBlock = {'muse_home_tiles_hidden': ''};
+  const showAdBlock = {'muse_home_tiles_hidden': 'services,groups,connections,lanip,memory,takeover'}; // 1.6.0 cards stay hidden
   const adblock = ValueKey('adblock_segmented');
 
   for (final b in [Brightness.light, Brightness.dark]) {

@@ -76,8 +76,9 @@ void main() {
 
   group('首页 tiles 1.4.0', () {
     test('no lone tile: columns follow the tile count', () {
-      // Windows ~886 px (3 columns max): 4 tiles = 2 × 2, 3 tiles = one row, 6 = 2 × 3
-      expect(museTileColumnsFor(860, 4), 2);
+      // 1.6.0: 4 columns from 860 px; just below = 2 columns
+      expect(museTileColumnsFor(850, 4), 2);
+      expect(museTileColumnsFor(860, 4), 4);
       expect(museTileColumnsFor(860, 3), 3);
       expect(museTileColumnsFor(860, 6), 3);
       expect(museTileColumnsFor(860, 5), 3);

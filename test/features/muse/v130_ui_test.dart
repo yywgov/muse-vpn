@@ -245,13 +245,14 @@ void main() {
     await _done(tester);
   });
 
-  testWidgets('Windows 1280×800: 首页 with tiles in 3 columns and the node column', (tester) async {
+  testWidgets('Windows 1280×800: 首页 with tiles in 2 columns (1.6.0: 4 from 860 px) and the node column', (tester) async {
     await _pump(tester, page: const MuseHomePage(), brightness: Brightness.light, size: windows, desktop: true);
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('home_side_nodes')), findsOneWidget);
-    // 3 tiles in the first row: 网速 / 本次流量 / 剩余流量 share one y
+    // 1.6.0: the dashboard beside the node column is under 860 px: 2 tiles a row (网速 / 本次流量)
     final y1 = tester.getTopLeft(find.byKey(const ValueKey('tile_speed'))).dy;
-    expect(tester.getTopLeft(find.byKey(const ValueKey('tile_remaining'))).dy, y1);
+    expect(tester.getTopLeft(find.byKey(const ValueKey('tile_traffic'))).dy, y1);
+    expect(tester.getTopLeft(find.byKey(const ValueKey('tile_remaining'))).dy, greaterThan(y1));
     expect(tester.getSize(find.byKey(const ValueKey('tile_speed'))).height, tester.getSize(find.byKey(const ValueKey('tile_exit'))).height);
     await _shot(tester, 'windows-light-home');
     await _done(tester);

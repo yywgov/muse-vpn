@@ -9,7 +9,8 @@ import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// 1.5.0: tiles hidden until the user shows them (logic/home_tiles.dart keys).
-const museDefaultHiddenTiles = 'adblock';
+/// 1.6.0 C4: the 1.6.0 dashboard cards start hidden too (编辑首页 adds them)
+const museDefaultHiddenTiles = 'adblock,services,groups,connections,lanip,memory,takeover';
 
 abstract class Preferences {
   // 穿云: no first-run intro (region is fixed to cn, language to 简体中文)

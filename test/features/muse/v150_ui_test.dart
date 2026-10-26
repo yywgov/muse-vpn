@@ -297,7 +297,7 @@ void main() {
     await _pump(tester, page: const MuseHomePage(), brightness: Brightness.light, size: phone);
     expect(find.byKey(const ValueKey('tile_adblock')), findsNothing);
     await _done(tester);
-    await _pump(tester, page: const MuseHomePage(), brightness: Brightness.light, size: phone, initialPrefs: {'muse_home_tiles_hidden': ''});
+    await _pump(tester, page: const MuseHomePage(), brightness: Brightness.light, size: phone, initialPrefs: {'muse_home_tiles_hidden': 'services,groups,connections,lanip,memory,takeover'});
     expect(find.byKey(const ValueKey('tile_adblock')), findsOneWidget);
     await _done(tester);
   });

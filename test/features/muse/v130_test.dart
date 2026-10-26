@@ -18,7 +18,7 @@ void main() {
       expect(museParseTileOrder(''), museStoredTiles);
       expect(
         museParseTileOrder('exit,bogus,speed,exit'),
-        [MuseHomeTile.exit, MuseHomeTile.speed, MuseHomeTile.traffic, MuseHomeTile.remaining, MuseHomeTile.expiry, MuseHomeTile.adBlock],
+        [MuseHomeTile.exit, MuseHomeTile.speed, MuseHomeTile.traffic, MuseHomeTile.remaining, MuseHomeTile.expiry, MuseHomeTile.adBlock, MuseHomeTile.services, MuseHomeTile.groups, MuseHomeTile.connections, MuseHomeTile.lanIp, MuseHomeTile.memory, MuseHomeTile.takeover],
       );
       final order = museParseTileOrder('adblock,speed');
       expect(museParseTileOrder(museTileOrderToRaw(order)), order);
@@ -27,7 +27,7 @@ void main() {
       final o = museStoredTiles.toList();
       expect(museMoveTile(o, MuseHomeTile.traffic, -1).take(2), [MuseHomeTile.traffic, MuseHomeTile.speed]);
       expect(museMoveTile(o, MuseHomeTile.speed, -1), o);
-      expect(museMoveTile(o, MuseHomeTile.adBlock, 1), o);
+      expect(museMoveTile(o, o.last, 1), o); // 1.6.0: the last tile is no longer 去广告
       expect(museMoveTileTo(o, MuseHomeTile.adBlock, 0).first, MuseHomeTile.adBlock);
       expect(museMoveTileTo(o, MuseHomeTile.speed, 99).last, MuseHomeTile.speed);
       expect(museMoveTileTo(o, MuseHomeTile.speed, 99).length, o.length);
@@ -46,11 +46,13 @@ void main() {
         {MuseHomeTile.adBlock},
         hasData: (t) => t != MuseHomeTile.remaining,
       );
-      expect(v, [MuseHomeTile.speed, MuseHomeTile.traffic, MuseHomeTile.expiry, MuseHomeTile.exit]);
+      expect(v, [MuseHomeTile.speed, MuseHomeTile.traffic, MuseHomeTile.expiry, MuseHomeTile.exit, MuseHomeTile.services, MuseHomeTile.groups, MuseHomeTile.connections, MuseHomeTile.lanIp, MuseHomeTile.memory, MuseHomeTile.takeover]);
     });
-    test('columns: 2 phone, 3 / 4 desktop', () {
+    test('columns: 2 up to 860, 4 above (1.6.0 dashboard)', () {
       expect(museTileColumns(380), 2);
-      expect(museTileColumns(700), 3);
+      expect(museTileColumns(700), 2);
+      expect(museTileColumns(859), 2);
+      expect(museTileColumns(860), 4);
       expect(museTileColumns(1100), 4);
     });
     test('speed text keeps a stable shape', () {
