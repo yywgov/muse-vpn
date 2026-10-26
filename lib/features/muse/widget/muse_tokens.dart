@@ -128,6 +128,10 @@ abstract final class MuseSize {
   static const barMin = 4.0;
   static const qrCode = 240.0;
 
+  /// 1.6.0 #40 / #34: the list inside 清除不可用 / 收藏排序 dialogs
+  static const dialogList = 280.0;
+  static const dialogWidth = 360.0;
+
   /// 隐私模式 blur strength
   static const privacyBlur = 6.0;
 

@@ -40,6 +40,12 @@ abstract final class MusePrefs {
   static final includeRegex = PreferencesNotifier.create<String, String>("muse_node_include", "");
   static final excludeRegex = PreferencesNotifier.create<String, String>("muse_node_exclude", "");
   static final hideDuplicates = PreferencesNotifier.create<bool, bool>("muse_hide_duplicates", false);
+  /// 1.6.0 #31: what makes two nodes duplicates: protocol (+ address + port, the default) /
+  /// address (address + port) / full (every setting)
+  static final dedupMode = PreferencesNotifier.create<String, String>("muse_dedup_mode", "protocol");
+
+  /// 1.6.0 #34: favourites follow the user's own order (the order of muse_favorite_nodes)
+  static final favoriteManualOrder = PreferencesNotifier.create<bool, bool>("muse_favorite_manual_order", false);
   static final recentNodes = PreferencesNotifier.create<String, String>("muse_recent_nodes", "");
 
   /// protocol filter on 节点 ('' = all)

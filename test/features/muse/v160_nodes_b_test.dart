@@ -1,5 +1,6 @@
-// 穿云 1.6.0 (batch 2, nodes B logic): #31 去重模式, #34 收藏排序, #35 sing-box 复制, #40 清除预览.
+// 穿云 1.6.0 (batch 2, nodes B logic): #31 去重模式, #34 收藏排序, #35 JSON 配置复制, #40 清除预览.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/features/muse/logic/node_share.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
 
 void main() {
@@ -30,10 +31,10 @@ void main() {
     expect(museClearPlan(['a'], unavailable: {}, selected: '').isEmpty, true);
   });
 
-  test('#35 sing-box copy', () {
+  test('#35 JSON 配置 copy', () {
     const raw = '{"outbounds":[{"tag":"t","type":"vless","server":"s"}]}';
-    expect(museNodeAsSingBox(raw, 't'), contains('"server": "s"'));
-    expect(museNodeAsSingBox(raw, 'x'), isNull);
-    expect(museNodeAsSingBox('bad', 't'), isNull);
+    expect(museNodeAsJsonConfig(raw, 't'), contains('"server": "s"'));
+    expect(museNodeAsJsonConfig(raw, 'x'), isNull);
+    expect(museNodeAsJsonConfig('bad', 't'), isNull);
   });
 }

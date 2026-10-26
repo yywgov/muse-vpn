@@ -232,6 +232,34 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
                 value: ref.watch(MusePrefs.hideDuplicates),
                 onChanged: (v) => ref.read(MusePrefs.hideDuplicates.notifier).update(v),
               ),
+              // 1.6.0 #31: what counts as a duplicate
+              MuseTile(
+                key: const ValueKey('node_dedup_mode'),
+                leading: const Icon(Icons.rule_outlined),
+                title: '重复判断',
+                subtitle: ref.watch(MusePrefs.hideDuplicates) ? null : '开启「隐藏重复节点」后生效',
+                trailing: Text(museDedupModes[ref.watch(MusePrefs.dedupMode)] ?? museDedupModes['protocol']!, overflow: TextOverflow.ellipsis),
+                chevron: true,
+                onTap: () async {
+                  final cur = ref.read(MusePrefs.dedupMode);
+                  final v = await showDialog<String>(
+                    context: context,
+                    builder: (c) => SimpleDialog(
+                      key: const ValueKey('node_dedup_dialog'),
+                      title: const Text('重复判断'),
+                      children: [
+                        for (final e in museDedupModes.entries)
+                          SimpleDialogOption(
+                            key: ValueKey('node_dedup_${e.key}'),
+                            onPressed: () => Navigator.of(c).pop(e.key),
+                            child: Text('${e.value}${cur == e.key ? '（当前）' : ''}'),
+                          ),
+                      ],
+                    ),
+                  );
+                  if (v != null) await ref.read(MusePrefs.dedupMode.notifier).update(v);
+                },
+              ),
               MuseTile(
                 key: const ValueKey('node_include'),
                 leading: const Icon(Icons.filter_alt_outlined),

@@ -52,16 +52,28 @@ String museToggleFavorite(String raw, String tag) {
 }
 
 /// Groups first (as they came), then favourites, then the rest; each part keeps [items]' order.
+/// 1.6.0 #34: with [favoriteOrder] (the user's own order) favourites follow that order instead.
 List<T> museFavoritesFirst<T>(
   List<T> items, {
   required bool Function(T) isGroup,
   required String Function(T) tag,
   required Set<String> favorites,
+  List<String>? favoriteOrder,
 }) {
   if (favorites.isEmpty) return items;
+  final favs = items.where((e) => !isGroup(e) && favorites.contains(tag(e))).toList();
+  if (favoriteOrder != null) {
+    final rank = {for (final (i, t) in favoriteOrder.indexed) t: i};
+    final orig = {for (final (i, e) in favs.indexed) tag(e): i};
+    favs.sort((a, b) {
+      final ra = rank[tag(a)] ?? (favoriteOrder.length + orig[tag(a)]!);
+      final rb = rank[tag(b)] ?? (favoriteOrder.length + orig[tag(b)]!);
+      return ra.compareTo(rb);
+    });
+  }
   return [
     ...items.where(isGroup),
-    ...items.where((e) => !isGroup(e) && favorites.contains(tag(e))),
+    ...favs,
     ...items.where((e) => !isGroup(e) && !favorites.contains(tag(e))),
   ];
 }

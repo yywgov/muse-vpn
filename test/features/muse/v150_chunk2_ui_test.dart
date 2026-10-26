@@ -316,7 +316,9 @@ void main() {
         await tester.drag(find.byType(CustomScrollView).first, const Offset(0, -20000));
         await tester.pump(const Duration(milliseconds: 300));
         expect(tester.takeException(), isNull);
-        expect(find.textContaining('东京 0000'), findsNothing);
+        expect(find.descendant(of: find.byType(CustomScrollView).first, matching: find.textContaining('东京 0000')), findsNothing);
+        // 1.6.0 #38: the node in use stays pinned above the list
+        expect(find.byKey(const ValueKey('node_current_card')), findsOneWidget);
         await _done(tester);
       });
     }

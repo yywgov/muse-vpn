@@ -17,7 +17,7 @@ class MuseNodesPage extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
           // key kept for the e2e driver's scroll steps
-          child: const MuseNodeList(listKey: ValueKey('home_node_list')),
+          child: const MuseNodeList(listKey: ValueKey('home_node_list'), pinCurrent: true),
         ),
       ),
     );

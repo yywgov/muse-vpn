@@ -43,6 +43,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('分应用代理', MuseSettingPage.perApp, keywords: ['应用', 'App', '绕过'], androidOnly: true),
   MuseSettingEntry('节点名美化', MuseSettingPage.nodes, keywords: ['国旗', '名称']),
   MuseSettingEntry('隐藏重复节点', MuseSettingPage.nodes, keywords: ['重复']),
+  MuseSettingEntry('重复判断', MuseSettingPage.nodes, keywords: ['去重', '地址', '端口', '完整参数']),
   MuseSettingEntry('只显示 / 排除', MuseSettingPage.nodes, keywords: ['过滤', '筛选', '正则']),
   MuseSettingEntry('订阅 UA', MuseSettingPage.nodes, keywords: ['User-Agent', '格式', '客户端']),
   MuseSettingEntry('订阅更新方式', MuseSettingPage.nodes, keywords: ['走代理', '直连', '订阅下载']),

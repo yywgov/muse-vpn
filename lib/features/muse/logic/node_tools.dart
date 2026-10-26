@@ -651,6 +651,9 @@ Set<String> museToggleRegionFold(Set<String> stored, String key, {required bool 
 /// #31: how duplicates are told apart.
 enum MuseDedupMode { addressPort, fullParams }
 
+/// #31: the choices in 设置 › 节点 › 重复判断 (stored key → label); 'protocol' is the default.
+const museDedupModes = {'protocol': '协议+地址+端口', 'address': '地址+端口', 'full': '完整参数'};
+
 /// #31: duplicates by address+port only (any protocol) or by full parameters ([params] is
 /// a canonical string of the node's settings). Returns the tags to drop; first one is kept.
 Set<String> museDuplicateTagsBy<T>(
@@ -672,7 +675,7 @@ Set<String> museDuplicateTagsBy<T>(
   return drop;
 }
 
-/// #34: favorites keep the user's order. Moves [from] to [to] (ReorderableListView semantics).
+/// #34: the user's own order of favorites. Moves [from] to [to] (ReorderableListView semantics).
 List<String> museReorderFavorites(List<String> order, int from, int to) {
   if (from < 0 || from >= order.length) return order;
   final next = [...order];
@@ -707,15 +710,77 @@ MuseClearPlan museClearPlan(Iterable<String> all, {required Set<String> unavaila
   return MuseClearPlan(remove, keep);
 }
 
-/// #35: a node's sing-box outbound JSON, pretty printed (null when it isn't in [raw]).
-String? museNodeAsSingBox(String raw, String tag) {
-  try {
-    final j = jsonDecode(raw);
-    if (j is! Map) return null;
-    final all = [...((j['outbounds'] as List?) ?? const []), ...((j['endpoints'] as List?) ?? const [])].whereType<Map>();
-    final o = all.where((e) => e['tag'] == tag).firstOrNull;
-    return o == null ? null : const JsonEncoder.withIndent('  ').convert(o);
-  } catch (_) {
+// #35: copying a node (link / Clash / JSON 配置) lives in logic/node_share.dart.
+
+// ---------------------------------------------------------------- 1.6.0 #36 relays
+
+/// #36: a relay node (中转): where traffic enters (a mainland city, '' = not said) and where it
+/// leaves (ISO code; null = unknown).
+class MuseRelayInfo {
+  const MuseRelayInfo({required this.entry, required this.exit, this.exitFromLanding = false});
+
+  /// city name (「上海」), '' when the name doesn't say
+  final String entry;
+
+  /// ISO code of the exit region, null when unknown
+  final String? exit;
+
+  /// the exit comes from the landing IP (measured), not from the name
+  final bool exitFromLanding;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MuseRelayInfo && other.entry == entry && other.exit == exit && other.exitFromLanding == exitFromLanding;
+
+  @override
+  int get hashCode => Object.hash(entry, exit, exitFromLanding);
+}
+
+const _relayCities = {
+  '上海': '上海', '沪': '上海',
+  '深圳': '深圳', '深': '深圳',
+  '广州': '广州', '广': '广州',
+  '北京': '北京', '京': '北京',
+  '杭州': '杭州', '杭': '杭州',
+  '苏州': '苏州', '苏': '苏州',
+  '东莞': '东莞', '莞': '东莞',
+  '佛山': '佛山', '佛': '佛山',
+  '厦门': '厦门', '厦': '厦门',
+  '成都': '成都', '蓉': '成都',
+  '南京': '南京', '宁': '南京',
+  '武汉': '武汉', '汉': '武汉',
+};
+
+final _relayWord = RegExp(r'中转|IPLC|IEPL|专线|隧道|转发|relay', caseSensitive: false);
+// a full city name anywhere, or a one-character city right before a region character (「沪日」
+// 「深港」 「广港」); 「东京」 「南京」 and the like are not entries
+final _relayEntryFull = RegExp(r'(上海|深圳|广州|北京|杭州|苏州|东莞|佛山|厦门|成都|南京|武汉)(?!\s*\d)');
+final _relayEntryShort = RegExp(r'(?<![东西南北中香上])(沪|深|广|京|杭|苏|莞|佛|厦|蓉|宁|汉)\s*[-→>－~]?\s*(港|日|美|新|台|韩|德|英|俄|澳|法|加|荷|土|印|马|泰|菲|越)');
+
+/// the region character after a one-character entry (「沪日」 → JP)
+const _relayExitChars = {
+  '港': 'HK', '日': 'JP', '美': 'US', '新': 'SG', '台': 'TW', '韩': 'KR', '德': 'DE', '英': 'GB', '俄': 'RU',
+  '澳': 'AU', '法': 'FR', '加': 'CA', '荷': 'NL', '土': 'TR', '印': 'IN', '马': 'MY', '泰': 'TH', '菲': 'PH', '越': 'VN',
+};
+
+/// #36: relay info for a node named [name] — null when it isn't a relay. [nameRegion] is the
+/// region recognised from (or set for) the name, [exitCode] the landing IP's country when known.
+MuseRelayInfo? museRelayInfo(String name, {String? nameRegion, String exitCode = ''}) {
+  final short = _relayEntryShort.firstMatch(name);
+  final full = _relayEntryFull.firstMatch(name);
+  final word = _relayWord.hasMatch(name);
+  final String entry;
+  if (short != null) {
+    entry = _relayCities[short[1]]!;
+  } else if (full != null && (word || nameRegion != null && nameRegion != 'CN')) {
+    entry = _relayCities[full[1]]!;
+  } else if (word) {
+    entry = '';
+  } else {
     return null;
   }
+  final landing = exitCode.trim().toUpperCase();
+  if (landing.isNotEmpty) return MuseRelayInfo(entry: entry, exit: landing, exitFromLanding: true);
+  final fromName = nameRegion == 'CN' ? null : nameRegion;
+  return MuseRelayInfo(entry: entry, exit: fromName ?? (short == null ? null : _relayExitChars[short[2]]));
 }
