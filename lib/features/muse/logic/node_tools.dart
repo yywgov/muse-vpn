@@ -645,3 +645,77 @@ Set<String> museToggleRegionFold(Set<String> stored, String key, {required bool 
   ..remove(key)
   ..remove('+$key')
   ..add(folded ? '+$key' : key);
+
+// ---------------------------------------------------------------- 1.6.0 nodes B (logic)
+
+/// #31: how duplicates are told apart.
+enum MuseDedupMode { addressPort, fullParams }
+
+/// #31: duplicates by address+port only (any protocol) or by full parameters ([params] is
+/// a canonical string of the node's settings). Returns the tags to drop; first one is kept.
+Set<String> museDuplicateTagsBy<T>(
+  List<T> nodes, {
+  required MuseDedupMode mode,
+  required String Function(T) tag,
+  required String Function(T) host,
+  required int Function(T) port,
+  required String Function(T) params,
+}) {
+  final seen = <String>{};
+  final drop = <String>{};
+  for (final n in nodes) {
+    final h = host(n).trim().toLowerCase();
+    if (h.isEmpty) continue;
+    final key = mode == MuseDedupMode.addressPort ? '$h|${port(n)}' : '$h|${port(n)}|${params(n)}';
+    if (!seen.add(key)) drop.add(tag(n));
+  }
+  return drop;
+}
+
+/// #34: favorites keep the user's order. Moves [from] to [to] (ReorderableListView semantics).
+List<String> museReorderFavorites(List<String> order, int from, int to) {
+  if (from < 0 || from >= order.length) return order;
+  final next = [...order];
+  final item = next.removeAt(from);
+  var t = to > from ? to - 1 : to;
+  t = t.clamp(0, next.length);
+  next.insert(t, item);
+  return next;
+}
+
+/// #34: the saved order, minus nodes that are no longer favorites, plus new favorites at the end.
+List<String> museFavoriteOrder(List<String> saved, Set<String> favorites) =>
+    [...saved.where(favorites.contains).toSet(), ...favorites.where((f) => !saved.contains(f))];
+
+/// #40: what "clear unavailable nodes" would remove, for a preview before doing it.
+class MuseClearPlan {
+  const MuseClearPlan(this.remove, this.keep);
+  final List<String> remove;
+  final List<String> keep;
+  bool get isEmpty => remove.isEmpty;
+
+  /// What to restore on undo: the whole hidden list as it was.
+  List<String> undoTo(List<String> before) => before;
+}
+
+MuseClearPlan museClearPlan(Iterable<String> all, {required Set<String> unavailable, required String selected, Set<String> favorites = const {}}) {
+  final remove = <String>[];
+  final keep = <String>[];
+  for (final t in all) {
+    (unavailable.contains(t) && t != selected && !favorites.contains(t) ? remove : keep).add(t);
+  }
+  return MuseClearPlan(remove, keep);
+}
+
+/// #35: a node's sing-box outbound JSON, pretty printed (null when it isn't in [raw]).
+String? museNodeAsSingBox(String raw, String tag) {
+  try {
+    final j = jsonDecode(raw);
+    if (j is! Map) return null;
+    final all = [...((j['outbounds'] as List?) ?? const []), ...((j['endpoints'] as List?) ?? const [])].whereType<Map>();
+    final o = all.where((e) => e['tag'] == tag).firstOrNull;
+    return o == null ? null : const JsonEncoder.withIndent('  ').convert(o);
+  } catch (_) {
+    return null;
+  }
+}
