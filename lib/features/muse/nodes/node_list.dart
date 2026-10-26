@@ -105,17 +105,34 @@ Future<void> musePickNode(WidgetRef ref, String groupTag, String tag) async {
   try {
     if (ref.read(museRunningProvider)) {
       await museSelectNode(ref, groupTag, tag);
+      await museRememberRecent(ref, tag);
     } else {
       final profileId = ref.read(museActiveProfileIdProvider);
       if (profileId == null) return;
       final raw = ref.read(Preferences.museLastNodes);
       await ref.read(Preferences.museLastNodes.notifier).update(museRememberNode(raw, profileId, tag));
+      await museRememberRecent(ref, tag);
     }
   } catch (_) {
     try {
       ref.read(inAppNotificationControllerProvider).showErrorToast('切换节点失败，请重试');
     } catch (_) {}
   }
+}
+
+/// 1.6.0 #37: [tag] goes to the front of 最近使用.
+Future<void> museRememberRecent(WidgetRef ref, String tag) async {
+  try {
+    final recent = museRecentFromRaw(ref.read(MusePrefs.recentNodes));
+    await ref.read(MusePrefs.recentNodes.notifier).update(museRecentToRaw(museAddRecent(recent, tag, keep: 8)));
+  } catch (_) {}
+}
+
+/// 1.6.0 #28: a node's protocol as its tag shows it ('' for groups, 直连 / 拦截 and broken nodes).
+String museNodeProtocolShort(OutboundInfo e) {
+  final t = e.type.toLowerCase();
+  if (e.isGroup || t == 'direct' || t == 'block' || museIsInvalidNodeType(e.type)) return '';
+  return museProtocolShort(e.type);
 }
 
 String museNodeName(OutboundInfo e) => e.tagDisplay.isNotEmpty ? e.tagDisplay : e.tag;
@@ -195,6 +212,15 @@ class MuseNodeList extends HookConsumerWidget {
     final showUserHidden = useState(false);
     String shownName(OutboundInfo e) => metas.displayName(e.tag, museNodeName(e), beautify: beautify);
     final shownPick = ref.watch(museShownPickProvider);
+    // 1.6.0 #32: a region set by hand wins over the one in the name
+    String? regionOf(OutboundInfo e) => metas.regionOf(e.tag, museRegionCode(museNodeName(e)));
+    // 1.6.0 #28 / #33: narrow to one protocol or one of the user's tags
+    final protocols = museProtocolsPresent([
+      for (final e in group?.items ?? const <OutboundInfo>[]) museNodeProtocolShort(e),
+    ]);
+    final nodeTags = metas.allTags;
+    final nodeFilter = MuseNodeFilter.parse(ref.watch(MusePrefs.protocolFilter)).within(protocols: protocols, tags: nodeTags);
+    final recent = museRecentFromRaw(ref.watch(MusePrefs.recentNodes));
     final profileName = ref.watch(museActiveProfileNameProvider)?.trim() ?? '';
 
     // every node answered (or timed out) since 测速 started: end the test
@@ -238,7 +264,7 @@ class MuseNodeList extends HookConsumerWidget {
                   : progress != null
                   // 1.5.0 #25: 测速 progress (stop with the button next to it)
                   ? '已测 ${progress.done} / ${progress.total}'
-                  : '${profileName.isEmpty ? '' : '$profileName · '}$nodeTotal 个节点',
+                  : '${profileName.isEmpty ? '' : '$profileName · '}$nodeTotal 个节点${nodeFilter.isNone ? '' : ' · 仅${nodeFilter.label}'}',
               key: const ValueKey('node_count_label'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -269,6 +295,46 @@ class MuseNodeList extends HookConsumerWidget {
                   query.value = '';
                 }
               },
+            ),
+          if (nodeTotal > 1 && (protocols.length > 1 || nodeTags.isNotEmpty))
+            PopupMenuButton<String>(
+              key: const ValueKey('node_filter_button'),
+              tooltip: '筛选：${nodeFilter.label}',
+              icon: Icon(
+                Icons.filter_list_outlined,
+                size: MuseIconSize.small,
+                color: nodeFilter.isNone ? null : MusePalette.brand,
+              ),
+              style: const ButtonStyle(visualDensity: VisualDensity.compact),
+              onSelected: (raw) => ref.read(MusePrefs.protocolFilter.notifier).update(raw),
+              itemBuilder: (context) => [
+                CheckedPopupMenuItem<String>(
+                  key: const ValueKey('node_filter_all'),
+                  value: '',
+                  checked: nodeFilter.isNone,
+                  child: const Text('全部'),
+                ),
+                if (protocols.length > 1) ...[
+                  const PopupMenuDivider(),
+                  for (final p in protocols)
+                    CheckedPopupMenuItem<String>(
+                      key: ValueKey('node_filter_p_$p'),
+                      value: MuseNodeFilter.protocol(p).toRaw(),
+                      checked: nodeFilter == MuseNodeFilter.protocol(p),
+                      child: Text(p),
+                    ),
+                ],
+                if (nodeTags.isNotEmpty) ...[
+                  const PopupMenuDivider(),
+                  for (final t in nodeTags)
+                    CheckedPopupMenuItem<String>(
+                      key: ValueKey('node_filter_t_$t'),
+                      value: MuseNodeFilter.tag(t).toRaw(),
+                      checked: nodeFilter == MuseNodeFilter.tag(t),
+                      child: Text('标签：$t'),
+                    ),
+                ],
+              ],
             ),
           if (nodeTotal > 1)
             PopupMenuButton<MuseNodeSort>(
@@ -351,6 +417,35 @@ class MuseNodeList extends HookConsumerWidget {
         ),
       );
     } else {
+      // 1.6.0 #37: 最近使用 — tap to switch back
+      final byTagAll = {for (final e in group.items) if (!e.isGroup) e.tag: e};
+      final offers = selecting.value ? const <String>[] : museRecentToOffer(recent, present: byTagAll.keys, selected: group.selected);
+      if (offers.isNotEmpty) {
+        children.add(
+          SingleChildScrollView(
+            key: const ValueKey('node_recent_row'),
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.fromLTRB(margin, 0, margin, MuseSpace.s8),
+            child: Row(
+              children: [
+                Text('最近', style: MuseType.caption(context)),
+                for (final t in offers) ...[
+                  const SizedBox(width: MuseSpace.s8),
+                  ActionChip(
+                    key: ValueKey('node_recent_$t'),
+                    visualDensity: VisualDensity.compact,
+                    label: Text(shownName(byTagAll[t]!), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    onPressed: () async {
+                      await musePickNode(ref, group.tag, t);
+                      onPicked?.call();
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      }
       final duplicates = hideDuplicates
           ? museDuplicateTags<OutboundInfo>(
               group.items.where((e) => !e.isGroup).toList(),
@@ -368,7 +463,8 @@ class MuseNodeList extends HookConsumerWidget {
                 (!museIsInfoNode(museNodeName(e)) &&
                     !duplicates.contains(e.tag) &&
                     museNodeNamePasses(museNodeName(e), include: includeRe, exclude: excludeRe) &&
-                    museNodeNamePasses(museNodeName(e), include: subFilter.include, exclude: subFilter.exclude)),
+                    museNodeNamePasses(museNodeName(e), include: subFilter.include, exclude: subFilter.exclude) &&
+                    nodeFilter.passes(protocolShort: museNodeProtocolShort(e), tags: metas.of(e.tag).tags)),
           )
           .toList();
       final userHidden = {for (final t in metas.hiddenTags) if (t != group.selected) t};
@@ -379,7 +475,7 @@ class MuseNodeList extends HookConsumerWidget {
           isGroup: (e) => e.isGroup,
           delay: (e) => museFreshDelay(e, since),
           isValidDelay: ConnectionConst.isValidDelay,
-          region: (e) => museRegionCode(museNodeName(e)),
+          region: regionOf,
         ),
         isGroup: (e) => e.isGroup,
         tag: (e) => e.tag,
@@ -414,6 +510,7 @@ class MuseNodeList extends HookConsumerWidget {
         selected: group.selected == proxy.tag,
         favorite: favorites.contains(proxy.tag),
         displayName: proxy.isGroup ? null : shownName(proxy),
+        region: proxy.isGroup ? null : metas.of(proxy.tag).region,
         note: proxy.isGroup ? '' : metas.of(proxy.tag).note,
         shownPick: shownPick,
         checked: selecting.value && !proxy.isGroup ? picked.value.contains(proxy.tag) : null,
@@ -447,10 +544,9 @@ class MuseNodeList extends HookConsumerWidget {
         children: isCollapsed ?? false ? const [] : [for (final p in items) row(p, dimmed: dimmed)],
       );
 
-      Future<void> toggleRegion(String code) async {
-        final next = {...collapsed};
-        if (!next.remove(code)) next.add(code);
-        await ref.read(MusePrefs.collapsedRegions.notifier).update(next.join(','));
+      // 1.6.0 #39: uncommon regions start folded; the user's own fold / unfold is remembered
+      Future<void> toggleRegion(String code, {required bool folded}) async {
+        await ref.read(MusePrefs.collapsedRegions.notifier).update(museToggleRegionFold(collapsed, code, folded: folded).join(','));
       }
 
       Widget foldToggle({required Key key, required IconData icon, required String label, required bool open, required VoidCallback onTap}) =>
@@ -492,11 +588,14 @@ class MuseNodeList extends HookConsumerWidget {
       if (sortMode == MuseNodeSort.region) {
         final favs = nodes.where((e) => favorites.contains(e.tag)).toList();
         if (favs.isNotEmpty) children.add(section('⭐ 收藏', favs, key: const ValueKey('region_header_favorites')));
-        for (final s in museRegionSections<OutboundInfo>(
+        final regionSections = museRegionSections<OutboundInfo>(
           nodes.where((e) => !favorites.contains(e.tag)).toList(),
           isGroup: (e) => e.isGroup,
-          region: (e) => museRegionCode(museNodeName(e)),
-        )) {
+          region: regionOf,
+        );
+        final inUse = group.items.where((e) => e.tag == group.selected && !e.isGroup).firstOrNull;
+        final inUseRegion = inUse == null ? null : (regionOf(inUse) ?? 'other');
+        for (final s in regionSections) {
           final code = s.region;
           final label = code == null ? '其他' : '${museCountryFlag(code) ?? ''} ${museCountryLabel(code)}'.trim();
           // 1.4.0: the header shows the group's best delay; tap folds the group
@@ -505,13 +604,15 @@ class MuseNodeList extends HookConsumerWidget {
               .where(ConnectionConst.isValidDelay)
               .fold<int>(0, (a, b) => a == 0 || b < a ? b : a);
           final key = code ?? 'other';
+          final folded = !filtering &&
+              museRegionFolded(key, collapsed, regionCount: regionSections.length, selectedRegion: inUseRegion);
           children.add(
             section(
               '$label · ${s.items.length}${best > 0 ? ' · $best ms' : ''}',
               s.items,
               key: ValueKey('region_header_$key'),
-              isCollapsed: !filtering && collapsed.contains(key),
-              onHeaderTap: () => toggleRegion(key),
+              isCollapsed: folded,
+              onHeaderTap: () => toggleRegion(key, folded: folded),
             ),
           );
         }
@@ -782,7 +883,11 @@ class MuseNodeRow extends StatelessWidget {
     this.note = '',
     this.checked,
     this.shownPick,
+    this.region,
   });
+
+  /// 1.6.0 #32: region set by hand (ISO code; null / '' = from the name)
+  final String? region;
 
   /// 1.5.3: a group's pick as its row shows it
   final String Function(String raw)? shownPick;
@@ -849,7 +954,12 @@ class MuseNodeRow extends StatelessWidget {
             MuseGroupIcon.other => Icons.folder_outlined,
           }
         : Icons.public_outlined;
-    final flag = proxy.isGroup ? null : (museFlagEmoji(name) ?? museFlagEmoji(museNodeName(proxy)));
+    final own = region ?? '';
+    final flag = proxy.isGroup
+        ? null
+        : own.isNotEmpty
+        ? museCountryFlag(own)
+        : (museFlagEmoji(name) ?? museFlagEmoji(museNodeName(proxy)));
 
     final row = Material(
       color: selected ? mt.selected : MusePalette.transparent,
@@ -1046,10 +1156,10 @@ Future<void> showMuseNodeDetails(
   } else {
     delayText = '超时';
   }
-  final region = museRegionCode(name);
   // 1.4.0: address, landing IP, health from the recent 测速 results
   final metas = MuseNodeMetas.parse(ref.read(MusePrefs.nodeMeta));
   final meta = metas.of(proxy.tag);
+  final region = metas.regionOf(proxy.tag, museRegionCode(name));
   final history = MuseDelayHistories.parse(ref.read(MusePrefs.delayHistory)).of(proxy.tag);
   final health = museHealthScore(history);
   final exitCode = proxy.hasIpinfo() ? proxy.ipinfo.countryCode : '';
@@ -1076,7 +1186,8 @@ Future<void> showMuseNodeDetails(
           ? museInvalidNodeSubtitle(proxy.type)
           : museProtocolName(proxy.type),
     ),
-    if (region != null) ('地区', '${museCountryFlag(region) ?? ''} ${museCountryLabel(region)}'.trim()),
+    if (region != null)
+      ('地区', '${museCountryFlag(region) ?? ''} ${museCountryLabel(region)}${meta.region.isNotEmpty ? '（手动）' : ''}'.trim()),
     ('延迟', delayText),
     if (testedAt != null && delay != 0) ('测速时间', museUpdatedAgo(testedAt, now: DateTime.now()).replaceAll('更新', '')),
     if (!proxy.isGroup && proxy.host.isNotEmpty) ('地址', '${proxy.host}${proxy.port > 0 ? ':${proxy.port}' : ''}'),
@@ -1089,7 +1200,10 @@ Future<void> showMuseNodeDetails(
         '${museHealthLabel(health)} $health · 丢包 ${(history.loss * 100).round()}% · 抖动 ${history.jitter.round()} ms',
       ),
     if (meta.note.isNotEmpty) ('备注', meta.note),
+    if (meta.tags.isNotEmpty) ('标签', meta.tags.join('、')),
   ];
+  // 1.6.0 #29: the last 10 delays as a mini line
+  final spark = museSparkline(history.samples);
   Future<void> saveMeta(MuseNodeMeta next) async {
     final cur = MuseNodeMetas.parse(ref.read(MusePrefs.nodeMeta));
     await ref.read(MusePrefs.nodeMeta.notifier).update(cur.set(proxy.tag, next).toRaw());
@@ -1150,6 +1264,19 @@ Future<void> showMuseNodeDetails(
                     if (sheetContext.mounted) Navigator.of(sheetContext).pop();
                     toast('已复制');
                   },
+                ),
+              ],
+              if (spark.length >= 2) ...[
+                const SizedBox(height: MuseSpace.s8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: MuseSize.labelColumn,
+                      child: Text('最近 ${spark.length} 次', style: MuseType.body(sheetContext).copyWith(color: mt.text2)),
+                    ),
+                    Expanded(child: MuseSparkline(points: spark)),
+                  ],
                 ),
               ],
               if (inUse) ...[
@@ -1230,6 +1357,36 @@ Future<void> showMuseNodeDetails(
                         onPressed: () async {
                           Navigator.of(sheetContext).pop();
                           await saveMeta(meta.copyWith(hidden: !meta.hidden));
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: MuseSpace.s12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('node_set_region'),
+                        icon: const Icon(Icons.flag_outlined, size: MuseIconSize.small),
+                        label: const Text('指定地区'),
+                        onPressed: () async {
+                          Navigator.of(sheetContext).pop();
+                          final v = await museAskRegion(context, current: meta.region);
+                          if (v != null) await saveMeta(meta.copyWith(region: v));
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: MuseSpace.s12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('node_set_tags'),
+                        icon: const Icon(Icons.sell_outlined, size: MuseIconSize.small),
+                        label: const Text('标签'),
+                        onPressed: () async {
+                          Navigator.of(sheetContext).pop();
+                          final v = await museAskNodeTags(context, current: meta.tags, known: metas.allTags);
+                          if (v != null) await saveMeta(meta.copyWith(tags: v));
                         },
                       ),
                     ),
@@ -1449,4 +1606,169 @@ class _MuseDownloadTestRowState extends State<MuseDownloadTestRow> {
       ],
     );
   }
+}
+
+/// 1.6.0 #29: the last delays of a node as a small line (gaps where a test got no answer).
+class MuseSparkline extends StatelessWidget {
+  const MuseSparkline({super.key, required this.points});
+
+  /// heights 0–1 (1 = slowest), null = no answer (logic/node_tools.dart museSparkline)
+  final List<double?> points;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    key: const ValueKey('node_sparkline'),
+    height: MuseSize.sparkHeight,
+    child: CustomPaint(painter: _SparkPainter(points, MusePalette.brand, MusePalette.red), size: Size.infinite),
+  );
+}
+
+class _SparkPainter extends CustomPainter {
+  _SparkPainter(this.points, this.color, this.missColor);
+
+  final List<double?> points;
+  final Color color;
+  final Color missColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+    final line = Paint()
+      ..color = color
+      ..strokeWidth = MuseSize.sparkStroke
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final dot = Paint()..color = color;
+    final miss = Paint()..color = missColor;
+    final step = size.width / (points.length - 1);
+    final pad = MuseSize.sparkDot;
+    final h = size.height - pad * 2;
+    Offset? prev;
+    for (var i = 0; i < points.length; i++) {
+      final v = points[i];
+      final x = i * step;
+      if (v == null) {
+        canvas.drawCircle(Offset(x.clamp(pad, size.width - pad), size.height - pad), pad, miss);
+        prev = null;
+        continue;
+      }
+      // faster = higher on the line
+      final p = Offset(x, pad + h * v);
+      if (prev != null) canvas.drawLine(prev, p, line);
+      canvas.drawCircle(Offset(x.clamp(pad, size.width - pad), p.dy), pad, dot);
+      prev = p;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SparkPainter old) => old.points.join(',') != points.join(',') || old.color != color;
+}
+
+/// 1.6.0 #32: pick a node's region by hand; '' = 按名称自动识别, null = cancelled.
+Future<String?> museAskRegion(BuildContext context, {String current = ''}) => showDialog<String>(
+  context: context,
+  builder: (c) => SimpleDialog(
+    key: const ValueKey('node_region_dialog'),
+    title: const Text('指定地区'),
+    children: [
+      SimpleDialogOption(
+        key: const ValueKey('node_region_auto'),
+        onPressed: () => Navigator.of(c).pop(''),
+        child: Text('按名称自动识别${current.isEmpty ? '（当前）' : ''}'),
+      ),
+      for (final e in museCountryNames.entries)
+        SimpleDialogOption(
+          key: ValueKey('node_region_${e.key}'),
+          onPressed: () => Navigator.of(c).pop(e.key),
+          child: Text('${museCountryFlag(e.key) ?? ''} ${e.value}${current == e.key ? '（当前）' : ''}'.trim()),
+        ),
+    ],
+  ),
+);
+
+/// 1.6.0 #33: choose a node's tags (presets + ones already used + a new one); null = cancelled.
+Future<List<String>?> museAskNodeTags(BuildContext context, {required List<String> current, required List<String> known}) =>
+    showDialog<List<String>>(
+      context: context,
+      builder: (c) => _MuseTagDialog(current: current, known: known),
+    );
+
+class _MuseTagDialog extends StatefulWidget {
+  const _MuseTagDialog({required this.current, required this.known});
+
+  final List<String> current;
+  final List<String> known;
+
+  @override
+  State<_MuseTagDialog> createState() => _MuseTagDialogState();
+}
+
+class _MuseTagDialogState extends State<_MuseTagDialog> {
+  late final List<String> _all = [...museCleanNodeTags([...museNodeTagPresets, ...widget.known, ...widget.current], max: 64)];
+  late final Set<String> _on = {...widget.current};
+  final _text = TextEditingController();
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _add() {
+    final v = museCleanNodeTags([_text.text]);
+    if (v.isEmpty) return;
+    setState(() {
+      if (!_all.contains(v.first)) _all.add(v.first);
+      _on.add(v.first);
+      _text.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    key: const ValueKey('node_tags_dialog'),
+    title: const Text('标签'),
+    content: SizedBox(
+      width: MuseSize.dialogText,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: MuseSpace.s8,
+            runSpacing: MuseSpace.s8,
+            children: [
+              for (final t in _all)
+                FilterChip(
+                  key: ValueKey('node_tag_$t'),
+                  label: Text(t),
+                  selected: _on.contains(t),
+                  onSelected: (v) => setState(() => v ? _on.add(t) : _on.remove(t)),
+                ),
+            ],
+          ),
+          const SizedBox(height: MuseSpace.s12),
+          TextField(
+            key: const ValueKey('node_tag_new'),
+            controller: _text,
+            maxLength: 12,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: '新标签，如 低倍率',
+              suffixIcon: IconButton(key: const ValueKey('node_tag_add'), icon: const Icon(Icons.add_outlined), onPressed: _add),
+            ),
+            onSubmitted: (_) => _add(),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('取消')),
+      FilledButton(
+        key: const ValueKey('node_tags_save'),
+        onPressed: () => Navigator.of(context).pop([for (final t in _all) if (_on.contains(t)) t]),
+        child: const Text('保存'),
+      ),
+    ],
+  );
 }

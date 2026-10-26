@@ -12,32 +12,72 @@ import 'dart:math' as math;
 /// What the user set on one node, kept by its tag (the name the subscription gives it), so it
 /// survives updates of the subscription.
 class MuseNodeMeta {
-  const MuseNodeMeta({this.rename = '', this.note = '', this.hidden = false});
+  const MuseNodeMeta({this.rename = '', this.note = '', this.hidden = false, this.region = '', this.tags = const []});
 
   final String rename;
   final String note;
   final bool hidden;
 
-  bool get isEmpty => rename.isEmpty && note.isEmpty && !hidden;
+  /// 1.6.0 #32: region set by hand (ISO code) when the name doesn't say; '' = recognised from the name
+  final String region;
 
-  MuseNodeMeta copyWith({String? rename, String? note, bool? hidden}) =>
-      MuseNodeMeta(rename: rename ?? this.rename, note: note ?? this.note, hidden: hidden ?? this.hidden);
+  /// 1.6.0 #33: the user's own tags (家宽 / 流媒体 / 游戏 …)
+  final List<String> tags;
+
+  bool get isEmpty => rename.isEmpty && note.isEmpty && !hidden && region.isEmpty && tags.isEmpty;
+
+  MuseNodeMeta copyWith({String? rename, String? note, bool? hidden, String? region, List<String>? tags}) => MuseNodeMeta(
+    rename: rename ?? this.rename,
+    note: note ?? this.note,
+    hidden: hidden ?? this.hidden,
+    region: region == null ? this.region : region.toUpperCase(),
+    tags: tags == null ? this.tags : museCleanNodeTags(tags),
+  );
 
   Map<String, dynamic> toJson() => {
     if (rename.isNotEmpty) 'n': rename,
     if (note.isNotEmpty) 'r': note,
     if (hidden) 'h': 1,
+    if (region.isNotEmpty) 'g': region,
+    if (tags.isNotEmpty) 't': tags,
   };
 
-  static MuseNodeMeta fromJson(Map<String, dynamic> m) =>
-      MuseNodeMeta(rename: '${m['n'] ?? ''}', note: '${m['r'] ?? ''}', hidden: m['h'] == 1 || m['h'] == true);
+  static MuseNodeMeta fromJson(Map<String, dynamic> m) => MuseNodeMeta(
+    rename: '${m['n'] ?? ''}',
+    note: '${m['r'] ?? ''}',
+    hidden: m['h'] == 1 || m['h'] == true,
+    region: '${m['g'] ?? ''}'.toUpperCase(),
+    tags: m['t'] is List ? museCleanNodeTags([for (final e in m['t'] as List) '$e']) : const [],
+  );
 
   @override
   bool operator ==(Object other) =>
-      other is MuseNodeMeta && other.rename == rename && other.note == note && other.hidden == hidden;
+      other is MuseNodeMeta &&
+      other.rename == rename &&
+      other.note == note &&
+      other.hidden == hidden &&
+      other.region == region &&
+      other.tags.join('\n') == tags.join('\n');
 
   @override
-  int get hashCode => Object.hash(rename, note, hidden);
+  int get hashCode => Object.hash(rename, note, hidden, region, tags.join('\n'));
+}
+
+/// 1.6.0 #33: the tags offered first.
+const museNodeTagPresets = ['家宽', '流媒体', '游戏'];
+
+/// Tags trimmed, de-duplicated, at most [max] (8 per node) of at most 12 characters each, in the
+/// given order.
+List<String> museCleanNodeTags(Iterable<String> tags, {int max = 8}) {
+  final out = <String>[];
+  for (final t in tags) {
+    var v = t.trim().replaceAll(RegExp(r'[\s,，]+'), ' ');
+    if (v.isEmpty) continue;
+    if (v.length > 12) v = v.substring(0, 12);
+    if (!out.contains(v)) out.add(v);
+    if (out.length == max) break;
+  }
+  return List.unmodifiable(out);
 }
 
 /// All node metas: `{tag: {n, r, h}}`.
@@ -94,6 +134,25 @@ class MuseNodeMetas {
     final own = of(tag).rename.trim();
     if (own.isNotEmpty) return own;
     return beautify ? museBeautifyNodeName(original) : original;
+  }
+
+  /// 1.6.0 #32: the node's region — the one set by hand, else [fromName] (recognised from its name).
+  String? regionOf(String tag, String? fromName) {
+    final own = of(tag).region;
+    return own.isNotEmpty ? own : fromName;
+  }
+
+  /// 1.6.0 #33: every tag in use, presets first, then the user's own in first-seen order.
+  List<String> get allTags {
+    final used = <String>[for (final m in byTag.values) ...m.tags];
+    return [
+      for (final p in museNodeTagPresets)
+        if (used.contains(p)) p,
+      ...{
+        for (final t in used)
+          if (!museNodeTagPresets.contains(t)) t,
+      },
+    ];
   }
 
   /// 1.5.3: the name to show for a group's pick (自动最快 → its node), given by the core as the
@@ -322,6 +381,22 @@ List<String> museAddRecent(List<String> recent, String tag, {int keep = 5}) =>
 List<String> museParseRecent(String raw) =>
     raw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
+/// 1.6.0 #37: the stored recent list (a JSON list, so tags with commas survive; the older comma
+/// list is still read).
+List<String> museRecentFromRaw(String raw) {
+  final r = raw.trim();
+  if (r.startsWith('[')) {
+    try {
+      return [for (final e in jsonDecode(r) as List) if ('$e'.isNotEmpty) '$e'];
+    } catch (_) {
+      return const [];
+    }
+  }
+  return museParseRecent(r);
+}
+
+String museRecentToRaw(List<String> recent) => jsonEncode(recent);
+
 // ---------------------------------------------------------------- landing region
 
 /// The landing region does not match the region in the node's name (「名不符实」): both known and
@@ -461,3 +536,112 @@ String museSpeedText(double bytesPerSecond) {
   final kbs = bytesPerSecond / 1024;
   return '${kbs.toStringAsFixed(0)} KB/s（${mbps.toStringAsFixed(1)} Mbps）';
 }
+
+// ---------------------------------------------------------------- 1.6.0 (batch 2, nodes)
+
+/// #28 / #33: what 节点 is narrowed to — one protocol (by its short label, 「VLESS」) or one of the
+/// user's tags. Stored as 「p:VLESS」 / 「t:家宽」; '' = everything.
+class MuseNodeFilter {
+  const MuseNodeFilter._(this.kind, this.value);
+
+  /// 'p' (protocol), 't' (tag) or '' (none)
+  final String kind;
+  final String value;
+
+  static const none = MuseNodeFilter._('', '');
+
+  factory MuseNodeFilter.protocol(String short) => MuseNodeFilter._('p', short);
+  factory MuseNodeFilter.tag(String tag) => MuseNodeFilter._('t', tag);
+
+  static MuseNodeFilter parse(String raw) {
+    final r = raw.trim();
+    if (r.length > 2 && (r.startsWith('p:') || r.startsWith('t:'))) return MuseNodeFilter._(r[0], r.substring(2));
+    if (r.isNotEmpty && !r.contains(':')) return MuseNodeFilter._('p', r.toUpperCase());
+    return none;
+  }
+
+  bool get isNone => kind.isEmpty;
+
+  String toRaw() => isNone ? '' : '$kind:$value';
+
+  /// The label in the toolbar / menu.
+  String get label => isNone ? '全部' : value;
+
+  /// Whether a node of [protocolShort] with [tags] stays in the list.
+  bool passes({required String protocolShort, required List<String> tags}) => switch (kind) {
+    'p' => protocolShort.toUpperCase() == value.toUpperCase(),
+    't' => tags.contains(value),
+    _ => true,
+  };
+
+  /// A filter whose protocol / tag no longer exists among the nodes filters nothing (so the
+  /// list never stays empty after the subscription changed).
+  MuseNodeFilter within({required Iterable<String> protocols, required Iterable<String> tags}) => switch (kind) {
+    'p' => protocols.any((p) => p.toUpperCase() == value.toUpperCase()) ? this : none,
+    't' => tags.contains(value) ? this : none,
+    _ => none,
+  };
+
+  @override
+  bool operator ==(Object other) => other is MuseNodeFilter && other.kind == kind && other.value == value;
+
+  @override
+  int get hashCode => Object.hash(kind, value);
+}
+
+/// #28: the protocols (short labels) among [shorts], most common first, ties by name.
+List<String> museProtocolsPresent(Iterable<String> shorts) {
+  final count = <String, int>{};
+  for (final s in shorts) {
+    if (s.isEmpty) continue;
+    count[s] = (count[s] ?? 0) + 1;
+  }
+  return count.keys.toList()..sort((a, b) => count[b]! != count[a]! ? count[b]!.compareTo(count[a]!) : a.compareTo(b));
+}
+
+/// #29: the last [keep] delays as heights 0–1 for the detail's mini line (1 = the slowest of
+/// them, 0.15 = the fastest, 0.5 when all are equal); null = no answer (a gap).
+List<double?> museSparkline(List<int> samples, {int keep = 10}) {
+  final last = samples.length > keep ? samples.sublist(samples.length - keep) : samples;
+  bool ok(int d) => d > 0 && d < 65000;
+  final good = last.where(ok);
+  if (good.isEmpty) return [for (final _ in last) null];
+  final hi = good.reduce(math.max).toDouble();
+  final lo = good.reduce(math.min).toDouble();
+  return [
+    for (final d in last)
+      if (!ok(d))
+        null
+      else if (hi == lo)
+        0.5
+      else
+        0.15 + 0.85 * (d - lo) / (hi - lo),
+  ];
+}
+
+/// #37: the recently used nodes to offer (newest first): only those still in the list, not the
+/// one in use, at most [keep].
+List<String> museRecentToOffer(List<String> recent, {required Iterable<String> present, required String selected, int keep = 5}) {
+  final has = present.toSet();
+  return recent.where((t) => t != selected && has.contains(t)).take(keep).toList();
+}
+
+/// #39: regions most people use; the others start folded when the list has many regions.
+const museCommonRegions = {'HK', 'TW', 'JP', 'SG', 'US', 'KR'};
+
+/// #39: whether the region [key] (ISO code or 'other') is folded. [stored] holds 「JP」 (folded by
+/// the user) or 「+DE」 (opened by the user); anything else follows the default — uncommon regions
+/// fold when there are more than [few] regions; [selectedRegion] (the key of the node in use)
+/// never does.
+bool museRegionFolded(String key, Set<String> stored, {required int regionCount, String? selectedRegion, int few = 4}) {
+  if (stored.contains(key)) return true;
+  if (stored.contains('+$key')) return false;
+  if (selectedRegion != null && key == selectedRegion) return false;
+  return regionCount > few && !museCommonRegions.contains(key);
+}
+
+/// #39: [stored] after the user tapped [key]'s header while it was [folded].
+Set<String> museToggleRegionFold(Set<String> stored, String key, {required bool folded}) => {...stored}
+  ..remove(key)
+  ..remove('+$key')
+  ..add(folded ? '+$key' : key);

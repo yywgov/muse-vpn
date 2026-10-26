@@ -119,6 +119,11 @@ abstract final class MuseSize {
 
   /// 1.4.0: 统计 chart height, gap between its bars, minimum bar, QR code
   static const chartHeight = 160.0;
+
+  /// 1.6.0 #29: the delay mini line in a node's detail
+  static const sparkHeight = 36.0;
+  static const sparkStroke = 2.0;
+  static const sparkDot = 2.5;
   static const barGap = 2.0;
   static const barMin = 4.0;
   static const qrCode = 240.0;
