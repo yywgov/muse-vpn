@@ -3,6 +3,9 @@ import 'package:hiddify/features/muse/settings/sub_filter_dialog.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/config/runtime_config_sheet.dart';
+import 'package:flutter/services.dart';
+import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/subscription_bar.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
@@ -334,6 +337,32 @@ class ProfileActionsMenu extends HookConsumerWidget {
             copyText: remote.url,
           ),
         ),
+      // 1.6.0 C6: copy the link (it carries the subscription's key: asked first)
+      if (profile case final RemoteProfileEntity remote)
+        AdaptiveMenuItem(
+          leadingIcon: const Icon(Icons.link_outlined),
+          title: '复制链接',
+          onTap: () async {
+            final ok = await ref
+                .read(dialogNotifierProvider.notifier)
+                .showConfirmation(
+                  title: '复制订阅链接',
+                  message: '链接里带有订阅密钥，别人拿到就能用你的流量。确定要复制吗？',
+                  positiveBtnTxt: '复制',
+                );
+            if (!ok) return;
+            await Clipboard.setData(ClipboardData(text: remote.url));
+            try {
+              ref.read(inAppNotificationControllerProvider).showSuccessToast('已复制订阅链接');
+            } catch (_) {}
+          },
+        ),
+      // 1.6.0 C6: the saved config, read only and redacted
+      AdaptiveMenuItem(
+        leadingIcon: const Icon(Icons.data_object_outlined),
+        title: '查看运行配置',
+        onTap: () => showMuseRuntimeConfig(context, id: profile.id, name: profile.name),
+      ),
       // 1.5.0 #43: 只显示 / 排除 for this subscription alone
       AdaptiveMenuItem(
         leadingIcon: const Icon(Icons.filter_alt_outlined),

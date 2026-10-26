@@ -69,6 +69,9 @@ abstract final class MusePrefs {
 
   /// 1.6.0 #34: favourites follow the user's own order (the order of muse_favorite_nodes)
   static final favoriteManualOrder = PreferencesNotifier.create<bool, bool>("muse_favorite_manual_order", false);
+
+  /// 1.6.0 C6: the user's order of subscriptions (comma list of ids; never deletes one)
+  static final profileOrder = PreferencesNotifier.create<String, String>("muse_profile_order", "");
   static final recentNodes = PreferencesNotifier.create<String, String>("muse_recent_nodes", "");
 
   /// protocol filter on 节点 ('' = all)

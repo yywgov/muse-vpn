@@ -11,6 +11,8 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
+import 'package:hiddify/features/muse/logic/profile_tools.dart';
+import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/profile/add/widgets/widgets.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
@@ -72,6 +74,13 @@ class AddProfileOptions extends HookConsumerWidget {
     final options = <Widget>[
       option(const ValueKey('add_from_clipboard_button'), Icons.content_paste_outlined, '粘贴链接', () async {
         final cr = await Clipboard.getData(Clipboard.kTextPlain).then((value) => value?.text ?? '');
+        // 1.6.0 C6: several subscription links at once → imported one by one, then one summary
+        if (museIsLinkBatch(cr) && context.mounted) {
+          final container = ProviderScope.containerOf(context);
+          if (context.canPop()) context.pop();
+          await museImportLinkBatch(container, museSplitSubLinks(cr));
+          return;
+        }
         ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
       }),
       if (!PlatformUtils.isDesktop)
@@ -289,4 +298,28 @@ class AddProfileManual extends HookConsumerWidget {
       ),
     );
   }
+}
+
+/// 1.6.0 C6: imports [links] one after another (each through the normal add path, which only adds or
+/// updates a subscription, never deletes one) and shows one summary. Returns (ok, failed).
+Future<(int, int)> museImportLinkBatch(ProviderContainer container, List<String> links) async {
+  final keep = container.listen(addProfileNotifierProvider, (_, _) {});
+  var ok = 0;
+  var failed = 0;
+  try {
+    for (final link in links) {
+      await container.read(addProfileNotifierProvider.notifier).addClipboard(link);
+      if (container.read(addProfileNotifierProvider).hasError) {
+        failed++;
+      } else {
+        ok++;
+      }
+    }
+  } finally {
+    keep.close();
+  }
+  try {
+    container.read(inAppNotificationControllerProvider).showInfoToast(museBatchSummary(ok, failed));
+  } catch (_) {}
+  return (ok, failed);
 }
