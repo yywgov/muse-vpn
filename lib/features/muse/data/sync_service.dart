@@ -36,6 +36,8 @@ final museSyncedPrefs = <String, ProviderOrFamily>{
   'muse_node_exclude': MusePrefs.excludeRegex,
   'muse_hide_duplicates': MusePrefs.hideDuplicates,
   'muse_dedup_mode': MusePrefs.dedupMode,
+  'muse_node_layout': MusePrefs.nodeLayout,
+  'muse_node_density': MusePrefs.nodeDensity,
   'muse_favorite_manual_order': MusePrefs.favoriteManualOrder,
   'muse_rule_presets': MusePrefs.rulePresets,
   'muse_hosts': MusePrefs.hosts,

@@ -5,6 +5,7 @@
 // Part of 穿云 (GPLv3).
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +22,7 @@ import 'package:hiddify/features/muse/logic/exit_check.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
+import 'package:hiddify/features/muse/logic/node_style.dart';
 import 'package:hiddify/features/muse/logic/node_share.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
@@ -231,6 +233,13 @@ class MuseNodeList extends HookConsumerWidget {
     final nodeFilter = MuseNodeFilter.parse(ref.watch(MusePrefs.protocolFilter)).within(protocols: protocols, tags: nodeTags);
     final recent = museRecentFromRaw(ref.watch(MusePrefs.recentNodes));
     final profileName = ref.watch(museActiveProfileNameProvider)?.trim() ?? '';
+    // 1.6.0 C5: 列表 / 卡片 and 紧凑 / 标准 / 宽松 (the embedded lists stay a plain list)
+    final layout = embedded ? MuseNodeLayout.list : MuseNodeLayout.fromKey(ref.watch(MusePrefs.nodeLayout));
+    final density = MuseNodeDensity.fromKey(ref.watch(MusePrefs.nodeDensity));
+    final ownScroll = useScrollController();
+    final scroll = controller ?? ownScroll;
+    final selectedKey = useMemoized(GlobalKey.new);
+    var selectedKeyUsed = false;
 
     // every node answered (or timed out) since 测速 started: end the test
     if (testing && group != null) {
@@ -343,6 +352,50 @@ class MuseNodeList extends HookConsumerWidget {
                       child: Text('标签：$t'),
                     ),
                 ],
+              ],
+            ),
+          // hidden while 测速 / 多选 runs (the toolbar needs the room at 320 px + 2× text)
+          if (!embedded && nodeTotal > 0 && !testing && !selecting.value)
+            PopupMenuButton<String>(
+              key: const ValueKey('node_style_button'),
+              tooltip: '样式',
+              icon: const Icon(Icons.view_agenda_outlined, size: MuseIconSize.small),
+              style: const ButtonStyle(visualDensity: VisualDensity.compact),
+              onSelected: (v) async {
+                if (v == _locateItem) {
+                  final found = await museScrollToKey(scroll, selectedKey);
+                  if (!found) {
+                    try {
+                      ref.read(inAppNotificationControllerProvider).showInfoToast('当前节点不在列表里（可能已折叠或被筛选）');
+                    } catch (_) {}
+                  }
+                  return;
+                }
+                final l = MuseNodeLayout.values.where((e) => 'layout_${e.key}' == v).firstOrNull;
+                if (l != null) return ref.read(MusePrefs.nodeLayout.notifier).update(l.key);
+                final d = MuseNodeDensity.values.where((e) => 'density_${e.key}' == v).firstOrNull;
+                if (d != null) return ref.read(MusePrefs.nodeDensity.notifier).update(d.key);
+              },
+              itemBuilder: (context) => [
+                if (group != null && group.selected.isNotEmpty) ...[
+                  const PopupMenuItem<String>(key: ValueKey('node_locate'), value: _locateItem, child: Text('滚动到当前节点')),
+                  const PopupMenuDivider(),
+                ],
+                for (final l in MuseNodeLayout.values)
+                  CheckedPopupMenuItem<String>(
+                    key: ValueKey('node_layout_${l.key}'),
+                    value: 'layout_${l.key}',
+                    checked: l == layout,
+                    child: Text(l.title),
+                  ),
+                const PopupMenuDivider(),
+                for (final d in MuseNodeDensity.values)
+                  CheckedPopupMenuItem<String>(
+                    key: ValueKey('node_density_${d.key}'),
+                    value: 'density_${d.key}',
+                    checked: d == density,
+                    child: Text(d.title),
+                  ),
               ],
             ),
           if (nodeTotal > 1)
@@ -532,8 +585,9 @@ class MuseNodeList extends HookConsumerWidget {
       final nodeCount = listed.where((e) => !e.isGroup).length;
       final latencyCache = ref.watch(museLatencyCacheProvider);
 
-      Widget row(OutboundInfo proxy, {bool dimmed = false}) => MuseNodeRow(
+      Widget rowOf(OutboundInfo proxy, {bool dimmed = false}) => MuseNodeRow(
         key: ValueKey(proxy.tag),
+        padV: density.padV,
         proxy: proxy,
         since: since,
         nodeCount: nodeCount,
@@ -560,6 +614,14 @@ class MuseNodeList extends HookConsumerWidget {
           onPicked?.call();
         },
       );
+
+      Widget row(OutboundInfo proxy, {bool dimmed = false}) {
+        final r = rowOf(proxy, dimmed: dimmed);
+        // 1.6.0 C5: 滚动到当前节点 finds the first row of the node in use
+        if (group.selected != proxy.tag || selectedKeyUsed) return r;
+        selectedKeyUsed = true;
+        return KeyedSubtree(key: selectedKey, child: r);
+      }
 
       Widget section(
         String? header,
@@ -705,18 +767,31 @@ class MuseNodeList extends HookConsumerWidget {
 
     // 1.5.0 #22: rows are built lazily (a subscription with a thousand nodes scrolls smoothly);
     // each section is one sliver, its card painted behind the rows
-    final list = CustomScrollView(
-      key: listKey,
-      controller: controller,
-      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-      slivers: [
-        SliverPadding(
-          padding: EdgeInsets.only(top: MuseSpace.s4, bottom: embedded ? MuseSpace.s16 : MuseSpace.s32),
-          sliver: SliverMainAxisGroup(
-            slivers: [for (final c in children) c is _NodeSection ? c.buildSliver(context) : SliverToBoxAdapter(child: c)],
-          ),
-        ),
-      ],
+    // 1.6.0 C5: 卡片 = the same rows as cards in a grid (fixed height, built lazily)
+    final scaler = MediaQuery.textScalerOf(context);
+    final list = LayoutBuilder(
+      builder: (context, box) {
+        final columns = layout == MuseNodeLayout.grid
+            ? museNodeColumns(box.maxWidth - margin * 2, density, textScale: scaler.scale(MuseType.numberSize) / MuseType.numberSize)
+            : 1;
+        final extent = museNodeCardExtent(density, scaler.scale);
+        return CustomScrollView(
+          key: listKey,
+          controller: scroll,
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.only(top: MuseSpace.s4, bottom: embedded ? MuseSpace.s16 : MuseSpace.s32),
+              sliver: SliverMainAxisGroup(
+                slivers: [
+                  for (final c in children)
+                    c is _NodeSection ? c.buildSliver(context, columns: columns, extent: extent) : SliverToBoxAdapter(child: c),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
     if (embedded) return list;
     // 1.6.0 #38: the node in use stays on top while the list scrolls
@@ -855,9 +930,37 @@ class _NodeSection extends StatelessWidget {
   }
 
   /// 1.5.0 #22: the same section as a sliver whose rows are built only when scrolled into view.
-  Widget buildSliver(BuildContext context) {
+  Widget buildSliver(BuildContext context, {int columns = 1, double extent = 0}) {
     final mt = MuseTheme.of(context);
     final last = children.length - 1;
+    if (columns > 1 && children.isNotEmpty) {
+      return SliverPadding(
+        key: key,
+        padding: EdgeInsets.fromLTRB(margin, MuseSpace.s8, margin, 0),
+        sliver: SliverMainAxisGroup(
+          slivers: [
+            if (header != null) SliverToBoxAdapter(child: _header(context)),
+            SliverGrid.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                mainAxisExtent: extent,
+                crossAxisSpacing: MuseSpace.s8,
+                mainAxisSpacing: MuseSpace.s8,
+              ),
+              itemCount: children.length,
+              itemBuilder: (context, i) => DecoratedBox(
+                key: const ValueKey('node_card'),
+                decoration: mt.cardDecoration(),
+                child: ClipRSuperellipse(
+                  borderRadius: MuseRadius.cardAll,
+                  child: Material(type: MaterialType.transparency, child: Center(child: children[i])),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     const top = BorderRadius.vertical(top: Radius.circular(MuseRadius.card));
     const bottom = BorderRadius.vertical(bottom: Radius.circular(MuseRadius.card));
     return SliverPadding(
@@ -963,7 +1066,11 @@ class MuseNodeRow extends StatelessWidget {
     this.checked,
     this.shownPick,
     this.region,
+    this.padV = MuseSpace.s12,
   });
+
+  /// 1.6.0 C5: vertical padding (紧凑 / 标准 / 宽松)
+  final double padV;
 
   /// 1.6.0 #32: region set by hand (ISO code; null / '' = from the name)
   final String? region;
@@ -1048,7 +1155,7 @@ class MuseNodeRow extends StatelessWidget {
         child: Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s12),
+              padding: EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: padV),
               child: Row(
                 children: [
                   if (checked != null)
@@ -1589,6 +1696,7 @@ Future<void> showMuseNodePicker(BuildContext context) => showModalBottomSheet<vo
 );
 
 /// 1.6.0 #34: the sort menu's 「收藏排序…」 entry.
+const _locateItem = '__locate';
 const _favoriteOrderItem = '__favorites';
 
 /// 1.6.0 #35: pick a format and copy the node in it; returns the format copied (null = cancelled).
@@ -2159,4 +2267,28 @@ class _MuseTagDialogState extends State<_MuseTagDialog> {
       ),
     ],
   );
+}
+
+/// 1.6.0 C5: scrolls [scroll] until the widget with [key] is built (rows are built lazily), then
+/// brings it into view. False when it is never built (folded section, filtered out).
+Future<bool> museScrollToKey(ScrollController scroll, GlobalKey key, {int maxSteps = 400}) async {
+  if (!scroll.hasClients) return false;
+  Future<bool> reveal() async {
+    final ctx = key.currentContext;
+    if (ctx == null || !ctx.mounted) return false;
+    await Scrollable.ensureVisible(ctx, alignment: 0.3, duration: MuseMotion.common);
+    return true;
+  }
+
+  if (await reveal()) return true;
+  scroll.jumpTo(scroll.position.minScrollExtent);
+  await WidgetsBinding.instance.endOfFrame;
+  for (var i = 0; i < maxSteps; i++) {
+    if (await reveal()) return true;
+    final p = scroll.position;
+    if (p.pixels >= p.maxScrollExtent) break;
+    scroll.jumpTo(math.min(p.pixels + p.viewportDimension * 0.8, p.maxScrollExtent));
+    await WidgetsBinding.instance.endOfFrame;
+  }
+  return reveal();
 }

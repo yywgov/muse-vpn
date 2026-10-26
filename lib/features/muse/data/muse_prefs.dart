@@ -63,6 +63,10 @@ abstract final class MusePrefs {
   /// address (address + port) / full (every setting)
   static final dedupMode = PreferencesNotifier.create<String, String>("muse_dedup_mode", "protocol");
 
+  /// 1.6.0 C5: 节点 layout (list / grid) and density (compact / standard / loose)
+  static final nodeLayout = PreferencesNotifier.create<String, String>("muse_node_layout", "list");
+  static final nodeDensity = PreferencesNotifier.create<String, String>("muse_node_density", "standard");
+
   /// 1.6.0 #34: favourites follow the user's own order (the order of muse_favorite_nodes)
   static final favoriteManualOrder = PreferencesNotifier.create<bool, bool>("muse_favorite_manual_order", false);
   static final recentNodes = PreferencesNotifier.create<String, String>("muse_recent_nodes", "");
