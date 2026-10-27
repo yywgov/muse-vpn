@@ -10,11 +10,7 @@ class ThemePreferences extends _$ThemePreferences {
   AppThemeMode build() {
     final persisted = ref.watch(sharedPreferencesProvider).requireValue.getString("theme_mode");
     if (persisted == null) return AppThemeMode.system;
-    // 穿云 1.3.0: 纯黑模式 became the night-blue 深色模式 again
-    if (persisted == AppThemeMode.black.name) {
-      Future.microtask(() => changeThemeMode(AppThemeMode.dark));
-      return AppThemeMode.dark;
-    }
+    // 穿云 1.6.0 C7: 纯黑 is kept again (1.3.0–1.5.x turned a saved 纯黑 into 深色)
     return AppThemeMode.values.asNameMap()[persisted] ?? AppThemeMode.system;
   }
 

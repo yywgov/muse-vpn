@@ -316,7 +316,8 @@ void main() {
   testWidgets('ⓘ on a row: 隐私模式 explanation folded', (tester) async {
     await _pump(tester, page: const MuseAppearancePage(), brightness: Brightness.light, size: phone, tab: 3);
     expect(find.text('首页的流量、IP 等数字打码'), findsNothing);
-    await tester.tap(find.byKey(const ValueKey('row_info')));
+    // 1.6.0 C7: 文字缩放 has an ⓘ too; tap the 隐私模式 one
+    await tester.tap(find.descendant(of: find.byKey(const ValueKey('appearance_privacy')), matching: find.byKey(const ValueKey('row_info'))));
     await tester.pump();
     expect(find.text('首页的流量、IP 等数字打码'), findsOneWidget);
     await _done(tester);

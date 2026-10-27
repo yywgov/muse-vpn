@@ -21,8 +21,9 @@ enum AppThemeMode {
     black => ThemeMode.dark,
   };
 
-  // 穿云 1.3.0: the dark theme is night blue (纯黑 is gone; a saved 纯黑 becomes 深色)
-  bool get trueBlack => false;
+  // 穿云 1.3.0: the dark theme is night blue; 1.6.0 C7: 纯黑 is back as a switch under 深色
+  // (stored as this value; 深浅色 shows it as 深色)
+  bool get trueBlack => this == black;
 
   /// The choices offered in 设置.
   static const choices = [system, light, dark];

@@ -68,27 +68,31 @@ class AppTheme {
   }
 
   ThemeData darkTheme(ColorScheme? darkColorScheme) {
-    // 穿云 1.3.0: night blue, never pure black
+    // 穿云 1.3.0: night blue; 1.6.0 C7: 纯黑 (a switch under 深色) puts the page on true black
+    final black = mode.trueBlack;
+    final page = black ? MusePalette.blackBg : MusePalette.darkBgBottom;
+    final card = black ? MusePalette.blackCard : MusePalette.darkCard;
+    final inner = black ? MusePalette.blackInner : MusePalette.darkInner;
     final ColorScheme scheme = ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.dark).copyWith(
       primary: brand,
       onPrimary: Colors.white,
-      surface: MusePalette.darkBgBottom,
+      surface: page,
       onSurface: MusePalette.darkText1,
       onSurfaceVariant: MusePalette.darkText2,
       outlineVariant: MusePalette.darkHairline,
-      surfaceContainerHighest: MusePalette.darkInner,
-      surfaceContainerHigh: MusePalette.darkCard,
-      surfaceContainer: MusePalette.darkCard,
-      surfaceContainerLow: MusePalette.darkBgBottom,
+      surfaceContainerHighest: inner,
+      surfaceContainerHigh: card,
+      surfaceContainer: card,
+      surfaceContainerLow: page,
       error: MusePalette.red,
     );
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: MusePalette.darkBgBottom,
+      scaffoldBackgroundColor: page,
       appBarTheme: AppBarTheme(systemOverlayStyle: museSystemOverlayStyle(Brightness.dark)),
-      dialogTheme: const DialogThemeData(backgroundColor: MusePalette.darkCard),
-      bottomSheetTheme: const BottomSheetThemeData(backgroundColor: MusePalette.darkCard),
+      dialogTheme: DialogThemeData(backgroundColor: card),
+      bottomSheetTheme: BottomSheetThemeData(backgroundColor: card),
       navigationBarTheme: _navBar(true),
       navigationRailTheme: _rail(true),
       dividerTheme: const DividerThemeData(color: MusePalette.darkHairline, thickness: 0.5, space: 0.5),
@@ -106,7 +110,7 @@ class AppTheme {
     return NavigationBarThemeData(
       height: 64,
       elevation: 0,
-      backgroundColor: dark ? MusePalette.darkBgBottom : MusePalette.lightBgBottom,
+      backgroundColor: dark ? (mode.trueBlack ? MusePalette.blackBg : MusePalette.darkBgBottom) : MusePalette.lightBgBottom,
       surfaceTintColor: Colors.transparent,
       indicatorColor: Colors.transparent,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,

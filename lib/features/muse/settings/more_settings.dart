@@ -101,8 +101,11 @@ class MuseAppearancePage extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final themeMode = ref.watch(themePreferencesProvider);
     final shownTheme = themeMode == AppThemeMode.black ? AppThemeMode.dark : themeMode;
-    final accent = MuseAccent.fromKey(ref.watch(MusePrefs.accent));
-    final textSize = ref.watch(MusePrefs.textSize);
+    final scaleOn = ref.watch(MusePrefs.textScaleOn);
+    final scalePct = museClampTextScalePct(ref.watch(MusePrefs.textScalePct));
+    // 1.6.0 C7: the slider moves locally and is saved when released (the whole app rebuilds on save)
+    final dragPct = useState<int?>(null);
+    final shownPct = dragPct.value ?? scalePct;
     return MuseScaffold(
       title: '外观',
       body: MuseGroupedBody(
@@ -122,51 +125,65 @@ class MuseAppearancePage extends HookConsumerWidget {
                     [for (final m in AppThemeMode.choices) (m, m.present(t))],
                     shownTheme,
                   );
-                  if (picked != null) await ref.read(themePreferencesProvider.notifier).changeThemeMode(picked);
+                  if (picked == null || picked == shownTheme) return; // 深色 again keeps 纯黑
+                  await ref.read(themePreferencesProvider.notifier).changeThemeMode(picked);
                 },
               ),
-              MuseTile(
-                key: const ValueKey('appearance_accent'),
-                leading: const Icon(Icons.palette_outlined),
-                title: '主题色',
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final a in MuseAccent.values)
-                      Padding(
-                        padding: const EdgeInsets.only(left: MuseSpace.s8),
-                        child: InkWell(
-                          key: ValueKey('accent_${a.key}'),
-                          customBorder: const CircleBorder(),
-                          onTap: () => ref.read(MusePrefs.accent.notifier).update(a.key),
-                          child: Container(
-                            width: MuseSpace.s24,
-                            height: MuseSpace.s24,
-                            decoration: BoxDecoration(
-                              color: a.brand,
-                              shape: BoxShape.circle,
-                              border: a == accent ? Border.all(color: MuseTheme.of(context).text1, width: 2) : null,
-                            ),
-                            child: a == accent
-                                ? const Icon(Icons.check_outlined, size: MuseIconSize.tiny, color: MusePalette.white)
-                                : null,
-                          ),
+              // 1.6.0 C7: 纯黑 only under 深色 (stored as the theme mode, so it never applies to 浅色)
+              if (shownTheme == AppThemeMode.dark)
+                MuseSwitchTile(
+                  key: const ValueKey('appearance_pure_black'),
+                  leading: const Icon(Icons.contrast_outlined),
+                  title: '纯黑',
+                  info: '深色背景改为纯黑，OLED 屏幕更省电',
+                  value: themeMode == AppThemeMode.black,
+                  onChanged: (v) => ref
+                      .read(themePreferencesProvider.notifier)
+                      .changeThemeMode(v ? AppThemeMode.black : AppThemeMode.dark),
+                ),
+            ],
+          ),
+          const MuseSection(header: '主题色', children: [MuseAccentPicker()]),
+          MuseSection(
+            children: [
+              MuseSwitchTile(
+                key: const ValueKey('appearance_text_scale'),
+                leading: const Icon(Icons.format_size_outlined),
+                title: '文字缩放',
+                info: '独立于系统字号，只改穿云里的文字大小',
+                value: scaleOn,
+                onChanged: (v) => ref.read(MusePrefs.textScaleOn.notifier).update(v),
+              ),
+              if (scaleOn)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s4),
+                  child: Row(
+                    children: [
+                      Text(museTextScaleLabel(museTextScaleMin), style: MuseType.caption(context)),
+                      Expanded(
+                        child: Slider(
+                          key: const ValueKey('appearance_text_scale_slider'),
+                          min: museTextScaleMin.toDouble(),
+                          max: museTextScaleMax.toDouble(),
+                          divisions: (museTextScaleMax - museTextScaleMin) ~/ museTextScaleStep,
+                          value: shownPct.toDouble(),
+                          label: museTextScaleLabel(shownPct),
+                          semanticFormatterCallback: (v) => '文字缩放 ${museTextScaleLabel(v.round())}',
+                          onChanged: (v) => dragPct.value = museClampTextScalePct(v.round()),
+                          onChangeEnd: (v) async {
+                            await ref.read(MusePrefs.textScalePct.notifier).update(museClampTextScalePct(v.round()));
+                            dragPct.value = null;
+                          },
                         ),
                       ),
-                  ],
+                      Text(
+                        museTextScaleLabel(shownPct),
+                        key: const ValueKey('appearance_text_scale_value'),
+                        style: MuseType.caption(context),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              MuseTile(
-                key: const ValueKey('appearance_text_size'),
-                leading: const Icon(Icons.format_size_outlined),
-                title: '字体大小',
-                trailing: Text(museTextSizes.firstWhere((e) => e.$1 == textSize, orElse: () => museTextSizes[1]).$2),
-                chevron: true,
-                onTap: () async {
-                  final picked = await musePick<String>(context, '字体大小', museTextSizes, textSize);
-                  if (picked != null) await ref.read(MusePrefs.textSize.notifier).update(picked);
-                },
-              ),
             ],
           ),
           MuseSection(
@@ -180,6 +197,116 @@ class MuseAppearancePage extends HookConsumerWidget {
                 onChanged: (v) => ref.read(MusePrefs.privacyMask.notifier).update(v),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 1.6.0 C7 主题色: the presets, the saved custom colours (long-press to remove) and 自定义.
+class MuseAccentPicker extends ConsumerWidget {
+  const MuseAccentPicker({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(MusePrefs.accent);
+    final customs = museParseCustomAccents(ref.watch(MusePrefs.customAccents));
+    final currentPreset = MuseAccent.presetOrNull(current);
+    final currentHex = currentPreset == null ? museParseHexColor(current) : null;
+    final selectedHex = currentHex == null ? null : museHexOf(currentHex);
+
+    Future<void> addCustom() async {
+      final v = await museAskText(context, '自定义主题色', initial: selectedHex ?? '', hint: '十六进制颜色，如 #2F6BFF');
+      if (v == null) return;
+      final c = museParseHexColor(v);
+      if (c == null) {
+        _toast(ref, '不是有效的颜色，请输入如 #2F6BFF 的十六进制值', error: true);
+        return;
+      }
+      final hex = museHexOf(c);
+      await ref.read(MusePrefs.customAccents.notifier).update(museAddCustomAccent(ref.read(MusePrefs.customAccents), hex));
+      await ref.read(MusePrefs.accent.notifier).update(hex);
+    }
+
+    Future<void> removeCustom(String hex) async {
+      await ref.read(MusePrefs.customAccents.notifier).update(museRemoveCustomAccent(ref.read(MusePrefs.customAccents), hex));
+      if (selectedHex == hex) await ref.read(MusePrefs.accent.notifier).update(MuseAccent.blue.key);
+    }
+
+    Widget swatch({required Key key, required Color color, required bool selected, required String label, VoidCallback? onLongPress, required VoidCallback onTap}) =>
+        Semantics(
+          button: true,
+          selected: selected,
+          label: '主题色 $label',
+          child: InkWell(
+            key: key,
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            onLongPress: onLongPress,
+            child: Container(
+              width: MuseSpace.s32,
+              height: MuseSpace.s32,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: selected ? Border.all(color: MuseTheme.of(context).text1, width: 2) : null,
+              ),
+              child: selected ? const Icon(Icons.check_outlined, size: MuseIconSize.small, color: MusePalette.white) : null,
+            ),
+          ),
+        );
+
+    return Padding(
+      padding: const EdgeInsets.all(MuseSpace.s16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: MuseSpace.s12,
+            runSpacing: MuseSpace.s12,
+            children: [
+              for (final a in MuseAccent.values)
+                swatch(
+                  key: ValueKey('accent_${a.key}'),
+                  color: a.brand,
+                  label: a.title,
+                  selected: a == currentPreset,
+                  onTap: () => ref.read(MusePrefs.accent.notifier).update(a.key),
+                ),
+              for (final hex in customs)
+                swatch(
+                  key: ValueKey('accent_custom_$hex'),
+                  color: museAccentColors(hex).brand,
+                  label: hex,
+                  selected: hex == selectedHex,
+                  onTap: () => ref.read(MusePrefs.accent.notifier).update(hex),
+                  onLongPress: () => removeCustom(hex),
+                ),
+              Semantics(
+                button: true,
+                label: '自定义主题色',
+                child: InkWell(
+                  key: const ValueKey('accent_add_custom'),
+                  customBorder: const CircleBorder(),
+                  onTap: addCustom,
+                  child: Container(
+                    width: MuseSpace.s32,
+                    height: MuseSpace.s32,
+                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: MuseTheme.of(context).hairline, width: 2)),
+                    child: Icon(Icons.add_outlined, size: MuseIconSize.small, color: MuseTheme.of(context).text2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: MuseSpace.s8),
+          Text(
+            currentPreset != null
+                ? '当前：${currentPreset.title}'
+                : '当前：自定义 ${selectedHex ?? ''}${customs.isNotEmpty ? '（长按自定义颜色可删除）' : ''}',
+            key: const ValueKey('accent_current'),
+            style: MuseType.caption(context),
           ),
         ],
       ),

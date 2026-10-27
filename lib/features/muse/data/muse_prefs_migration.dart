@@ -2,6 +2,7 @@
 // and leaves the stored version unchanged.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/home_tiles.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,12 +13,18 @@ typedef MusePrefsStep = void Function(Map<String, Object?> prefs);
 
 /// Steps keyed by the version they migrate FROM.
 /// 1→2 (1.6.0): the new dashboard cards start hidden for a saved 首页 layout; 字体大小 becomes
-/// 文字缩放 (see C7).
+/// 文字缩放 (C7: 小 90 % / 大 110 % / 特大 120 % turn it on; 标准 leaves it off; an existing
+/// 文字缩放 is never overwritten).
 final Map<int, MusePrefsStep> musePrefsSteps = {1: museMigrate1to2};
 
 void museMigrate1to2(Map<String, Object?> prefs) {
   final hidden = prefs['muse_home_tiles_hidden'];
   if (hidden is String) prefs['muse_home_tiles_hidden'] = museHideNewTiles16(hidden);
+  final pct = museLegacyTextSizePct(prefs['muse_text_size']);
+  if (pct != null && !prefs.containsKey('muse_text_scale_on') && !prefs.containsKey('muse_text_scale_pct')) {
+    prefs['muse_text_scale_on'] = true;
+    prefs['muse_text_scale_pct'] = pct;
+  }
 }
 
 /// Runs the migrations on [sp] (only muse_* keys are read and written back). Never throws.

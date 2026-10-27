@@ -1,4 +1,5 @@
-// 穿云 Windows - the desktop-only rows of 设置: 运行模式 (系统代理 / TUN), 开机自启, 关闭窗口时.
+// 穿云 Windows - the desktop-only rows of 设置: 运行模式 (系统代理 / TUN), 开机自启, 静默启动 (1.6.0 C7),
+// 关闭窗口时.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
@@ -64,6 +65,15 @@ class WindowsSettingsSection extends ConsumerWidget {
             final notifier = ref.read(autoStartNotifierProvider.notifier);
             value ? await notifier.enable() : await notifier.disable();
           },
+        ),
+        // 1.6.0 C7 (#146): the existing silent_start preference, now on screen
+        MuseSwitchTile(
+          key: const ValueKey('settings_silent_start'),
+          leading: const Icon(Icons.visibility_off_outlined),
+          title: '静默启动',
+          info: '打开穿云时不弹出窗口，只在托盘里运行（点托盘图标显示窗口）',
+          value: ref.watch(Preferences.silentStart),
+          onChanged: (v) => ref.read(Preferences.silentStart.notifier).update(v),
         ),
         MuseTile(
           leading: const Icon(Icons.close_outlined),

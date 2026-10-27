@@ -204,10 +204,15 @@ abstract final class MuseSize {
 }
 
 /// 1.4.0: accent colours to pick from (one at a time; brand blue by default).
+/// 1.6.0 C7: more presets, plus any custom colour stored as "#RRGGBB" in the same preference.
 enum MuseAccent {
   blue('blue', '蓝', Color(0xFF2F6BFF), Color(0xFF5A8BFF), Color(0xFF1E4FD8)),
   green('green', '绿', Color(0xFF16A34A), Color(0xFF3DBE6C), Color(0xFF0F7A37)),
-  purple('purple', '紫', Color(0xFF7C3AED), Color(0xFF9B67F2), Color(0xFF5B21B6));
+  purple('purple', '紫', Color(0xFF7C3AED), Color(0xFF9B67F2), Color(0xFF5B21B6)),
+  teal('teal', '青', Color(0xFF0D9488), Color(0xFF2DB3A6), Color(0xFF0B6F66)),
+  indigo('indigo', '靛', Color(0xFF4F46E5), Color(0xFF7069EE), Color(0xFF3730A3)),
+  pink('pink', '粉', Color(0xFFDB2777), Color(0xFFE85497), Color(0xFFA31C59)),
+  orange('orange', '橙', Color(0xFFD9480F), Color(0xFFE8703F), Color(0xFFA8370B));
 
   const MuseAccent(this.key, this.title, this.brand, this.light, this.deep);
 
@@ -218,14 +223,91 @@ enum MuseAccent {
   final Color deep;
 
   static MuseAccent fromKey(String key) => values.where((e) => e.key == key).firstOrNull ?? blue;
+
+  /// The preset for [key], or null when it is a custom colour / unknown.
+  static MuseAccent? presetOrNull(String key) => values.where((e) => e.key == key).firstOrNull;
 }
 
-/// Makes [accent] the brand colour everywhere (call before building the app).
-void museApplyAccent(MuseAccent accent) {
-  MusePalette.brand = accent.brand;
-  MusePalette.brandLight = accent.light;
-  MusePalette.brandDeep = accent.deep;
+/// 1.6.0 C7: how many custom colours are kept.
+const museMaxCustomAccents = 8;
+
+/// White text on the accent needs at least this contrast (WCAG large text / UI parts).
+const museAccentMinContrast = 3.0;
+
+/// "#RRGGBB" / "RRGGBB" / "#RGB" (case-insensitive, spaces ignored) as an opaque colour; null if
+/// it is not a colour.
+Color? museParseHexColor(String input) {
+  var s = input.trim().replaceAll(' ', '');
+  if (s.startsWith('#')) s = s.substring(1);
+  if (RegExp(r'^[0-9a-fA-F]{3}$').hasMatch(s)) s = s.split('').map((c) => '$c$c').join();
+  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(s)) return null;
+  return Color(0xFF000000 | int.parse(s, radix: 16));
 }
+
+/// "#RRGGBB" (upper case) for [c].
+String museHexOf(Color c) => '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+
+double _contrastWithWhite(Color c) => 1.05 / (c.computeLuminance() + 0.05);
+
+/// brand / light / deep for a preference value: a preset key or a custom "#RRGGBB". A custom
+/// colour too light for white text is darkened just enough to stay readable.
+({Color brand, Color light, Color deep}) museAccentColors(String key) {
+  final preset = MuseAccent.presetOrNull(key);
+  if (preset != null) return (brand: preset.brand, light: preset.light, deep: preset.deep);
+  final custom = museParseHexColor(key);
+  if (custom == null) {
+    const b = MuseAccent.blue;
+    return (brand: b.brand, light: b.light, deep: b.deep);
+  }
+  var hsl = HSLColor.fromColor(custom);
+  var guard = 0;
+  while (_contrastWithWhite(hsl.toColor()) < museAccentMinContrast && hsl.lightness > 0.05 && guard++ < 40) {
+    hsl = hsl.withLightness((hsl.lightness - 0.02).clamp(0.0, 1.0));
+  }
+  final brand = hsl.toColor();
+  return (
+    brand: brand,
+    light: hsl.withLightness((hsl.lightness + 0.1).clamp(0.0, 0.9)).toColor(),
+    deep: hsl.withLightness((hsl.lightness - 0.12).clamp(0.05, 1.0)).toColor(),
+  );
+}
+
+/// Saved custom colours ("#RRGGBB,#RRGGBB"), valid ones only, no duplicates, newest first.
+List<String> museParseCustomAccents(String raw) {
+  final out = <String>[];
+  for (final part in raw.split(',')) {
+    final c = museParseHexColor(part);
+    if (c == null) continue;
+    final hex = museHexOf(c);
+    if (!out.contains(hex)) out.add(hex);
+    if (out.length >= museMaxCustomAccents) break;
+  }
+  return out;
+}
+
+/// [raw] with [hex] added at the front (kept to [museMaxCustomAccents]).
+String museAddCustomAccent(String raw, String hex) {
+  final c = museParseHexColor(hex);
+  if (c == null) return museParseCustomAccents(raw).join(',');
+  final h = museHexOf(c);
+  return [h, ...museParseCustomAccents(raw).where((e) => e != h)].take(museMaxCustomAccents).join(',');
+}
+
+/// [raw] without [hex].
+String museRemoveCustomAccent(String raw, String hex) =>
+    museParseCustomAccents(raw).where((e) => e != hex.toUpperCase()).join(',');
+
+/// Makes the accent stored as [key] (preset key or "#RRGGBB") the brand colour everywhere (call
+/// before building the app).
+void museApplyAccent(String key) {
+  final c = museAccentColors(key);
+  MusePalette.brand = c.brand;
+  MusePalette.brandLight = c.light;
+  MusePalette.brandDeep = c.deep;
+}
+
+/// 1.6.0 C7: 纯黑 (深色下的开关) — the dark page, cards and insets go to true black.
+void museApplyPureBlack(bool on) => MusePalette.pureBlack = on;
 
 /// Fixed palette. Brand blue only for primary actions and selected state; one value per status.
 abstract final class MusePalette {
@@ -234,6 +316,9 @@ abstract final class MusePalette {
   static Color brand = MuseAccent.blue.brand;
   static Color brandLight = MuseAccent.blue.light;
   static Color brandDeep = MuseAccent.blue.deep;
+
+  /// 1.6.0 C7: dark theme on true black (set by museApplyPureBlack before the app builds).
+  static bool pureBlack = false;
 
   static const green = Color(0xFF22C55E);
   static const orange = Color(0xFFF59E0B);
@@ -270,6 +355,13 @@ abstract final class MusePalette {
   static const darkHeroBottom = Color(0xFF17368F);
   static const darkHeroIdle = Color(0xFF1C2847);
 
+  // 1.6.0 C7: 纯黑 (dark only)
+  static const blackBg = Color(0xFF000000);
+  static const blackCard = Color(0xFF111318);
+  static const blackInner = Color(0xFF1A1D24);
+  static const blackSelected = Color(0xFF162447);
+  static const blackHeroIdle = Color(0xFF14171D);
+
   static const white = Color(0xFFFFFFFF);
   static const black = Color(0xFF000000);
   static const transparent = Color(0x00000000);
@@ -296,16 +388,18 @@ class MuseTheme {
 
   final bool dark;
 
-  Color get card => dark ? MusePalette.darkCard : MusePalette.lightCard;
+  bool get _black => dark && MusePalette.pureBlack;
+
+  Color get card => _black ? MusePalette.blackCard : (dark ? MusePalette.darkCard : MusePalette.lightCard);
   Color get text1 => dark ? MusePalette.darkText1 : MusePalette.lightText1;
   Color get text2 => dark ? MusePalette.darkText2 : MusePalette.lightText2;
   Color get text3 => dark ? MusePalette.darkText3 : MusePalette.lightText3;
   Color get hairline => dark ? MusePalette.darkHairline : MusePalette.lightHairline;
-  Color get selected => dark ? MusePalette.darkSelected : MusePalette.lightSelected;
-  Color get inner => dark ? MusePalette.darkInner : MusePalette.lightInner;
-  Color get bgTop => dark ? MusePalette.darkBgTop : MusePalette.lightBgTop;
-  Color get bgBottom => dark ? MusePalette.darkBgBottom : MusePalette.lightBgBottom;
-  Color get heroIdle => dark ? MusePalette.darkHeroIdle : MusePalette.lightHeroIdle;
+  Color get selected => _black ? MusePalette.blackSelected : (dark ? MusePalette.darkSelected : MusePalette.lightSelected);
+  Color get inner => _black ? MusePalette.blackInner : (dark ? MusePalette.darkInner : MusePalette.lightInner);
+  Color get bgTop => _black ? MusePalette.blackBg : (dark ? MusePalette.darkBgTop : MusePalette.lightBgTop);
+  Color get bgBottom => _black ? MusePalette.blackBg : (dark ? MusePalette.darkBgBottom : MusePalette.lightBgBottom);
+  Color get heroIdle => _black ? MusePalette.blackHeroIdle : (dark ? MusePalette.darkHeroIdle : MusePalette.lightHeroIdle);
 
   /// The connected hero card.
   LinearGradient get heroGradient => dark

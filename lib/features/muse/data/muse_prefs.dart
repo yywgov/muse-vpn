@@ -17,8 +17,17 @@ abstract final class MusePrefs {
   // ---- 外观
   static final accent = PreferencesNotifier.create<String, String>("muse_accent", "blue");
 
-  /// small / normal / large / huge
+  /// small / normal / large / huge — 1.4.0–1.5.x 字体大小; 1.6.0 C7 migrates it into 文字缩放 and
+  /// no longer reads it (kept so an older device's backup still restores).
   static final textSize = PreferencesNotifier.create<String, String>("muse_text_size", "normal");
+
+  /// 1.6.0 C7 文字缩放: on/off and the factor in percent (80–140, steps of 5), independent of the
+  /// system font size.
+  static final textScaleOn = PreferencesNotifier.create<bool, bool>("muse_text_scale_on", false);
+  static final textScalePct = PreferencesNotifier.create<int, int>("muse_text_scale_pct", 100);
+
+  /// 1.6.0 C7: saved custom 主题色 ("#RRGGBB,…", newest first)
+  static final customAccents = PreferencesNotifier.create<String, String>("muse_custom_accents", "");
 
   /// 隐私模式: 首页 numbers blurred
   static final privacyMask = PreferencesNotifier.create<bool, bool>("muse_privacy_mask", false);
@@ -185,20 +194,38 @@ abstract final class MusePrefs {
   static final exitCache = PreferencesNotifier.create<String, String>("muse_exit_cache", "");
 }
 
-/// 字体大小 choices.
-const museTextSizes = [('small', '小'), ('normal', '标准'), ('large', '大'), ('huge', '特大')];
+/// 1.6.0 C7 文字缩放 range (percent).
+const museTextScaleMin = 80;
+const museTextScaleMax = 140;
+const museTextScaleStep = 5;
 
-double museTextScale(String key) => switch (key) {
-  'small' => 0.92,
-  'large' => 1.1,
-  'huge' => 1.2,
-  _ => 1.0,
+/// [pct] clamped to the range and snapped to the step.
+int museClampTextScalePct(int pct) {
+  final c = pct.clamp(museTextScaleMin, museTextScaleMax);
+  return ((c / museTextScaleStep).round() * museTextScaleStep).clamp(museTextScaleMin, museTextScaleMax);
+}
+
+/// The app's own text factor (on top of the system's): 1.0 while 文字缩放 is off.
+double museTextScale(bool on, int pct) => on ? museClampTextScalePct(pct) / 100 : 1.0;
+
+/// The 1.4.0 字体大小 value as a 文字缩放 percent (null = 标准 / unknown: leave 文字缩放 off).
+int? museLegacyTextSizePct(Object? key) => switch (key) {
+  'small' => 90,
+  'large' => 110,
+  'huge' => 120,
+  _ => null,
 };
+
+/// "1.10×"
+String museTextScaleLabel(int pct) => '${(museClampTextScalePct(pct) / 100).toStringAsFixed(2)}×';
 
 /// Preference keys that go into 同步 / 备份 (settings that make sense on another device).
 const museSyncedPrefKeys = [
   'muse_accent',
   'muse_text_size',
+  'muse_text_scale_on',
+  'muse_text_scale_pct',
+  'muse_custom_accents',
   'muse_privacy_mask',
   'muse_holiday_clouds',
   'muse_node_meta',

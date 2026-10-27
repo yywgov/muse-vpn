@@ -184,9 +184,10 @@ void main() {
   });
 
   group('look and naming', () {
-    test('dark mode is night blue again, 纯黑 is gone from the choices', () {
+    test('dark mode is night blue again, 纯黑 is not in the choices (1.6.0 C7: a switch under 深色)', () {
       expect(AppThemeMode.choices, [AppThemeMode.system, AppThemeMode.light, AppThemeMode.dark]);
-      expect(AppThemeMode.black.trueBlack, isFalse);
+      expect(AppThemeMode.dark.trueBlack, isFalse);
+      expect(AppThemeMode.black.trueBlack, isTrue);
     });
     test('四个标签 首页 / 节点 / 订阅 / 设置 (1.6.0: the shell lives in muse/shell)', () {
       final layout = File('lib/features/muse/shell/muse_shell.dart').readAsStringSync();
