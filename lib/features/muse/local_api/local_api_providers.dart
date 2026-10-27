@@ -9,6 +9,7 @@ import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
+import 'package:hiddify/features/muse/logic/resources.dart' show museEngineVersion;
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -143,3 +144,16 @@ Future<void> museCloseConnectionsAfterSwitch(T Function<T>(ProviderListenable<T>
     // the old connections just end on their own
   }
 }
+
+/// 1.6.0 C10 关于 › 内核版本: the running engine's version number (null while disconnected or when
+/// the local interface does not answer).
+final museEngineVersionProvider = FutureProvider.autoDispose<String?>((ref) async {
+  final api = ref.watch(museLocalApiProvider);
+  if (api == null) return null;
+  try {
+    final j = await api.getJson('/version');
+    return museEngineVersion('${j['version'] ?? ''}');
+  } catch (_) {
+    return null;
+  }
+});

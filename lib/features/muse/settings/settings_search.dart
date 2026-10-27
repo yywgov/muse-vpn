@@ -7,19 +7,22 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 
-Future<MuseSettingEntry?> showMuseSettingsSearch(BuildContext context, {bool? android, bool? windows}) =>
+Future<MuseSettingEntry?> showMuseSettingsSearch(BuildContext context, {bool? android, bool? windows, bool developer = false}) =>
     showModalBottomSheet<MuseSettingEntry>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (c) => MuseSettingsSearch(android: android ?? Platform.isAndroid, windows: windows ?? Platform.isWindows),
+      builder: (c) => MuseSettingsSearch(android: android ?? Platform.isAndroid, windows: windows ?? Platform.isWindows, developer: developer),
     );
 
 class MuseSettingsSearch extends StatefulWidget {
-  const MuseSettingsSearch({super.key, required this.android, required this.windows});
+  const MuseSettingsSearch({super.key, required this.android, required this.windows, this.developer = false});
 
   final bool android;
   final bool windows;
+
+  /// 1.6.0 C10: 开发者选项 entries only once it is turned on
+  final bool developer;
 
   @override
   State<MuseSettingsSearch> createState() => _MuseSettingsSearchState();
@@ -31,7 +34,7 @@ class _MuseSettingsSearchState extends State<MuseSettingsSearch> {
   @override
   Widget build(BuildContext context) {
     final mt = MuseTheme.of(context);
-    final hits = museSearchSettings(_query, android: widget.android, windows: widget.windows);
+    final hits = museSearchSettings(_query, android: widget.android, windows: widget.windows, developer: widget.developer);
     final height = MediaQuery.sizeOf(context).height * 0.7;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),

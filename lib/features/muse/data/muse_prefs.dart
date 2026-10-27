@@ -193,6 +193,10 @@ abstract final class MusePrefs {
   // 1.5.1: the 1.4.1 Beta 通道 switch is gone (no prereleases are published); a stored
   // "muse_beta_channel" value is simply no longer read.
 
+  // ---- 1.6.0 C10
+  /// 开发者选项 shown in 设置 (tap 关于 › 版本 7 times); this device only, never synced
+  static final devMode = PreferencesNotifier.create<bool, bool>("muse_dev_mode", false);
+
   // ---- Windows (1.6.0 C8: 窗口置顶, used by the title bar and 设置 › 电脑)
   static final alwaysOnTop = PreferencesNotifier.create<bool, bool>("muse_always_on_top", false);
 

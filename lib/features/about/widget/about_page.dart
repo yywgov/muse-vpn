@@ -4,8 +4,12 @@
 // 1.1: 检查更新 downloads and installs the new version in the app; 复制版本信息 and the
 // GPL note are gone from here (the credit lives on the 开源许可 page).
 // 1.3.0: 导出日志 moved into 诊断 (设置 › 诊断 / 首页 出口 IP tile).
+// 1.6.0 C10: 版本与构建号, 内核版本 (bundled release + the running engine while connected), 致谢
+// (the GPL credits: the only place the upstream projects are named); tapping the version 7 times
+// turns 开发者选项 on (#127).
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
@@ -13,7 +17,10 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/changelog_dialog.dart';
+import 'package:hiddify/features/muse/local_api/local_api_providers.dart' show museEngineVersionProvider;
+import 'package:hiddify/features/muse/logic/resources.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart' show MuseStatusDot;
@@ -29,6 +36,23 @@ class AboutPage extends HookConsumerWidget {
     final appInfo = ref.watch(appInfoProvider).requireValue;
     final update = ref.watch(museUpdaterProvider);
     final toast = ref.read(inAppNotificationControllerProvider);
+    final taps = useMemoized(MuseDevTaps.new);
+    final engine = ref.watch(museEngineVersionProvider).valueOrNull;
+
+    Future<void> tapVersion() async {
+      final left = taps.tap(DateTime.now());
+      final on = ref.read(MusePrefs.devMode);
+      if (left == 0) {
+        if (on) {
+          toast.showInfoToast('开发者选项已开启');
+        } else {
+          await ref.read(MusePrefs.devMode.notifier).update(true);
+          toast.showSuccessToast('已开启开发者选项（设置 › 开发者选项）');
+        }
+      } else if (left <= 3 && !on) {
+        toast.showInfoToast('再点 $left 次开启开发者选项');
+      }
+    }
 
     Future<void> checkUpdate() async {
       final updater = ref.read(museUpdaterProvider.notifier);
@@ -98,9 +122,35 @@ class AboutPage extends HookConsumerWidget {
                 const Gap(MuseSpace.s12),
                 Text(Constants.appName, style: MuseType.title(context)),
                 const Gap(MuseSpace.s4),
-                Text('版本 ${appInfo.presentVersion}', style: MuseType.caption(context)),
+                GestureDetector(
+                  key: const ValueKey('about_version'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: tapVersion,
+                  child: Padding(
+                    padding: const EdgeInsets.all(MuseSpace.s4),
+                    child: Text('版本 ${appInfo.presentVersion}', style: MuseType.caption(context)),
+                  ),
+                ),
               ],
             ),
+          ),
+          MuseSection(
+            children: [
+              MuseTile(
+                key: const ValueKey('about_app_version'),
+                leading: const Icon(Icons.info_outlined),
+                title: '版本',
+                subtitle: '${appInfo.presentVersion}（构建 ${appInfo.buildNumber}）',
+                onTap: tapVersion,
+              ),
+              MuseTile(
+                key: const ValueKey('about_core_version'),
+                leading: const Icon(Icons.memory_outlined),
+                title: '内核版本',
+                subtitle: museCoreVersionLabel(engine: engine),
+                subtitleMaxLines: 2,
+              ),
+            ],
           ),
           MuseSection(
             children: [
@@ -128,6 +178,25 @@ class AboutPage extends HookConsumerWidget {
                 title: '开源许可 · 源代码',
                 chevron: true,
                 onTap: () => context.goNamed('openSource'),
+              ),
+            ],
+          ),
+          // the GPL credits — the only place in the app the upstream projects are named
+          const MuseSection(
+            header: '致谢',
+            footer: '穿云以 GPL-3.0 协议开源',
+            children: [
+              MuseTile(
+                key: ValueKey('about_credit_ui'),
+                leading: Icon(Icons.design_services_outlined),
+                title: '界面设计参考 FlClash',
+                subtitle: 'chen08209 · GPL-3.0',
+              ),
+              MuseTile(
+                key: ValueKey('about_credit_base'),
+                leading: Icon(Icons.account_tree_outlined),
+                title: '基于 Hiddify 开发',
+                subtitle: 'GPL-3.0',
               ),
             ],
           ),

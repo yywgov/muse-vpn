@@ -31,7 +31,9 @@ import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:hiddify/features/muse/logic/stats_tools.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
-import 'package:hiddify/features/muse/logic/sync_core.dart' show museIsEncrypted, museParseAutoBackupName, museAutoBackupReasonTitle, museShortDateTime;
+import 'package:hiddify/features/muse/logic/sync_core.dart' show MuseSnapshot, museIsEncrypted, museParseAutoBackupName, museAutoBackupReasonTitle, museShortDateTime;
+import 'package:hiddify/features/muse/settings/restore_preview.dart';
+import 'package:hiddify/features/muse/settings/theme_preview_page.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart' show museAskText, museNodeName;
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -40,6 +42,10 @@ import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 import 'package:hiddify/utils/utils.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/features/muse/data/crash_recorder.dart';
+import 'package:hiddify/features/log/model/log_level.dart' as log;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Opens a settings sub-page.
@@ -195,6 +201,14 @@ class MuseAppearancePage extends HookConsumerWidget {
                 info: '首页的流量、IP 等数字打码',
                 value: ref.watch(MusePrefs.privacyMask),
                 onChanged: (v) => ref.read(MusePrefs.privacyMask.notifier).update(v),
+              ),
+              // 1.6.0 C10
+              MuseTile(
+                key: const ValueKey('appearance_preview'),
+                leading: const Icon(Icons.preview_outlined),
+                title: '主题预览',
+                chevron: true,
+                onTap: () => musePushPage(context, const MuseThemePreviewPage()),
               ),
             ],
           ),
@@ -468,6 +482,8 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
 // ======================================================================= 开发者选项
 
 /// 1.5.0: tuning nobody needs day to day (测速 并发数 / 超时 moved here from 设置 › 节点).
+/// 1.6.0 C10 (#127): hidden until 关于 › 版本 is tapped 7 times; adds 调试日志, 清除缓存,
+/// 消息样式测试, 崩溃记录测试, 重置引导 and a switch to hide it again.
 class MuseDeveloperPage extends HookConsumerWidget {
   const MuseDeveloperPage({super.key});
 
@@ -475,6 +491,7 @@ class MuseDeveloperPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final workers = ref.watch(MusePrefs.testWorkers);
     final timeout = ref.watch(MusePrefs.testTimeoutSec);
+    final debugLog = ref.watch(ConfigOptions.logLevel) == log.LogLevel.debug;
     return MuseScaffold(
       title: '开发者选项',
       body: MuseGroupedBody(
@@ -514,12 +531,134 @@ class MuseDeveloperPage extends HookConsumerWidget {
                   _toast(ref, '已恢复默认');
                 },
               ),
+              MuseTile(
+                key: const ValueKey('dev_clear_latency'),
+                leading: const Icon(Icons.cleaning_services_outlined),
+                title: '清除测速记录',
+                onTap: () async {
+                  await ref.read(MusePrefs.latencyCache.notifier).update(MuseLatencyCache.empty.toRaw());
+                  await ref.read(MusePrefs.delayHistory.notifier).update('');
+                  _toast(ref, '已清除');
+                },
+              ),
+            ],
+          ),
+          MuseSection(
+            header: '调试',
+            children: [
+              MuseSwitchTile(
+                key: const ValueKey('dev_debug_log'),
+                leading: const Icon(Icons.bug_report_outlined),
+                title: '调试日志',
+                info: '内核输出最详细的日志，便于排查；下次连接起生效。日志会变多，排查完请关闭',
+                value: debugLog,
+                onChanged: (v) => ref.read(ConfigOptions.logLevel.notifier).update(v ? log.LogLevel.debug : log.LogLevel.warn),
+              ),
+              MuseTile(
+                key: const ValueKey('dev_clear_cache'),
+                leading: const Icon(Icons.delete_sweep_outlined),
+                title: '清除缓存',
+                subtitle: '下载的更新安装包、导出的诊断文件，不影响设置和订阅',
+                onTap: () async {
+                  final freed = await museClearTempFiles();
+                  _toast(ref, freed == 0 ? '没有可清除的缓存' : '已清除 ${museBytes(freed)}');
+                },
+              ),
+              MuseTile(
+                key: const ValueKey('dev_toast_test'),
+                leading: const Icon(Icons.chat_bubble_outline_outlined),
+                title: '消息样式测试',
+                subtitle: '依次显示 成功 / 提示 / 错误 三种消息',
+                onTap: () {
+                  try {
+                    final n = ref.read(inAppNotificationControllerProvider);
+                    n.showSuccessToast('成功消息示例');
+                    n.showInfoToast('提示消息示例');
+                    n.showErrorToast('错误消息示例');
+                  } catch (_) {}
+                },
+              ),
+              MuseTile(
+                key: const ValueKey('dev_crash_test'),
+                leading: const Icon(Icons.report_outlined),
+                title: '崩溃记录测试',
+                subtitle: '写入一条测试崩溃，用来检查「诊断 › 导出崩溃记录」',
+                onTap: () async {
+                  final ok = await museConfirm(context, title: '崩溃记录测试', message: '写入一条测试用的崩溃记录（不会真的退出）？', okText: '写入');
+                  if (!ok) return;
+                  MuseCrashRecorder.record(StateError('穿云崩溃记录测试'), StackTrace.current);
+                  _toast(ref, '已写入测试崩溃记录');
+                },
+              ),
+            ],
+          ),
+          MuseSection(
+            children: [
+              MuseTile(
+                key: const ValueKey('dev_reset_guides'),
+                leading: const Icon(Icons.tips_and_updates_outlined),
+                title: '重置引导',
+                subtitle: '后台运行引导、更新内容提示重新显示一次',
+                onTap: () async {
+                  await ref.read(Preferences.keepAliveGuideShown.notifier).update(false);
+                  await ref.read(MusePrefs.onboardingDone.notifier).update(false);
+                  await ref.read(MusePrefs.changelogSeen.notifier).update('');
+                  _toast(ref, '已重置');
+                },
+              ),
+              MuseTile(
+                key: const ValueKey('dev_turn_off'),
+                leading: const Icon(Icons.visibility_off_outlined),
+                title: '隐藏开发者选项',
+                subtitle: '在「关于」连点版本号 7 次可再次打开',
+                onTap: () async {
+                  await ref.read(MusePrefs.devMode.notifier).update(false);
+                  if (context.mounted) Navigator.of(context).maybePop();
+                },
+              ),
             ],
           ),
         ],
       ),
     );
   }
+}
+
+/// 1.6.0 C10 清除缓存: only what 穿云 itself put in the temporary directory (on Windows that is the
+/// shared %TEMP%, so nothing else is touched): downloaded updates and exported diagnostics
+/// (chuanyun-*). The bytes freed. Never throws.
+bool museIsOwnTempEntry(String name, {required bool android}) =>
+    name.startsWith('chuanyun-') || (android && name == 'updates');
+
+Future<int> museClearTempFiles({Directory? dir, bool? android}) async {
+  var freed = 0;
+  final onAndroid = android ?? PlatformUtils.isAndroid;
+  try {
+    final d = dir ?? await getTemporaryDirectory();
+    if (!d.existsSync()) return 0;
+    for (final e in d.listSync(followLinks: false)) {
+      if (!museIsOwnTempEntry(e.uri.pathSegments.where((x) => x.isNotEmpty).last, android: onAndroid)) continue;
+      try {
+        if (e is File) {
+          final n = e.lengthSync();
+          e.deleteSync();
+          freed += n;
+        } else if (e is Directory) {
+          var n = 0;
+          for (final f in e.listSync(recursive: true, followLinks: false).whereType<File>()) {
+            try {
+              n += f.lengthSync();
+            } catch (_) {}
+          }
+          e.deleteSync(recursive: true);
+          freed += n;
+        }
+      } catch (_) {
+        // in use (Windows) or not ours to delete: skipped
+      }
+    }
+  } catch (_) {}
+  return freed;
 }
 
 // ======================================================================= 分流
@@ -1101,6 +1240,26 @@ class MuseSyncPage extends HookConsumerWidget {
       await run(() async => (await museLanSyncWith(ref.read(museSyncServiceProvider), p)).summary);
     }
 
+    /// 1.6.0 C10: read the file, preview (恢复范围 / 恢复策略), then restore.
+    Future<void> restore(String text, {String password = '', String? source}) async {
+      final service = ref.read(museSyncServiceProvider);
+      final MuseSnapshot snap;
+      try {
+        snap = await service.readBackup(text, password: password);
+      } on MuseSyncException catch (e) {
+        _toast(ref, e.message, error: true);
+        return;
+      }
+      if (!context.mounted) return;
+      final plan = await showMuseRestorePreview(
+        context,
+        (scope, strategy) => service.planRestore(snap, scope: scope, strategy: strategy),
+        source: source,
+      );
+      if (plan == null) return;
+      await run(() async => (await service.applyRestore(plan)).summary);
+    }
+
     Future<String?> askPassword(String title) => museAskText(context, title, hint: '留空 = 不加密', obscure: true);
 
     return MuseScaffold(
@@ -1183,6 +1342,7 @@ class MuseSyncPage extends HookConsumerWidget {
                 key: const ValueKey('backup_import'),
                 leading: const Icon(Icons.restore_outlined),
                 title: '从备份恢复',
+                subtitle: '先预览，可选 仅订阅 / 仅设置、合并 / 覆盖',
                 onTap: () async {
                   final text = await museOpenTextFile();
                   if (text == null || !context.mounted) return;
@@ -1191,7 +1351,7 @@ class MuseSyncPage extends HookConsumerWidget {
                     pw = await museAskText(context, '备份密码', obscure: true) ?? '';
                     if (pw.isEmpty) return;
                   }
-                  await run(() async => (await ref.read(museSyncServiceProvider).importBackup(text, password: pw)).summary);
+                  await restore(text, password: pw);
                 },
               ),
               // 1.5.0 #197 / #206: taken by itself before a restore or an app update
@@ -1214,7 +1374,11 @@ class MuseSyncPage extends HookConsumerWidget {
                         (f, '${museAutoBackupReasonTitle(meta.reason)} · ${museShortDateTime(meta.at)}'),
                   ], files.first);
                   if (picked == null) return;
-                  await run(() async => (await ref.read(museSyncServiceProvider).importBackup(await picked.readAsString())).summary);
+                  final meta = museParseAutoBackupName(picked.uri.pathSegments.last);
+                  await restore(
+                    await picked.readAsString(),
+                    source: meta == null ? null : '自动备份 · ${museAutoBackupReasonTitle(meta.reason)} · ${museShortDateTime(meta.at)}',
+                  );
                 },
               ),
             ],

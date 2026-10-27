@@ -15,6 +15,7 @@ import 'package:dio/dio.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/logic/restore_plan.dart';
 import 'package:hiddify/features/muse/logic/sync_core.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
@@ -306,8 +307,9 @@ class MuseSyncService {
     return password.isEmpty ? plain : museEncryptAsync(plain, password);
   }
 
-  /// Restores a backup file's text (asks for nothing: [password] is needed for an encrypted file).
-  Future<MuseSyncResult> importBackup(String text, {String password = ''}) async {
+  /// 1.6.0 C10: a backup file's text read into a snapshot (decrypted with [password] when it is
+  /// encrypted). Throws [MuseSyncException] with a readable message; changes nothing.
+  Future<MuseSnapshot> readBackup(String text, {String password = ''}) async {
     String plain = text;
     if (museIsEncrypted(text)) {
       if (password.isEmpty) throw const MuseSyncException('这个备份已加密，请输入密码');
@@ -324,10 +326,36 @@ class MuseSyncService {
       throw const MuseSyncException('不是穿云的备份文件');
     }
     if (snap.entries.isEmpty) throw const MuseSyncException('备份里没有内容');
+    return snap;
+  }
+
+  /// 1.6.0 C10: what restoring [snap] would change here (nothing is written).
+  Future<MuseRestorePlan> planRestore(
+    MuseSnapshot snap, {
+    MuseRestoreScope scope = MuseRestoreScope.all,
+    MuseRestoreStrategy strategy = MuseRestoreStrategy.merge,
+  }) async => museRestorePlan(
+    current: await localValues(),
+    backup: snap.values,
+    settingKeys: museSyncedPrefs.keys.toSet(),
+    scope: scope,
+    strategy: strategy,
+  );
+
+  /// 1.6.0 C10: carries out [plan], after saving the current state as an automatic backup.
+  /// Subscriptions are only added (the plan never holds a removal).
+  Future<MuseSyncResult> applyRestore(MuseRestorePlan plan) async {
+    if (plan.isEmpty) return const MuseSyncResult();
     // 1.5.0 #197: what is there now is kept first, so a wrong file can be undone
     await autoBackup('restore');
-    final current = await localValues();
-    return apply(museSyncChanges(current, snap));
+    return apply(plan.changes);
+  }
+
+  /// Restores a backup file's text: everything in it, merged (asks for nothing: [password] is
+  /// needed for an encrypted file).
+  Future<MuseSyncResult> importBackup(String text, {String password = ''}) async {
+    final snap = await readBackup(text, password: password);
+    return applyRestore(await planRestore(snap));
   }
 
   /// 1.5.0 #197 / #206: the current settings and subscriptions saved as an automatic backup

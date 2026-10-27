@@ -23,6 +23,8 @@ import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart';
 import 'package:hiddify/features/muse/settings/privacy_page.dart';
+import 'package:hiddify/features/muse/settings/resources_page.dart';
+import 'package:hiddify/features/muse/settings/theme_preview_page.dart';
 import 'package:hiddify/features/muse/settings/windows_settings.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
@@ -45,6 +47,7 @@ class SettingsPage extends HookConsumerWidget {
     final shownTheme = themeMode == AppThemeMode.black ? AppThemeMode.dark : themeMode;
     final balancer = ref.watch(ConfigOptions.balancerStrategy);
     final advancedOpen = useState(false);
+    final devMode = ref.watch(MusePrefs.devMode);
     final ipv6 = MuseIpv6Policy.fromKey(ref.watch(MusePrefs.ipv6Policy));
 
     // 1.5.0 #101: jump to a setting found by search
@@ -67,8 +70,11 @@ class SettingsPage extends HookConsumerWidget {
         case MuseSettingPage.stats:
           musePushPage(context, const MuseStatsPage());
         case MuseSettingPage.developer:
-          advancedOpen.value = true;
           musePushPage(context, const MuseDeveloperPage());
+        case MuseSettingPage.resources:
+          musePushPage(context, const MuseResourcesPage());
+        case MuseSettingPage.themePreview:
+          musePushPage(context, const MuseThemePreviewPage());
         case MuseSettingPage.perApp:
           context.goNamed('perAppProxy');
         case MuseSettingPage.diagnose:
@@ -87,7 +93,7 @@ class SettingsPage extends HookConsumerWidget {
           tooltip: '搜索设置',
           icon: const Icon(Icons.search_outlined),
           onPressed: () async {
-            final picked = await showMuseSettingsSearch(context);
+            final picked = await showMuseSettingsSearch(context, developer: ref.read(MusePrefs.devMode));
             if (picked != null && context.mounted) openEntry(picked);
           },
         ),
@@ -192,6 +198,14 @@ class SettingsPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseStatsPage()),
               ),
+              // 1.6.0 C10
+              MuseTile(
+                key: const ValueKey('settings_resources'),
+                leading: const Icon(Icons.inventory_2_outlined),
+                title: '资源',
+                chevron: true,
+                onTap: () => musePushPage(context, const MuseResourcesPage()),
+              ),
             ],
           ),
           if (PlatformUtils.isWindows) const WindowsSettingsSection(),
@@ -215,6 +229,15 @@ class SettingsPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => context.goNamed('about'),
               ),
+              // 1.6.0 C10 (#127): only after 关于 › 版本 was tapped 7 times
+              if (devMode)
+                MuseTile(
+                  key: const ValueKey('settings_developer'),
+                  leading: const Icon(Icons.developer_mode_outlined),
+                  title: '开发者选项',
+                  chevron: true,
+                  onTap: () => musePushPage(context, const MuseDeveloperPage()),
+                ),
               MuseTile(
                 key: const ValueKey('advanced_toggle'),
                 leading: const Icon(Icons.tune_outlined),
@@ -306,14 +329,6 @@ class SettingsPage extends HookConsumerWidget {
                   subtitle: ref.watch(MusePrefs.logCapture) ? '日志记录已打开' : '日志记录已关闭',
                   chevron: true,
                   onTap: () => context.goNamed('logs'),
-                ),
-                // 1.5.0: 测速 并发数 / 超时
-                MuseTile(
-                  key: const ValueKey('settings_developer'),
-                  leading: const Icon(Icons.developer_mode_outlined),
-                  title: '开发者选项',
-                  chevron: true,
-                  onTap: () => musePushPage(context, const MuseDeveloperPage()),
                 ),
               ],
             ],

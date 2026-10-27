@@ -11,10 +11,13 @@ enum MuseSettingPage {
   network('设置 › 网络'),
   sync('设置 › 同步与备份'),
   stats('设置 › 统计'),
-  developer('设置 › 高级 › 开发者选项'),
+  developer('设置 › 开发者选项'),
   perApp('设置 › 分应用代理'),
   diagnose('设置 › 诊断'),
-  about('设置 › 关于');
+  about('设置 › 关于'),
+  // 1.6.0 C10
+  resources('设置 › 资源'),
+  themePreview('设置 › 外观 › 主题预览');
 
   const MuseSettingPage(this.path);
 
@@ -90,14 +93,25 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('自启动', MuseSettingPage.main, keywords: ['开机', '保活'], androidOnly: true),
   MuseSettingEntry('隐藏桌面图标 / 最近任务 / 通知', MuseSettingPage.main, keywords: ['隐私', '隐藏'], androidOnly: true),
   MuseSettingEntry('检查更新', MuseSettingPage.about, keywords: ['版本', '更新内容']),
+  // 1.6.0 C10
+  MuseSettingEntry('资源', MuseSettingPage.resources, keywords: ['规则集', '规则文件', 'geosite', 'geoip', '更新规则', '数据库']),
+  MuseSettingEntry('主题预览', MuseSettingPage.themePreview, keywords: ['预览', '主题', '配色', '样式']),
+  MuseSettingEntry('内核版本', MuseSettingPage.about, keywords: ['内核', '构建号', '版本号', '开源许可', '致谢']),
+  MuseSettingEntry('恢复范围 / 恢复策略', MuseSettingPage.sync, keywords: ['仅订阅', '仅设置', '合并', '覆盖', '预览', '恢复']),
+  MuseSettingEntry('调试日志', MuseSettingPage.developer, keywords: ['debug', '日志级别']),
+  MuseSettingEntry('清除缓存', MuseSettingPage.developer, keywords: ['缓存', '临时文件']),
+  MuseSettingEntry('消息样式测试', MuseSettingPage.developer, keywords: ['提示', 'toast']),
+  MuseSettingEntry('崩溃记录测试', MuseSettingPage.developer, keywords: ['崩溃', 'crash']),
+  MuseSettingEntry('重置引导', MuseSettingPage.developer, keywords: ['引导', '新手']),
 ];
 
 /// Settings matching [query] (title, keywords or page; case-insensitive, every word must match),
-/// title matches first. Empty query = nothing.
-List<MuseSettingEntry> museSearchSettings(String query, {required bool android, required bool windows}) {
+/// title matches first. Empty query = nothing. 1.6.0 C10: 开发者选项 entries only with [developer].
+List<MuseSettingEntry> museSearchSettings(String query, {required bool android, required bool windows, bool developer = false}) {
   final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return const [];
-  bool visible(MuseSettingEntry e) => (!e.androidOnly || android) && (!e.windowsOnly || windows);
+  bool visible(MuseSettingEntry e) =>
+      (!e.androidOnly || android) && (!e.windowsOnly || windows) && (developer || e.page != MuseSettingPage.developer);
   String hay(MuseSettingEntry e) => [e.title, ...e.keywords, e.page.path].join(' ').toLowerCase();
   final hits = [for (final e in museSettingEntries) if (visible(e) && words.every(hay(e).contains)) e];
   bool inTitle(MuseSettingEntry e) => words.every(e.title.toLowerCase().contains);
