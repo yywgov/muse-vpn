@@ -3,6 +3,7 @@
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 
 /// Spacing scale (dp). Nothing else is used for gaps and paddings.
 abstract final class MuseSpace {
@@ -93,6 +94,9 @@ abstract final class MuseIconSize {
   static const small = 20.0;
   static const regular = 24.0;
 
+  /// 1.6.1: the glyph on the 首页 start button
+  static const large = 32.0;
+
   /// a flag emoji in its box
   static const flag = 18.0;
 }
@@ -114,6 +118,9 @@ abstract final class MuseSize {
 
   /// the selected-row bar of a list
   static const selectedBar = 4.0;
+
+  /// 1.6.1: height of the selected-row mark
+  static const selectedMark = 24.0;
 
   /// a status dot
   static const dot = 8.0;
@@ -147,6 +154,9 @@ abstract final class MuseSize {
   static const switchWidth = 64.0;
   static const switchHeight = 36.0;
   static const switchKnob = 28.0;
+
+  /// 1.6.1: the 首页 start button (a squircle; round while disconnected)
+  static const startButton = 64.0;
 
   /// the hero card's node row, a list row, a button
   static const heroRow = 56.0;
@@ -197,6 +207,11 @@ abstract final class MuseSize {
   static const navRailCollapsed = 80.0;
   static const navSidebarExpanded = 220.0;
   static const dockHeight = 64.0;
+
+  /// 1.6.1: the Material 3 bottom navigation bar
+  static const navBarHeight = 80.0;
+  static const navIndicatorWidth = 64.0;
+  static const navIndicatorHeight = 32.0;
   static const sheetHandle = 36.0;
   static const sheetHandleThickness = 4.0;
   static const menuWidth = 240.0;
@@ -309,6 +324,13 @@ void museApplyAccent(String key) {
 /// 1.6.0 C7: 纯黑 (深色下的开关) — the dark page, cards and insets go to true black.
 void museApplyPureBlack(bool on) => MusePalette.pureBlack = on;
 
+/// 1.6.1: 配色风格 (a MuseColorStyle key) used to derive the app's Material 3 colour scheme.
+void museApplyColorStyle(String key) => MusePalette.colorStyle = key;
+
+/// 1.6.1: the accent (primary) of the current colour scheme — what screens paint selected
+/// state and primary actions with. [MusePalette.brand] is only the seed it is derived from.
+Color museBrandOf(BuildContext context) => Theme.of(context).colorScheme.primary;
+
 /// Fixed palette. Brand blue only for primary actions and selected state; one value per status.
 abstract final class MusePalette {
   // 1.4.0: the accent can be 蓝 (default) / 绿 / 紫 (设置 › 外观); set by museApplyAccent before
@@ -319,6 +341,9 @@ abstract final class MusePalette {
 
   /// 1.6.0 C7: dark theme on true black (set by museApplyPureBlack before the app builds).
   static bool pureBlack = false;
+
+  /// 1.6.1: 配色风格 key (set by museApplyColorStyle before the app builds).
+  static String colorStyle = 'tonalSpot';
 
   static const green = Color(0xFF22C55E);
   static const orange = Color(0xFFF59E0B);
@@ -374,74 +399,51 @@ abstract final class MuseToast {
   static const error = MusePalette.red;
   static const success = MusePalette.green;
   static Color get info => MusePalette.brand;
+
 }
 
-/// The palette resolved for the current brightness.
+/// The palette resolved for the current theme. 1.6.1: every colour comes from the app's
+/// Material 3 colour scheme (seeded by 主题色, see museSeededScheme) — flat filled surfaces,
+/// no card shadows, no borders and no gradients.
 @immutable
 class MuseTheme {
-  const MuseTheme._(this.dark);
+  const MuseTheme._(this.scheme);
 
-  factory MuseTheme.of(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? _dark : _light;
+  factory MuseTheme.of(BuildContext context) => MuseTheme._(Theme.of(context).colorScheme);
 
-  static const _light = MuseTheme._(false);
-  static const _dark = MuseTheme._(true);
+  final ColorScheme scheme;
 
-  final bool dark;
+  bool get dark => scheme.brightness == Brightness.dark;
 
-  bool get _black => dark && MusePalette.pureBlack;
+  Color get card => MuseSurface.card.color(scheme);
+  Color get text1 => scheme.onSurface;
+  Color get text2 => scheme.onSurfaceVariant;
+  Color get text3 => scheme.outline;
+  Color get hairline => scheme.outlineVariant;
+  Color get selected => scheme.secondaryContainer;
+  Color get inner => MuseSurface.block.color(scheme);
+  Color get bgTop => MuseSurface.page.color(scheme);
+  Color get bgBottom => MuseSurface.page.color(scheme);
+  Color get heroIdle => card;
 
-  Color get card => _black ? MusePalette.blackCard : (dark ? MusePalette.darkCard : MusePalette.lightCard);
-  Color get text1 => dark ? MusePalette.darkText1 : MusePalette.lightText1;
-  Color get text2 => dark ? MusePalette.darkText2 : MusePalette.lightText2;
-  Color get text3 => dark ? MusePalette.darkText3 : MusePalette.lightText3;
-  Color get hairline => dark ? MusePalette.darkHairline : MusePalette.lightHairline;
-  Color get selected => _black ? MusePalette.blackSelected : (dark ? MusePalette.darkSelected : MusePalette.lightSelected);
-  Color get inner => _black ? MusePalette.blackInner : (dark ? MusePalette.darkInner : MusePalette.lightInner);
-  Color get bgTop => _black ? MusePalette.blackBg : (dark ? MusePalette.darkBgTop : MusePalette.lightBgTop);
-  Color get bgBottom => _black ? MusePalette.blackBg : (dark ? MusePalette.darkBgBottom : MusePalette.lightBgBottom);
-  Color get heroIdle => _black ? MusePalette.blackHeroIdle : (dark ? MusePalette.darkHeroIdle : MusePalette.lightHeroIdle);
+  /// The connected hero card: a flat primary-container fill (kept as a one-colour gradient so
+  /// callers that animate between states keep working).
+  LinearGradient get heroGradient => LinearGradient(colors: [scheme.primaryContainer, scheme.primaryContainer]);
 
-  /// The connected hero card.
-  LinearGradient get heroGradient => dark
-      ? LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: MusePalette.brand == MuseAccent.blue.brand
-              ? const [MusePalette.darkHeroTop, MusePalette.darkHeroBottom]
-              : [
-                  Color.lerp(MusePalette.brand, MusePalette.black, 0.12)!,
-                  Color.lerp(MusePalette.brandDeep, MusePalette.black, 0.38)!,
-                ],
-        )
-      : LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [MusePalette.brandLight, MusePalette.brand],
-        );
+  /// Text / icons on the connected hero card.
+  Color get onHero => scheme.onPrimaryContainer;
 
-  LinearGradient get pageGradient => LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [bgTop, bgBottom],
-    stops: const [0, 0.6],
-  );
+  LinearGradient get pageGradient => LinearGradient(colors: [bgBottom, bgBottom]);
 
-  /// White tile with a very light shadow (light) / faint border without shadow (dark): never both.
-  BoxDecoration cardDecoration({Color? color, BorderRadius radius = MuseRadius.cardAll}) => BoxDecoration(
-    color: color ?? card,
-    borderRadius: radius,
-    border: dark ? Border.all(color: MusePalette.darkBorder) : null,
-    boxShadow: dark ? null : const [BoxShadow(color: MusePalette.lightShadow, blurRadius: 12, offset: Offset(0, 2))],
-  );
+  /// A filled card: no shadow and no border in either brightness.
+  BoxDecoration cardDecoration({Color? color, BorderRadius radius = MuseRadius.cardAll}) =>
+      BoxDecoration(color: color ?? card, borderRadius: radius);
 
-  /// ShapeBorder for Material cards (dark: faint border).
-  ShapeBorder cardShape({BorderRadius radius = MuseRadius.cardAll}) => RoundedRectangleBorder(
-    borderRadius: radius,
-    side: dark ? const BorderSide(color: MusePalette.darkBorder) : BorderSide.none,
-  );
+  /// ShapeBorder for Material cards (no border).
+  ShapeBorder cardShape({BorderRadius radius = MuseRadius.cardAll}) => RoundedSuperellipseBorder(borderRadius: radius);
 
-  double get cardElevation => dark ? 0 : 1.5;
-  Color get shadowColor => dark ? MusePalette.transparent : MusePalette.lightShadow;
+  double get cardElevation => 0;
+  Color get shadowColor => MusePalette.transparent;
 }
 
 /// Four text levels. Numbers use tabular figures.

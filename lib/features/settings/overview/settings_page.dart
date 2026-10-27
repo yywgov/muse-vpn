@@ -100,7 +100,9 @@ class SettingsPage extends HookConsumerWidget {
       ],
       body: MuseGroupedBody(
         children: [
+          // 1.6.1: labelled groups (常用 / 功能 / 其他), the way the tools page groups its rows
           MuseSection(
+            header: '常用',
             children: [
               MuseTile(
                 key: const ValueKey('theme_mode'),
@@ -162,6 +164,7 @@ class SettingsPage extends HookConsumerWidget {
           ),
           // 1.4.0
           MuseSection(
+            header: '功能',
             children: [
               MuseTile(
                 key: const ValueKey('settings_nodes'),
@@ -212,6 +215,7 @@ class SettingsPage extends HookConsumerWidget {
           if (android) const MuseAndroidGeneralSection(),
           if (android) const MusePrivacySection(),
           MuseSection(
+            header: '其他',
             children: [
               MuseTile(
                 key: const ValueKey('diagnose'),
@@ -351,7 +355,7 @@ Future<T?> museSettingPick<T>(BuildContext context, String title, List<(T, Strin
               key: ValueKey('pick_$label'),
               title: Text(label),
               trailing: value == current
-                  ? Icon(Icons.check_outlined, color: MusePalette.brand, size: MuseIconSize.small)
+                  ? Icon(Icons.check_outlined, color: museBrandOf(context), size: MuseIconSize.small)
                   : null,
               onTap: () => Navigator.of(c).pop(value),
             ),

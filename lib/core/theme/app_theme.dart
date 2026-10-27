@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 
 /// 穿云 1.2.1: status / navigation bar icons that contrast with the page: dark icons on the light
 /// theme, light icons on the dark and true-black themes. Every app bar (AppBarTheme) and the app
@@ -38,64 +40,99 @@ class AppTheme {
   final AppThemeMode mode;
   final String fontFamily;
 
-  ThemeData lightTheme(ColorScheme? lightColorScheme) {
-    // 穿云: always the brand blue (Material You wallpaper colours are ignored on purpose)
-    final ColorScheme scheme = ColorScheme.fromSeed(seedColor: brand).copyWith(
-      primary: brand,
-      onPrimary: Colors.white,
-      surface: MusePalette.lightBgBottom,
-      onSurface: MusePalette.lightText1,
-      onSurfaceVariant: MusePalette.lightText2,
-      outlineVariant: MusePalette.lightHairline,
-      error: MusePalette.red,
-    );
+  /// 1.6.1: the Material 3 colour scheme seeded by 主题色 in the chosen 配色风格 (纯黑 lowers the
+  /// dark surfaces). Material You wallpaper colours are ignored on purpose.
+  ColorScheme scheme(Brightness brightness) => museSeededScheme(
+    seed: brand,
+    brightness: brightness,
+    style: MuseColorStyle.fromKey(MusePalette.colorStyle),
+    pureBlack: brightness == Brightness.dark && mode.trueBlack,
+  );
+
+  ThemeData lightTheme(ColorScheme? lightColorScheme) => _theme(scheme(Brightness.light));
+
+  ThemeData darkTheme(ColorScheme? darkColorScheme) => _theme(scheme(Brightness.dark));
+
+  ThemeData _theme(ColorScheme s) {
+    final dark = s.brightness == Brightness.dark;
+    final page = MuseSurface.page.color(s);
+    final card = MuseSurface.card.color(s);
+    // dialogs and sheets sit one level above the page (dark: one more, so they lift off it)
+    final floating = dark ? MuseSurface.block.color(s) : card;
     return ThemeData(
       useMaterial3: true,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: MusePalette.lightBgBottom,
-      appBarTheme: AppBarTheme(systemOverlayStyle: museSystemOverlayStyle(Brightness.light)),
+      colorScheme: s,
+      scaffoldBackgroundColor: page,
+      canvasColor: page,
+      appBarTheme: AppBarTheme(
+        systemOverlayStyle: museSystemOverlayStyle(s.brightness),
+        backgroundColor: page,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        elevation: 0,
+        foregroundColor: s.onSurface,
+      ),
+      cardTheme: CardThemeData(
+        color: card,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        shape: RoundedSuperellipseBorder(borderRadius: MuseRadius.cardAll),
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: s.onSurfaceVariant,
+        minTileHeight: MuseSize.rowMin,
+        contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
+        titleTextStyle: TextStyle(fontFamily: _family, fontSize: 16, height: 1.3, color: s.onSurface),
+        subtitleTextStyle: TextStyle(fontFamily: _family, fontSize: 13, height: 1.35, color: s.onSurfaceVariant),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (st) => st.contains(WidgetState.selected) ? s.onPrimary : s.outline,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (st) => st.contains(WidgetState.selected) ? s.primary : s.surfaceContainerHighest,
+        ),
+        trackOutlineColor: WidgetStateProperty.resolveWith(
+          (st) => st.contains(WidgetState.selected) ? Colors.transparent : s.outline,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(shape: MuseShape.full)),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: SegmentedButton.styleFrom(
+          selectedBackgroundColor: s.secondaryContainer,
+          selectedForegroundColor: s.onSecondaryContainer,
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        shape: MuseShape.sm,
+        selectedColor: s.secondaryContainer,
+        side: BorderSide(color: s.outlineVariant),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: s.primaryContainer,
+        foregroundColor: s.onPrimaryContainer,
+        elevation: 0,
+        shape: MuseShape.lg,
+      ),
       // 1.2.1: a lighter scrim behind dialogs and bottom sheets, so the dark status bar icons
       // stay readable on the light theme while one is open (the default black54 hid them)
-      dialogTheme: const DialogThemeData(barrierColor: museLightScrim, backgroundColor: MusePalette.lightCard),
-      bottomSheetTheme: const BottomSheetThemeData(modalBarrierColor: museLightScrim, backgroundColor: MusePalette.lightCard),
-      navigationBarTheme: _navBar(false),
-      navigationRailTheme: _rail(false),
-      dividerTheme: const DividerThemeData(color: MusePalette.lightHairline, thickness: 0.5, space: 0.5),
-      fontFamily: fontFamily,
-      pageTransitionsTheme: _transitions,
-      extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
-    );
-  }
-
-  ThemeData darkTheme(ColorScheme? darkColorScheme) {
-    // 穿云 1.3.0: night blue; 1.6.0 C7: 纯黑 (a switch under 深色) puts the page on true black
-    final black = mode.trueBlack;
-    final page = black ? MusePalette.blackBg : MusePalette.darkBgBottom;
-    final card = black ? MusePalette.blackCard : MusePalette.darkCard;
-    final inner = black ? MusePalette.blackInner : MusePalette.darkInner;
-    final ColorScheme scheme = ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.dark).copyWith(
-      primary: brand,
-      onPrimary: Colors.white,
-      surface: page,
-      onSurface: MusePalette.darkText1,
-      onSurfaceVariant: MusePalette.darkText2,
-      outlineVariant: MusePalette.darkHairline,
-      surfaceContainerHighest: inner,
-      surfaceContainerHigh: card,
-      surfaceContainer: card,
-      surfaceContainerLow: page,
-      error: MusePalette.red,
-    );
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: page,
-      appBarTheme: AppBarTheme(systemOverlayStyle: museSystemOverlayStyle(Brightness.dark)),
-      dialogTheme: DialogThemeData(backgroundColor: card),
-      bottomSheetTheme: BottomSheetThemeData(backgroundColor: card),
-      navigationBarTheme: _navBar(true),
-      navigationRailTheme: _rail(true),
-      dividerTheme: const DividerThemeData(color: MusePalette.darkHairline, thickness: 0.5, space: 0.5),
+      dialogTheme: DialogThemeData(
+        barrierColor: dark ? null : museLightScrim,
+        backgroundColor: floating,
+        surfaceTintColor: Colors.transparent,
+        shape: MuseShape.xxl,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        modalBarrierColor: dark ? null : museLightScrim,
+        backgroundColor: floating,
+        surfaceTintColor: Colors.transparent,
+      ),
+      popupMenuTheme: PopupMenuThemeData(color: floating, surfaceTintColor: Colors.transparent, shape: MuseShape.md),
+      navigationBarTheme: _navBar(s),
+      navigationRailTheme: _rail(s),
+      dividerTheme: DividerThemeData(color: s.outlineVariant, thickness: MuseSize.hairline, space: MuseSize.hairline),
       fontFamily: fontFamily,
       pageTransitionsTheme: _transitions,
       extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
@@ -104,41 +141,40 @@ class AppTheme {
 
   String? get _family => fontFamily.isEmpty ? null : fontFamily;
 
-  /// Bottom nav: icon + label; the selected item only changes colour (no pill indicator).
-  NavigationBarThemeData _navBar(bool dark) {
-    final idle = dark ? MusePalette.darkText2 : MusePalette.lightText2;
-    return NavigationBarThemeData(
-      height: 64,
-      elevation: 0,
-      backgroundColor: dark ? (mode.trueBlack ? MusePalette.blackBg : MusePalette.darkBgBottom) : MusePalette.lightBgBottom,
-      surfaceTintColor: Colors.transparent,
-      indicatorColor: Colors.transparent,
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      iconTheme: WidgetStateProperty.resolveWith(
-        (s) => IconThemeData(size: MuseIconSize.regular, color: s.contains(WidgetState.selected) ? brand : idle),
+  /// 1.6.1 bottom nav (Material 3): icon + label, the selected icon sits in a tonal pill.
+  NavigationBarThemeData _navBar(ColorScheme s) => NavigationBarThemeData(
+    height: MuseSize.navBarHeight,
+    elevation: 0,
+    backgroundColor: MuseSurface.card.color(s),
+    surfaceTintColor: Colors.transparent,
+    indicatorColor: s.secondaryContainer,
+    indicatorShape: MuseShape.full,
+    labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+    iconTheme: WidgetStateProperty.resolveWith(
+      (st) => IconThemeData(
+        size: MuseIconSize.regular,
+        color: st.contains(WidgetState.selected) ? s.onSecondaryContainer : s.onSurfaceVariant,
       ),
-      labelTextStyle: WidgetStateProperty.resolveWith(
-        (s) => TextStyle(
-          fontFamily: _family,
-          fontSize: 12,
-          fontWeight: s.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
-          color: s.contains(WidgetState.selected) ? brand : idle,
-        ),
+    ),
+    labelTextStyle: WidgetStateProperty.resolveWith(
+      (st) => TextStyle(
+        fontFamily: _family,
+        fontSize: 12,
+        fontWeight: st.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
+        color: st.contains(WidgetState.selected) ? s.onSurface : s.onSurfaceVariant,
       ),
-    );
-  }
+    ),
+  );
 
-  NavigationRailThemeData _rail(bool dark) {
-    final idle = dark ? MusePalette.darkText2 : MusePalette.lightText2;
-    return NavigationRailThemeData(
-      backgroundColor: Colors.transparent,
-      indicatorColor: Colors.transparent,
-      selectedIconTheme: IconThemeData(size: MuseIconSize.regular, color: brand),
-      unselectedIconTheme: IconThemeData(size: MuseIconSize.regular, color: idle),
-      selectedLabelTextStyle: TextStyle(fontFamily: _family, fontSize: 12, fontWeight: FontWeight.w600, color: brand),
-      unselectedLabelTextStyle: TextStyle(fontFamily: _family, fontSize: 12, fontWeight: FontWeight.w500, color: idle),
-    );
-  }
+  NavigationRailThemeData _rail(ColorScheme s) => NavigationRailThemeData(
+    backgroundColor: Colors.transparent,
+    indicatorColor: s.secondaryContainer,
+    indicatorShape: MuseShape.full,
+    selectedIconTheme: IconThemeData(size: MuseIconSize.regular, color: s.onSecondaryContainer),
+    unselectedIconTheme: IconThemeData(size: MuseIconSize.regular, color: s.onSurfaceVariant),
+    selectedLabelTextStyle: TextStyle(fontFamily: _family, fontSize: 12, fontWeight: FontWeight.w600, color: s.onSurface),
+    unselectedLabelTextStyle: TextStyle(fontFamily: _family, fontSize: 12, fontWeight: FontWeight.w500, color: s.onSurfaceVariant),
+  );
 
   CupertinoThemeData cupertinoThemeData(bool sysDark, ColorScheme? lightColorScheme, ColorScheme? darkColorScheme) {
     final bool isDark = switch (mode) {

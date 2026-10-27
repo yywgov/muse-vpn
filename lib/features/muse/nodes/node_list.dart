@@ -27,6 +27,7 @@ import 'package:hiddify/features/muse/logic/node_share.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:hiddify/features/muse/data/speed_test.dart';
@@ -322,7 +323,7 @@ class MuseNodeList extends HookConsumerWidget {
               icon: Icon(
                 Icons.filter_list_outlined,
                 size: MuseIconSize.small,
-                color: nodeFilter.isNone ? null : MusePalette.brand,
+                color: nodeFilter.isNone ? null : museBrandOf(context),
               ),
               style: const ButtonStyle(visualDensity: VisualDensity.compact),
               onSelected: (raw) => ref.read(MusePrefs.protocolFilter.notifier).update(raw),
@@ -442,7 +443,7 @@ class MuseNodeList extends HookConsumerWidget {
                         child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke),
                       ),
                       const SizedBox(width: MuseSpace.s8),
-                      Text('停止', style: MuseType.body(context).copyWith(color: MusePalette.brand)),
+                      Text('停止', style: MuseType.body(context).copyWith(color: museBrandOf(context))),
                     ],
                   )
                 : const Text('测速'),
@@ -846,7 +847,7 @@ class MuseNodeList extends HookConsumerWidget {
     final refresh = RefreshIndicator(
       key: const ValueKey('nodes_pull_refresh'),
       onRefresh: () => museNodePull(ref),
-      color: MusePalette.brand,
+      color: museBrandOf(context),
       notificationPredicate: (n) => hasProfile && n.depth == 0 && !selecting.value,
       child: list,
     );
@@ -1232,7 +1233,7 @@ class MuseNodeRow extends StatelessWidget {
                       height: MuseSize.flagBox,
                       child: Icon(
                         checked! ? Icons.check_circle_outlined : Icons.radio_button_unchecked_outlined,
-                        color: checked! ? MusePalette.brand : mt.text3,
+                        color: checked! ? museBrandOf(context) : mt.text3,
                       ),
                     )
                   else
@@ -1305,12 +1306,23 @@ class MuseNodeRow extends StatelessWidget {
                 ],
               ),
             ),
+            // 1.6.1: a short rounded accent mark (the row itself is filled with the tonal
+            // selected colour) instead of a full-height bar
             if (selected)
               Positioned(
                 left: 0,
                 top: 0,
                 bottom: 0,
-                child: SizedBox(width: MuseSize.selectedBar, child: ColoredBox(color: MusePalette.brand, key: const ValueKey('node_selected_bar'))),
+                child: Center(
+                  child: SizedBox(
+                    width: MuseSize.selectedBar,
+                    height: MuseSize.selectedMark,
+                    child: DecoratedBox(
+                      key: const ValueKey('node_selected_bar'),
+                      decoration: ShapeDecoration(color: museBrandOf(context), shape: MuseShape.full),
+                    ),
+                  ),
+                ),
               ),
           ],
         ),
@@ -1372,7 +1384,7 @@ class MuseFlagBox extends StatelessWidget {
       height: MuseSize.flagBox,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: onBrand ? MusePalette.white.withValues(alpha: 0.18) : mt.inner,
+        color: onBrand ? mt.onHero.withValues(alpha: 0.1) : mt.inner,
         borderRadius: MuseRadius.smallAll,
       ),
       child: flag != null
@@ -1381,7 +1393,7 @@ class MuseFlagBox extends StatelessWidget {
               icon,
               key: neutral ? const ValueKey('flag_box_neutral') : null,
               size: MuseIconSize.small,
-              color: onBrand ? MusePalette.white : (neutral ? mt.text3 : MusePalette.brand),
+              color: onBrand ? mt.onHero : (neutral ? mt.text3 : museBrandOf(context)),
             ),
     );
   }
@@ -2182,7 +2194,7 @@ class MuseSparkline extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(
     key: const ValueKey('node_sparkline'),
     height: MuseSize.sparkHeight,
-    child: CustomPaint(painter: _SparkPainter(points, MusePalette.brand, MusePalette.red), size: Size.infinite),
+    child: CustomPaint(painter: _SparkPainter(points, museBrandOf(context), MusePalette.red), size: Size.infinite),
   );
 }
 

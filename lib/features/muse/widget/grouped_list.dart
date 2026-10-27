@@ -131,6 +131,9 @@ class MuseSection extends HookWidget {
   /// Where the hairline starts (label column of a row with a leading icon).
   final double dividerIndent;
 
+  /// 1.6.1: a group is one filled block with the large (xl) corner.
+  static const radius = BorderRadius.all(Radius.circular(MuseRadiusScale.xl));
+
   @override
   Widget build(BuildContext context) {
     final theme = MuseTheme.of(context);
@@ -153,7 +156,13 @@ class MuseSection extends HookWidget {
               padding: const EdgeInsets.fromLTRB(MuseSpace.s16, MuseSpace.s4, 0, MuseSpace.s8),
               child: Row(
                 children: [
-                  Expanded(child: Text(header ?? '', style: MuseType.caption(context))),
+                  // 1.6.1: section headers in the accent, the way Material 3 lists label groups
+                  Expanded(
+                    child: Text(
+                      header ?? '',
+                      style: MuseTextLevel.footnote.style(context, color: museBrandOf(context), weight: FontWeight.w600),
+                    ),
+                  ),
                   ?headerTrailing,
                   // 1.5.0: the explanation stays folded behind ⓘ
                   if (footer != null) MuseInfoButton(key: const ValueKey('section_info'), open: open.value, onTap: () => open.value = !open.value),
@@ -161,9 +170,9 @@ class MuseSection extends HookWidget {
               ),
             ),
           DecoratedBox(
-            decoration: theme.cardDecoration(),
+            decoration: theme.cardDecoration(radius: MuseSection.radius),
             child: ClipRSuperellipse(
-              borderRadius: MuseRadius.cardAll,
+              borderRadius: MuseSection.radius,
               child: Material(
                 type: MaterialType.transparency,
                 child: Column(mainAxisSize: MainAxisSize.min, children: items),
@@ -196,7 +205,7 @@ class MuseRowIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      Icon(icon, size: MuseIconSize.small, color: color ?? MuseTheme.of(context).text2);
+      Icon(icon, size: MuseIconSize.regular, color: color ?? MuseTheme.of(context).text2);
 }
 
 Widget? _leadingOf(Widget? leading) => leading is Icon && leading.size == null && leading.color == null && leading.icon != null
@@ -233,18 +242,23 @@ class MuseTile extends StatelessWidget {
     final theme = MuseTheme.of(context);
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
-      minLeadingWidth: MuseIconSize.small,
+      minLeadingWidth: MuseIconSize.regular,
       horizontalTitleGap: MuseSpace.s16,
       minVerticalPadding: MuseSpace.s12,
       leading: _leadingOf(leading),
-      title: info == null ? Text(title, style: MuseType.body(context)) : MuseInfoTitle(title: title, info: info!),
+      title: info == null ? Text(title, style: MuseTextLevel.callout.style(context)) : MuseInfoTitle(title: title, info: info!),
       subtitle: subtitle == null
           ? null
-          : Text(subtitle!, maxLines: subtitleMaxLines, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
+          : Text(
+              subtitle!,
+              maxLines: subtitleMaxLines,
+              overflow: TextOverflow.ellipsis,
+              style: MuseTextLevel.footnote.style(context, color: theme.text2),
+            ),
       trailing: trailing == null && !chevron
           ? null
           : DefaultTextStyle.merge(
-              style: MuseType.body(context).copyWith(color: theme.text2),
+              style: MuseTextLevel.subheadline.style(context, color: theme.text2),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -285,13 +299,16 @@ class MuseSwitchTile extends StatelessWidget {
     // (SwitchListTile put the title 8 px further right)
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
-      minLeadingWidth: MuseIconSize.small,
+      minLeadingWidth: MuseIconSize.regular,
       horizontalTitleGap: MuseSpace.s16,
       minVerticalPadding: MuseSpace.s12,
       leading: _leadingOf(leading),
-      title: info == null ? Text(title, style: MuseType.body(context)) : MuseInfoTitle(title: title, info: info!),
-      subtitle: subtitle == null ? null : Text(subtitle!, style: MuseType.caption(context)),
-      trailing: Switch.adaptive(activeTrackColor: MusePalette.brand, value: value, onChanged: onChanged),
+      title: info == null ? Text(title, style: MuseTextLevel.callout.style(context)) : MuseInfoTitle(title: title, info: info!),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle!, style: MuseTextLevel.footnote.style(context, color: MuseTheme.of(context).text2)),
+      // 1.6.1: the Material 3 switch from the theme (accent track, tonal off state)
+      trailing: Switch(value: value, onChanged: onChanged),
       enabled: onChanged != null,
       onTap: onChanged == null ? null : () => onChanged!(!value),
     );
@@ -323,7 +340,7 @@ class MuseChoiceTile extends StatelessWidget {
       info: info,
       onTap: onTap,
       trailing: selected
-          ? Icon(Icons.check_outlined, size: MuseIconSize.small, color: MusePalette.brand)
+          ? Icon(Icons.check_outlined, size: MuseIconSize.small, color: museBrandOf(context))
           : const SizedBox(width: MuseIconSize.small),
     );
   }
@@ -348,7 +365,7 @@ class MuseInfoButton extends StatelessWidget {
         child: Icon(
           open ? Icons.info_outlined : Icons.info_outlined,
           size: MuseIconSize.tiny,
-          color: open ? MusePalette.brand : MuseTheme.of(context).text2,
+          color: open ? museBrandOf(context) : MuseTheme.of(context).text2,
         ),
       ),
     ),
@@ -371,7 +388,7 @@ class MuseInfoTitle extends HookWidget {
       children: [
         Row(
           children: [
-            Flexible(child: Text(title, style: MuseType.body(context))),
+            Flexible(child: Text(title, style: MuseTextLevel.callout.style(context))),
             MuseInfoButton(key: const ValueKey('row_info'), open: open.value, onTap: () => open.value = !open.value),
           ],
         ),

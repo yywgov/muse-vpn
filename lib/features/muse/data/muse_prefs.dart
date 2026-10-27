@@ -17,6 +17,9 @@ abstract final class MusePrefs {
   // ---- 外观
   static final accent = PreferencesNotifier.create<String, String>("muse_accent", "blue");
 
+  /// 1.6.1 配色风格 (MuseColorStyle key): how the Material 3 scheme is derived from 主题色
+  static final colorStyle = PreferencesNotifier.create<String, String>("muse_color_style", "tonalSpot");
+
   /// small / normal / large / huge — 1.4.0–1.5.x 字体大小; 1.6.0 C7 migrates it into 文字缩放 and
   /// no longer reads it (kept so an older device's backup still restores).
   static final textSize = PreferencesNotifier.create<String, String>("muse_text_size", "normal");
@@ -252,6 +255,7 @@ String museTextScaleLabel(int pct) => '${(museClampTextScalePct(pct) / 100).toSt
 /// Preference keys that go into 同步 / 备份 (settings that make sense on another device).
 const museSyncedPrefKeys = [
   'muse_accent',
+  'muse_color_style',
   'muse_text_size',
   'muse_text_scale_on',
   'muse_text_scale_pct',

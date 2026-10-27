@@ -75,7 +75,7 @@ class _Segment extends StatelessWidget {
             duration: museMotion(context),
             curve: MuseMotion.curve,
             decoration: BoxDecoration(
-              color: selected ? (mt.dark ? MusePalette.brand : MusePalette.white) : MusePalette.transparent,
+              color: selected ? (mt.dark ? museBrandOf(context) : MusePalette.white) : MusePalette.transparent,
               borderRadius: MuseRadius.fullAll,
               boxShadow: selected && !mt.dark ? [BoxShadow(color: mt.shadowColor, blurRadius: MuseSpace.s4, offset: const Offset(0, 1))] : null,
             ),
@@ -95,7 +95,7 @@ class _Segment extends StatelessWidget {
                       height: 1,
                       leadingDistribution: TextLeadingDistribution.even,
                       fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                      color: selected ? (mt.dark ? MusePalette.white : MusePalette.brand) : mt.text2,
+                      color: selected ? (mt.dark ? MusePalette.white : museBrandOf(context)) : mt.text2,
                     ),
                   ),
                 ),

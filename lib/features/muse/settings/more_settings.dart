@@ -90,7 +90,7 @@ Future<T?> musePick<T>(BuildContext context, String title, List<(T, String)> opt
         ListTile(
           key: ValueKey('pick_$label'),
           title: Text(label),
-          trailing: value == current ? Icon(Icons.check_outlined, color: MusePalette.brand, size: MuseIconSize.small) : null,
+          trailing: value == current ? Icon(Icons.check_outlined, color: museBrandOf(context), size: MuseIconSize.small) : null,
           onTap: () => Navigator.of(c).pop(value),
         ),
     ],
@@ -850,7 +850,7 @@ class MusePresetsPage extends HookConsumerWidget {
                     subtitleMaxLines: 1,
                     trailing: Text(
                       choice.containsKey(p.key) ? museOutboundTitle(choice[p.key]!) : '关',
-                      style: choice.containsKey(p.key) ? TextStyle(color: MusePalette.brand, fontWeight: FontWeight.w600) : null,
+                      style: choice.containsKey(p.key) ? TextStyle(color: museBrandOf(context), fontWeight: FontWeight.w600) : null,
                     ),
                     chevron: true,
                     onTap: () async {
@@ -1762,7 +1762,7 @@ class _MuseBarChart extends StatelessWidget {
                         margin: const EdgeInsets.symmetric(horizontal: MuseSize.barGap),
                         height: b.$2 == 0 ? MuseSize.barGap : math.min(h, math.max(MuseSize.barMin, h * b.$2 / maxV)),
                         decoration: BoxDecoration(
-                          color: b.$2 == 0 ? mt.hairline : MusePalette.brand,
+                          color: b.$2 == 0 ? mt.hairline : museBrandOf(context),
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(MuseSize.barMin)),
                         ),
                       ),

@@ -149,7 +149,7 @@ class _Dashboard extends ConsumerWidget {
     return RefreshIndicator(
       key: const ValueKey('home_pull_refresh'),
       onRefresh: () => museNodePull(ref),
-      color: MusePalette.brand,
+      color: museBrandOf(context),
       notificationPredicate: (n) => n.depth == 0,
       child: ListView(
         key: const ValueKey('home_dashboard'),
@@ -251,8 +251,9 @@ class MuseHeroCard extends HookConsumerWidget {
     final onBrand = state != _HeroState.idle;
     // 1.4.0: roomier on the desktop
     final heroPad = MediaQuery.sizeOf(context).width >= 720 ? MuseSpace.s24 : MuseSpace.s16;
-    final fg = onBrand ? MusePalette.white : mt.text1;
-    final fg2 = onBrand ? MusePalette.white.withValues(alpha: 0.78) : mt.text2;
+    // 1.6.1: connected = the scheme's primary container (flat), text on it in onPrimaryContainer
+    final fg = onBrand ? mt.onHero : mt.text1;
+    final fg2 = onBrand ? mt.onHero.withValues(alpha: 0.78) : mt.text2;
     final switchEnabled = action != MuseConnectAction.ignore;
 
     final card = AnimatedContainer(
@@ -260,22 +261,8 @@ class MuseHeroCard extends HookConsumerWidget {
       curve: MuseMotion.curve,
       decoration: switch (state) {
         _HeroState.idle => mt.cardDecoration(color: mt.heroIdle),
-        _HeroState.connecting => BoxDecoration(
-          borderRadius: MuseRadius.cardAll,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              mt.heroGradient.colors.first.withValues(alpha: 0.85),
-              mt.heroGradient.colors.last.withValues(alpha: 0.85),
-            ],
-          ),
-        ),
-        _HeroState.connected => BoxDecoration(
-          borderRadius: MuseRadius.cardAll,
-          gradient: mt.heroGradient,
-          boxShadow: mt.cardDecoration().boxShadow,
-        ),
+        _HeroState.connecting => mt.cardDecoration(color: Color.lerp(mt.heroIdle, mt.heroGradient.colors.first, 0.6)),
+        _HeroState.connected => mt.cardDecoration(color: mt.heroGradient.colors.first),
       },
       child: ClipRSuperellipse(
         borderRadius: MuseRadius.cardAll,
@@ -399,7 +386,7 @@ class MuseHeroCard extends HookConsumerWidget {
                           Divider(
                             height: MuseSize.hairline,
                             thickness: MuseSize.hairline,
-                            color: onBrand ? MusePalette.white.withValues(alpha: 0.22) : mt.hairline,
+                            color: onBrand ? mt.onHero.withValues(alpha: 0.14) : mt.hairline,
                           ),
                         ],
                       ),
@@ -458,9 +445,9 @@ class _ModePill extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mt = MuseTheme.of(context);
-    final fg = onBrand ? MusePalette.white : mt.text1;
+    final fg = onBrand ? mt.onHero : mt.text1;
     return Material(
-      color: onBrand ? MusePalette.white.withValues(alpha: 0.18) : mt.inner,
+      color: onBrand ? mt.onHero.withValues(alpha: 0.1) : mt.inner,
       shape: MuseShape.full,
       child: InkWell(
         key: const ValueKey('home_mode_pill'),
@@ -491,7 +478,8 @@ class _ModePill extends ConsumerWidget {
   }
 }
 
-/// The large switch on the hero card (64 × 36).
+/// The hero card's start button (1.6.1: a filled squircle in the accent with ▶ / ❚❚, the
+/// way the dashboard's start button looks; it was a 64 × 36 switch before).
 class _BigSwitch extends StatelessWidget {
   const _BigSwitch({
     super.key,
@@ -508,9 +496,7 @@ class _BigSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mt = MuseTheme.of(context);
-    final track = on ? MusePalette.white : (mt.dark ? mt.inner : MusePalette.lightHairline);
-    final knob = on ? MusePalette.brand : MusePalette.white;
+    final scheme = Theme.of(context).colorScheme;
     return Semantics(
       button: true,
       toggled: on,
@@ -522,24 +508,19 @@ class _BigSwitch extends StatelessWidget {
         child: AnimatedContainer(
           duration: museMotion(context),
           curve: MuseMotion.curve,
-          width: MuseSize.switchWidth,
-          height: MuseSize.switchHeight,
-          padding: const EdgeInsets.all(MuseSpace.s4),
-          decoration: BoxDecoration(color: track, borderRadius: MuseRadius.fullAll),
-          child: AnimatedAlign(
+          width: MuseSize.startButton,
+          height: MuseSize.startButton,
+          decoration: ShapeDecoration(
+            color: onTap == null ? scheme.primary.withValues(alpha: 0.5) : scheme.primary,
+            shape: on ? MuseShape.xl : MuseShape.full,
+          ),
+          child: AnimatedSwitcher(
             duration: museMotion(context),
-            curve: MuseMotion.curve,
-            alignment: on ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              width: MuseSize.switchKnob,
-              height: MuseSize.switchKnob,
-              decoration: BoxDecoration(
-                color: knob,
-                shape: BoxShape.circle,
-                boxShadow: on
-                    ? null
-                    : const [BoxShadow(color: MusePalette.knobShadow, blurRadius: 4, offset: Offset(0, 1))],
-              ),
+            child: Icon(
+              on ? Icons.pause_outlined : Icons.play_arrow_outlined,
+              key: ValueKey(on),
+              size: MuseIconSize.large,
+              color: scheme.onPrimary,
             ),
           ),
         ),
@@ -608,8 +589,8 @@ class _HeroNodeRow extends ConsumerWidget {
     final since = ref.watch(museConnectedSinceProvider).valueOrNull;
     final item = group?.items.where((e) => e.tag == group.selected).firstOrNull;
     final shown = ref.watch(museShownPickProvider);
-    final fg = onBrand ? MusePalette.white : mt.text1;
-    final fg2 = onBrand ? MusePalette.white.withValues(alpha: 0.78) : mt.text2;
+    final fg = onBrand ? mt.onHero : mt.text1;
+    final fg2 = onBrand ? mt.onHero.withValues(alpha: 0.78) : mt.text2;
     String text = '选择节点';
     String? flag;
     IconData icon = Icons.public_outlined;
@@ -827,7 +808,7 @@ class _Tile extends ConsumerWidget {
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: MuseType.caption(context),
+                          style: MuseTextLevel.subheadline.style(context, weight: FontWeight.w600),
                         ),
                       ),
                       if (titleTrailing != null)
@@ -890,7 +871,7 @@ class _SpeedTile extends ConsumerWidget {
       titleTrailing: Text('↑ ${museSpeedText(stats.uplink.toInt())}', style: MuseType.caption(context)),
       value: '↓ ${museSpeedText(stats.downlink.toInt())}',
       bottom: SizedBox.expand(
-        child: CustomPaint(painter: _SparklinePainter(history, MusePalette.brand, MuseTheme.of(context).hairline)),
+        child: CustomPaint(painter: _SparklinePainter(history, museBrandOf(context), MuseTheme.of(context).hairline)),
       ),
       onTap: () => _showSessionSheet(context),
     );
@@ -918,7 +899,7 @@ class _FlowTile extends ConsumerWidget {
             flex: 2,
             child: CustomPaint(
               size: Size.infinite,
-              painter: _SparklinePainter(history, MusePalette.brand, MuseTheme.of(context).hairline),
+              painter: _SparklinePainter(history, museBrandOf(context), MuseTheme.of(context).hairline),
             ),
           ),
           const SizedBox(width: MuseSpace.s12),
@@ -1033,7 +1014,7 @@ class _RemainingTile extends ConsumerWidget {
                     value: v,
                     minHeight: MuseSize.progressBar,
                     backgroundColor: mt.inner,
-                    color: low ? MusePalette.orange : MusePalette.brand,
+                    color: low ? MusePalette.orange : museBrandOf(context),
                   ),
                 ),
               ),
@@ -1274,7 +1255,7 @@ class _TileEditor extends ConsumerWidget {
                     title: Text(t.title, style: MuseType.body(context)),
                     trailing: Switch.adaptive(
                       value: !hidden.contains(t),
-                      activeTrackColor: MusePalette.brand,
+                      activeTrackColor: museBrandOf(context),
                       onChanged: (_) async {
                         final next = museToggleHiddenTile(hidden, t);
                         await ref.read(Preferences.museHomeTilesHidden.notifier).update(museHiddenTilesToRaw(next));
@@ -1319,11 +1300,11 @@ class _EmptyState extends ConsumerWidget {
                   width: MuseSize.emptyArt,
                   height: MuseSize.emptyArt,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: MusePalette.brand.withValues(alpha: 0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: museBrandOf(context).withValues(alpha: 0.1), shape: BoxShape.circle),
                   child: Assets.images.glyph.svg(
                     width: MuseSize.emptyIcon,
                     height: MuseSize.emptyIcon,
-                    colorFilter: ColorFilter.mode(MusePalette.brand, BlendMode.srcIn),
+                    colorFilter: ColorFilter.mode(museBrandOf(context), BlendMode.srcIn),
                   ),
                 ),
                 const SizedBox(height: MuseSpace.s16),
@@ -1334,7 +1315,7 @@ class _EmptyState extends ConsumerWidget {
                   height: MuseSize.button,
                   child: FilledButton(
                     key: const ValueKey('empty_add_button'),
-                    style: FilledButton.styleFrom(backgroundColor: MusePalette.brand, shape: MuseShape.full),
+                    style: FilledButton.styleFrom(backgroundColor: museBrandOf(context), shape: MuseShape.full),
                     onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
                     child: const Text('添加订阅'),
                   ),

@@ -82,6 +82,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     museApplyPureBlack(themeMode.trueBlack);
     // 1.4.0: accent colour and text size (设置 › 外观); 1.6.0 C7: custom accent, 纯黑, 文字缩放
     museApplyAccent(ref.watch(MusePrefs.accent));
+    museApplyColorStyle(ref.watch(MusePrefs.colorStyle));
     final textScale = museTextScale(ref.watch(MusePrefs.textScaleOn), ref.watch(MusePrefs.textScalePct));
     final theme = AppTheme(themeMode, locale.preferredFontFamily);
     final activeBreakpoint = Breakpoint(context).activeBreakpoint;

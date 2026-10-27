@@ -48,7 +48,7 @@ class MuseConfigPage extends HookConsumerWidget {
             key: const ValueKey('profile_add_button'),
             onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
             // a subscription link waits on the clipboard
-            icon: Badge(isLabelVisible: offer, smallSize: 8, backgroundColor: MusePalette.brand, child: const Icon(Icons.add_outlined)),
+            icon: Badge(isLabelVisible: offer, smallSize: 8, backgroundColor: museBrandOf(context), child: const Icon(Icons.add_outlined)),
             tooltip: '添加',
           ),
           const SizedBox(width: MuseSpace.s8),
@@ -56,7 +56,7 @@ class MuseConfigPage extends HookConsumerWidget {
       // 1.2.5: pull down to update every subscription (FlClash / Clash Verge Rev)
       body: RefreshIndicator(
         key: const ValueKey('config_pull_refresh'),
-        color: MuseColors.brand,
+        color: museBrandOf(context),
         onRefresh: () async {
           try {
             await ref.read(foregroundProfilesUpdateNotifierProvider.notifier).trigger();

@@ -205,7 +205,9 @@ class _MuseTabTransitionState extends State<MuseTabTransition> with SingleTicker
   }
 }
 
-/// The phone bottom bar: floating pill (default) or docked full-width bar.
+/// The phone bottom bar: floating (default) or docked full-width bar. 1.6.1: Material 3 look —
+/// a tonal indicator marks the selected tab (docked: a pill behind the icon; floating: a
+/// rounded block behind icon and label), no shadow, the bar on the card surface.
 class MuseDock extends StatelessWidget {
   const MuseDock({super.key, required this.floating, required this.index, required this.onTap, required this.icon});
 
@@ -218,10 +220,19 @@ class MuseDock extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final bottom = MediaQuery.paddingOf(context).bottom;
+    Color iconColor(int i) => i == index ? scheme.onSecondaryContainer : scheme.onSurfaceVariant;
     final items = Row(
       children: [
         for (var i = 0; i < museShellActions.length; i++)
-          Expanded(child: _DockItem(selected: i == index, label: museShellActions[i].title, onTap: () => onTap(i), icon: icon(i, i == index ? scheme.primary : scheme.onSurfaceVariant))),
+          Expanded(
+            child: _DockItem(
+              selected: i == index,
+              block: floating,
+              label: museShellActions[i].title,
+              onTap: () => onTap(i),
+              icon: icon(i, iconColor(i)),
+            ),
+          ),
       ],
     );
     if (!floating) {
@@ -230,29 +241,33 @@ class MuseDock extends StatelessWidget {
         color: MuseSurface.card.color(scheme),
         child: Padding(
           padding: EdgeInsets.only(bottom: bottom),
-          child: SizedBox(height: MuseSize.dockHeight, child: items),
+          child: SizedBox(height: MuseSize.navBarHeight, child: items),
         ),
       );
     }
     return Padding(
-      padding: EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, bottom + MuseSpace.s12),
+      padding: EdgeInsets.fromLTRB(MuseSpace.s12, 0, MuseSpace.s12, bottom + MuseSpace.s8),
       child: Material(
         key: const ValueKey('muse_dock_floating'),
         color: MuseSurface.card.color(scheme),
-        shape: MuseShape.full,
-        elevation: MuseSpace.s4,
-        shadowColor: scheme.shadow.withValues(alpha: 0.3),
+        shape: MuseShape.xxl,
         clipBehavior: Clip.antiAlias,
-        child: SizedBox(height: MuseSize.dockHeight, child: items),
+        child: Padding(
+          padding: const EdgeInsets.all(MuseSpace.s4),
+          child: SizedBox(height: MuseSize.dockHeight, child: items),
+        ),
       ),
     );
   }
 }
 
 class _DockItem extends StatelessWidget {
-  const _DockItem({required this.selected, required this.label, required this.onTap, required this.icon});
+  const _DockItem({required this.selected, required this.block, required this.label, required this.onTap, required this.icon});
 
   final bool selected;
+
+  /// the indicator covers icon and label (floating bar) instead of a pill behind the icon
+  final bool block;
   final String label;
   final VoidCallback onTap;
   final Widget icon;
@@ -260,31 +275,49 @@ class _DockItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = selected ? scheme.primary : scheme.onSurfaceVariant;
+    final fill = selected ? scheme.secondaryContainer : MusePalette.transparent;
+    final text = Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.fade,
+      style: MuseTextLevel.caption1.style(
+        context,
+        color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
+        weight: selected ? FontWeight.w600 : FontWeight.w500,
+      ),
+    );
+    final Widget content = block
+        ? AnimatedContainer(
+            key: const ValueKey('muse_dock_indicator'),
+            duration: museMotion(context),
+            margin: const EdgeInsets.symmetric(horizontal: MuseSpace.s4),
+            decoration: ShapeDecoration(color: fill, shape: MuseShape.xl),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [icon, const SizedBox(height: MuseSpace.s4), text],
+            ),
+          )
+        : Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                key: const ValueKey('muse_dock_indicator'),
+                duration: museMotion(context),
+                width: MuseSize.navIndicatorWidth,
+                height: MuseSize.navIndicatorHeight,
+                alignment: Alignment.center,
+                decoration: ShapeDecoration(color: fill, shape: MuseShape.full),
+                child: icon,
+              ),
+              const SizedBox(height: MuseSpace.s4),
+              text,
+            ],
+          );
     return Semantics(
       selected: selected,
       button: true,
       label: label,
-      child: InkResponse(
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: museMotion(context),
-              padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s4),
-              decoration: ShapeDecoration(color: selected ? scheme.primary.withValues(alpha: 0.12) : MusePalette.transparent, shape: MuseShape.full),
-              child: icon,
-            ),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              style: MuseTextLevel.caption1.style(context, color: color, weight: selected ? FontWeight.w600 : FontWeight.w500),
-            ),
-          ],
-        ),
-      ),
+      child: InkResponse(onTap: onTap, highlightShape: BoxShape.rectangle, child: content),
     );
   }
 }
@@ -324,7 +357,7 @@ class MuseSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     Widget row({required bool selected, required Widget leading, required String label, required VoidCallback onTap, Key? key}) {
-      final color = selected ? scheme.primary : scheme.onSurfaceVariant;
+      final color = selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant;
       return SizedBox(
         key: key,
         height: itemHeight,
@@ -335,8 +368,8 @@ class MuseSidebar extends StatelessWidget {
             button: true,
             label: label,
             child: Material(
-              color: selected ? scheme.primary.withValues(alpha: 0.12) : MusePalette.transparent,
-              shape: MuseShape.md,
+              color: selected ? scheme.secondaryContainer : MusePalette.transparent,
+              shape: MuseShape.full,
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: onTap,
@@ -393,7 +426,7 @@ class MuseSidebar extends StatelessWidget {
             row(
               key: ValueKey('muse_nav_$i'),
               selected: i == index,
-              leading: icon(i, i == index ? scheme.primary : scheme.onSurfaceVariant),
+              leading: icon(i, i == index ? scheme.onSecondaryContainer : scheme.onSurfaceVariant),
               label: museShellActions[i].title,
               onTap: () => onTap(i),
             ),
@@ -406,7 +439,7 @@ class MuseSidebar extends StatelessWidget {
             row(
               key: ValueKey('muse_nav_${e.route}'),
               selected: e == selectedExtra,
-              leading: Icon(e.icon, color: e == selectedExtra ? scheme.primary : scheme.onSurfaceVariant),
+              leading: Icon(e.icon, color: e == selectedExtra ? scheme.onSecondaryContainer : scheme.onSurfaceVariant),
               label: e.title,
               onTap: () => onExtra(e),
             ),

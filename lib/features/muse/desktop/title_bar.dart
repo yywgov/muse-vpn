@@ -212,7 +212,7 @@ class _CaptionButtonState extends State<_CaptionButton> {
     final theme = MuseTheme.of(context);
     final danger = widget.danger && _hover;
     final bg = danger ? MusePalette.red : (_hover ? theme.selected : null);
-    final fg = danger ? MusePalette.white : (widget.active ? MusePalette.brand : theme.text2);
+    final fg = danger ? MusePalette.white : (widget.active ? museBrandOf(context) : theme.text2);
     return Semantics(
       button: true,
       label: widget.tooltip,

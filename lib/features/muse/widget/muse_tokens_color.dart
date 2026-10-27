@@ -9,8 +9,12 @@ import 'package:flutter/foundation.dart' show clampDouble;
 import 'package:flutter/material.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
 
-/// 配色风格: 鲜明 / 着色 / 柔和 / 单色.
+/// 配色风格. 1.6.1: 标准 (Material 3 tonal spot) is the default; 鲜艳 / 表现力 are the other
+/// Material 3 variants; 鲜明 keeps the seed itself as the accent; 着色 also tints the surfaces.
 enum MuseColorStyle {
+  tonalSpot('tonalSpot', '标准'),
+  vibrant('vibrant', '鲜艳'),
+  expressive('expressive', '表现力'),
   vivid('vivid', '鲜明'),
   tinted('tinted', '着色'),
   soft('soft', '柔和'),
@@ -21,7 +25,10 @@ enum MuseColorStyle {
   final String key;
   final String title;
 
-  static MuseColorStyle fromKey(String? key) => values.where((e) => e.key == key).firstOrNull ?? vivid;
+  static MuseColorStyle fromKey(String? key) => values.where((e) => e.key == key).firstOrNull ?? tonalSpot;
+
+  /// The styles offered in 设置 › 外观 › 配色风格 (着色 stays readable from old settings only).
+  static const offered = [tonalSpot, vibrant, expressive, vivid, soft, monochrome];
 }
 
 /// The brand blue: the default seed.
@@ -60,7 +67,10 @@ abstract final class MuseTone {
 
 DynamicScheme _scheme(Hct source, bool dark, MuseColorStyle style) => switch (style) {
   MuseColorStyle.vivid || MuseColorStyle.tinted => SchemeContent(sourceColorHct: source, isDark: dark, contrastLevel: 0),
-  MuseColorStyle.soft => SchemeTonalSpot(sourceColorHct: source, isDark: dark, contrastLevel: 0),
+  MuseColorStyle.tonalSpot => SchemeTonalSpot(sourceColorHct: source, isDark: dark, contrastLevel: 0),
+  MuseColorStyle.vibrant => SchemeVibrant(sourceColorHct: source, isDark: dark, contrastLevel: 0),
+  MuseColorStyle.expressive => SchemeExpressive(sourceColorHct: source, isDark: dark, contrastLevel: 0),
+  MuseColorStyle.soft => SchemeNeutral(sourceColorHct: source, isDark: dark, contrastLevel: 0),
   MuseColorStyle.monochrome => SchemeMonochrome(sourceColorHct: source, isDark: dark, contrastLevel: 0),
 };
 
@@ -72,7 +82,7 @@ final _cache = <(int, bool, MuseColorStyle, bool), ColorScheme>{};
 ColorScheme museSeededScheme({
   Color seed = museBrandSeed,
   required Brightness brightness,
-  MuseColorStyle style = MuseColorStyle.vivid,
+  MuseColorStyle style = MuseColorStyle.tonalSpot,
   bool pureBlack = false,
 }) {
   final dark = brightness == Brightness.dark;
