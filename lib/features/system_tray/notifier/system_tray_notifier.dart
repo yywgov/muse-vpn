@@ -7,7 +7,11 @@ import 'package:hiddify/core/logger/logger_setup.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
+import 'package:hiddify/features/muse/desktop/desktop_actions.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
+import 'package:hiddify/features/muse/logic/proxy_env.dart';
+import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/muse/home/node_memory.dart';
@@ -81,7 +85,17 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
             ],
             selected: group.selected,
           );
-    final spec = museTrayMenuSpec(connection, ref.watch(ConfigOptions.museRouteMode), nodes: nodes, speed: speed);
+    final windows = PlatformUtils.isWindows;
+    final spec = museTrayMenuSpec(
+      connection,
+      ref.watch(ConfigOptions.museRouteMode),
+      nodes: nodes,
+      speed: speed,
+      moreNodes: group != null && group.items.where((e) => !e.isGroup).length > museTrayMaxNodes,
+      serviceMode: windows ? ref.watch(ConfigOptions.serviceMode) : null,
+      autoStart: windows ? (ref.watch(autoStartNotifierProvider).valueOrNull ?? false) : null,
+      copyEnv: windows,
+    );
     final menuKey = _specKey(spec);
     if (menuKey != _lastMenuKey) {
       _lastMenuKey = menuKey;
@@ -146,33 +160,37 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
 
   @override
   Future<void> onTrayMenuItemClick(MenuItem menuItem) async {
-    // if (menuItem.key == 'dashboard') {
-    //   await ref.read(windowNotifierProvider.notifier).open();
-    // }
-    if (menuItem.key == 'dashboard') {
-      await ref.read(windowNotifierProvider.notifier).show();
-    } else if (menuItem.key == 'connection') {
-      await ref.read(connectionNotifierProvider.notifier).toggleConnection();
-    } else if (menuItem.key?.startsWith('mode:') ?? false) {
-      await ref.read(ConfigOptions.museRouteMode.notifier).update(MuseRouteMode.fromKey(menuItem.key!.substring(5)));
-    } else if (menuItem.key?.startsWith('node:') ?? false) {
-      final group = _groupTag;
-      if (group == null) return;
-      try {
-        await museSelectNodeFrom(ref, group, menuItem.key!.substring(5));
-      } catch (e) {
-        loggy.warning('tray: switching node failed', e);
-      }
-    } else if (menuItem.key == 'urltest') {
-      final group = _groupTag;
-      if (group == null) return;
-      try {
+    final key = menuItem.key ?? '';
+    try {
+      if (key == 'dashboard') {
+        await ref.read(windowNotifierProvider.notifier).show();
+      } else if (key == 'connection') {
+        await museRunDesktopAction(ref, MuseDesktopAction.toggleConnection);
+      } else if (key.startsWith('mode:')) {
+        await ref.read(ConfigOptions.museRouteMode.notifier).update(MuseRouteMode.fromKey(key.substring(5)));
+      } else if (key == 'nodes:more') {
+        await museRunDesktopAction(ref, MuseDesktopAction.openNodes);
+      } else if (key.startsWith('node:')) {
+        final group = _groupTag;
+        if (group == null) return;
+        await museSelectNodeFrom(ref, group, key.substring(5));
+      } else if (key == 'urltest') {
+        final group = _groupTag;
+        if (group == null) return;
         await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest(group);
-      } catch (e) {
-        loggy.warning('tray: url test failed', e);
+      } else if (key == 'svc:proxy') {
+        await museRunDesktopAction(ref, MuseDesktopAction.systemProxy);
+      } else if (key == 'svc:tun') {
+        await museRunDesktopAction(ref, MuseDesktopAction.tun);
+      } else if (key == 'autostart') {
+        await museRunDesktopAction(ref, MuseDesktopAction.toggleAutoStart);
+      } else if (key.startsWith('env:')) {
+        await museRunDesktopAction(ref, MuseDesktopAction.copyEnv, shell: MuseShellKind.fromKey(key.substring(4)));
+      } else if (key == 'quit') {
+        await ref.read(windowNotifierProvider.notifier).exit();
       }
-    } else if (menuItem.key == 'quit') {
-      await ref.read(windowNotifierProvider.notifier).exit();
+    } catch (e) {
+      loggy.warning('tray: $key failed', e);
     }
   }
 
@@ -397,7 +415,7 @@ class MuseTrayNode {
 }
 
 /// The tray lists at most this many nodes (fastest first); the window has the full list.
-const museTrayMaxNodes = 25;
+const museTrayMaxNodes = 30;
 
 /// Nodes for the tray: fastest first (untested and timed-out last), the selected one always
 /// included, each labelled `name   123 ms` / `超时`.
@@ -418,40 +436,65 @@ List<MuseTrayNode> museTrayNodes(List<({String tag, String name, int delay})> it
 }
 
 /// 穿云 tray right-click menu: 连接/断开 · 规则/全局 · 节点 ▸ (1.2.3, while connected) · 显示窗口 · 退出.
+/// 1.6.0 C8 (Windows, when the values are given): 系统代理 / TUN 模式 (checked), 开机自启 (checked),
+/// 复制终端代理命令 ▸ (CMD / PowerShell / Bash), 节点 ▸ 更多… when the group has more than
+/// [museTrayMaxNodes]. 「连接」「规则」「全局」「显示窗口」「退出」 keep their wording and relative order
+/// (tool/smoke/app_smoke.ps1 tray-menu check).
 List<MuseTrayItem> museTrayMenuSpec(
   ConnectionStatus connection,
   MuseRouteMode mode, {
   List<MuseTrayNode> nodes = const [],
   String? speed,
-}) => [
-  // 穿云 1.2.8: current speed (read-only line) while connected
-  if (connection is Connected && speed != null && speed.isNotEmpty) MuseTrayItem('speed', speed, disabled: true),
-  MuseTrayItem(
-    'connection',
-    switch (connection) {
-      Disconnected() => '连接',
-      Connecting() => '连接中…',
-      Connected() => '断开',
-      Disconnecting() => '断开中…',
-    },
-    disabled: connection.isSwitching,
-  ),
-  const MuseTrayItem('-', ''),
-  for (final m in MuseRouteMode.values) MuseTrayItem('mode:${m.key}', m.title, checkable: true, checked: m == mode),
-  const MuseTrayItem('-', ''),
-  if (connection is Connected && nodes.isNotEmpty)
+  bool moreNodes = false,
+  ServiceMode? serviceMode,
+  bool? autoStart,
+  bool copyEnv = false,
+}) {
+  final desktop = [
+    if (serviceMode != null) ...[
+      MuseTrayItem('svc:proxy', '系统代理', checkable: true, checked: serviceMode != ServiceMode.tun),
+      MuseTrayItem('svc:tun', 'TUN 模式', checkable: true, checked: serviceMode == ServiceMode.tun),
+    ],
+    if (autoStart != null) MuseTrayItem('autostart', '开机自启', checkable: true, checked: autoStart),
+    if (copyEnv)
+      MuseTrayItem(
+        'env',
+        '复制终端代理命令',
+        children: [for (final k in MuseShellKind.values) MuseTrayItem('env:${k.name}', k.title)],
+      ),
+  ];
+  return [
+    // 穿云 1.2.8: current speed (read-only line) while connected
+    if (connection is Connected && speed != null && speed.isNotEmpty) MuseTrayItem('speed', speed, disabled: true),
     MuseTrayItem(
-      'nodes',
-      '节点',
-      children: [
-        for (final n in nodes) MuseTrayItem('node:${n.tag}', n.label, checkable: true, checked: n.selected),
-        const MuseTrayItem('-', ''),
-        const MuseTrayItem('urltest', '测速'),
-      ],
+      'connection',
+      switch (connection) {
+        Disconnected() => '连接',
+        Connecting() => '连接中…',
+        Connected() => '断开',
+        Disconnecting() => '断开中…',
+      },
+      disabled: connection.isSwitching,
     ),
-  const MuseTrayItem('dashboard', '显示窗口'),
-  const MuseTrayItem('quit', '退出'),
-];
+    const MuseTrayItem('-', ''),
+    for (final m in MuseRouteMode.values) MuseTrayItem('mode:${m.key}', m.title, checkable: true, checked: m == mode),
+    const MuseTrayItem('-', ''),
+    if (connection is Connected && nodes.isNotEmpty)
+      MuseTrayItem(
+        'nodes',
+        '节点',
+        children: [
+          for (final n in nodes) MuseTrayItem('node:${n.tag}', n.label, checkable: true, checked: n.selected),
+          const MuseTrayItem('-', ''),
+          if (moreNodes) const MuseTrayItem('nodes:more', '更多…'),
+          const MuseTrayItem('urltest', '测速'),
+        ],
+      ),
+    if (desktop.isNotEmpty) ...[...desktop, const MuseTrayItem('-', '')],
+    const MuseTrayItem('dashboard', '显示窗口'),
+    const MuseTrayItem('quit', '退出'),
+  ];
+}
 
 /// 1.5.0 #144: the tray has three looks: grey (off / switching), blue (connected), orange
 /// (connected, but the post-connect check found no internet through the node).

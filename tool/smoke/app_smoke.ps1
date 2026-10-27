@@ -137,10 +137,11 @@ foreach ($t in @(@{ n = "2-config"; r = "config" }, @{ n = "3-settings"; r = "se
 Ctl "/go?route=home" | Out-Null
 Start-Sleep -Seconds 2
 if ($w -ge 600 * $scale) {
-  # sidebar (lib/features/muse/shell/muse_shell.dart): title bar ~31, header row 56, items 52 tall;
+  # sidebar (lib/features/muse/shell/muse_shell.dart): title bar 32 (1.6.0 C8: the app's own bar,
+  # lib/features/muse/desktop/title_bar.dart, MuseSize.titleBar), header row 56, items 52 tall;
   # 订阅 is the third item. Best effort: the screenshot shows whether the click landed.
   $x = $r.L + [int](40 * $scale)
-  Click $x ($r.T + [int]((31 + 56 + 52 * 2 + 26) * $scale))
+  Click $x ($r.T + [int]((32 + 56 + 52 * 2 + 26) * $scale))
   Start-Sleep -Seconds 3
   Shot "2c-config-click"
   Ctl "/go?route=home" | Out-Null
@@ -195,6 +196,8 @@ foreach ($root in @($env:APPDATA, $env:LOCALAPPDATA)) {
 }
 
 # ---- tray right-click menu (1.2; route modes 规则/全局 since 1.2.2): the app logs the menu it hands to the tray ----
+# 1.6.0 C8 adds system proxy / TUN / autostart / copy-proxy-command items before the show-window item; the five
+# words below keep their wording and order (checked in sequence, so the new items don't matter).
 function Cn([int[]]$cps) { [string]::new([char[]]$cps) }
 $expect = @((Cn 0x8FDE,0x63A5), (Cn 0x89C4,0x5219), (Cn 0x5168,0x5C40), (Cn 0x663E,0x793A,0x7A97,0x53E3), (Cn 0x9000,0x51FA))
 $menuLine = ""

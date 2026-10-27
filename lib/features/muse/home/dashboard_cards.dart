@@ -375,7 +375,7 @@ class _TakeoverTile extends ConsumerWidget {
         values: const [ServiceMode.systemProxy, ServiceMode.tun],
         selected: tun ? ServiceMode.tun : ServiceMode.systemProxy,
         label: (m) => m == ServiceMode.tun ? 'TUN' : '系统代理',
-        onChanged: (m) => museSwitchServiceMode(ref, m),
+        onChanged: (m) => museSwitchServiceMode(ref.read, m),
       ),
     );
   }

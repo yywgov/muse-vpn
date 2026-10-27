@@ -6,7 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/desktop/connection_keeper.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/desktop/recovery.dart';
+import 'package:hiddify/features/muse/logic/net_tools.dart';
+import 'package:hiddify/features/muse/settings/service_mode_switch.dart' show MuseRead;
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -20,6 +23,14 @@ part 'window_notifier.g.dart';
 /// 1.6.0 (#152): the narrowest window still lays out (phone layout under 600 dp)
 const minimumWindowSize = Size(360, 560);
 const defaultWindowSize = Size(900, 680);
+
+/// 1.6.0 C8: 静默启动 / crash relaunch / --silent / 开机自启时静默 (see museStartSilently)
+bool museStartSilentlyNow(MuseRead read) => museStartSilently(
+  silentStart: read(Preferences.silentStart),
+  afterCrash: MuseRecovery.relaunchedAfterCrash,
+  args: museStartArgs,
+  autostartSilent: read(MusePrefs.autostartSilent),
+);
 
 @Riverpod(keepAlive: true)
 class WindowNotifier extends _$WindowNotifier with AppLogger {
@@ -57,11 +68,20 @@ class WindowNotifier extends _$WindowNotifier with AppLogger {
     final position = ref.read(Preferences.windowPosition);
     final isWindowVisible = position != null && await checkWindowVisivility(position, size);
     loggy.debug("window state. position: ${isWindowVisible ? position : "centered"}");
-    final silentStart = ref.read(Preferences.silentStart) || MuseRecovery.relaunchedAfterCrash;
+    final silentStart = museStartSilentlyNow(ref.read);
     loggy.debug("window state. silent start: ${silentStart ? "Enabled" : "Disabled"}");
 
+    // 1.6.0 C8: 穿云's own title bar (window title string unchanged) and 窗口置顶, set before the
+    // window first shows so it never flashes the system frame
+    final customTitle = Platform.isWindows && ref.read(MusePrefs.customTitleBar);
     await windowManager.waitUntilReadyToShow(
-      WindowOptions(size: size, center: !isWindowVisible, minimumSize: minimumWindowSize),
+      WindowOptions(
+        size: size,
+        center: !isWindowVisible,
+        minimumSize: minimumWindowSize,
+        titleBarStyle: customTitle ? TitleBarStyle.hidden : null,
+        alwaysOnTop: Platform.isWindows && ref.read(MusePrefs.alwaysOnTop) ? true : null,
+      ),
     );
     if (isWindowVisible) {
       await windowManager.setPosition(position);
@@ -112,6 +132,18 @@ class WindowNotifier extends _$WindowNotifier with AppLogger {
     if (Platform.isMacOS) {
       await windowManager.setSkipTaskbar(false);
     }
+  }
+
+  /// 1.6.0 C8 窗口置顶 (saved; Windows)
+  Future<void> setAlwaysOnTop(bool on) async {
+    await ref.read(MusePrefs.alwaysOnTop.notifier).update(on);
+    if (PlatformUtils.isDesktop) await windowManager.setAlwaysOnTop(on);
+  }
+
+  /// 1.6.0 C8 自绘标题栏 on / off (saved; Windows)
+  Future<void> setCustomTitleBar(bool on) async {
+    await ref.read(MusePrefs.customTitleBar.notifier).update(on);
+    if (Platform.isWindows) await windowManager.setTitleBarStyle(on ? TitleBarStyle.hidden : TitleBarStyle.normal);
   }
 
   Future<void> hide() async {

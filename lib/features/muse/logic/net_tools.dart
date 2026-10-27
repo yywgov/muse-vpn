@@ -190,16 +190,19 @@ const museDefaultBypass = 'localhost\n127.*\n10.*\n172.16.*\n192.168.*\n<local>'
 
 /// Command-line arguments 穿云.exe understands.
 class MuseCliArgs {
-  const MuseCliArgs({this.connect = false, this.disconnect = false, this.node, this.silent = false});
+  const MuseCliArgs({this.connect = false, this.disconnect = false, this.node, this.silent = false, this.autostart = false});
 
   final bool connect;
   final bool disconnect;
   final String? node;
 
-  /// start in the tray without a window
+  /// start in the tray without a window (`--silent` / `--tray`)
   final bool silent;
 
-  bool get isEmpty => !connect && !disconnect && node == null && !silent;
+  /// started by 开机自启 (`--autostart`, 1.6.0 C8): silent only when 开机自启时静默 is on
+  final bool autostart;
+
+  bool get isEmpty => !connect && !disconnect && node == null && !silent && !autostart;
 }
 
 /// `--connect`, `--disconnect`, `--node=<name>` (or `--node <name>`), `--silent` / `--tray`.
@@ -207,18 +210,28 @@ MuseCliArgs museParseCliArgs(List<String> args) {
   var connect = false;
   var disconnect = false;
   var silent = false;
+  var autostart = false;
   String? node;
   for (var i = 0; i < args.length; i++) {
     final a = args[i].trim();
     if (a == '--connect') connect = true;
     if (a == '--disconnect') disconnect = true;
-    if (a == '--silent' || a == '--tray' || a == '--autostart') silent = true;
+    if (a == '--silent' || a == '--tray') silent = true;
+    if (a == '--autostart') autostart = true;
     if (a.startsWith('--node=')) node = a.substring(7);
     if (a == '--node' && i + 1 < args.length) node = args[++i];
   }
   if (node != null && node.trim().isEmpty) node = null;
-  return MuseCliArgs(connect: connect || node != null, disconnect: disconnect, node: node, silent: silent);
+  return MuseCliArgs(connect: connect || node != null, disconnect: disconnect, node: node, silent: silent, autostart: autostart);
 }
+
+/// The arguments this run was started with (set once by main; never cleared).
+MuseCliArgs museStartArgs = const MuseCliArgs();
+
+/// 1.6.0 C8: whether the window stays hidden at start: 静默启动, a relaunch after a crash,
+/// `--silent` / `--tray`, or a start by 开机自启 with 开机自启时静默 on.
+bool museStartSilently({required bool silentStart, required bool afterCrash, required MuseCliArgs args, required bool autostartSilent}) =>
+    silentStart || afterCrash || args.silent || (args.autostart && autostartSilent);
 
 // ---------------------------------------------------------------- update assets
 

@@ -22,36 +22,37 @@ MuseModeStep museModeStep(ServiceMode current, ServiceMode picked, {required boo
 const museTunAdminMessage = 'TUN 模式需要以管理员身份运行穿云。要以管理员身份重新打开吗？';
 const museTunAdminWaitingMessage = 'TUN 模式需要以管理员身份运行穿云，现在没有管理员权限，暂时使用系统代理。要以管理员身份重新打开吗？';
 
-Future<void> museRelaunchElevated(WidgetRef ref) async {
+/// `ref.read` of a widget or a provider (1.6.0 C8: the tray switches the mode too).
+typedef MuseRead = T Function<T>(ProviderListenable<T> provider);
+
+Future<void> museRelaunchElevated(MuseRead read) async {
   if (!await WindowsAdmin.relaunchElevated()) return;
-  await ref.read(windowNotifierProvider.notifier).exit();
+  await read(windowNotifierProvider.notifier).exit();
 }
 
 /// Switches to [picked] (asks for administrator rights for TUN when needed). Returns true when the
 /// mode was saved.
-Future<bool> museSwitchServiceMode(WidgetRef ref, ServiceMode picked, {bool? elevated}) async {
-  final current = ref.read(ConfigOptions.serviceMode);
+Future<bool> museSwitchServiceMode(MuseRead read, ServiceMode picked, {bool? elevated}) async {
+  final current = read(ConfigOptions.serviceMode);
   switch (museModeStep(current, picked, elevated: elevated ?? WindowsAdmin.isElevated)) {
     case MuseModeStep.none:
       return false;
     case MuseModeStep.needsAdmin:
-      final ok = await ref
-          .read(dialogNotifierProvider.notifier)
+      final ok = await read(dialogNotifierProvider.notifier)
           .showConfirmation(title: '需要管理员权限', message: museTunAdminMessage, positiveBtnTxt: '重新打开');
       if (!ok) return false;
-      await ref.read(ConfigOptions.serviceMode.notifier).update(picked);
-      await museRelaunchElevated(ref);
+      await read(ConfigOptions.serviceMode.notifier).update(picked);
+      await museRelaunchElevated(read);
       return true;
     case MuseModeStep.apply:
-      await ref.read(ConfigOptions.serviceMode.notifier).update(picked);
+      await read(ConfigOptions.serviceMode.notifier).update(picked);
       return true;
   }
 }
 
 /// TUN chosen but this process has no administrator rights: offer to relaunch.
-Future<void> museOfferElevation(WidgetRef ref) async {
-  final ok = await ref
-      .read(dialogNotifierProvider.notifier)
+Future<void> museOfferElevation(MuseRead read) async {
+  final ok = await read(dialogNotifierProvider.notifier)
       .showConfirmation(title: '需要管理员权限', message: museTunAdminWaitingMessage, positiveBtnTxt: '重新打开');
-  if (ok) await museRelaunchElevated(ref);
+  if (ok) await museRelaunchElevated(read);
 }

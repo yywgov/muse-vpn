@@ -162,7 +162,7 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
     await _safeInit("window controller", () => container.read(windowNotifierProvider.future));
 
     // relaunched by the guard after a crash: back into the tray, reconnect quietly
-    final silentStart = container.read(Preferences.silentStart) || MuseRecovery.relaunchedAfterCrash;
+    final silentStart = museStartSilentlyNow(container.read);
     Logger.bootstrap.debug("silent start [${silentStart ? "Enabled" : "Disabled"}]");
     if (!silentStart) {
       await _safeInit("show window", () => container.read(windowNotifierProvider.notifier).show(focus: false));

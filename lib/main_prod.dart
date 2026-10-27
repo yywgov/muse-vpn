@@ -13,6 +13,7 @@ import 'package:hiddify/core/model/environment.dart';
 Future<void> main(List<String> args) async {
   // 穿云 1.4.1: --connect / --node= / --disconnect (desktop)
   museLaunchArgs = museParseCliArgs(args);
+  museStartArgs = museLaunchArgs;
   // Behind --dart-define=driver=true — see the note in lib/main.dart.
   if (kDebugMode && const bool.fromEnvironment('driver')) {
     enableFlutterDriverExtension();

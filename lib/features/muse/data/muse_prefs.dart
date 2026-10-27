@@ -123,8 +123,23 @@ abstract final class MusePrefs {
   static final schedule = PreferencesNotifier.create<String, String>("muse_schedule", "-1,-1");
   static final qualityAlert = PreferencesNotifier.create<bool, bool>("muse_quality_alert", false);
 
-  /// Wi‑Fi rules (Windows; experimental)
+  /// Wi‑Fi rules (Windows; experimental). 1.6.0 C8 按需运行 keeps its Wi‑Fi list here as
+  /// `{"SSID": "disconnect"}` entries.
   static final wifiRules = PreferencesNotifier.create<String, String>("muse_wifi_rules", "");
+
+  // ---- 1.6.0 C8 电脑 (Windows; per device, not synced)
+  /// 按需运行: pause the connection on the listed Wi‑Fi, resume after leaving it
+  static final onDemand = PreferencesNotifier.create<bool, bool>("muse_on_demand", false);
+
+  /// 全局快捷键: master switch + bindings (desktop/hotkeys.dart, JSON action → "ctrl+shift+0x70004")
+  static final hotkeysOn = PreferencesNotifier.create<bool, bool>("muse_hotkeys_on", true);
+  static final hotkeys = PreferencesNotifier.create<String, String>("muse_hotkeys", "");
+
+  /// 自绘标题栏 (off = the system title bar); 窗口置顶 is [alwaysOnTop] below
+  static final customTitleBar = PreferencesNotifier.create<bool, bool>("muse_custom_title_bar", true);
+
+  /// 开机自启时静默: a start by 开机自启 (`--autostart`) stays in the tray
+  static final autostartSilent = PreferencesNotifier.create<bool, bool>("muse_autostart_silent", false);
 
   // ---- 同步 (1.4.1: 局域网同步 first; WebDAV — any server — under 更多)
   static final webdavUrl = PreferencesNotifier.create<String, String>("muse_webdav_url", "");
@@ -167,7 +182,7 @@ abstract final class MusePrefs {
   // 1.5.1: the 1.4.1 Beta 通道 switch is gone (no prereleases are published); a stored
   // "muse_beta_channel" value is simply no longer read.
 
-  // ---- Windows
+  // ---- Windows (1.6.0 C8: 窗口置顶, used by the title bar and 设置 › 电脑)
   static final alwaysOnTop = PreferencesNotifier.create<bool, bool>("muse_always_on_top", false);
 
   /// last window bounds "x,y,w,h"

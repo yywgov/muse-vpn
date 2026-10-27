@@ -8,6 +8,9 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'auto_start_notifier.g.dart';
 
+/// What 开机自启 starts 穿云 with (see museParseCliArgs).
+const museAutostartArgs = ['--autostart'];
+
 @Riverpod(keepAlive: true)
 class AutoStartNotifier extends _$AutoStartNotifier with InfraLogger {
   Timer? _timer;
@@ -16,12 +19,31 @@ class AutoStartNotifier extends _$AutoStartNotifier with InfraLogger {
   Future<bool> build() async {
     if (!PlatformUtils.isDesktop) return false;
     final appInfo = ref.watch(appInfoProvider).requireValue;
-    launchAtStartup.setup(
+    // 穿云 1.6.0 C8: the start-up entry carries --autostart (开机自启时静默 tells it apart from a
+    // start by hand). An entry written by an older version (no argument) is rewritten once.
+    void setup(List<String> args) => launchAtStartup.setup(
       appName: appInfo.name,
       appPath: Platform.resolvedExecutable,
       packageName: "Chuanyun",
+      args: args,
     );
-    final isEnabled = await launchAtStartup.isEnabled();
+    setup(museAutostartArgs);
+    var isEnabled = await launchAtStartup.isEnabled();
+    if (!isEnabled && Platform.isWindows) {
+      try {
+        setup(const []);
+        final legacy = await launchAtStartup.isEnabled();
+        setup(museAutostartArgs);
+        if (legacy) {
+          await launchAtStartup.enable();
+          isEnabled = await launchAtStartup.isEnabled();
+          loggy.info("auto start entry updated with $museAutostartArgs");
+        }
+      } catch (e) {
+        setup(museAutostartArgs);
+        loggy.warning("auto start entry update failed", e);
+      }
+    }
     loggy.info("auto start is [${isEnabled ? "Enabled" : "Disabled"}]");
     _startTimer();
     ref.onDispose(() => _timer?.cancel());

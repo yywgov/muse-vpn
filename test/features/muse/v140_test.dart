@@ -118,10 +118,14 @@ void main() {
     });
   });
 
-  test('global hotkey is gone (setting, code, dependency)', () {
+  // 1.4.0 removed the fixed Ctrl+Alt+P hotkey and its setting; 1.6.0 C8 brings user-defined global
+  // hotkeys back (设置 › 电脑 › 快捷键) with nothing bound by default, so nothing is registered
+  // unless the user records a combination (v160_c8_test).
+  test('the fixed Ctrl+Alt+P hotkey is gone; 1.6.0 hotkeys start unbound', () {
     expect(File('lib/features/muse/desktop/hotkey.dart').existsSync(), isFalse);
-    expect(File('pubspec.yaml').readAsStringSync().contains('hotkey_manager'), isFalse);
-    expect(File('lib/features/muse/settings/windows_settings.dart').readAsStringSync().contains('快捷键'), isFalse);
     expect(File('lib/core/preferences/general_preferences.dart').readAsStringSync().contains('muse_hotkey'), isFalse);
+    final prefs = File('lib/features/muse/data/muse_prefs.dart').readAsStringSync();
+    expect(prefs, contains('PreferencesNotifier.create<String, String>("muse_hotkeys", "")'));
+    expect(File('lib/features/muse/desktop/hotkeys.dart').readAsStringSync().contains('Ctrl+Alt+P'), isFalse);
   });
 }

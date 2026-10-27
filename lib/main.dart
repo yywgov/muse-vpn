@@ -14,6 +14,7 @@ import 'package:hiddify/core/model/environment.dart';
 Future<void> main(List<String> args) async {
   // 穿云 1.4.1: --connect / --node= / --disconnect (desktop)
   museLaunchArgs = museParseCliArgs(args);
+  museStartArgs = museLaunchArgs;
   // Debug builds that ask for it: lets an external client tap, type and scroll
   // the app. Behind a flag because the extension installs a TestTextInput that
   // takes over the text input channel — with it on, no field in the app accepts

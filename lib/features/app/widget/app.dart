@@ -1,3 +1,6 @@
+import 'package:hiddify/features/muse/desktop/hotkeys.dart';
+import 'package:hiddify/features/muse/desktop/on_demand.dart';
+import 'package:hiddify/features/muse/desktop/title_bar.dart';
 import 'package:hiddify/features/muse/data/core_extras_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/traffic_recorder.dart';
@@ -108,6 +111,12 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     ref.listen(museNodeMemoryProvider, (_, _) {});
     ref.listen(museReachProvider, (_, _) {});
     if (PlatformUtils.isDesktop) ref.listen(systemTrayNotifierProvider, (_, _) {});
+    // 1.6.0 C8 (Windows): 全局快捷键 (nothing registered until one is bound) and 按需运行 (idle
+    // unless switched on with a Wi‑Fi listed)
+    if (PlatformUtils.isWindows) {
+      ref.listen(museHotkeysProvider, (_, _) {});
+      ref.listen(museOnDemandProvider, (_, _) {});
+    }
 
     // updating ActiveBreakpointNotifier value
     useEffect(() {
@@ -147,7 +156,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                   // 穿云: edge-to-edge, the pages draw behind transparent system bars; icons follow
                   // the theme (1.2.1: also set on every app bar, see museSystemOverlayStyle)
                   value: museSystemOverlayStyle(theme.brightness),
-                  child: child,
+                  // 1.6.0 C8: Windows draws 穿云's own title bar above the pages
+                  child: MuseTitleBarFrame(child: child),
                 );
               },
             ),
