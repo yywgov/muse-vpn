@@ -298,6 +298,18 @@ Future<void> main() async {
     }
     results['urltest'] = timings;
     results['nodes'] = jsonDecode(await cmd('nodes'));
+
+    // 1.6.0 C9: automation intent — TOGGLE twice flips the connection twice (connected → off → on)
+    final toggles = <Object?>[];
+    for (final want in [false, true]) {
+      await adb(['shell', 'am', 'start', '-a', 'com.chuanyun.app.action.TOGGLE', '-p', pkg]);
+      final ok = await waitRunning(want, seconds: 45);
+      toggles.add({'want': want, 'ok': ok});
+      if (!ok) failures.add('TOGGLE intent did not switch to running=$want');
+    }
+    results['toggleIntent'] = toggles;
+    await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.MainActivity']);
+    await sleep(2000);
   }
 
   results['pickApps'] = await cmd('pickApps:com.android.chrome,com.google.android.youtube,com.google.android.apps.maps,'

@@ -36,6 +36,21 @@ abstract final class ChuanyunPlatform {
 
   static Future<bool> openAutostartSettings() async => await _call<bool>('open_autostart_settings') ?? false;
 
+  /// 1.6.0 C9 按需运行: the Wi‑Fi name ({ok, ssid} / {ok: false, reason: permission | location_off | unknown}).
+  static Future<Map<Object?, Object?>?> wifiSsid() => _call<Map<Object?, Object?>>('wifi_ssid');
+
+  /// granted / denied / blocked (null when not Android)
+  static Future<String?> wifiPermission() => _call<String>('wifi_permission');
+
+  /// Asks for 「位置信息」 (only when the user turns 按需运行 on); same answers as [wifiPermission].
+  static Future<String?> requestWifiPermission() => _call<String>('request_wifi_permission');
+
+  /// 1.6.0 C9 分应用代理 › 只看联网应用: packages that asked for INTERNET (null when unknown).
+  static Future<Set<String>?> internetPackages() async {
+    final l = await _call<List<Object?>>('internet_packages');
+    return l == null ? null : {for (final p in l) '$p'};
+  }
+
   /// Epoch millis when the VPN service last came up (0/null when stopped or not Android).
   static Future<int?> connectedSince() => _call<int>('get_connected_since');
 

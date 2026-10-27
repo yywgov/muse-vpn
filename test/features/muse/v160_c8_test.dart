@@ -599,11 +599,13 @@ There is 1 interface on the system:
   });
 
   group('C8 设置', () {
-    test('search entries (Windows only)', () {
-      for (final title in ['开机自启时静默', '穿云标题栏', '窗口置顶', '按需运行', '快捷键']) {
+    test('search entries (Windows only; 按需运行 is Android\'s too since C9)', () {
+      for (final title in ['开机自启时静默', '穿云标题栏', '窗口置顶', '快捷键']) {
         final e = museSettingEntries.where((x) => x.title == title).single;
         expect(e.windowsOnly, isTrue, reason: title);
       }
+      final onDemand = museSettingEntries.where((x) => x.title == '按需运行').single;
+      expect(onDemand.windowsOnly || onDemand.androidOnly, isFalse);
     });
 
     test('new code and text never name the upstream projects', () {

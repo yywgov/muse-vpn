@@ -127,6 +127,17 @@ abstract final class MusePrefs {
   /// `{"SSID": "disconnect"}` entries.
   static final wifiRules = PreferencesNotifier.create<String, String>("muse_wifi_rules", "");
 
+  // ---- 1.6.0 C9 Android (per device, not synced)
+  /// 自动运行: connect when 穿云 is opened (cold start only, once per launch)
+  static final autoRun = PreferencesNotifier.create<bool, bool>("muse_auto_run", false);
+
+  /// 通知栏「断开」按钮 (read by the Android notification, flutter.muse_notify_stop_button)
+  static final notifyStopButton = PreferencesNotifier.create<bool, bool>("muse_notify_stop_button", true);
+
+  /// 分应用代理 list: sort (selected / name / installed) and 只看联网应用
+  static final appSort = PreferencesNotifier.create<String, String>("muse_app_sort", "selected");
+  static final appInternetOnly = PreferencesNotifier.create<bool, bool>("muse_app_internet_only", false);
+
   // ---- 1.6.0 C8 电脑 (Windows; per device, not synced)
   /// 按需运行: pause the connection on the listed Wi‑Fi, resume after leaving it
   static final onDemand = PreferencesNotifier.create<bool, bool>("muse_on_demand", false);

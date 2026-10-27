@@ -21,6 +21,7 @@ import 'package:hiddify/features/muse/settings/settings_search.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
+import 'package:hiddify/features/muse/settings/android_settings.dart';
 import 'package:hiddify/features/muse/settings/privacy_page.dart';
 import 'package:hiddify/features/muse/settings/windows_settings.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
@@ -194,6 +195,7 @@ class SettingsPage extends HookConsumerWidget {
             ],
           ),
           if (PlatformUtils.isWindows) const WindowsSettingsSection(),
+          if (android) const MuseAndroidGeneralSection(),
           if (android) const MusePrivacySection(),
           MuseSection(
             children: [

@@ -1,9 +1,12 @@
 // 穿云 1.6.0 C8 - the Wi‑Fi this Windows computer is on, read from `netsh wlan show interfaces`
 // (works on Chinese and English Windows: the field names SSID / BSSID are never translated).
-// Used by 按需运行. Part of 穿云 (GPLv3).
+// Used by 按需运行. 1.6.0 C9: Android reads it over the app's own platform channel
+// (ChuanyunHandler.wifi_ssid), which needs 「位置信息」 permission. Part of 穿云 (GPLv3).
 
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 
 /// What one read gave: [ok] false when netsh failed (no wireless service, location access off on
 /// Windows 11 24H2+…) — the caller then keeps its last state instead of treating it as "left the
@@ -52,6 +55,32 @@ Future<MuseSsidRead> museReadWindowsSsid() async {
   } catch (e) {
     return MuseSsidRead.failed('读不到 Wi‑Fi 状态（$e）');
   }
+}
+
+const museWifiPermissionHint = '读不到 Wi‑Fi 名称：需要允许穿云使用「位置信息」（选「使用时允许」和「精确位置」）。Android 只把 Wi‑Fi 名称给有这项权限的应用，穿云不会读取你的位置。';
+const museWifiLocationOffHint = '读不到 Wi‑Fi 名称：请在系统设置里打开「位置信息」开关（Android 关闭定位时不提供 Wi‑Fi 名称）';
+const museWifiUnknownHint = '暂时读不到 Wi‑Fi 名称（穿云在后台时 Android 可能不提供），回到穿云时会再检查';
+
+/// The Android channel's answer as a read.
+MuseSsidRead museParseAndroidWifi(Map<Object?, Object?>? m) {
+  if (m == null) return const MuseSsidRead.failed(museWifiUnknownHint);
+  if (m['ok'] == true) {
+    final s = m['ssid'];
+    return MuseSsidRead.ok(s is String && s.isNotEmpty ? s : null);
+  }
+  return MuseSsidRead.failed(switch (m['reason']) {
+    'permission' => museWifiPermissionHint,
+    'location_off' => museWifiLocationOffHint,
+    _ => museWifiUnknownHint,
+  });
+}
+
+Future<MuseSsidRead> museReadAndroidSsid() async => museParseAndroidWifi(await ChuanyunPlatform.wifiSsid());
+
+/// The reader for this platform (Windows netsh, Android channel; elsewhere "no Wi‑Fi").
+Future<MuseSsidRead> museReadSsid() {
+  if (Platform.isAndroid) return museReadAndroidSsid();
+  return museReadWindowsSsid();
 }
 
 /// `{"A": "disconnect", "B": "disconnect"}` ⇄ the 按需运行 list (other rule kinds are kept as is).

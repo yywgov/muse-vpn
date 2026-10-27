@@ -1,11 +1,13 @@
 // 穿云 1.6.0 C8 - Windows settings pages: 按需运行 (Wi‑Fi list) and 快捷键 (record / clear each
-// global hotkey, master switch). Opened from 设置 › 电脑.
+// global hotkey, master switch). Opened from 设置 › 电脑. 1.6.0 C9: 按需运行 is also Android's
+// (设置 › 通用); there it asks for 「位置信息」 first and explains when it is refused.
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
@@ -33,6 +35,32 @@ class MuseOnDemandPage extends HookConsumerWidget {
     final input = useTextEditingController();
     final hint = useState<String?>(null);
     final reading = useState(false);
+    final android = ref.watch(museOnDemandAndroidProvider);
+    // 「不再询问」 after a refusal: only the app's settings page can grant it now
+    final blocked = useState(false);
+
+    /// Android: asks for 「位置信息」; false (with the explanation shown) when refused.
+    Future<bool> ensurePermission() async {
+      if (!android) return true;
+      final answer = await ref.read(museWifiPermissionRequestProvider)();
+      if (answer == null || answer == 'granted') {
+        blocked.value = false;
+        if (hint.value == museWifiPermissionHint) hint.value = null;
+        return true;
+      }
+      blocked.value = answer == 'blocked';
+      hint.value = museWifiPermissionHint;
+      return false;
+    }
+
+    useEffect(() {
+      if (android && on) {
+        ChuanyunPlatform.wifiPermission().then((p) {
+          if (context.mounted && p != null && p != 'granted') hint.value = museWifiPermissionHint;
+        });
+      }
+      return null;
+    }, const []);
 
     Future<void> save(List<String> list) =>
         ref.read(MusePrefs.wifiRules.notifier).update(museOnDemandWithSsids(raw, list));
@@ -48,6 +76,7 @@ class MuseOnDemandPage extends HookConsumerWidget {
     }
 
     Future<void> addCurrent() async {
+      if (!await ensurePermission()) return;
       reading.value = true;
       final r = await ref.read(museSsidReaderProvider)();
       reading.value = false;
@@ -68,14 +97,20 @@ class MuseOnDemandPage extends HookConsumerWidget {
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            footer: '连上列表里的 Wi‑Fi（比如家里、公司）时自动暂停连接，离开后自动恢复。手动点了「连接」或「断开」以你的操作为准。',
+            footer: android
+                ? '连上列表里的 Wi‑Fi（比如家里、公司）时自动暂停连接，离开后自动恢复。手动点了「连接」或「断开」以你的操作为准。'
+                      '需要「位置信息」权限才能读到 Wi‑Fi 名称；穿云在后台时 Android 可能不提供，回到穿云时会立即检查。'
+                : '连上列表里的 Wi‑Fi（比如家里、公司）时自动暂停连接，离开后自动恢复。手动点了「连接」或「断开」以你的操作为准。',
             children: [
               MuseSwitchTile(
                 key: const ValueKey('on_demand_switch'),
                 leading: const Icon(Icons.wifi_outlined),
                 title: '按需运行',
                 value: on,
-                onChanged: (v) => ref.read(MusePrefs.onDemand.notifier).update(v),
+                onChanged: (v) async {
+                  if (v && !await ensurePermission()) return;
+                  await ref.read(MusePrefs.onDemand.notifier).update(v);
+                },
               ),
             ],
           ),
@@ -143,6 +178,18 @@ class MuseOnDemandPage extends HookConsumerWidget {
                 hint.value!,
                 key: const ValueKey('on_demand_hint'),
                 style: MuseType.caption(context).copyWith(color: MusePalette.orange),
+              ),
+            ),
+          if (android && blocked.value)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(
+                  key: const ValueKey('on_demand_open_permission'),
+                  onPressed: ChuanyunPlatform.openAppDetails,
+                  child: const Text('去系统设置开启权限'),
+                ),
               ),
             ),
         ],

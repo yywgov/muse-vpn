@@ -96,6 +96,10 @@ object Settings {
     val excludeFromRecents: Boolean
         get() = preferences.getBoolean(SettingsKey.EXCLUDE_FROM_RECENTS, false)
 
+    /** 穿云 1.6.0 C9: 通知栏「断开」按钮 (read when the notification is built, i.e. per connection). */
+    val notifyStopButton: Boolean
+        get() = preferences.getBoolean(SettingsKey.NOTIFY_STOP_BUTTON, true)
+
     /** 穿云: wall-clock millis when the tunnel last came up; 0 while stopped. */
     var connectedSince: Long
         get() = preferences.getLong(SettingsKey.CONNECTED_SINCE, 0L)

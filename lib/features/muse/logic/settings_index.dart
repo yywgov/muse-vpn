@@ -81,8 +81,11 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('开机自启时静默', MuseSettingPage.main, keywords: ['开机', '托盘', '不弹窗口'], windowsOnly: true),
   MuseSettingEntry('穿云标题栏', MuseSettingPage.main, keywords: ['标题栏', '系统标题栏', '窗口边框'], windowsOnly: true),
   MuseSettingEntry('窗口置顶', MuseSettingPage.main, keywords: ['置顶', '最前面', '总在最前'], windowsOnly: true),
-  MuseSettingEntry('按需运行', MuseSettingPage.main, keywords: ['Wi-Fi', 'WiFi', '无线', '暂停', '家里', '公司'], windowsOnly: true),
+  MuseSettingEntry('按需运行', MuseSettingPage.main, keywords: ['Wi-Fi', 'WiFi', '无线', '暂停', '家里', '公司']),
   MuseSettingEntry('快捷键', MuseSettingPage.main, keywords: ['全局快捷键', '热键', '键盘'], windowsOnly: true),
+  // 1.6.0 C9 (Android 通用)
+  MuseSettingEntry('自动运行', MuseSettingPage.main, keywords: ['打开即连接', '自动连接', '启动时连接'], androidOnly: true),
+  MuseSettingEntry('通知栏断开按钮', MuseSettingPage.main, keywords: ['通知', '断开', '停止按钮'], androidOnly: true),
   MuseSettingEntry('允许后台运行', MuseSettingPage.main, keywords: ['保活', '电池', '后台'], androidOnly: true),
   MuseSettingEntry('自启动', MuseSettingPage.main, keywords: ['开机', '保活'], androidOnly: true),
   MuseSettingEntry('隐藏桌面图标 / 最近任务 / 通知', MuseSettingPage.main, keywords: ['隐私', '隐藏'], androidOnly: true),

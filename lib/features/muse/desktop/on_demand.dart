@@ -6,9 +6,14 @@
 //   * the user disconnects while paused-or-not → nothing is resumed later;
 //   * the user connects again on a listed Wi‑Fi → it is not paused again until the Wi‑Fi changes.
 // The pause decision is the existing Wi‑Fi rule logic (museWifiDecide, "disconnect" rules).
+// 1.6.0 C9: Android too (same state machine, Wi‑Fi name over the app's platform channel). Android
+// gives the name only while 穿云 is in use, so there it also checks right when 穿云 comes back to
+// the front; an unreadable name keeps the current state (never counts as leaving the Wi‑Fi).
 // Part of 穿云 (GPLv3).
 
 import 'dart:async';
+
+import 'package:flutter/widgets.dart';
 
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
@@ -83,13 +88,13 @@ class MuseOnDemand {
 /// persisted so a restart while paused still resumes after leaving the Wi‑Fi
 final _pausedPref = PreferencesNotifier.create<bool, bool>("muse_on_demand_paused", false);
 
-/// netsh read, overridable in tests
-final museSsidReaderProvider = Provider<Future<MuseSsidRead> Function()>((_) => museReadWindowsSsid);
+/// netsh / Android read, overridable in tests
+final museSsidReaderProvider = Provider<Future<MuseSsidRead> Function()>((_) => museReadSsid);
 
 const museOnDemandInterval = Duration(seconds: 15);
 
 final museOnDemandProvider = Provider<void>((ref) {
-  if (!PlatformUtils.isWindows && !ref.watch(museOnDemandForceProvider)) return;
+  if (!PlatformUtils.isWindows && !PlatformUtils.isAndroid && !ref.watch(museOnDemandForceProvider)) return;
   final on = ref.watch(MusePrefs.onDemand);
   final ssids = museOnDemandSsids(ref.watch(MusePrefs.wifiRules));
   if (!on || ssids.isEmpty) {
@@ -137,11 +142,27 @@ final museOnDemandProvider = Provider<void>((ref) {
 
   final first = Timer(const Duration(seconds: 3), tick);
   final timer = Timer.periodic(museOnDemandInterval, (_) => tick());
+  AppLifecycleListener? lifecycle;
+  if (PlatformUtils.isAndroid) {
+    try {
+      lifecycle = AppLifecycleListener(onResume: tick);
+    } catch (_) {}
+  }
   ref.onDispose(() {
     first.cancel();
     timer.cancel();
+    lifecycle?.dispose();
   });
 });
 
-/// tests run the provider off Windows
+/// 1.6.0 C9: Android asks for 「位置信息」 before 按需运行 can read Wi‑Fi names (overridable in tests).
+/// Answers granted / denied / blocked; null off Android (nothing to ask).
+final museWifiPermissionRequestProvider = Provider<Future<String?> Function()>(
+  (_) => ChuanyunPlatform.requestWifiPermission,
+);
+
+/// whether the 按需运行 page follows Android's rules (permission, foreground only)
+final museOnDemandAndroidProvider = Provider<bool>((_) => PlatformUtils.isAndroid);
+
+/// tests run the provider off Windows / Android
 final museOnDemandForceProvider = Provider<bool>((_) => false);

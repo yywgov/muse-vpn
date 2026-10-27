@@ -101,7 +101,9 @@ void main() {
       expect(File('lib/features/settings/overview/settings_page.dart').readAsStringSync(), isNot(contains('按网络自动开关')));
       final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
       expect(manifest, isNot(contains('NetworkChangeReceiver')));
-      for (final p in ['ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'ACCESS_BACKGROUND_LOCATION', 'ACCESS_WIFI_STATE', 'NEARBY_WIFI_DEVICES']) {
+      // 1.6.0 C9: 按需运行 brings back Wi‑Fi state + while-in-use location (asked only when it is
+      // turned on, v160_c9_test); background location and nearby devices stay removed
+      for (final p in ['ACCESS_BACKGROUND_LOCATION', 'NEARBY_WIFI_DEVICES']) {
         final line = manifest.split('\n').firstWhere((l) => l.contains('permission.$p'), orElse: () => '');
         expect(line, contains('tools:node="remove"'), reason: p);
       }

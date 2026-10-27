@@ -94,7 +94,8 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
                         )
                 )
                 .setPriority(if (Settings.hideNotification) NotificationCompat.PRIORITY_MIN else NotificationCompat.PRIORITY_LOW).apply {
-                    addAction(
+                    // 穿云 1.6.0 C9: 设置 › 通知栏「断开」按钮 can turn it off (applies from the next connection)
+                    if (Settings.notifyStopButton) addAction(
                             NotificationCompat.Action.Builder(
                                     0, service.getText(R.string.stop), PendingIntent.getBroadcast(
                                     service,

@@ -1,5 +1,6 @@
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
 import 'package:hiddify/features/muse/desktop/on_demand.dart';
+import 'package:hiddify/features/muse/home/auto_run.dart';
 import 'package:hiddify/features/muse/desktop/title_bar.dart';
 import 'package:hiddify/features/muse/data/core_extras_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
@@ -115,6 +116,11 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     // unless switched on with a Wi‑Fi listed)
     if (PlatformUtils.isWindows) {
       ref.listen(museHotkeysProvider, (_, _) {});
+      ref.listen(museOnDemandProvider, (_, _) {});
+    }
+    // 1.6.0 C9 (Android): 自动运行 (once per launch, after the first frame) and 按需运行
+    if (PlatformUtils.isAndroid) {
+      ref.listen(museAutoRunProvider, (_, _) {});
       ref.listen(museOnDemandProvider, (_, _) {});
     }
 

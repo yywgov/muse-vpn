@@ -39,6 +39,10 @@ class AppList extends _$AppList with AppLogger {
     await ref.read(appProxyDataSourceProvider).updatePkg(pkg: pkg, mode: mode!);
   }
 
+  /// 穿云 1.6.0 C9: 全选 / 反选 / 剪贴板导入
+  Future<void> setSelected(Iterable<String> pkgs, {required bool selected}) =>
+      ref.read(appProxyDataSourceProvider).setSelected(pkgs: pkgs, selected: selected, mode: mode!);
+
   Future<void> clearAll() async {
     loggy.info('Clearing all items');
     await ref.read(appProxyDataSourceProvider).clearAll(mode: mode!);

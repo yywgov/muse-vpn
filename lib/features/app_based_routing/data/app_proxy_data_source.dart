@@ -18,6 +18,9 @@ abstract interface class AppProxyDataSource {
   Future<void> clearAutoSelected({required AppProxyMode mode});
   Future<void> revertForceDeselection({required AppProxyMode mode});
   Future<int> clearAll({required AppProxyMode mode});
+
+  /// 穿云 1.6.0 C9: chooses ([selected]) or un-chooses each of [pkgs] (全选 / 反选 / 剪贴板导入).
+  Future<void> setSelected({required Iterable<String> pkgs, required bool selected, required AppProxyMode mode});
 }
 
 @DriftAccessor(tables: [AppProxyEntries])
@@ -59,6 +62,42 @@ class AppProxyDao extends DatabaseAccessor<Db> with _$AppProxyDaoMixin, InfraLog
       await (update(appProxyEntries)..where((tbl) => tbl.mode.equalsValue(mode) & tbl.pkgName.equals(pkg))).write(
         AppProxyEntriesCompanion(flags: Value(newFlag)),
       );
+    });
+  }
+
+  // 穿云 1.6.0 C9: chosen = your pick (a removed automatic pick comes back as yours); un-chosen =
+  // your pick deleted, an automatic pick marked removed (so the next automatic update keeps it out)
+  @override
+  Future<void> setSelected({required Iterable<String> pkgs, required bool selected, required AppProxyMode mode}) {
+    final list = pkgs.toSet();
+    if (list.isEmpty) return Future.value();
+    return transaction(() async {
+      final rows = await (select(
+        appProxyEntries,
+      )..where((tbl) => tbl.mode.equalsValue(mode) & tbl.pkgName.isIn(list))).get();
+      final existing = {for (final r in rows) r.pkgName: r.flags};
+      for (final pkg in list) {
+        final flag = existing[pkg];
+        if (selected) {
+          if (flag == null) {
+            await into(appProxyEntries).insert(
+              AppProxyEntriesCompanion.insert(mode: mode, pkgName: pkg, flags: Value(PkgFlag.userSelection.add(0))),
+            );
+          } else if (!PkgFlag.userSelection.check(flag) || PkgFlag.forceDeselection.check(flag)) {
+            await (update(appProxyEntries)..where((tbl) => tbl.mode.equalsValue(mode) & tbl.pkgName.equals(pkg))).write(
+              AppProxyEntriesCompanion(flags: Value(PkgFlag.userSelection.add(flag))),
+            );
+          }
+        } else if (flag != null) {
+          if (PkgFlag.autoSelection.check(flag)) {
+            await (update(appProxyEntries)..where((tbl) => tbl.mode.equalsValue(mode) & tbl.pkgName.equals(pkg))).write(
+              AppProxyEntriesCompanion(flags: Value(PkgFlag.forceDeselection.add(flag))),
+            );
+          } else {
+            await (delete(appProxyEntries)..where((tbl) => tbl.mode.equalsValue(mode) & tbl.pkgName.equals(pkg))).go();
+          }
+        }
+      }
     });
   }
 

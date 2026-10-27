@@ -1,41 +1,49 @@
-import 'package:dartx/dartx.dart';
+// 穿云 1.6.0 C9: sort (已选优先 / 名称 / 安装时间), 只看联网应用, 全选 / 反选 of what is shown, and
+// the list to / from the clipboard (one package name per line). The installed apps are read once
+// (with icons) plus a light list of the user's apps that marks system apps, instead of two full
+// reads with icons. List logic in muse/logic/per_app_tools.dart.
+
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/app_based_routing/data/selected_data_provider.dart';
-import 'package:hiddify/features/app_based_routing/model/app_package_info.dart';
 import 'package:hiddify/features/app_based_routing/model/pkg_flag.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_notifier.dart';
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/logic/per_app_tools.dart';
+import 'package:hiddify/features/muse/widget/muse_sheet.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:installed_apps/index.dart';
 
+/// The installed apps (icons included), system apps marked. Overridable in tests.
+final museInstalledAppsProvider = FutureProvider.autoDispose<List<MuseAppRow>>((ref) async {
+  if (!PlatformUtils.isAndroid) return const [];
+  final all = await InstalledApps.getInstalledApps(false, true);
+  final user = {for (final a in await InstalledApps.getInstalledApps(true, false)) a.packageName};
+  return [
+    for (final a in all)
+      MuseAppRow(
+        packageName: a.packageName,
+        name: a.name,
+        installed: a.installedTimestamp,
+        system: !user.contains(a.packageName),
+        icon: a.icon,
+      ),
+  ];
+});
+
+/// Apps that asked for network access (null = unknown). Read only when 只看联网应用 is on.
+final museInternetAppsProvider = FutureProvider.autoDispose<Set<String>?>((_) => ChuanyunPlatform.internetPackages());
+
 class AppListPage extends HookConsumerWidget with PresLogger {
   const AppListPage({super.key});
-
-  int _getPriority(AppPackageInfo app, Map<String, int> selected) {
-    final flag = selected[app.packageName];
-    if (flag == null) return 4;
-    if (PkgFlag.userSelection.check(flag)) {
-      return 1;
-    } else if (PkgFlag.autoSelection.check(flag) && !PkgFlag.forceDeselection.check(flag)) {
-      return 2;
-    } else {
-      return 3;
-    }
-  }
-
-  Future<Set<AppPackageInfo>> getApps(bool hideSystem) async {
-    if (!PlatformUtils.isAndroid) return {};
-    return (await InstalledApps.getInstalledApps(
-      hideSystem,
-      true,
-    )).map((e) => AppPackageInfo(packageName: e.packageName, name: e.name, icon: e.icon)).toSet();
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -50,41 +58,39 @@ class AppListPage extends HookConsumerWidget with PresLogger {
     final isSearching = useState(false);
     final searchQuery = useState("");
     final sortListener = useState(false);
+    final sort = MuseAppSort.fromKey(ref.watch(MusePrefs.appSort));
+    final internetOnly = ref.watch(MusePrefs.appInternetOnly);
+    final internet = internetOnly ? ref.watch(museInternetAppsProvider).valueOrNull : null;
 
-    final asyncApps = useFuture(useMemoized(() => getApps(false)));
-    final asyncAppsHideSys = useFuture(useMemoized(() => getApps(true)));
+    final asyncApps = ref.watch(museInstalledAppsProvider);
 
-    final asyncFilteredApps = hideSystemApps.value ? asyncAppsHideSys : asyncApps;
-
-    final displayedApps = useMemoized<AsyncValue<List<AppPackageInfo>>>(
+    // the order is fixed while you tick boxes (only a bulk change, a filter or the sort re-sorts)
+    final displayedApps = useMemoized<AsyncValue<List<MuseAppRow>>>(
       () {
-        if (!(selectedApps.hasValue &&
-            selectedApps is AsyncData &&
-            asyncFilteredApps.hasData &&
-            asyncFilteredApps.connectionState == ConnectionState.done)) {
+        if (!(selectedApps.hasValue && selectedApps is AsyncData && asyncApps.hasValue)) {
           return const AsyncValue.loading();
         }
-        final appsList = asyncFilteredApps.requireData.toList();
-        if (searchQuery.value.isBlank) {
-          appsList.sort((a, b) {
-            final priorityA = _getPriority(a, selectedApps.requireValue);
-            final priorityB = _getPriority(b, selectedApps.requireValue);
-            return priorityA.compareTo(priorityB);
-          });
-          return AsyncValue.data(appsList);
-        }
-        final query = searchQuery.value.toLowerCase();
-        final filteredAppsList = appsList
-            .filter((e) => e.name.toLowerCase().contains(query) || e.packageName.toLowerCase().contains(query))
-            .toList();
-        return AsyncValue.data(filteredAppsList);
+        return AsyncValue.data(
+          museAppView(
+            asyncApps.requireValue,
+            flags: selectedApps.requireValue,
+            sort: sort,
+            query: searchQuery.value,
+            hideSystem: hideSystemApps.value,
+            internetOnly: internetOnly,
+            internet: internet,
+          ),
+        );
       },
       [
-        asyncFilteredApps.connectionState == ConnectionState.done,
+        asyncApps.hasValue,
         hideSystemApps.value,
         selectedApps.hasValue,
         searchQuery.value,
         sortListener.value,
+        sort,
+        internetOnly,
+        internet,
       ],
     );
 
@@ -142,6 +148,62 @@ class AppListPage extends HookConsumerWidget with PresLogger {
           );
     }
 
+    void toast(String text) {
+      try {
+        ref.read(inAppNotificationControllerProvider).showSuccessToast(text);
+      } catch (_) {}
+    }
+
+    // 全选 / 反选 act on what is shown (search, filters), then the list re-sorts once
+    List<MuseAppRow> shown() => displayedApps.valueOrNull ?? const [];
+    Map<String, int> flagsNow() => selectedApps.valueOrNull ?? const {};
+    Future<void> selectAll() async {
+      final targets = museSelectAllTargets(shown(), flagsNow());
+      await ref.read(AppListProvider(mode).notifier).setSelected(targets, selected: true);
+      sortListener.value = !sortListener.value;
+      toast('已选择 ${targets.length} 个');
+    }
+
+    Future<void> invert() async {
+      final r = museInvertTargets(shown(), flagsNow());
+      final n = ref.read(AppListProvider(mode).notifier);
+      await n.setSelected(r.select, selected: true);
+      await n.setSelected(r.deselect, selected: false);
+      sortListener.value = !sortListener.value;
+      toast('已反选 ${r.select.length + r.deselect.length} 个');
+    }
+
+    Future<void> importClipboard() async {
+      final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text ?? '';
+      final parsed = museParsePackageList(text);
+      if (parsed.packages.isEmpty) {
+        try {
+          ref
+              .read(inAppNotificationControllerProvider)
+              .showErrorToast(
+                parsed.skipped > 0 ? '剪贴板里没有有效的包名（忽略 ${parsed.skipped} 个）' : '剪贴板里没有包名（每行一个，如 com.example.app）',
+              );
+        } catch (_) {}
+        return;
+      }
+      final flags = flagsNow();
+      final fresh = [
+        for (final p in parsed.packages)
+          if (!museAppActive(flags[p])) p,
+      ];
+      await ref.read(AppListProvider(mode).notifier).setSelected(fresh, selected: true);
+      sortListener.value = !sortListener.value;
+      toast(
+        museImportSummary(added: fresh.length, already: parsed.packages.length - fresh.length, skipped: parsed.skipped),
+      );
+    }
+
+    Future<void> exportClipboard() async {
+      final text = museExportPackageList(flagsNow());
+      await Clipboard.setData(ClipboardData(text: text));
+      toast(text.isEmpty ? '列表是空的' : '已复制 ${text.split('\n').length} 个包名');
+    }
+
     final chips = PreferredSize(
       preferredSize: const Size.fromHeight(48),
       child: SizedBox(
@@ -158,6 +220,16 @@ class AppListPage extends HookConsumerWidget with PresLogger {
                 label: Text(appBasedRouting.hideSysApps),
                 selected: hideSystemApps.value,
                 onSelected: (value) => hideSystemApps.value = value,
+              ),
+            ),
+            const Gap(8),
+            Center(
+              child: ChoiceChip(
+                key: const ValueKey('app_list_internet_only'),
+                padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s8),
+                label: const Text('只看联网应用'),
+                selected: internetOnly,
+                onSelected: (value) => ref.read(MusePrefs.appInternetOnly.notifier).update(value),
               ),
             ),
             if (removed.isNotEmpty) ...[
@@ -212,21 +284,37 @@ class AppListPage extends HookConsumerWidget with PresLogger {
                   onPressed: () => isSearching.value = true,
                   tooltip: localizations.searchFieldLabel,
                 ),
-                MenuAnchor(
-                  menuChildren: <Widget>[
-                    MenuItemButton(
-                      child: Text(t.pages.settings.routing.appBasedRouting.options.clearAllSelections),
-                      onPressed: () => ref.read(AppListProvider(mode).notifier).clearAll(),
+                MuseAnchorMenu(
+                  items: [
+                    for (final o in MuseAppSort.values)
+                      MuseMenuItem(
+                        label: '排序：${o.label}',
+                        icon: Icons.sort_outlined,
+                        checked: o == sort,
+                        onTap: () => ref.read(MusePrefs.appSort.notifier).update(o.key),
+                      ),
+                    MuseMenuItem(label: '全选', icon: Icons.select_all_outlined, onTap: mode == null ? null : selectAll),
+                    MuseMenuItem(label: '反选', icon: Icons.flip_outlined, onTap: mode == null ? null : invert),
+                    MuseMenuItem(
+                      label: '从剪贴板导入',
+                      icon: Icons.content_paste_outlined,
+                      onTap: mode == null ? null : importClipboard,
+                    ),
+                    MuseMenuItem(
+                      label: '复制到剪贴板',
+                      icon: Icons.content_copy_outlined,
+                      onTap: mode == null ? null : exportClipboard,
+                    ),
+                    MuseMenuItem(
+                      label: t.pages.settings.routing.appBasedRouting.options.clearAllSelections,
+                      icon: Icons.delete_sweep_outlined,
+                      destructive: true,
+                      onTap: () => ref.read(AppListProvider(mode).notifier).clearAll(),
                     ),
                   ],
-                  builder: (context, controller, child) => IconButton(
-                    onPressed: () {
-                      if (controller.isOpen) {
-                        controller.close();
-                      } else {
-                        controller.open();
-                      }
-                    },
+                  builder: (context, toggle) => IconButton(
+                    key: const ValueKey('app_list_menu'),
+                    onPressed: toggle,
                     icon: const Icon(Icons.more_vert_outlined),
                   ),
                 ),
@@ -248,6 +336,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
             final package = packages[index];
             final flag = selectedApps.requireValue[package.packageName];
             return CheckboxListTile.adaptive(
+              key: ValueKey('app_${package.packageName}'),
               title: Row(
                 children: [
                   Flexible(child: Text(package.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
@@ -271,7 +360,13 @@ class AppListPage extends HookConsumerWidget with PresLogger {
               onChanged: (_) => ref.read(AppListProvider(mode).notifier).updatePkg(package.packageName),
               secondary: package.icon == null
                   ? null
-                  : Image.memory(package.icon!, width: MuseSize.appIconLarge, height: MuseSize.appIconLarge, cacheWidth: 48, cacheHeight: 48),
+                  : Image.memory(
+                      package.icon!,
+                      width: MuseSize.appIconLarge,
+                      height: MuseSize.appIconLarge,
+                      cacheWidth: 48,
+                      cacheHeight: 48,
+                    ),
             );
           },
           itemCount: packages.length,
