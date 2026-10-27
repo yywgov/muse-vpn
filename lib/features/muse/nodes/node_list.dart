@@ -239,6 +239,7 @@ class MuseNodeList extends HookConsumerWidget {
     final ownScroll = useScrollController();
     final scroll = controller ?? ownScroll;
     final selectedKey = useMemoized(GlobalKey.new);
+    final rowMemo = useRef(_NodeRowMemo(null));
     var selectedKeyUsed = false;
 
     // every node answered (or timed out) since 测速 started: end the test
@@ -585,7 +586,14 @@ class MuseNodeList extends HookConsumerWidget {
       final nodeCount = listed.where((e) => !e.isGroup).length;
       final latencyCache = ref.watch(museLatencyCacheProvider);
 
-      Widget rowOf(OutboundInfo proxy, {bool dimmed = false}) => MuseNodeRow(
+      // 1.6.0 C11: a delay update for one node rebuilds only that node's row. A row whose inputs did
+      // not change is handed back as the same widget instance, so Flutter skips its build.
+      final rowScope = (since, nodeCount, running ? testStarted : null, selecting.value, group.tag, group.selected, density, onPicked);
+      if (rowMemo.value.scope != rowScope) rowMemo.value = _NodeRowMemo(rowScope);
+      final memo = rowMemo.value;
+      if (memo.rows.length > 2 * group.items.length + 16) memo.rows.clear();
+
+      Widget rowWidget(OutboundInfo proxy, {bool dimmed = false}) => MuseNodeRow(
         key: ValueKey(proxy.tag),
         padV: density.padV,
         proxy: proxy,
@@ -614,6 +622,26 @@ class MuseNodeList extends HookConsumerWidget {
           onPicked?.call();
         },
       );
+
+      Widget rowOf(OutboundInfo proxy, {bool dimmed = false}) {
+        final inputs = (
+          proxy,
+          latencyCache.delayOf(proxy.tag),
+          dimmed,
+          favorites.contains(proxy.tag),
+          proxy.isGroup ? null : shownName(proxy),
+          proxy.isGroup ? null : metas.of(proxy.tag).region,
+          proxy.isGroup ? '' : metas.of(proxy.tag).note,
+          // only a group row shows its pick
+          proxy.isGroup ? shownPick : null,
+          selecting.value && !proxy.isGroup ? picked.value.contains(proxy.tag) : null,
+        );
+        final hit = memo.rows[proxy.tag];
+        if (hit != null && hit.$1 == inputs) return hit.$2;
+        final built = rowWidget(proxy, dimmed: dimmed);
+        memo.rows[proxy.tag] = (inputs, built);
+        return built;
+      }
 
       Widget row(OutboundInfo proxy, {bool dimmed = false}) {
         final r = rowOf(proxy, dimmed: dimmed);
@@ -895,6 +923,25 @@ class MuseNodeList extends HookConsumerWidget {
   }
 }
 
+/// 1.6.0 C11: the slot of one row in a lazily built section (found again after the order changes).
+class _NodeSlotKey extends LocalKey {
+  const _NodeSlotKey(this.row);
+  final Key row;
+
+  @override
+  bool operator ==(Object other) => other is _NodeSlotKey && other.row == row;
+
+  @override
+  int get hashCode => Object.hash(_NodeSlotKey, row);
+}
+
+/// 1.6.0 C11: the rows built for one set of list-wide inputs, by node tag.
+class _NodeRowMemo {
+  _NodeRowMemo(this.scope);
+  final Object? scope;
+  final rows = <String, (Object, Widget)>{};
+}
+
 /// One card of node rows with an optional caption above.
 class _NodeSection extends StatelessWidget {
   const _NodeSection({super.key, this.header, required this.margin, required this.children, this.collapsed, this.onHeaderTap});
@@ -933,6 +980,16 @@ class _NodeSection extends StatelessWidget {
   Widget buildSliver(BuildContext context, {int columns = 1, double extent = 0}) {
     final mt = MuseTheme.of(context);
     final last = children.length - 1;
+    // 1.6.0 C11: when the order changes (a new delay under 按延迟), a row keeps its element and moves
+    // instead of every row after it being rebuilt in its new slot
+    final slots = <Key, int>{for (var i = 0; i < children.length; i++) ?children[i].key: i};
+    // (a key seen twice would clash: then the rows stay in plain index slots)
+    final unique = slots.length == children.where((c) => c.key != null).length;
+    int? findSlot(Key key) => key is _NodeSlotKey ? slots[key.row] : null;
+    Widget slot(int i, Widget child) {
+      final k = children[i].key;
+      return k == null || !unique ? child : KeyedSubtree(key: _NodeSlotKey(k), child: child);
+    }
     if (columns > 1 && children.isNotEmpty) {
       return SliverPadding(
         key: key,
@@ -948,12 +1005,16 @@ class _NodeSection extends StatelessWidget {
                 mainAxisSpacing: MuseSpace.s8,
               ),
               itemCount: children.length,
-              itemBuilder: (context, i) => DecoratedBox(
-                key: const ValueKey('node_card'),
-                decoration: mt.cardDecoration(),
-                child: ClipRSuperellipse(
-                  borderRadius: MuseRadius.cardAll,
-                  child: Material(type: MaterialType.transparency, child: Center(child: children[i])),
+              findChildIndexCallback: findSlot,
+              itemBuilder: (context, i) => slot(
+                i,
+                DecoratedBox(
+                  key: const ValueKey('node_card'),
+                  decoration: mt.cardDecoration(),
+                  child: ClipRSuperellipse(
+                    borderRadius: MuseRadius.cardAll,
+                    child: Material(type: MaterialType.transparency, child: Center(child: children[i])),
+                  ),
                 ),
               ),
             ),
@@ -974,6 +1035,7 @@ class _NodeSection extends StatelessWidget {
               decoration: mt.cardDecoration(),
               sliver: SliverList.builder(
                 itemCount: children.length,
+                findChildIndexCallback: findSlot,
                 itemBuilder: (context, i) {
                   Widget row = Material(
                     type: MaterialType.transparency,
@@ -991,7 +1053,7 @@ class _NodeSection extends StatelessWidget {
                   if (i == 0 || i == last) {
                     row = ClipRSuperellipse(borderRadius: i == 0 && i == last ? MuseRadius.cardAll : (i == 0 ? top : bottom), child: row);
                   }
-                  return row;
+                  return slot(i, row);
                 },
               ),
             ),
@@ -1095,8 +1157,13 @@ class MuseNodeRow extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
+  /// 1.6.0 C11: how many times a row was built (the rebuild-count test reads it).
+  @visibleForTesting
+  static int debugBuilds = 0;
+
   @override
   Widget build(BuildContext context) {
+    debugBuilds++;
     final mt = MuseTheme.of(context);
     final view = museDelayView(
       delay: proxy.urlTestDelay,

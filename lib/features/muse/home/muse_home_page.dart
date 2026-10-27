@@ -181,8 +181,13 @@ enum _HeroState { idle, connecting, connected }
 class MuseHeroCard extends HookConsumerWidget {
   const MuseHeroCard({super.key});
 
+  /// 1.6.0 C11: how many times the card was built (the perf test reads it).
+  @visibleForTesting
+  static int debugBuilds = 0;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    debugBuilds++;
     final mt = MuseTheme.of(context);
     final connection = ref.watch(museConnectionProvider);
     // first time connected: one-time 后台运行/自启动 guide
@@ -204,13 +209,7 @@ class MuseHeroCard extends HookConsumerWidget {
     final failoverFrom = ref.watch(museFailoverFromProvider);
     final mode = ref.watch(ConfigOptions.museRouteMode);
 
-    // tick every second while connected, for the timer
-    final tick = useState(0);
-    useEffect(() {
-      if (since == null) return null;
-      final timer = Timer.periodic(const Duration(seconds: 1), (_) => tick.value++);
-      return timer.cancel;
-    }, [since]);
+    // 1.6.0 C11: the timer ticks in its own small widget (the card no longer rebuilds every second)
 
     final status = connection.valueOrNull;
     final connected = status is Connected;
@@ -360,10 +359,8 @@ class MuseHeroCard extends HookConsumerWidget {
                                             ),
                                           )
                                         else if (since != null) ...[
-                                          Text(
-                                            museFormatDuration(DateTime.now().difference(since)),
-                                            key: const ValueKey('home_timer'),
-                                            maxLines: 1,
+                                          MuseUptimeText(
+                                            since: since,
                                             style: MuseType.body(
                                               context,
                                             ).copyWith(color: fg2, fontFeatures: MuseType.tabular),
@@ -425,6 +422,33 @@ class MuseHeroCard extends HookConsumerWidget {
 }
 
 /// 「规则模式」 / 「全局模式」: tap to switch.
+/// 1.6.0 C11: 已连接 time, ticking once a second on its own (only this text rebuilds).
+class MuseUptimeText extends HookWidget {
+  const MuseUptimeText({super.key, required this.since, this.style});
+
+  final DateTime since;
+  final TextStyle? style;
+
+  @visibleForTesting
+  static int debugBuilds = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    debugBuilds++;
+    final tick = useState(0);
+    useEffect(() {
+      final timer = Timer.periodic(const Duration(seconds: 1), (_) => tick.value++);
+      return timer.cancel;
+    }, [since]);
+    return Text(
+      museFormatDuration(DateTime.now().difference(since)),
+      key: const ValueKey('home_timer'),
+      maxLines: 1,
+      style: style,
+    );
+  }
+}
+
 class _ModePill extends ConsumerWidget {
   const _ModePill({required this.mode, required this.onBrand});
 

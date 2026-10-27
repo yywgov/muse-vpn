@@ -45,6 +45,23 @@ void museKeepFor(Ref ref, Duration grace) {
 
 const museStreamGrace = Duration(seconds: 5);
 
+/// 1.6.0 C11: [source] until the provider is disposed. An `async*` provider only notices it was
+/// cancelled at its next `yield`, so a quiet stream (no log lines) would keep its WebSocket open
+/// after the page left; this ends the subscription the moment the provider goes away.
+Stream<T> museUntilDisposed<T>(Ref ref, Stream<T> source) {
+  final out = StreamController<T>(sync: true);
+  StreamSubscription<T>? sub;
+  out.onListen = () {
+    sub = source.listen(out.add, onError: out.addError, onDone: out.close);
+  };
+  ref.onDispose(() {
+    unawaited(sub?.cancel());
+    sub = null;
+    unawaited(out.close());
+  });
+  return out.stream;
+}
+
 /// Ended connections (请求), shared by 连接 and 首页.
 final museRequestHistoryProvider = Provider<MuseRequestHistory>((ref) => MuseRequestHistory());
 
@@ -71,7 +88,7 @@ final museConnectionsProvider = StreamProvider.autoDispose<MuseConnState>((ref) 
   final tracker = MuseConnTracker(history: ref.read(museRequestHistoryProvider));
   yield const MuseConnState(loading: true);
   try {
-    await for (final raw in api.stream('/connections', query: const {'interval': '1000'})) {
+    await for (final raw in museUntilDisposed(ref, api.stream('/connections', query: const {'interval': '1000'}))) {
       final frame = await museParseConnFrameAsync(raw);
       yield MuseConnState(connections: tracker.apply(frame, DateTime.now()), frame: frame);
     }
@@ -100,7 +117,7 @@ final museLogsProvider = StreamProvider.autoDispose<List<MuseLogLine>>((ref) asy
   if (api == null) return;
   final level = ref.watch(museLogLevelProvider);
   try {
-    await for (final raw in api.stream('/logs', query: {'level': level == 'warning' ? 'warn' : level})) {
+    await for (final raw in museUntilDisposed(ref, api.stream('/logs', query: {'level': level == 'warning' ? 'warn' : level}))) {
       final l = MuseLogLine.fromJson(raw, DateTime.now());
       if (l == null) continue;
       buffer.add(l);
