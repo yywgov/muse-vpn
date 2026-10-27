@@ -48,7 +48,8 @@ void main() {
     }
 
     test('vivid light keeps the brand blue itself', () {
-      expect(museSeededScheme(brightness: Brightness.light).primary.toARGB32(), museBrandSeed.toARGB32());
+      // 1.6.1: 标准 is the default, so 鲜明 is asked for explicitly
+      expect(museSeededScheme(brightness: Brightness.light, style: MuseColorStyle.vivid).primary.toARGB32(), museBrandSeed.toARGB32());
     });
 
     test('status colours never follow the seed', () {
@@ -80,7 +81,7 @@ void main() {
       for (final s in MuseColorStyle.values) {
         expect(MuseColorStyle.fromKey(s.key), s);
       }
-      expect(MuseColorStyle.fromKey('nope'), MuseColorStyle.vivid);
+      expect(MuseColorStyle.fromKey('nope'), MuseColorStyle.tonalSpot);
     });
   });
 

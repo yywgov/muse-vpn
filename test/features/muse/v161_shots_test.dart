@@ -238,7 +238,8 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.byType(MuseDock), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump(const Duration(seconds: 1));
+        // riverpod keeps a profile's update state for a minute after the page leaves
+        await tester.pump(const Duration(seconds: 61));
       });
     }
   }

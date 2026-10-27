@@ -27,8 +27,8 @@ enum MuseColorStyle {
 
   static MuseColorStyle fromKey(String? key) => values.where((e) => e.key == key).firstOrNull ?? tonalSpot;
 
-  /// The styles offered in 设置 › 外观 › 配色风格 (着色 stays readable from old settings only).
-  static const offered = [tonalSpot, vibrant, expressive, vivid, soft, monochrome];
+  /// The styles offered in 设置 › 外观 › 配色风格, in this order.
+  static const offered = [tonalSpot, vibrant, expressive, soft, vivid, tinted, monochrome];
 }
 
 /// The brand blue: the default seed.
@@ -76,6 +76,9 @@ DynamicScheme _scheme(Hct source, bool dark, MuseColorStyle style) => switch (st
 
 final _cache = <(int, bool, MuseColorStyle, bool), ColorScheme>{};
 
+/// How many colour schemes were actually computed (cache misses; tests).
+int museSchemeComputations = 0;
+
 /// The app's colour scheme for [seed]: surfaces nearly neutral (chroma ≤ 3, light paper ≤ 1.5),
 /// dark surfaces at tones 6 / 15 / 21 / 27, the accent's tone kept readable, and pure black
 /// (dark only) lowering every surface so the page is #000. Results are cached.
@@ -89,6 +92,7 @@ ColorScheme museSeededScheme({
   final key = (seed.toARGB32(), dark, style, pureBlack && dark);
   final hit = _cache[key];
   if (hit != null) return hit;
+  museSchemeComputations++;
   final source = Hct.fromInt(seed.toARGB32());
   final scheme = _scheme(source, dark, style);
   final primary = scheme.primaryPalette;

@@ -16,6 +16,7 @@ import 'package:hiddify/features/muse/data/sync_service.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -111,9 +112,14 @@ void main() {
       expect(AppThemeMode.black.flutterThemeMode, ThemeMode.dark);
       expect(AppThemeMode.black.trueBlack, isTrue);
       expect(AppThemeMode.choices, isNot(contains(AppThemeMode.black)));
-      expect(AppTheme(AppThemeMode.black, '').darkTheme(null).scaffoldBackgroundColor, MusePalette.blackBg);
-      expect(AppTheme(AppThemeMode.dark, '').darkTheme(null).scaffoldBackgroundColor, MusePalette.darkBgBottom);
-      expect(AppTheme(AppThemeMode.black, '').lightTheme(null).scaffoldBackgroundColor, MusePalette.lightBgBottom);
+      // 1.6.1: the page colour comes from the seeded scheme; 纯黑 makes the dark page #000
+      final black = AppTheme(AppThemeMode.black, '').darkTheme(null);
+      final dark = AppTheme(AppThemeMode.dark, '').darkTheme(null);
+      expect(black.scaffoldBackgroundColor.toARGB32(), 0xFF000000);
+      expect(dark.scaffoldBackgroundColor, MuseSurface.page.color(dark.colorScheme));
+      expect(dark.scaffoldBackgroundColor.toARGB32(), isNot(0xFF000000));
+      final light = AppTheme(AppThemeMode.black, '').lightTheme(null);
+      expect(light.scaffoldBackgroundColor, AppTheme(AppThemeMode.light, '').lightTheme(null).scaffoldBackgroundColor);
     });
     test('a saved 纯黑 stays 纯黑 (no longer turned into 深色)', () {
       final src = File('lib/core/theme/theme_preferences.dart').readAsStringSync();
@@ -133,8 +139,8 @@ void main() {
       final t = c.read(translationsProvider).requireValue;
       expect(find.descendant(of: find.byKey(const ValueKey('appearance_theme')), matching: find.text(AppThemeMode.dark.present(t))), findsOneWidget);
       expect(find.byKey(const ValueKey('appearance_pure_black')), findsOneWidget);
-      museApplyPureBlack(true);
-      expect(MuseTheme.of(tester.element(find.byType(MuseAppearancePage))).bgBottom, MusePalette.blackBg);
+      // the theme the app builds for 纯黑 paints the page true black
+      expect(AppTheme(c.read(themePreferencesProvider), '').darkTheme(null).scaffoldBackgroundColor.toARGB32(), 0xFF000000);
     });
   });
 

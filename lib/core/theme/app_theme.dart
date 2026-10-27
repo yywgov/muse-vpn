@@ -49,9 +49,23 @@ class AppTheme {
     pureBlack: brightness == Brightness.dark && mode.trueBlack,
   );
 
-  ThemeData lightTheme(ColorScheme? lightColorScheme) => _theme(scheme(Brightness.light));
+  ThemeData lightTheme(ColorScheme? lightColorScheme) => _cached(scheme(Brightness.light));
 
-  ThemeData darkTheme(ColorScheme? darkColorScheme) => _theme(scheme(Brightness.dark));
+  ThemeData darkTheme(ColorScheme? darkColorScheme) => _cached(scheme(Brightness.dark));
+
+  /// 1.6.1: ThemeData is built once per (colour scheme, font) and reused, so rebuilding the app
+  /// (or switching back to a style used before) does not rebuild the theme. The schemes
+  /// themselves are cached by museSeededScheme; the few combinations (seeds × styles ×
+  /// brightness × 纯黑) keep this small.
+  static final _themes = <(ColorScheme, String), ThemeData>{};
+
+  /// How many ThemeData were actually built (tests).
+  static int debugThemeBuilds = 0;
+
+  ThemeData _cached(ColorScheme s) => _themes.putIfAbsent((s, fontFamily), () {
+    debugThemeBuilds++;
+    return _theme(s);
+  });
 
   ThemeData _theme(ColorScheme s) {
     final dark = s.brightness == Brightness.dark;

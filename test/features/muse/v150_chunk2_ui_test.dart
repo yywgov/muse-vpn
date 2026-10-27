@@ -274,6 +274,12 @@ void main() {
     for (final s in [(phone, 'phone', false), (narrow, 'windows-narrow', true), (wide, 'windows-wide', true)]) {
       testWidgets('${s.$2} $label: 设置 › 高级 shows IPv6 and Fake-IP, both off', (tester) async {
         await _pump(tester, page: const SettingsPage(), brightness: b, size: s.$1, desktop: s.$3, tab: 3);
+        // 1.6.1: the settings list is longer (group headers); on a short window the row is built lazily
+        await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('advanced_toggle')),
+          200,
+          scrollable: find.descendant(of: find.byType(SettingsPage), matching: find.byType(Scrollable)).first,
+        );
         await tester.ensureVisible(find.byKey(const ValueKey('advanced_toggle')));
         await tester.pump(const Duration(milliseconds: 300));
         await tester.tap(find.byKey(const ValueKey('advanced_toggle')));

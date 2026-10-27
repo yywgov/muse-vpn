@@ -16,7 +16,6 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
-import 'package:hiddify/core/widget/adaptive_icon.dart';
 import 'package:hiddify/core/widget/adaptive_menu.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
@@ -61,26 +60,42 @@ class ProfileTile extends HookConsumerWidget {
       }
     }
 
-    // 1.3.0: flat inside the 订阅 card; the active one is tinted (brand = selected state only)
-    final mt = MuseTheme.of(context);
+    // 1.6.1: a Material 3 filled card (no shadow, no outline): the active subscription on the
+    // secondary container, the others on the highest surface container; the menu sits in a
+    // tonal square on the left.
+    final scheme = theme.colorScheme;
+    final active = profile.active;
     final card = Card(
+      key: const ValueKey('profile_tile_card'),
       margin: EdgeInsets.zero,
-      color: profile.active ? mt.selected : MusePalette.transparent,
+      color: active ? scheme.secondaryContainer : scheme.surfaceContainerHighest,
       surfaceTintColor: MusePalette.transparent,
       shadowColor: MusePalette.transparent,
-      shape: MuseShape.radius(ProfileTileConst.cardBorderRadius),
+      shape: MuseShape.md,
+      clipBehavior: Clip.antiAlias,
       elevation: 0,
       child: IntrinsicHeight(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
+          constraints: const BoxConstraints(minHeight: MuseSize.rowMin),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(
-                width: 48,
-                child: Semantics(sortKey: const OrdinalSortKey(1), child: ProfileActionButton(profile, true)),
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: MuseSpace.s8, top: MuseSpace.s8, bottom: MuseSpace.s8),
+                child: SizedBox(
+                  width: MuseSize.button - MuseSpace.s8,
+                  child: Material(
+                    key: const ValueKey('profile_tile_leading'),
+                    color: active ? scheme.primaryContainer : scheme.surfaceContainerLow,
+                    shape: MuseShape.sm,
+                    clipBehavior: Clip.antiAlias,
+                    child: IconTheme.merge(
+                      data: IconThemeData(color: active ? scheme.onPrimaryContainer : scheme.onSurfaceVariant),
+                      child: Semantics(sortKey: const OrdinalSortKey(1), child: ProfileActionButton(profile, true)),
+                    ),
+                  ),
+                ),
               ),
-              VerticalDivider(width: 1, thickness: 0.5, color: mt.hairline),
               Expanded(child: _body(context, t, theme, subInfo, handleTap)),
             ],
           ),
@@ -266,7 +281,7 @@ class ProfileActionButton extends HookConsumerWidget {
           child: InkWell(
             borderRadius: ProfileTileConst.startBorderRadius(Directionality.of(context), squareBottom: squareBottom),
             onTap: toggleVisibility,
-            child: Icon(AdaptiveIcon(context).more),
+            child: const Icon(Icons.more_vert_outlined),
           ),
         ),
       );

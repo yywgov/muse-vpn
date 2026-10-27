@@ -39,6 +39,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('深浅色', MuseSettingPage.appearance, keywords: ['深色模式', '浅色模式', '跟随系统', '主题']),
   MuseSettingEntry('纯黑', MuseSettingPage.appearance, keywords: ['黑色', 'OLED', '省电', '深色模式', 'AMOLED']),
   MuseSettingEntry('主题色', MuseSettingPage.appearance, keywords: ['颜色', '蓝', '绿', '紫', '青', '靛', '粉', '橙', '强调色']),
+  MuseSettingEntry('配色风格', MuseSettingPage.appearance, keywords: ['标准', '鲜艳', '表现力', '柔和', '鲜明', '着色', '单色', '配色', '风格', '色调', 'Material You']),
   MuseSettingEntry('自定义主题色', MuseSettingPage.appearance, keywords: ['十六进制', 'hex', '#', '自定义颜色', '取色']),
   MuseSettingEntry('文字缩放', MuseSettingPage.appearance, keywords: ['字体大小', '字号', '文字', '放大', '缩小']),
   MuseSettingEntry('隐私模式', MuseSettingPage.appearance, keywords: ['模糊', '截图']),

@@ -420,14 +420,28 @@ class MuseUptimeText extends HookWidget {
   @visibleForTesting
   static int debugBuilds = 0;
 
+  /// 1.6.1: timers currently running (tests: none while hidden or in the background).
+  @visibleForTesting
+  static int debugActiveTimers = 0;
+
   @override
   Widget build(BuildContext context) {
     debugBuilds++;
     final tick = useState(0);
+    // 1.6.1 省电: tick only while the page is on screen (another tab mutes its tickers) and the
+    // app is in the foreground; coming back shows the right time at once.
+    final visible = TickerMode.of(context);
+    final life = useAppLifecycleState();
+    final active = visible && (life == null || life == AppLifecycleState.resumed);
     useEffect(() {
+      if (!active) return null;
+      debugActiveTimers++;
       final timer = Timer.periodic(const Duration(seconds: 1), (_) => tick.value++);
-      return timer.cancel;
-    }, [since]);
+      return () {
+        timer.cancel();
+        debugActiveTimers--;
+      };
+    }, [since, active]);
     return Text(
       museFormatDuration(DateTime.now().difference(since)),
       key: const ValueKey('home_timer'),
@@ -742,8 +756,9 @@ class MuseTileGrid extends ConsumerWidget {
 /// 1.4.1: height a tile needs at [scaler]: padding + title caption + big number + bottom element
 /// (all scaled with the text) + a little slack.
 /// 1.5.1: [bottom] is the tallest bottom element in the grid ([MuseSize.segmented] with 去广告).
+/// 1.6.1: the title is a subheadline (15 / 20) now, not a caption.
 double museTileHeightFor(TextScaler scaler, {double bottom = MuseSize.tileBottom}) {
-  const caption = 12 * 1.3; // MuseType.caption line
+  const caption = 20.0; // MuseTextLevel.subheadline line
   const number = 24 * 1.2; // MuseType.number line
   return MuseSpace.s16 * 2 + scaler.scale(caption + number + bottom) + MuseSpace.s8;
 }

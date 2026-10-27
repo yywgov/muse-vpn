@@ -569,7 +569,7 @@ There is 1 interface on the system:
       await c.read(MusePrefs.alwaysOnTop.notifier).update(true);
       await t.pump();
       expect(find.bySemanticsLabel('取消置顶'), findsOneWidget);
-      expect(t.widget<Icon>(find.byIcon(Icons.push_pin_outlined)).color, MusePalette.brand);
+      expect(t.widget<Icon>(find.byIcon(Icons.push_pin_outlined)).color, museBrandOf(t.element(find.byIcon(Icons.push_pin_outlined))));
       // off: the pages only, no bar
       await c.read(MusePrefs.customTitleBar.notifier).update(false);
       await t.pump();

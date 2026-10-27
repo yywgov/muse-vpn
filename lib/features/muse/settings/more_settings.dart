@@ -38,6 +38,7 @@ import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart' show museAskText, museNodeName;
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
@@ -149,7 +150,31 @@ class MuseAppearancePage extends HookConsumerWidget {
                 ),
             ],
           ),
-          const MuseSection(header: '主题色', children: [MuseAccentPicker()]),
+          MuseSection(
+            header: '主题色',
+            children: [
+              const MuseAccentPicker(),
+              // 1.6.1 配色风格: how the colour scheme is derived from 主题色
+              MuseTile(
+                key: const ValueKey('appearance_color_style'),
+                leading: const Icon(Icons.palette_outlined),
+                title: '配色风格',
+                trailing: Text(MuseColorStyle.fromKey(ref.watch(MusePrefs.colorStyle)).title),
+                chevron: true,
+                onTap: () async {
+                  final current = MuseColorStyle.fromKey(ref.read(MusePrefs.colorStyle));
+                  final picked = await musePick<MuseColorStyle>(
+                    context,
+                    '配色风格',
+                    [for (final s in MuseColorStyle.offered) (s, s.title)],
+                    current,
+                  );
+                  if (picked == null || picked == current) return;
+                  await ref.read(MusePrefs.colorStyle.notifier).update(picked.key);
+                },
+              ),
+            ],
+          ),
           MuseSection(
             children: [
               MuseSwitchTile(
