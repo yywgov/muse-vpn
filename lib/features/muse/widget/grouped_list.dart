@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/features/muse/logic/latency.dart';
+import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 
 export 'package:hiddify/features/muse/widget/muse_tokens.dart';
@@ -101,7 +102,7 @@ class MuseGroupedBody extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
         child: ListView(
-          padding: padding ?? const EdgeInsets.only(top: MuseSpace.s4, bottom: MuseSpace.s32),
+          padding: museScrollPadding(context, padding ?? const EdgeInsets.only(top: MuseSpace.s4, bottom: MuseSpace.s32)),
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           children: children,
         ),

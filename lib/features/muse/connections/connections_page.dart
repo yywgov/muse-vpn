@@ -12,6 +12,7 @@ import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
 import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/muse/logic/home_tiles.dart' show museSpeedText;
+import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_card.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart' show museFormatDuration;
@@ -117,7 +118,7 @@ class MuseConnectionsPage extends HookConsumerWidget {
                 : ListView.builder(
                     key: const ValueKey('conn_list'),
                     itemExtent: museConnRowHeight,
-                    padding: EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), MuseSize.fabClearance),
+                    padding: EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), museScrollEndGap(context, MuseSize.fabClearance)),
                     itemCount: list.length,
                     itemBuilder: (_, i) => MuseConnRow(conn: list[i], ended: tab.value == 1, wide: MediaQuery.sizeOf(context).width > MuseBreak.laptop),
                   ),
@@ -249,7 +250,7 @@ Future<void> showMuseConnDetail(BuildContext context, WidgetRef ref, MuseConn c,
             );
       return ListView(
         controller: controller,
-        padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s24),
+        padding: EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, museScrollEndGap(ctx, MuseSpace.s24)),
         children: [
           if (c.host.isNotEmpty)
             FilledButton.icon(

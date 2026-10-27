@@ -25,6 +25,7 @@ import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/logic/node_style.dart';
 import 'package:hiddify/features/muse/logic/node_share.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
+import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
@@ -810,7 +811,7 @@ class MuseNodeList extends HookConsumerWidget {
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             SliverPadding(
-              padding: EdgeInsets.only(top: MuseSpace.s4, bottom: embedded ? MuseSpace.s16 : MuseSpace.s32),
+              padding: EdgeInsets.only(top: MuseSpace.s4, bottom: museScrollEndGap(context, embedded ? MuseSpace.s16 : MuseSpace.s32)),
               sliver: SliverMainAxisGroup(
                 slivers: [
                   for (final c in children)

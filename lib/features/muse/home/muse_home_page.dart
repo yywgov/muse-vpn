@@ -39,6 +39,7 @@ import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
+import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_segmented.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
@@ -141,7 +142,7 @@ class _Dashboard extends ConsumerWidget {
     // 1.5.0: the dashboard's outline while the subscriptions are read
     if (hasProfile == null) {
       return ListView(
-        padding: EdgeInsets.fromLTRB(margin, MuseSpace.s4, margin, MuseSpace.s32),
+        padding: EdgeInsets.fromLTRB(margin, MuseSpace.s4, margin, museScrollEndGap(context)),
         children: [MuseSkeleton.dashboard()],
       );
     }
@@ -153,7 +154,7 @@ class _Dashboard extends ConsumerWidget {
       notificationPredicate: (n) => n.depth == 0,
       child: ListView(
         key: const ValueKey('home_dashboard'),
-        padding: EdgeInsets.fromLTRB(margin, MuseSpace.s4, margin, MuseSpace.s32),
+        padding: EdgeInsets.fromLTRB(margin, MuseSpace.s4, margin, museScrollEndGap(context)),
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         children: const [
           MuseHeroCard(),

@@ -11,6 +11,7 @@ import 'package:hiddify/features/muse/local_api/local_api_client.dart';
 import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/muse/logic/redact.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart' show museSaveTextFile;
+import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_card.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
@@ -116,7 +117,7 @@ class MuseLogsPage extends HookConsumerWidget {
                 : ListView.builder(
                     key: const ValueKey('logs_list'),
                     reverse: true,
-                    padding: EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), MuseSpace.s16),
+                    padding: EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), museScrollEndGap(context, MuseSpace.s16)),
                     itemCount: lines.length,
                     itemBuilder: (_, i) {
                       final l = lines[lines.length - 1 - i];

@@ -103,7 +103,10 @@ class MuseShellFrame extends ConsumerWidget {
         color: MuseSurface.page.color(scheme),
         child: Scaffold(
           backgroundColor: MuseSurface.page.color(scheme),
-          extendBody: floating,
+          // 1.6.1: the page ends at the bar's top edge in both styles (1.6.0 let pages run under the
+          // floating bar, which hid the last ~100 dp of every list). The bar itself pads for the
+          // system gesture / button area.
+          extendBody: false,
           body: body,
           bottomNavigationBar: FocusScope(
             node: navScopeNode,
@@ -137,13 +140,19 @@ class MuseShellFrame extends ConsumerWidget {
               ),
             ),
             Expanded(
+              // 1.6.1: no bar here, so the page stops above the system gesture / button area.
               child: MuseEdgeScrollbar(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: AnimatedContainer(
-                    duration: museMotion(context),
-                    constraints: BoxConstraints(maxWidth: maxWidth),
-                    child: body,
+                child: SafeArea(
+                  left: false,
+                  top: false,
+                  right: false,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: AnimatedContainer(
+                      duration: museMotion(context),
+                      constraints: BoxConstraints(maxWidth: maxWidth),
+                      child: body,
+                    ),
                   ),
                 ),
               ),
@@ -154,6 +163,16 @@ class MuseShellFrame extends ConsumerWidget {
     );
   }
 }
+
+/// 1.6.1: the bottom padding a scroll view's last item needs: [base] plus whatever the screen still
+/// covers below this context — the system gesture / button area on a page outside the shell or in
+/// a sheet. Inside the shell this is just [base]: the shell already ends every page at the top of
+/// the bottom bar (dock) or above the system area (rail / sidebar), so pages never pad for the bar.
+double museScrollEndGap(BuildContext context, [double base = MuseSpace.s32]) => base + MediaQuery.paddingOf(context).bottom;
+
+/// [museScrollEndGap] as the bottom of [padding].
+EdgeInsets museScrollPadding(BuildContext context, EdgeInsets padding) =>
+    padding.copyWith(bottom: museScrollEndGap(context, padding.bottom));
 
 /// Fades (or slides) the new tab in when [index] changes; nothing with reduced motion.
 class MuseTabTransition extends StatefulWidget {
