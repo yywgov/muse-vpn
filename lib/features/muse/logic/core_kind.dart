@@ -43,6 +43,16 @@ abstract final class MuseCoreSelection {
   static void init(Object? key) => _startup = MuseCoreKind.fromKey(key);
 }
 
+/// Windows library of 兼容内核 (next to the app; same C functions as the standard core's library).
+const museCompatLibrary = 'muse-compat.dll';
+
+/// Path of the 兼容内核 library to load, or null for the standard core: not chosen, or missing.
+String? museCompatLibraryPath(String dir, MuseCoreKind kind, {required bool Function(String path) exists}) {
+  if (kind != MuseCoreKind.compat) return null;
+  final path = dir.isEmpty ? museCompatLibrary : '$dir\\$museCompatLibrary';
+  return exists(path) ? path : null;
+}
+
 /// What happens when the user picks [picked] while [current] is saved.
 enum MuseCoreSwitchStep {
   /// same core: nothing to do

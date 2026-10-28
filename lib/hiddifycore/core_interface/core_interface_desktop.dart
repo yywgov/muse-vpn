@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:ffi/ffi.dart';
 import 'package:grpc/grpc.dart';
 import 'package:hiddify/core/model/directories.dart';
+import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/gen/hiddify_core_generated_bindings.dart';
 import 'package:hiddify/hiddifycore/core_interface/core_interface.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -29,6 +30,19 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
       fullPath = "hiddify-core";
     }
     if (Platform.isWindows) {
+      // 穿云 1.7.0: the core chosen in 设置 › 内核 (read once at start-up); 标准内核 when the other
+      // library is missing, so a damaged install still connects
+      // (looked up next to Chuanyun.exe: the working directory differs when started at log-in)
+      final libDir = fullPath.isEmpty ? File(Platform.resolvedExecutable).parent.path : fullPath;
+      final compat = museCompatLibraryPath(libDir, MuseCoreSelection.startup, exists: (f) => File(f).existsSync());
+      if (compat != null) {
+        _logger.info('core: 兼容内核 ($compat)');
+        return HiddifyCoreNativeLibrary(DynamicLibrary.open(compat));
+      }
+      if (MuseCoreSelection.startup == MuseCoreKind.compat) {
+        _logger.warning('core: $museCompatLibrary not found, using 标准内核');
+        MuseCoreSelection.init(MuseCoreKind.standard.key);
+      }
       fullPath = p.join(fullPath, "hiddify-core.dll");
     } else if (Platform.isMacOS) {
       fullPath = p.join(fullPath, "hiddify-core.dylib");

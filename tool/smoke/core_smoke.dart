@@ -9,6 +9,8 @@
 //     through the node, Stop removes the adapter
 //
 //   dart run tool/smoke/core_smoke.dart --dll <dir with hiddify-core.dll> --work <dir> --out <dir>
+//   --kind standard|compat   1.7.0: which core library (hiddify-core.dll / muse-compat.dll); both
+//                            run the same checks, results in core-smoke.md / core-smoke-compat.md
 //   dart run tool/smoke/core_smoke.dart --app-grpc --out <dir>    (checks the running app's core)
 //
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
@@ -85,6 +87,14 @@ Future<void> main(List<String> args) async {
     await _checkAppGrpc();
     return _finish();
   }
+  final kind = _arg(args, '--kind', 'standard');
+  if (kind != 'standard' && kind != 'compat') {
+    print('--kind must be standard or compat');
+    exit(2);
+  }
+  final compat = kind == 'compat';
+  if (compat) _name = 'core-smoke-compat';
+  final dllName = compat ? 'muse-compat.dll' : 'hiddify-core.dll';
   final dllDir = Directory(_arg(args, '--dll', '.')).absolute;
   final work = Directory(_arg(args, '--work', 'smoke-work')).absolute..createSync(recursive: true);
   final skipTun = args.contains('--no-tun');
@@ -97,10 +107,10 @@ Future<void> main(List<String> args) async {
   HiddifyCoreNativeLibrary box;
   try {
     Directory.current = dllDir; // libcronet.dll etc. next to it
-    box = HiddifyCoreNativeLibrary(DynamicLibrary.open('${dllDir.path}\\hiddify-core.dll'));
-    _record('dll', 'hiddify-core.dll loads', true, dllDir.path);
+    box = HiddifyCoreNativeLibrary(DynamicLibrary.open('${dllDir.path}\\$dllName'));
+    _record('dll', '$dllName loads', true, dllDir.path);
   } catch (e) {
-    _record('dll', 'hiddify-core.dll loads', false, '$e');
+    _record('dll', '$dllName loads', false, '$e');
     return _finish();
   }
   final err = box
@@ -163,6 +173,15 @@ Future<void> main(List<String> args) async {
   try {
     final p = await core.parse(ParseRequest(tempPath: tmpProfile.path, configPath: profile));
     _record('parse', 'profile parses', p.responseCode == ResponseCode.OK, '${p.responseCode} ${p.message}');
+  } on GrpcError catch (e) {
+    // 兼容内核 before its subscription parsing landed: it reads the profile file as it is
+    if (compat && e.code == StatusCode.unimplemented) {
+      tmpProfile.copySync(profile);
+      _record('parse', 'profile parses', true, 'parse not offered by this core yet; profile used as is', optional: true);
+    } else {
+      _record('parse', 'profile parses', false, '$e');
+      return _finish();
+    }
   } catch (e) {
     _record('parse', 'profile parses', false, '$e');
     return _finish();
@@ -357,7 +376,7 @@ Future<String> _tunAdapters() async {
   final r = await Process.run('powershell', [
     '-NoProfile',
     '-Command',
-    "Get-NetAdapter | Where-Object { \$_.InterfaceDescription -like '*Wintun*' -or \$_.InterfaceDescription -like '*sing-tun*' -or \$_.Name -like 'tun*' } | ForEach-Object { \"\$(\$_.Name) | \$(\$_.InterfaceDescription) | \$(\$_.Status)\" }",
+    "Get-NetAdapter | Where-Object { \$_.InterfaceDescription -like '*Wintun*' -or \$_.InterfaceDescription -like '*sing-tun*' -or \$_.Name -like 'tun*' -or \$_.Name -like 'Chuanyun*' -or \$_.InterfaceDescription -like 'Chuanyun*' } | ForEach-Object { \"\$(\$_.Name) | \$(\$_.InterfaceDescription) | \$(\$_.Status)\" }",
   ]);
   return '${r.stdout}'.trim();
 }

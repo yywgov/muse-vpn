@@ -232,6 +232,53 @@ void main() {
     });
   });
 
+  group('Windows: 兼容内核 library', () {
+    test('loaded only when chosen and present next to the app; otherwise 标准内核', () {
+      bool yes(String _) => true;
+      bool no(String _) => false;
+      expect(museCompatLibraryPath(r'C:\App', MuseCoreKind.standard, exists: yes), isNull);
+      expect(museCompatLibraryPath(r'C:\App', MuseCoreKind.compat, exists: no), isNull);
+      expect(museCompatLibraryPath(r'C:\App', MuseCoreKind.compat, exists: yes), r'C:\App\muse-compat.dll');
+      expect(museCompatLibraryPath('', MuseCoreKind.compat, exists: yes), 'muse-compat.dll');
+      final seen = <String>[];
+      museCompatLibraryPath(r'D:\x', MuseCoreKind.compat, exists: (p) {
+        seen.add(p);
+        return false;
+      });
+      expect(seen, [r'D:\x\muse-compat.dll']);
+    });
+
+    test('the desktop core interface picks the library by the start-up choice, looked up next to the exe', () {
+      final s = File('lib/hiddifycore/core_interface/core_interface_desktop.dart').readAsStringSync();
+      expect(s, contains('museCompatLibraryPath(libDir, MuseCoreSelection.startup'));
+      expect(s, contains('File(Platform.resolvedExecutable).parent.path'));
+      expect(s, contains('"hiddify-core.dll"'), reason: '标准内核 path unchanged');
+    });
+
+    test('built from the core source at a pinned commit; bundled; both kinds smoke-tested', () {
+      final props = File('dependencies.properties').readAsStringSync();
+      expect(RegExp(r'^muse\.compat\.ref=[0-9a-f]{40}$', multiLine: true).hasMatch(props), isTrue);
+      expect(props, contains('muse.core.version=$museCoreRelease'), reason: '标准内核 release unchanged');
+      final wf = File('.github/workflows/muse-windows.yml').readAsStringSync();
+      expect(wf, contains('compat-core:'));
+      expect(wf, contains('repository: yywgov/muse-core'));
+      expect(wf, contains('needs: compat-core'));
+      expect(wf, contains('-o "\$GITHUB_WORKSPACE/out/muse-compat.dll" ./bridge'));
+      expect(wf, contains('muse-compat.dll not bundled'));
+      expect(wf, contains('core_smoke.dart --kind standard'));
+      expect(wf, contains('core_smoke.dart --kind compat'));
+      expect(wf, contains('"core-compat:\${{ steps.smoke_core_compat.outcome }}"'));
+      expect(wf, isNot(contains('gh release create v')), reason: 'no core release from the client CI');
+      final cmake = File('windows/CMakeLists.txt').readAsStringSync();
+      expect(cmake, contains('install(FILES "../hiddify-core/bin/muse-compat.dll"'));
+      expect(cmake, contains('COMPONENT Runtime OPTIONAL)'));
+      final smoke = File('tool/smoke/core_smoke.dart').readAsStringSync();
+      expect(smoke, contains("_arg(args, '--kind', 'standard')"));
+      expect(smoke, contains("compat ? 'muse-compat.dll' : 'hiddify-core.dll'"));
+      expect(smoke, contains("_name = 'core-smoke-compat'"));
+    });
+  });
+
   group('sources', () {
     test('new files do not name upstream projects', () {
       for (final p in [

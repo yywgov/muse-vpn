@@ -24,7 +24,83 @@ env:
   FLUTTER_VERSION: '3.38.5'
 
 jobs:
+  # 穿云 1.7.0: 兼容内核 (muse-compat.dll) from the core repository's source at the commit pinned in
+  # dependencies.properties (muse.compat.ref, branch rel-1.7.0) — cross-built with MinGW like the
+  # core repository's own CI. No core release is involved.
+  compat-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: dependencies.properties
+          sparse-checkout-cone-mode: false
+
+      - name: Pinned core commit
+        id: ref
+        run: |
+          ref=$(sed -n 's/^muse\.compat\.ref=\([0-9a-f]\{40\}\)$/\1/p' dependencies.properties)
+          [ -n "$ref" ] || { echo "::error::dependencies.properties needs muse.compat.ref=<40-hex commit>"; exit 1; }
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          repository: yywgov/muse-core
+          ref: ${{ steps.ref.outputs.ref }}
+          path: core
+          submodules: false
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/mihomo/go.mod
+          cache-dependency-path: core/mihomo/go.sum
+          check-latest: false
+
+      - name: Setup MinGW
+        timeout-minutes: 15
+        run: |
+          for i in 1 2 3; do
+            sudo timeout 300 apt-get update -q && sudo timeout 400 apt-get install -y -q gcc-mingw-w64-x86-64 && break
+            echo "::warning::mingw install attempt $i failed"; sleep 10
+          done
+          x86_64-w64-mingw32-gcc --version
+
+      - name: Build muse-compat.dll
+        working-directory: core/mihomo
+        env:
+          CGO_ENABLED: '1'
+          GOOS: windows
+          GOARCH: amd64
+          CC: x86_64-w64-mingw32-gcc
+        run: |
+          tags=$(sed -n 's/^  MIHOMO_TAGS: \(.*\)$/\1/p' ../.github/workflows/mihomo.yml)
+          ver=$(sed -n 's/^  MIHOMO_VERSION: \(.*\)$/\1/p' ../.github/workflows/mihomo.yml)
+          echo "tags=$tags version=$ver"
+          [ -n "$tags" ] && [ -n "$ver" ] || { echo "::error::could not read the build tags"; exit 1; }
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          go build -buildmode=c-shared -trimpath -tags "$tags" \
+            -ldflags "-s -w -buildid= -X github.com/metacubex/mihomo/constant.Version=$ver" \
+            -o "$GITHUB_WORKSPACE/out/muse-compat.dll" ./bridge
+
+      - name: Check exports and record size
+        working-directory: out
+        run: |
+          rm -f muse-compat.h
+          x86_64-w64-mingw32-objdump -p muse-compat.dll | tr -d '\r' > /tmp/pe.txt
+          sed -n '/Ordinal\/Name Pointer/,/^$/p' /tmp/pe.txt > /tmp/exports.txt
+          for f in setup start stop restart freeString cleanup closeGrpc; do
+            grep -qw -- "$f" /tmp/exports.txt || { echo "::error::muse-compat.dll does not export $f"; exit 1; }
+          done
+          b=$(stat -c %s muse-compat.dll)
+          echo "### muse-compat.dll: $b bytes (core ${{ steps.ref.outputs.ref }})" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: muse-compat-dll
+          path: out/muse-compat.dll
+          retention-days: 3
+
   windows:
+    needs: compat-core
     runs-on: windows-latest
     permissions:
       contents: write
@@ -44,10 +120,15 @@ jobs:
       - name: Prepare (codegen + prebuilt core)
         run: make windows-prepare
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: muse-compat-dll
+          path: hiddify-core/bin
+
       - name: Core files present
         run: |
           ls -la hiddify-core/bin
-          for f in hiddify-core.dll libcronet.dll; do
+          for f in hiddify-core.dll libcronet.dll muse-compat.dll; do
             test -f "hiddify-core/bin/$f" || { echo "missing $f"; exit 1; }
           done
 
@@ -76,6 +157,7 @@ jobs:
           Get-ChildItem $rel | Select-Object Name, Length
           if (-not (Test-Path "$rel\Chuanyun.exe")) { throw "Chuanyun.exe not found" }
           if (-not (Test-Path "$rel\hiddify-core.dll")) { throw "hiddify-core.dll not bundled" }
+          if (-not (Test-Path "$rel\muse-compat.dll")) { throw "muse-compat.dll not bundled" }
           if (-not (Test-Path "$rel\ChuanyunGuard.exe")) { throw "ChuanyunGuard.exe not bundled" }
           foreach ($d in @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")) {
             if (-not (Test-Path "$rel\$d")) { throw "$d not bundled (PCs without VC++ Redistributable cannot start the app)" }
@@ -97,7 +179,14 @@ jobs:
         id: smoke_core
         continue-on-error: true
         timeout-minutes: 14
-        run: bash tool/smoke/retry.sh "core smoke" 2 dart run tool/smoke/core_smoke.dart --dll build/windows/x64/runner/Release --work "$RUNNER_TEMP/coresmoke" --out smoke
+        run: bash tool/smoke/retry.sh "core smoke" 2 dart run tool/smoke/core_smoke.dart --kind standard --dll build/windows/x64/runner/Release --work "$RUNNER_TEMP/coresmoke" --out smoke
+
+      # 1.7.0: the same checks against 兼容内核 (muse-compat.dll)
+      - name: Smoke test - core, 兼容内核 (token, 系统代理, TUN)
+        id: smoke_core_compat
+        continue-on-error: true
+        timeout-minutes: 14
+        run: bash tool/smoke/retry.sh "core smoke (compat)" 2 dart run tool/smoke/core_smoke.dart --kind compat --dll build/windows/x64/runner/Release --work "$RUNNER_TEMP/coresmoke-compat" --out smoke
 
       - name: Installer (Inno Setup)
         shell: pwsh
@@ -150,11 +239,12 @@ jobs:
 
       - name: Smoke gate
         run: |
-          echo "app=${{ steps.smoke_app.outcome }} core=${{ steps.smoke_core.outcome }} installer=${{ steps.smoke_installer.outcome }} recovery=${{ steps.smoke_recovery.outcome }}"
+          echo "app=${{ steps.smoke_app.outcome }} core=${{ steps.smoke_core.outcome }} core-compat=${{ steps.smoke_core_compat.outcome }} installer=${{ steps.smoke_installer.outcome }} recovery=${{ steps.smoke_recovery.outcome }}"
           # continue-on-error steps always *conclude* success (green in the UI); their real result
           # is the outcome. Name every failed one, as an annotation anyone can read.
           bad=0
           for x in "app:${{ steps.smoke_app.outcome }}" "core:${{ steps.smoke_core.outcome }}" \
+                   "core-compat:${{ steps.smoke_core_compat.outcome }}" \
                    "installer:${{ steps.smoke_installer.outcome }}" "recovery:${{ steps.smoke_recovery.outcome }}"; do
             if [ "${x#*:}" != success ]; then echo "::error title=Smoke gate::${x%%:*} smoke ${x#*:}"; bad=1; fi
           done

@@ -101,6 +101,11 @@ COMPONENT Runtime RENAME hiddify-core.dll)
 install(FILES "../hiddify-core/bin/libcronet.dll" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
 COMPONENT Runtime RENAME libcronet.dll)
 
+# 穿云 1.7.0: 兼容内核, built by CI from the core repository's source (OPTIONAL: a local build
+# without it still works and stays on 标准内核)
+install(FILES "../hiddify-core/bin/muse-compat.dll" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+COMPONENT Runtime OPTIONAL)
+
 # 穿云 1.1.1: HiddifyCli.exe is not shipped (nothing launches it; the app loads hiddify-core.dll)
 
 
