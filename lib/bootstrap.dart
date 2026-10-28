@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/features/muse/data/bundled_rule_sets.dart';
 import 'package:hiddify/features/muse/data/muse_prefs_migration.dart';
 import 'package:flutter/foundation.dart';
@@ -136,6 +137,10 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
   });
   // 穿云 1.6.0 (#217): versioned migrations of the 穿云 settings (idempotent, never throws)
   await _init("muse preferences migration", () => musePrefsMigrateStore(container.read(sharedPreferencesProvider).requireValue));
+  // 穿云 1.7.0 M3: the core this process uses (Windows loads its library once per run)
+  try {
+    MuseCoreSelection.init(container.read(sharedPreferencesProvider).requireValue.get(museCoreKindPrefKey));
+  } catch (_) {}
 
   // The log level decides this now. There is no second debug switch to keep in
   // sync, and the core reaches the same conclusion from the same value.

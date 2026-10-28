@@ -3,6 +3,7 @@
 // Part of 穿云 (GPLv3).
 
 import 'package:hiddify/core/utils/preferences_utils.dart';
+import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';
 
 abstract final class MusePrefs {
@@ -199,6 +200,10 @@ abstract final class MusePrefs {
   // ---- 1.6.0 C10
   /// 开发者选项 shown in 设置 (tap 关于 › 版本 7 times); this device only, never synced
   static final devMode = PreferencesNotifier.create<bool, bool>("muse_dev_mode", false);
+
+  /// 1.7.0 M3 内核 (MuseCoreKind key, logic/core_kind.dart): only on this device, not synced or
+  /// backed up. Windows uses it after a restart, Android from the next connect.
+  static final coreKind = PreferencesNotifier.create<String, String>(museCoreKindPrefKey, "standard");
 
   // ---- Windows (1.6.0 C8: 窗口置顶, used by the title bar and 设置 › 电脑)
   static final alwaysOnTop = PreferencesNotifier.create<bool, bool>("muse_always_on_top", false);

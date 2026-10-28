@@ -30,6 +30,31 @@ abstract final class WindowsAdmin {
     _logger.info('running elevated: $_elevated');
   }
 
+  /// 1.7.0 M3: starts a new copy of 穿云 a moment after this one quits (内核 switch). An elevated
+  /// run starts the new copy through its own (elevated) PowerShell, so it stays elevated.
+  static Future<bool> relaunch() async {
+    if (!PlatformUtils.isWindows) return false;
+    final exe = Platform.resolvedExecutable.replaceAll("'", "''");
+    try {
+      await Process.start(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-WindowStyle',
+          'Hidden',
+          '-Command',
+          "Start-Sleep -Milliseconds 2500; Start-Process -FilePath '$exe'",
+        ],
+        mode: ProcessStartMode.detached,
+      );
+      return true;
+    } catch (e) {
+      _logger.warning('could not relaunch', e);
+      return false;
+    }
+  }
+
   /// Starts a second, elevated copy of 穿云 (UAC prompt) a moment after this one quits.
   /// The caller quits the app right after; the delay lets the single-instance check pass.
   static Future<bool> relaunchElevated() async {

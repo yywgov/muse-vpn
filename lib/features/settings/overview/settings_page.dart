@@ -22,6 +22,7 @@ import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart';
+import 'package:hiddify/features/muse/settings/core_kind_section.dart';
 import 'package:hiddify/features/muse/settings/privacy_page.dart';
 import 'package:hiddify/features/muse/settings/resources_page.dart';
 import 'package:hiddify/features/muse/settings/theme_preview_page.dart';
@@ -211,6 +212,8 @@ class SettingsPage extends HookConsumerWidget {
               ),
             ],
           ),
+          // 1.7.0 M3
+          if (PlatformUtils.isWindows || android) const MuseCoreKindSection(),
           if (PlatformUtils.isWindows) const WindowsSettingsSection(),
           if (android) const MuseAndroidGeneralSection(),
           if (android) const MusePrivacySection(),

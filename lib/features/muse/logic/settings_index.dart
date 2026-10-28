@@ -95,6 +95,8 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('隐藏桌面图标 / 最近任务 / 通知', MuseSettingPage.main, keywords: ['隐私', '隐藏'], androidOnly: true),
   MuseSettingEntry('检查更新', MuseSettingPage.about, keywords: ['版本', '更新内容']),
   // 1.6.0 C10
+  // 1.7.0 M3
+  MuseSettingEntry('内核', MuseSettingPage.main, keywords: ['切换内核', '标准内核', '兼容内核', '双内核', '引擎', '代理组']),
   MuseSettingEntry('资源', MuseSettingPage.resources, keywords: ['规则集', '规则文件', 'geosite', 'geoip', '更新规则', '数据库']),
   MuseSettingEntry('主题预览', MuseSettingPage.themePreview, keywords: ['预览', '主题', '配色', '样式']),
   MuseSettingEntry('内核版本', MuseSettingPage.about, keywords: ['内核', '构建号', '版本号', '开源许可', '致谢']),
