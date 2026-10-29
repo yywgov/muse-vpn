@@ -7,6 +7,7 @@ import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/features/muse/logic/latency.dart';
 import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 
 export 'package:hiddify/features/muse/widget/muse_tokens.dart';
 
@@ -35,12 +36,12 @@ abstract final class MuseColors {
   static Color separator(BuildContext context) => MuseTheme.of(context).hairline;
 
   /// Latency colour (see museLatencyLevel): green < 300 ms, orange 300–600 ms,
-  /// red > 600 ms or timeout, grey while not tested yet.
+  /// red > 600 ms or timeout, 墨灰 while not tested yet.
   static Color delay(BuildContext context, int delay) => switch (museLatencyLevel(delay)) {
     MuseLatencyLevel.good => MusePalette.green,
     MuseLatencyLevel.fair => MusePalette.orange,
     MuseLatencyLevel.bad => MusePalette.red,
-    MuseLatencyLevel.unknown => MuseTheme.of(context).text2,
+    MuseLatencyLevel.unknown => Theme.of(context).colorScheme.idle,
   };
 }
 

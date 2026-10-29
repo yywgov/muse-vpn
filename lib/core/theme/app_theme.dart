@@ -33,6 +33,9 @@ class AppTheme {
 
   static Color get brand => MusePalette.brand;
 
+  /// 1.6.2: the accent colour itself (主题色), the scheme's seed
+  static Color get seed => MusePalette.seed;
+
   // smooth on 120 Hz phones: the predictive-back aware Android transition
   static const _transitions = PageTransitionsTheme(
     builders: {TargetPlatform.android: FadeForwardsPageTransitionsBuilder()},
@@ -43,7 +46,7 @@ class AppTheme {
   /// 1.6.1: the Material 3 colour scheme seeded by 主题色 in the chosen 配色风格 (纯黑 lowers the
   /// dark surfaces). Material You wallpaper colours are ignored on purpose.
   ColorScheme scheme(Brightness brightness) => museSeededScheme(
-    seed: brand,
+    seed: seed,
     brightness: brightness,
     style: MuseColorStyle.fromKey(MusePalette.colorStyle),
     pureBlack: brightness == Brightness.dark && mode.trueBlack,

@@ -52,7 +52,7 @@ Future<ProviderContainer> _pump(WidgetTester tester, Map<String, Object> initial
 
 void main() {
   tearDown(() {
-    museApplyAccent('blue');
+    museApplyAccent(museDefaultAccent);
     museApplyPureBlack(false);
   });
 
@@ -66,11 +66,11 @@ void main() {
       }
       expect(museHexOf(const Color(0xFF0a0b0c)), '#0A0B0C');
     });
-    test('presets keep their colours; unknown falls back to brand blue', () {
+    test('presets keep their colours; unknown falls back to 景泰蓝', () {
       expect(MuseAccent.values.length, greaterThanOrEqualTo(6));
-      expect(MuseAccent.blue.brand, const Color(0xFF2F6BFF));
-      expect(museAccentColors('green').brand, MuseAccent.green.brand);
-      expect(museAccentColors('nope').brand, MuseAccent.blue.brand);
+      expect(MuseAccent.jingtailan.brand, const Color(0xFF2775B6));
+      expect(museAccentColors('zhuqing').brand, MuseAccent.zhuqing.brand);
+      expect(museAccentColors('nope').brand, MuseAccent.jingtailan.brand);
       expect(MuseAccent.values.map((e) => e.key).toSet().length, MuseAccent.values.length);
     });
     test('every preset and any custom colour keeps white text readable', () {
@@ -85,8 +85,9 @@ void main() {
       expect(museAccentColors('#123456').brand, const Color(0xFF123456));
     });
     test('museApplyAccent sets the palette from a preset or a custom value', () {
-      museApplyAccent('purple');
-      expect(MusePalette.brand, MuseAccent.purple.brand);
+      museApplyAccent('dingxiang');
+      expect(MusePalette.brand, MuseAccent.dingxiang.brand);
+      expect(MusePalette.seed, const Color(0xFFCCA4E3));
       museApplyAccent('#123456');
       expect(MusePalette.brand, const Color(0xFF123456));
       expect(MusePalette.brandLight, isNot(MusePalette.brand));
@@ -206,9 +207,9 @@ void main() {
   group('C7 page', () {
     testWidgets('custom colour: add, select, remove', (tester) async {
       final c = await _pump(tester, {});
-      await tester.tap(find.byKey(const ValueKey('accent_teal')));
+      await tester.tap(find.byKey(const ValueKey('accent_qingbi')));
       await tester.pump();
-      expect(c.read(MusePrefs.accent), 'teal');
+      expect(c.read(MusePrefs.accent), 'qingbi');
       await tester.tap(find.byKey(const ValueKey('accent_add_custom')));
       await tester.pump(const Duration(milliseconds: 400));
       await tester.enterText(find.byType(TextField).last, '#123456');
@@ -220,7 +221,7 @@ void main() {
       await tester.longPress(find.byKey(const ValueKey('accent_custom_#123456')));
       await tester.pump(const Duration(milliseconds: 300));
       expect(c.read(MusePrefs.customAccents), '');
-      expect(c.read(MusePrefs.accent), 'blue');
+      expect(c.read(MusePrefs.accent), museDefaultAccent);
     });
     for (final s in [(const Size(320, 640), 2.0), (const Size(412, 915), 1.0), (const Size(1280, 800), 1.4)]) {
       testWidgets('no overflow ${s.$1.width.toInt()} @${s.$2}×, dark + 纯黑 + 文字缩放 on', (tester) async {

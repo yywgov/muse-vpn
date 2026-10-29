@@ -31,20 +31,29 @@ enum MuseColorStyle {
   static const offered = [tonalSpot, vibrant, expressive, soft, vivid, tinted, monochrome];
 }
 
-/// The brand blue: the default seed.
-const museBrandSeed = Color(0xFF2F6BFF);
+/// 1.6.2: 景泰蓝, the default seed.
+const museBrandSeed = Color(0xFF2775B6);
 
-/// Preset seeds for 主题色 (brand blue first).
+/// Preset seeds for 主题色: ten Chinese traditional colours, 景泰蓝 first (same order as
+/// MuseAccent): 景泰蓝 苤蓝 竹青 月白 苍蝇灰 朱瑾 藤黄 青碧 丁香 赭石.
 const museSeedPresets = <Color>[
   museBrandSeed,
-  Color(0xFF16A34A),
-  Color(0xFF7C3AED),
-  Color(0xFF0EA5E9),
-  Color(0xFFDB2777),
-  Color(0xFFEA580C),
-  Color(0xFF0D9488),
-  Color(0xFF64748B),
+  Color(0xFF6B798E),
+  Color(0xFF789262),
+  Color(0xFFD6ECF0),
+  Color(0xFF36282B),
+  Color(0xFFC41E3A),
+  Color(0xFFFFB61E),
+  Color(0xFF48C0A3),
+  Color(0xFFCCA4E3),
+  Color(0xFF845A33),
 ];
+
+/// 1.6.2: status lights (fixed, never follow 主题色): 葱青 / 杏黄 / 朱砂 / 墨灰.
+const museStatusGreen = Color(0xFF0EB83A);
+const museStatusYellow = Color(0xFFFFA631);
+const museStatusRed = Color(0xFFFF461F);
+const museStatusGrey = Color(0xFF758A99);
 
 /// Surface tones of the dark theme (page / card / block / inset).
 abstract final class MuseTone {
@@ -190,18 +199,23 @@ double museTone(Color c) => Hct.fromInt(c.toARGB32()).tone;
 /// Chroma of a colour.
 double museChroma(Color c) => Hct.fromInt(c.toARGB32()).chroma;
 
-final _success = TonalPalette.fromHct(Hct.fromInt(0xFF4CAF50));
-final _warning = TonalPalette.fromHct(Hct.fromInt(0xFFFF9800));
+final _success = TonalPalette.fromHct(Hct.fromInt(museStatusGreen.toARGB32()));
+final _warning = TonalPalette.fromHct(Hct.fromInt(museStatusYellow.toARGB32()));
+final _idle = TonalPalette.fromHct(Hct.fromInt(museStatusGrey.toARGB32()));
 
-/// Status colours: fixed green / orange that never follow the seed, iOS-style destructive red,
-/// and the second data series (primary at 45 %).
+/// Status colours that never follow the seed (1.6.2: 葱青 / 杏黄 / 朱砂 / 墨灰, toned for text
+/// on light / dark surfaces), and the second data series (primary at 45 %).
 extension MuseSchemeStatus on ColorScheme {
   bool get _dark => brightness == Brightness.dark;
   Color get success => Color(_success.get(_dark ? 80 : 40));
   Color get successContainer => Color(_success.get(_dark ? 30 : 90));
   Color get warning => Color(_warning.get(_dark ? 80 : 40));
   Color get warningContainer => Color(_warning.get(_dark ? 30 : 90));
-  Color get destructive => Color(_dark ? 0xFFFF4245 : 0xFFFF383C);
+  /// 朱砂 (a filled destructive button keeps white text ≥ 3:1)
+  Color get destructive => museStatusRed;
+
+  /// 墨灰: not tested / not connected / unknown
+  Color get idle => _dark ? Color(_idle.get(70)) : museStatusGrey;
   Color get secondSeries => primary.withValues(alpha: 0.45);
   Color get modalScrim => scrim.withValues(alpha: 0.32);
 
