@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 
 /// The core release this build bundles (dependencies.properties `muse.core.version`; a test keeps
 /// the two equal).
-const museCoreRelease = '5.0.0-muse.17';
+const museCoreRelease = '5.0.0-muse.18';
 
 /// While connected the core refreshes every rule-set in the background this often.
 const museRuleSetUpdateDays = 5;
