@@ -256,11 +256,11 @@ class MuseAccentPicker extends ConsumerWidget {
     final selectedHex = currentHex == null ? null : museHexOf(currentHex);
 
     Future<void> addCustom() async {
-      final v = await museAskText(context, '自定义主题色', initial: selectedHex ?? '', hint: '十六进制颜色，如 #2F6BFF');
+      final v = await museAskText(context, '自定义主题色', initial: selectedHex ?? '', hint: '十六进制颜色，如 #2775B6');
       if (v == null) return;
       final c = museParseHexColor(v);
       if (c == null) {
-        _toast(ref, '不是有效的颜色，请输入如 #2F6BFF 的十六进制值', error: true);
+        _toast(ref, '不是有效的颜色，请输入如 #2775B6 的十六进制值', error: true);
         return;
       }
       final hex = museHexOf(c);
@@ -270,7 +270,7 @@ class MuseAccentPicker extends ConsumerWidget {
 
     Future<void> removeCustom(String hex) async {
       await ref.read(MusePrefs.customAccents.notifier).update(museRemoveCustomAccent(ref.read(MusePrefs.customAccents), hex));
-      if (selectedHex == hex) await ref.read(MusePrefs.accent.notifier).update(MuseAccent.blue.key);
+      if (selectedHex == hex) await ref.read(MusePrefs.accent.notifier).update(MuseAccent.fallback.key);
     }
 
     Widget swatch({required Key key, required Color color, required bool selected, required String label, VoidCallback? onLongPress, required VoidCallback onTap}) =>
@@ -278,7 +278,10 @@ class MuseAccentPicker extends ConsumerWidget {
           button: true,
           selected: selected,
           label: '主题色 $label',
-          child: InkWell(
+          child: Tooltip(
+            message: label,
+            excludeFromSemantics: true,
+            child: InkWell(
             key: key,
             customBorder: const CircleBorder(),
             onTap: onTap,
@@ -289,10 +292,15 @@ class MuseAccentPicker extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
-                border: selected ? Border.all(color: MuseTheme.of(context).text1, width: 2) : null,
+                // 1.6.2: a hairline keeps 月白 visible on a light page
+                border: selected
+                    ? Border.all(color: MuseTheme.of(context).text1, width: 2)
+                    : Border.all(color: MuseTheme.of(context).hairline),
               ),
-              child: selected ? const Icon(Icons.check_outlined, size: MuseIconSize.small, color: MusePalette.white) : null,
+              // 1.6.2: dark tick on light colours (月白 / 藤黄 / 丁香)
+              child: selected ? Icon(Icons.check_outlined, size: MuseIconSize.small, color: museOnColor(color)) : null,
             ),
+          ),
           ),
         );
 
@@ -308,7 +316,7 @@ class MuseAccentPicker extends ConsumerWidget {
               for (final a in MuseAccent.values)
                 swatch(
                   key: ValueKey('accent_${a.key}'),
-                  color: a.brand,
+                  color: a.color,
                   label: a.title,
                   selected: a == currentPreset,
                   onTap: () => ref.read(MusePrefs.accent.notifier).update(a.key),
@@ -316,7 +324,7 @@ class MuseAccentPicker extends ConsumerWidget {
               for (final hex in customs)
                 swatch(
                   key: ValueKey('accent_custom_$hex'),
-                  color: museAccentColors(hex).brand,
+                  color: museAccentColors(hex).seed,
                   label: hex,
                   selected: hex == selectedHex,
                   onTap: () => ref.read(MusePrefs.accent.notifier).update(hex),

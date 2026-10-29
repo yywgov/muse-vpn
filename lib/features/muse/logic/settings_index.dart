@@ -38,7 +38,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('外观', MuseSettingPage.appearance, keywords: ['主题', '深色', '浅色', '夜间']),
   MuseSettingEntry('深浅色', MuseSettingPage.appearance, keywords: ['深色模式', '浅色模式', '跟随系统', '主题']),
   MuseSettingEntry('纯黑', MuseSettingPage.appearance, keywords: ['黑色', 'OLED', '省电', '深色模式', 'AMOLED']),
-  MuseSettingEntry('主题色', MuseSettingPage.appearance, keywords: ['颜色', '蓝', '绿', '紫', '青', '靛', '粉', '橙', '强调色']),
+  MuseSettingEntry('主题色', MuseSettingPage.appearance, keywords: ['颜色', '强调色', '中国传统色', '传统色', '景泰蓝', '苤蓝', '竹青', '月白', '苍蝇灰', '朱瑾', '藤黄', '青碧', '丁香', '赭石', '蓝', '绿', '紫', '青', '红', '黄', '灰', '棕']),
   MuseSettingEntry('配色风格', MuseSettingPage.appearance, keywords: ['标准', '鲜艳', '表现力', '柔和', '鲜明', '着色', '单色', '配色', '风格', '色调', 'Material You']),
   MuseSettingEntry('自定义主题色', MuseSettingPage.appearance, keywords: ['十六进制', 'hex', '#', '自定义颜色', '取色']),
   MuseSettingEntry('文字缩放', MuseSettingPage.appearance, keywords: ['字体大小', '字号', '文字', '放大', '缩小']),

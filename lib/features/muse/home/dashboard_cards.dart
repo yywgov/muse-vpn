@@ -137,7 +137,6 @@ class _ServicesSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(museServicesProvider);
     final running = ref.watch(museRunningProvider);
-    final mt = MuseTheme.of(context);
     return CustomScrollView(
       key: const ValueKey('services_sheet'),
       controller: controller,
@@ -175,7 +174,7 @@ class _ServicesSheet extends ConsumerWidget {
                 MuseSvcState.ok => Theme.of(context).colorScheme.success,
                 MuseSvcState.limited => Theme.of(context).colorScheme.warning,
                 MuseSvcState.failed => Theme.of(context).colorScheme.error,
-                _ => mt.text2,
+                _ => Theme.of(context).colorScheme.idle,
               };
               return MuseCard(
                 key: ValueKey('service_${sv.key}'),

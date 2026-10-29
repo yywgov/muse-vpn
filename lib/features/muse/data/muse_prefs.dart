@@ -15,7 +15,9 @@ abstract final class MusePrefs {
   static final delayHistory = PreferencesNotifier.create<String, String>("muse_delay_history", "");
 
   // ---- 外观
-  static final accent = PreferencesNotifier.create<String, String>("muse_accent", "blue");
+  /// 主题色: a MuseAccent key (1.6.2 default 景泰蓝; 1.6.1-and-earlier keys such as "blue" still
+  /// read as their new preset) or a custom "#RRGGBB"
+  static final accent = PreferencesNotifier.create<String, String>("muse_accent", museDefaultAccent);
 
   /// 1.6.1 配色风格 (MuseColorStyle key): how the Material 3 scheme is derived from 主题色
   static final colorStyle = PreferencesNotifier.create<String, String>("muse_color_style", "tonalSpot");
@@ -228,6 +230,9 @@ abstract final class MusePrefs {
 }
 
 /// 1.6.0 C7 文字缩放 range (percent).
+/// 1.6.2: the default 主题色 key (景泰蓝, MuseAccent.jingtailan).
+const museDefaultAccent = 'jingtailan';
+
 const museTextScaleMin = 80;
 const museTextScaleMax = 140;
 const museTextScaleStep = 5;

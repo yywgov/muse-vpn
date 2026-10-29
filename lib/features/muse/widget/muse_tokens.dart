@@ -218,29 +218,51 @@ abstract final class MuseSize {
   static const badge = 20.0;
 }
 
-/// 1.4.0: accent colours to pick from (one at a time; brand blue by default).
-/// 1.6.0 C7: more presets, plus any custom colour stored as "#RRGGBB" in the same preference.
+/// 1.4.0: accent colours to pick from (one at a time). 1.6.0 C7: plus any custom colour stored
+/// as "#RRGGBB" in the same preference. 1.6.2: ten Chinese traditional colours, 景泰蓝 by default.
+/// [color] is the colour itself (the swatch and the seed of the colour scheme); [brand] / [light]
+/// / [deep] are derived from it and keep white text readable (see [museAccentColors]).
 enum MuseAccent {
-  blue('blue', '蓝', Color(0xFF2F6BFF), Color(0xFF5A8BFF), Color(0xFF1E4FD8)),
-  green('green', '绿', Color(0xFF16A34A), Color(0xFF3DBE6C), Color(0xFF0F7A37)),
-  purple('purple', '紫', Color(0xFF7C3AED), Color(0xFF9B67F2), Color(0xFF5B21B6)),
-  teal('teal', '青', Color(0xFF0D9488), Color(0xFF2DB3A6), Color(0xFF0B6F66)),
-  indigo('indigo', '靛', Color(0xFF4F46E5), Color(0xFF7069EE), Color(0xFF3730A3)),
-  pink('pink', '粉', Color(0xFFDB2777), Color(0xFFE85497), Color(0xFFA31C59)),
-  orange('orange', '橙', Color(0xFFD9480F), Color(0xFFE8703F), Color(0xFFA8370B));
+  jingtailan('jingtailan', '景泰蓝', Color(0xFF2775B6)),
+  pielan('pielan', '苤蓝', Color(0xFF6B798E)),
+  zhuqing('zhuqing', '竹青', Color(0xFF789262)),
+  yuebai('yuebai', '月白', Color(0xFFD6ECF0)),
+  cangyinghui('cangyinghui', '苍蝇灰', Color(0xFF36282B)),
+  zhujin('zhujin', '朱瑾', Color(0xFFC41E3A)),
+  tenghuang('tenghuang', '藤黄', Color(0xFFFFB61E)),
+  qingbi('qingbi', '青碧', Color(0xFF48C0A3)),
+  dingxiang('dingxiang', '丁香', Color(0xFFCCA4E3)),
+  zheshi('zheshi', '赭石', Color(0xFF845A33));
 
-  const MuseAccent(this.key, this.title, this.brand, this.light, this.deep);
+  const MuseAccent(this.key, this.title, this.color);
 
   final String key;
   final String title;
-  final Color brand;
-  final Color light;
-  final Color deep;
+  final Color color;
 
-  static MuseAccent fromKey(String key) => values.where((e) => e.key == key).firstOrNull ?? blue;
+  Color get brand => museAccentColors(key).brand;
+  Color get light => museAccentColors(key).light;
+  Color get deep => museAccentColors(key).deep;
 
-  /// The preset for [key], or null when it is a custom colour / unknown.
-  static MuseAccent? presetOrNull(String key) => values.where((e) => e.key == key).firstOrNull;
+  /// The default (景泰蓝).
+  static const fallback = jingtailan;
+
+  /// 1.6.2: keys saved by 1.4.0–1.6.1 (and still synced from an older device) → the new preset.
+  static const legacy = <String, MuseAccent>{
+    'blue': jingtailan,
+    'green': zhuqing,
+    'teal': qingbi,
+    'purple': dingxiang,
+    'indigo': pielan,
+    'pink': zhujin,
+    'orange': tenghuang,
+  };
+
+  static MuseAccent fromKey(String key) => presetOrNull(key) ?? fallback;
+
+  /// The preset for [key] (a current or a 1.6.1-and-earlier key), or null when it is a custom
+  /// colour / unknown.
+  static MuseAccent? presetOrNull(String key) => values.where((e) => e.key == key).firstOrNull ?? legacy[key];
 }
 
 /// 1.6.0 C7: how many custom colours are kept.
@@ -264,27 +286,36 @@ String museHexOf(Color c) => '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).pad
 
 double _contrastWithWhite(Color c) => 1.05 / (c.computeLuminance() + 0.05);
 
-/// brand / light / deep for a preference value: a preset key or a custom "#RRGGBB". A custom
-/// colour too light for white text is darkened just enough to stay readable.
-({Color brand, Color light, Color deep}) museAccentColors(String key) {
-  final preset = MuseAccent.presetOrNull(key);
-  if (preset != null) return (brand: preset.brand, light: preset.light, deep: preset.deep);
-  final custom = museParseHexColor(key);
-  if (custom == null) {
-    const b = MuseAccent.blue;
-    return (brand: b.brand, light: b.light, deep: b.deep);
-  }
-  var hsl = HSLColor.fromColor(custom);
+/// 1.6.2: text / icons drawn straight on [c] (a swatch, a filled chip): white while it stays
+/// readable (≥ [museAccentMinContrast]), otherwise near-black ink.
+Color museOnColor(Color c) => _contrastWithWhite(c) >= museAccentMinContrast ? MusePalette.white : MusePalette.ink;
+
+typedef MuseAccentColors = ({Color seed, Color brand, Color light, Color deep});
+
+final _accentCache = <String, MuseAccentColors>{};
+
+/// seed / brand / light / deep for a preference value: a preset key (old 1.6.1 keys map to the
+/// new presets) or a custom "#RRGGBB"; anything else is 景泰蓝. [seed] is the colour itself (the
+/// colour scheme is derived from it); [brand] is darkened just enough for white text, so light
+/// colours such as 月白 / 藤黄 / 丁香 stay readable. Computed once per value and cached.
+MuseAccentColors museAccentColors(String key) {
+  final hit = _accentCache[key];
+  if (hit != null) return hit;
+  final seed = MuseAccent.presetOrNull(key)?.color ?? museParseHexColor(key) ?? MuseAccent.fallback.color;
+  var hsl = HSLColor.fromColor(seed);
   var guard = 0;
-  while (_contrastWithWhite(hsl.toColor()) < museAccentMinContrast && hsl.lightness > 0.05 && guard++ < 40) {
+  while (_contrastWithWhite(hsl.toColor()) < museAccentMinContrast && hsl.lightness > 0.05 && guard++ < 50) {
     hsl = hsl.withLightness((hsl.lightness - 0.02).clamp(0.0, 1.0));
   }
-  final brand = hsl.toColor();
-  return (
+  final brand = hsl.lightness == HSLColor.fromColor(seed).lightness ? seed : hsl.toColor();
+  final out = (
+    seed: seed,
     brand: brand,
     light: hsl.withLightness((hsl.lightness + 0.1).clamp(0.0, 0.9)).toColor(),
     deep: hsl.withLightness((hsl.lightness - 0.12).clamp(0.05, 1.0)).toColor(),
   );
+  if (_accentCache.length > 32) _accentCache.clear();
+  return _accentCache[key] = out;
 }
 
 /// Saved custom colours ("#RRGGBB,#RRGGBB"), valid ones only, no duplicates, newest first.
@@ -316,6 +347,7 @@ String museRemoveCustomAccent(String raw, String hex) =>
 /// before building the app).
 void museApplyAccent(String key) {
   final c = museAccentColors(key);
+  MusePalette.seed = c.seed;
   MusePalette.brand = c.brand;
   MusePalette.brandLight = c.light;
   MusePalette.brandDeep = c.deep;
@@ -333,11 +365,13 @@ Color museBrandOf(BuildContext context) => Theme.of(context).colorScheme.primary
 
 /// Fixed palette. Brand blue only for primary actions and selected state; one value per status.
 abstract final class MusePalette {
-  // 1.4.0: the accent can be 蓝 (default) / 绿 / 紫 (设置 › 外观); set by museApplyAccent before
-  // the app builds, and the app is rebuilt when it changes.
-  static Color brand = MuseAccent.blue.brand;
-  static Color brandLight = MuseAccent.blue.light;
-  static Color brandDeep = MuseAccent.blue.deep;
+  // 1.4.0: the accent picked in 设置 › 外观 (1.6.2: 景泰蓝 by default); set by museApplyAccent
+  // before the app builds, and the app is rebuilt when it changes.
+  /// 1.6.2: the accent colour itself — the seed of the Material 3 colour scheme.
+  static Color seed = MuseAccent.fallback.color;
+  static Color brand = MuseAccent.fallback.brand;
+  static Color brandLight = MuseAccent.fallback.light;
+  static Color brandDeep = MuseAccent.fallback.deep;
 
   /// 1.6.0 C7: dark theme on true black (set by museApplyPureBlack before the app builds).
   static bool pureBlack = false;
@@ -345,9 +379,12 @@ abstract final class MusePalette {
   /// 1.6.1: 配色风格 key (set by museApplyColorStyle before the app builds).
   static String colorStyle = 'tonalSpot';
 
-  static const green = Color(0xFF22C55E);
-  static const orange = Color(0xFFF59E0B);
-  static const red = Color(0xFFEF4444);
+  // 1.6.2: status lights in Chinese traditional colours (never follow 主题色):
+  // 葱青 ok / 杏黄 warning / 朱砂 error / 墨灰 idle (未测试、未连接)
+  static const green = museStatusGreen;
+  static const orange = museStatusYellow;
+  static const red = museStatusRed;
+  static const grey = museStatusGrey;
   static const star = Color(0xFFFFB300);
 
   // light
@@ -389,6 +426,9 @@ abstract final class MusePalette {
 
   static const white = Color(0xFFFFFFFF);
   static const black = Color(0xFF000000);
+
+  /// 1.6.2: text on a light accent swatch (月白 / 藤黄 / 丁香)
+  static const ink = Color(0xFF1B1B1F);
   static const transparent = Color(0x00000000);
 }
 

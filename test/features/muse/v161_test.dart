@@ -66,7 +66,7 @@ class _ThemeProbe extends ConsumerWidget {
 
 void main() {
   tearDown(() {
-    museApplyAccent('blue');
+    museApplyAccent(museDefaultAccent);
     museApplyColorStyle('tonalSpot');
   });
 
