@@ -100,6 +100,17 @@ class MuseHomePage extends HookConsumerWidget {
     return MuseScaffold(
       large: true,
       title: Constants.appName,
+      // 1.6.3: a visible way into the tile editor (long-press on a tile still works)
+      actions: [
+        if (hasProfile == true)
+          IconButton(
+            key: const ValueKey('home_edit_button'),
+            tooltip: '编辑首页',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () => showMuseTileEditor(context),
+          ),
+        SizedBox(width: MuseSpace.page(context) - MuseSpace.s8),
+      ],
       body: LayoutBuilder(
         builder: (context, constraints) {
           final dashboard = _Dashboard(hasProfile: hasProfile);
@@ -156,10 +167,21 @@ class _Dashboard extends ConsumerWidget {
         key: const ValueKey('home_dashboard'),
         padding: EdgeInsets.fromLTRB(margin, MuseSpace.s4, margin, museScrollEndGap(context)),
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-        children: const [
-          MuseHeroCard(),
-          SizedBox(height: MuseSpace.s12),
-          MuseTileGrid(),
+        children: [
+          const MuseHeroCard(),
+          const SizedBox(height: MuseSpace.s12),
+          const MuseTileGrid(),
+          const SizedBox(height: MuseSpace.s8),
+          // 1.6.3: the editor at the end of the tiles too
+          Center(
+            child: TextButton.icon(
+              key: const ValueKey('home_edit_tiles'),
+              style: TextButton.styleFrom(foregroundColor: museBrandOf(context), shape: MuseShape.full),
+              onPressed: () => showMuseTileEditor(context),
+              icon: const Icon(Icons.dashboard_customize_outlined, size: MuseIconSize.small),
+              label: const Text('编辑首页'),
+            ),
+          ),
         ],
       ),
     );
@@ -1219,7 +1241,7 @@ class _SessionSheet extends ConsumerWidget {
   }
 }
 
-/// Long-press a tile: drag to reorder, switch to show / hide.
+/// 编辑首页 (top bar / end of the tiles) or long-press a tile: drag to reorder, switch to show / hide.
 Future<void> showMuseTileEditor(BuildContext context) => showModalBottomSheet<void>(
   context: context,
   showDragHandle: true,
@@ -1250,6 +1272,14 @@ class _TileEditor extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(MuseSpace.s24, 0, MuseSpace.s24, MuseSpace.s8),
             child: Text('首页卡片', style: MuseType.title(context)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(MuseSpace.s24, 0, MuseSpace.s24, MuseSpace.s8),
+            child: Text(
+              '打开开关显示卡片，关闭隐藏；按住左侧把手拖动排序',
+              key: const ValueKey('tile_editor_hint'),
+              style: MuseType.caption(context).copyWith(color: mt.text2),
+            ),
           ),
           Flexible(
             child: ReorderableListView(
