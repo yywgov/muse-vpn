@@ -14,9 +14,20 @@ import java.security.SecureRandom
 object GrpcAuth {
     const val HEADER = "x-muse-token"
 
-    val token: String by lazy {
+    private val own: String by lazy {
+        // 穿云 1.7.0: a 兼容内核 connection outlived the previous app process: keep its token
+        com.hiddify.hiddify.bg.CompatState.runningToken()?.let { return@lazy it }
         val bytes = ByteArray(32)
         SecureRandom().nextBytes(bytes)
         bytes.joinToString("") { "%02x".format(it) }
     }
+
+    /**
+     * 穿云 1.7.0: the 兼容内核 process (:compat) uses the app process's token, handed over in its
+     * start intent, so the app reaches either core with the one token it already has.
+     */
+    @Volatile
+    var override: String? = null
+
+    val token: String get() = override ?: own
 }

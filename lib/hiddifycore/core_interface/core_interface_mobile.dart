@@ -104,7 +104,7 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
   }
 
   @override
-  Future<CoreStatus> setupBackground(String path, String name) async {
+  Future<CoreStatus> setupBackground(String path, String name, {Map<String, Object> extras = const {}}) async {
     // if (!await waitUntilPort(portBack, false, stop)) return const CoreStatus.stopped(alert: CoreAlert.createService);
     if (!await stop()) return const CoreStatus.stopped(alert: CoreAlert.createService);
     _status.clean();
@@ -114,6 +114,8 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
       "grpcPort": portBack,
       "startBg": true,
       "debug": _debug,
+      // 穿云 1.7.0: 内核 choice (+ what 兼容内核 needs), read again at every connect
+      ...extras,
     });
 
     _isBgClientAvailable = true;

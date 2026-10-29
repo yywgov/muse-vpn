@@ -22,6 +22,10 @@ class Application : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // 穿云 1.7.0: the 兼容内核 process loads only its own core; the standard core's runtime,
+        // the package receiver and the clean-up (which writes preferences) stay in the app process.
+        if (com.hiddify.hiddify.bg.ChuanyunProcess.isCompat) return
+
         Seq.setContext(this)
 
         registerReceiver(AppChangeReceiver(), IntentFilter().apply {

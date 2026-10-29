@@ -39,7 +39,74 @@ jobs:
             { echo '```'; cat osv.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  # 穿云 1.7.0: 兼容内核 for Android (libmusecompat.so, arm64-v8a) from the core repository's source at
+  # the commit pinned in dependencies.properties (muse.compat.ref) — NDK cross-build like the core
+  # repository's own CI. Loaded only in the app's :compat process. No core release is involved.
+  compat-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: dependencies.properties
+          sparse-checkout-cone-mode: false
+
+      - name: Pinned core commit
+        id: ref
+        run: |
+          ref=$(sed -n 's/^muse\.compat\.ref=\([0-9a-f]\{40\}\)$/\1/p' dependencies.properties)
+          [ -n "$ref" ] || { echo "::error::dependencies.properties needs muse.compat.ref=<40-hex commit>"; exit 1; }
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          repository: yywgov/muse-core
+          ref: ${{ steps.ref.outputs.ref }}
+          path: core
+          submodules: false
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/mihomo/go.mod
+          cache-dependency-path: core/mihomo/go.sum
+          check-latest: false
+
+      - name: Build libmusecompat.so (arm64-v8a)
+        working-directory: core/mihomo
+        run: |
+          test -f android/main.go || { echo "::error::core ${{ steps.ref.outputs.ref }} has no mihomo/android (needs a2c6e7d or later)"; exit 1; }
+          tags=$(sed -n 's/^  MIHOMO_TAGS: \(.*\)$/\1/p' ../.github/workflows/mihomo.yml)
+          ver=$(sed -n 's/^  MIHOMO_VERSION: \(.*\)$/\1/p' ../.github/workflows/mihomo.yml)
+          echo "tags=$tags version=$ver"
+          [ -n "$tags" ] && [ -n "$ver" ] || { echo "::error::could not read the build tags"; exit 1; }
+          ndk="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          echo "NDK: $ndk"
+          export CGO_ENABLED=1 GOOS=android GOARCH=arm64
+          export CC="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          go build -buildmode=c-shared -trimpath -tags "$tags" \
+            -ldflags "-s -w -buildid= -X github.com/metacubex/mihomo/constant.Version=$ver" \
+            -o "$GITHUB_WORKSPACE/out/libmusecompat.so" ./android
+          rm -f "$GITHUB_WORKSPACE/out/libmusecompat.h"
+
+      - name: Check JNI exports and record size
+        working-directory: out
+        run: |
+          ndk="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D --defined-only libmusecompat.so | grep -E 'Java_' | tee /tmp/syms.txt
+          for f in nativeSetup nativeSetTunFd nativeStop nativeVersion; do
+            grep -q "Java_com_hiddify_hiddify_bg_CompatCore_$f" /tmp/syms.txt || { echo "::error::libmusecompat.so does not export $f"; exit 1; }
+          done
+          b=$(stat -c %s libmusecompat.so); g=$(gzip -9 -c libmusecompat.so | wc -c)
+          echo "### libmusecompat.so (arm64): $b bytes, gzip $g bytes (core ${{ steps.ref.outputs.ref }})" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: muse-compat-android
+          path: out/libmusecompat.so
+          retention-days: 3
+
   apk:
+    needs: compat-core
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -94,6 +161,16 @@ jobs:
       - name: Prepare (codegen + prebuilt core)
         run: make android-prepare
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: muse-compat-android
+          path: android/app/src/main/jniLibs/arm64-v8a
+
+      - name: 兼容内核 library present
+        run: |
+          ls -la android/app/src/main/jniLibs/arm64-v8a
+          test -s android/app/src/main/jniLibs/arm64-v8a/libmusecompat.so || { echo "missing libmusecompat.so"; exit 1; }
+
       # 穿云 1.1: no warnings in lib, and the unit tests for the 穿云 logic must pass
       - name: Analyze + unit tests
         run: |
@@ -112,6 +189,9 @@ jobs:
             echo "arm64 APK not found"; ls -R build/app/outputs; exit 1
           fi
           cp "$apk" out/Chuanyun-Android-arm64.apk
+          # 1.7.0: 兼容内核 must be inside, next to the standard core
+          unzip -l out/Chuanyun-Android-arm64.apk | tee /tmp/apk.txt | grep -E 'lib/arm64-v8a/.*\.so$' || true
+          grep -q 'lib/arm64-v8a/libmusecompat.so' /tmp/apk.txt || { echo "::error::libmusecompat.so is not in the APK"; exit 1; }
           # 1.5.0 #219: APK size recorded on every run; 1.4.1 was 45.4 MB. Warn past 60 MB, fail past 80 MB
           size=$(stat -c %s out/Chuanyun-Android-arm64.apk)
           mb=$(awk "BEGIN{printf \"%.1f\", $size/1048576}")

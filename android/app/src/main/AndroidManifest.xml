@@ -175,6 +175,30 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="proxy" />
         </service>
+        <!-- 穿云 1.7.0: 兼容内核 runs in its own process, so its runtime never shares one with the
+             standard core. Only started when 兼容内核 is chosen. -->
+        <service
+            android:name=".bg.CompatVpnService"
+            android:exported="false"
+            android:process=":compat"
+            android:foregroundServiceType="specialUse"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="vpn" />
+        </service>
+        <service
+            android:name=".bg.CompatProxyService"
+            android:exported="false"
+            android:process=":compat"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="proxy" />
+        </service>
         <receiver
             android:name=".bg.BootReceiver"
             android:enabled="true"

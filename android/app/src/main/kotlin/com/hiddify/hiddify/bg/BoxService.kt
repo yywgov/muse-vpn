@@ -95,7 +95,7 @@ class BoxService(
         fun start() {
             val intent = runBlocking {
                 withContext(Dispatchers.IO) {
-                    Intent(Application.application, Settings.serviceClass())
+                    Settings.serviceIntent(Application.application)
                 }
             }
             ContextCompat.startForegroundService(Application.application, intent)

@@ -10,7 +10,9 @@ import 'package:hiddify/core/logger/core_logger.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/log/model/log_level.dart' as config_log_level;
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
+import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper_stub.dart'
     if (dart.library.io) 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper.dart';
@@ -19,6 +21,7 @@ import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore_service.pbgrpc.dart';
 import 'package:hiddify/hiddifycore/init_signal.dart';
 import 'package:hiddify/singbox/model/core_status.dart';
+import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/singbox/model/singbox_config_option.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -224,7 +227,16 @@ class HiddifyCoreService with InfraLogger {
       loggy.debug("starting");
       // 穿云 Windows: remember the user's own proxy settings before sing-box replaces them
       if (PlatformUtils.isWindows) await WindowsProxyGuard.saveBeforeConnect(ref.read(ConfigOptions.mixedPort));
-      final background = await core.setupBackground(path, name);
+      final background = await core.setupBackground(
+        path,
+        name,
+        extras: PlatformUtils.isAndroid
+            ? museAndroidStartExtras(
+                kind: MuseCoreKind.fromKey(ref.read(MusePrefs.coreKind)),
+                ipv6: ref.read(ConfigOptions.ipv6Mode) != IPv6Mode.disable,
+              )
+            : const {},
+      );
       if (background != const CoreStatus.started()) {
         statusController.add(currentState = const CoreStatus.stopped());
         return left(background.getCoreAlert() ?? const ConnectionFailure.unexpected("failed to start core"));

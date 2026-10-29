@@ -64,6 +64,8 @@ object ChuanyunLabels {
 
     /** Screen-off: the core tests nodes every 15 minutes; screen-on: re-tests at once. */
     fun screenChanged(on: Boolean) {
+        // 穿云 1.7.0: the standard core's library must never load in the 兼容内核 process
+        if (ChuanyunProcess.isCompat) return
         try {
             if (on) Mobile.screenOn() else Mobile.screenOff()
         } catch (e: Throwable) {

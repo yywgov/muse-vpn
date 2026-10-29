@@ -10,7 +10,8 @@ class CoreInterface {
     return "";
   }
 
-  Future<CoreStatus> setupBackground(String path, String name) async {
+  /// [extras]: what the platform service needs besides the profile (Android: the 内核 choice).
+  Future<CoreStatus> setupBackground(String path, String name, {Map<String, Object> extras = const {}}) async {
     return const CoreStarted();
   }
 

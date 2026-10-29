@@ -126,6 +126,9 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
                         Settings.activeProfileName = args["name"] as String? ?: ""
                         Settings.debugMode = args["debug"] as Boolean? ?: false
                         Settings.grpcServiceModePort = args["grpcPort"] as Int
+                        // 穿云 1.7.0: the app's 内核 choice and what 兼容内核 needs to build its TUN
+                        (args["coreKind"] as String?)?.let { Settings.coreKindFromApp = it }
+                        (args["ipv6"] as Boolean?)?.let { com.hiddify.hiddify.bg.CompatLaunch.ipv6FromApp = it }
 
                         val mainActivity = MainActivity.instance
 //                        val started = mainActivity.serviceStatus.value == Status.Started

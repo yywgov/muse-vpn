@@ -43,6 +43,22 @@ abstract final class MuseCoreSelection {
   static void init(Object? key) => _startup = MuseCoreKind.fromKey(key);
 }
 
+/// Android: what the app hands the platform side with every connect. `coreKind` picks the service
+/// (兼容内核 runs in its own process; a build without its library keeps the standard core), and
+/// `ipv6` tells 兼容内核's VPN service whether to route IPv6 into its TUN (the standard core takes
+/// that from its own configuration and ignores it).
+Map<String, Object> museAndroidStartExtras({required MuseCoreKind kind, required bool ipv6}) => {
+  'coreKind': kind.key,
+  'ipv6': ipv6,
+};
+
+/// Android: port of the background core's control service. Both cores' services listen there
+/// (兼容内核 in its own process), so the app's background client never changes.
+const museAndroidBackgroundPort = 17079;
+
+/// Android library of 兼容内核 (arm64-v8a, built by the client CI from the pinned core source).
+const museCompatAndroidLibrary = 'libmusecompat.so';
+
 /// Windows library of 兼容内核 (next to the app; same C functions as the standard core's library).
 const museCompatLibrary = 'muse-compat.dll';
 

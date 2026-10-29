@@ -71,7 +71,7 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
                     return@launch
                 }
             }
-            val intent = Intent(Application.application, Settings.serviceClass())
+            val intent = Settings.serviceIntent(Application.application, startCore = false)
             withContext(Dispatchers.Main) {
                 ContextCompat.startForegroundService(this@MainActivity, intent)
             }

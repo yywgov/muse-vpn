@@ -2,6 +2,10 @@ package com.hiddify.hiddify
 
 import android.content.Context
 import android.util.Base64
+import com.hiddify.hiddify.bg.ChuanyunProcess
+import com.hiddify.hiddify.bg.CompatProxyService
+import com.hiddify.hiddify.bg.CompatVpnService
+import com.hiddify.hiddify.bg.NoopEditor
 import com.hiddify.hiddify.bg.ProxyService
 import com.hiddify.hiddify.bg.VPNService
 import com.hiddify.hiddify.constant.PerAppProxyMode
@@ -20,21 +24,34 @@ object Settings {
         context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
     }
 
+    /**
+     * 穿云 1.7.0: the 兼容内核 process (:compat) never writes these preferences. Its in-memory copy
+     * of the file is stale (the app process owns it), and a write there would put that whole stale
+     * copy back over the user's settings. The values it needs come with its start intent instead.
+     */
+    private fun edit(): android.content.SharedPreferences.Editor =
+        if (ChuanyunProcess.isCompat) NoopEditor else preferences.edit()
+
+    /** Set in the :compat process from its start intent; read first by the getters it uses. */
+    @Volatile
+    var compatLaunch: com.hiddify.hiddify.bg.CompatLaunch? = null
+
     private const val LIST_IDENTIFIER = "VGhpcyBpcyB0aGUgcHJlZml4IGZvciBhIGxpc3Qu"
 
     var perAppProxyMode: String
-        get() = preferences.getString(SettingsKey.PER_APP_PROXY_MODE, PerAppProxyMode.EXCLUDE)!!
-        set(value) = preferences.edit().putString(SettingsKey.PER_APP_PROXY_MODE, value).apply()
+        get() = compatLaunch?.perAppMode ?: preferences.getString(SettingsKey.PER_APP_PROXY_MODE, PerAppProxyMode.EXCLUDE)!!
+        set(value) = edit().putString(SettingsKey.PER_APP_PROXY_MODE, value).apply()
 
     // Older versions saved it as the mode's "off". The tile can start the VPN before the app moves it.
     val perAppProxyEnabled: Boolean
-        get() = preferences.getBoolean(
+        get() = compatLaunch?.perAppEnabled ?: preferences.getBoolean(
             SettingsKey.PER_APP_PROXY_ENABLED,
             preferences.getString(SettingsKey.PER_APP_PROXY_MODE, PerAppProxyMode.OFF) != PerAppProxyMode.OFF
         )
 
     val perAppProxyList: List<String>
         get() {
+            compatLaunch?.let { return it.perAppList }
             val stringValue = if (perAppProxyMode == PerAppProxyMode.INCLUDE) {
                 preferences.getString(SettingsKey.PER_APP_PROXY_INCLUDE_LIST, "")!!
             } else {
@@ -56,64 +73,93 @@ object Settings {
     }
 
     var activeConfigPath: String
-        get() = preferences.getString(SettingsKey.ACTIVE_CONFIG_PATH, "")!!
-        set(value) = preferences.edit().putString(SettingsKey.ACTIVE_CONFIG_PATH, value).apply()
+        get() = compatLaunch?.configPath ?: preferences.getString(SettingsKey.ACTIVE_CONFIG_PATH, "")!!
+        set(value) = edit().putString(SettingsKey.ACTIVE_CONFIG_PATH, value).apply()
 
     var activeProfileName: String
-        get() = preferences.getString(SettingsKey.ACTIVE_PROFILE_NAME, "")!!
-        set(value) = preferences.edit().putString(SettingsKey.ACTIVE_PROFILE_NAME, value).apply()
+        get() = compatLaunch?.profileName ?: preferences.getString(SettingsKey.ACTIVE_PROFILE_NAME, "")!!
+        set(value) = edit().putString(SettingsKey.ACTIVE_PROFILE_NAME, value).apply()
 
     var serviceMode: String
         get() = preferences.getString(SettingsKey.SERVICE_MODE, ServiceMode.VPN)!!
-        set(value) = preferences.edit().putString(SettingsKey.SERVICE_MODE, value).apply()
+        set(value) = edit().putString(SettingsKey.SERVICE_MODE, value).apply()
 
     var configOptions: String
         get() = preferences.getString(SettingsKey.CONFIG_OPTIONS, "")!!
-        set(value) = preferences.edit().putString(SettingsKey.CONFIG_OPTIONS, value).apply()
+        set(value) = edit().putString(SettingsKey.CONFIG_OPTIONS, value).apply()
 
     var debugMode: Boolean
-        get() = preferences.getBoolean(SettingsKey.DEBUG_MODE, false)
-        set(value) = preferences.edit().putBoolean(SettingsKey.DEBUG_MODE, value).apply()
+        get() = compatLaunch?.debug ?: preferences.getBoolean(SettingsKey.DEBUG_MODE, false)
+        set(value) = edit().putBoolean(SettingsKey.DEBUG_MODE, value).apply()
 
     var disableMemoryLimit: Boolean
         get() = preferences.getBoolean(SettingsKey.DISABLE_MEMORY_LIMIT, false)
         set(value) =
-            preferences.edit().putBoolean(SettingsKey.DISABLE_MEMORY_LIMIT, value).apply()
+            edit().putBoolean(SettingsKey.DISABLE_MEMORY_LIMIT, value).apply()
 
     var dynamicNotification: Boolean
         get() = preferences.getBoolean(SettingsKey.DYNAMIC_NOTIFICATION, true)
         set(value) =
-            preferences.edit().putBoolean(SettingsKey.DYNAMIC_NOTIFICATION, value).apply()
+            edit().putBoolean(SettingsKey.DYNAMIC_NOTIFICATION, value).apply()
 
     var systemProxyEnabled: Boolean
         get() = preferences.getBoolean(SettingsKey.SYSTEM_PROXY_ENABLED, true)
         set(value) =
-            preferences.edit().putBoolean(SettingsKey.SYSTEM_PROXY_ENABLED, value).apply()
+            edit().putBoolean(SettingsKey.SYSTEM_PROXY_ENABLED, value).apply()
 
     val hideNotification: Boolean
-        get() = preferences.getBoolean(SettingsKey.HIDE_NOTIFICATION, false)
+        get() = compatLaunch?.hideNotification ?: preferences.getBoolean(SettingsKey.HIDE_NOTIFICATION, false)
 
     val excludeFromRecents: Boolean
         get() = preferences.getBoolean(SettingsKey.EXCLUDE_FROM_RECENTS, false)
 
     /** 穿云 1.6.0 C9: 通知栏「断开」按钮 (read when the notification is built, i.e. per connection). */
     val notifyStopButton: Boolean
-        get() = preferences.getBoolean(SettingsKey.NOTIFY_STOP_BUTTON, true)
+        get() = compatLaunch?.notifyStopButton ?: preferences.getBoolean(SettingsKey.NOTIFY_STOP_BUTTON, true)
 
     /** 穿云: wall-clock millis when the tunnel last came up; 0 while stopped. */
     var connectedSince: Long
-        get() = preferences.getLong(SettingsKey.CONNECTED_SINCE, 0L)
-        set(value) = preferences.edit().putLong(SettingsKey.CONNECTED_SINCE, value).apply()
+        get() = com.hiddify.hiddify.bg.CompatState.connectedSince() ?: preferences.getLong(SettingsKey.CONNECTED_SINCE, 0L)
+        set(value) = edit().putLong(SettingsKey.CONNECTED_SINCE, value).apply()
 
     var startedByUser: Boolean
-        get() = preferences.getBoolean(SettingsKey.STARTED_BY_USER, false)
-        set(value) = preferences.edit().putBoolean(SettingsKey.STARTED_BY_USER, value).apply()
+        get() = preferences.getBoolean(SettingsKey.STARTED_BY_USER, false) && !com.hiddify.hiddify.bg.CompatState.stoppedByUser()
+        set(value) = edit().putBoolean(SettingsKey.STARTED_BY_USER, value).apply()
+
+    /**
+     * 穿云 1.7.0: 内核 chosen in the app (muse_core_kind). The app passes it with every connect
+     * ([coreKindFromApp]); the tile / boot / shortcut paths read the saved preference.
+     */
+    @Volatile
+    var coreKindFromApp: String? = null
+
+    val coreKind: String
+        get() = coreKindFromApp ?: preferences.getString(SettingsKey.CORE_KIND, "standard") ?: "standard"
+
+    /** 兼容内核 is used only when chosen and its library is in this build (else the standard core). */
+    val useCompatCore: Boolean
+        get() = coreKind == "compat" && com.hiddify.hiddify.bg.CompatLibrary.bundled
 
     fun serviceClass(): Class<*> {
+        val compat = useCompatCore
         return when (serviceMode) {
-            ServiceMode.VPN -> VPNService::class.java
-            else -> ProxyService::class.java
+            ServiceMode.VPN -> if (compat) CompatVpnService::class.java else VPNService::class.java
+            else -> if (compat) CompatProxyService::class.java else ProxyService::class.java
         }
+    }
+
+    /**
+     * The intent that starts the chosen service. 兼容内核 runs in its own process, which gets
+     * everything it needs from the app process here (see [CompatLaunch]).
+     */
+    fun serviceIntent(context: Context, startCore: Boolean = startCoreAfterStartingService): android.content.Intent {
+        val cls = serviceClass()
+        com.hiddify.hiddify.bg.CompatState.clear()
+        val intent = android.content.Intent(context, cls)
+        if (cls == CompatVpnService::class.java || cls == CompatProxyService::class.java) {
+            com.hiddify.hiddify.bg.CompatLaunch.fromSettings(startCore).putInto(intent)
+        }
+        return intent
     }
 
     private var currentServiceMode : String? = null
@@ -126,6 +172,8 @@ object Settings {
             }
         } catch (_: Exception) {
         }
+        // 穿云 1.7.0: the bound service also changes with the core
+        newMode += if (useCompatCore) "+compat" else ""
         if (currentServiceMode == newMode) {
             return false
         }
@@ -148,15 +196,15 @@ object Settings {
     }
 
     var workingDir: String
-        get() = preferences.getString(SettingsKey.WORKING_DIR, "./")!!
-        set(value) = preferences.edit().putString(SettingsKey.WORKING_DIR, value).apply()
+        get() = compatLaunch?.workingDir ?: preferences.getString(SettingsKey.WORKING_DIR, "./")!!
+        set(value) = edit().putString(SettingsKey.WORKING_DIR, value).apply()
     var tempDir: String
-        get() = preferences.getString(SettingsKey.TMP_DIR, "./")!!
-        set(value) = preferences.edit().putString(SettingsKey.TMP_DIR, value).apply()
+        get() = compatLaunch?.tempDir ?: preferences.getString(SettingsKey.TMP_DIR, "./")!!
+        set(value) = edit().putString(SettingsKey.TMP_DIR, value).apply()
 
     var baseDir: String
-        get() = preferences.getString(SettingsKey.BASE_DIR, "./")!!
-        set(value) = preferences.edit().putString(SettingsKey.BASE_DIR, value).apply()
+        get() = compatLaunch?.baseDir ?: preferences.getString(SettingsKey.BASE_DIR, "./")!!
+        set(value) = edit().putString(SettingsKey.BASE_DIR, value).apply()
 
 
 
@@ -167,15 +215,15 @@ object Settings {
         }
         set(value) {
             val encoded = Base64.encodeToString(value, Base64.DEFAULT)
-            preferences.edit().putString(SettingsKey.GRPC_FLUTTER_PUBLIC_KEY, encoded).apply()
+            edit().putString(SettingsKey.GRPC_FLUTTER_PUBLIC_KEY, encoded).apply()
         }
     var grpcServiceModePort: Int
-        get() = preferences.getInt(SettingsKey.GRPC_PORT, 17078)!!
-        set(value) = preferences.edit().putInt(SettingsKey.GRPC_PORT, value).apply()
+        get() = compatLaunch?.grpcPort ?: preferences.getInt(SettingsKey.GRPC_PORT, 17078)!!
+        set(value) = edit().putInt(SettingsKey.GRPC_PORT, value).apply()
 
     var startCoreAfterStartingService: Boolean
         get() = preferences.getBoolean(SettingsKey.START_CORE_ON_STARTING_SERVICE, false)
-        set(value) = preferences.edit().putBoolean(SettingsKey.START_CORE_ON_STARTING_SERVICE, value).apply()
+        set(value) = edit().putBoolean(SettingsKey.START_CORE_ON_STARTING_SERVICE, value).apply()
 
 
 }
