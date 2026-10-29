@@ -7,6 +7,8 @@ package com.hiddify.hiddify.bg
 
 import android.content.Intent
 import com.hiddify.hiddify.Application
+import org.json.JSONArray
+import org.json.JSONObject
 import com.hiddify.hiddify.Settings
 import com.hiddify.hiddify.utils.GrpcAuth
 import java.io.File
@@ -46,6 +48,15 @@ data class CompatLaunch(
             .putExtra(K_HIDE, hideNotification)
             .putExtra(K_STOP_BUTTON, notifyStopButton)
     }
+
+    /** For the system's restart of this service after the process was killed (CompatState.saveLaunch). */
+    fun toJson(): String = JSONObject()
+        .put(K_TOKEN, token).put(K_PORT, grpcPort).put(K_PATH, configPath).put(K_NAME, profileName)
+        .put(K_BASE, baseDir).put(K_WORK, workingDir).put(K_TEMP, tempDir).put(K_DEBUG, debug)
+        .put(K_START, startCore).put(K_IPV6, ipv6).put(K_PER_APP, perAppEnabled)
+        .put(K_PER_APP_MODE, perAppMode).put(K_PER_APP_LIST, JSONArray(perAppList))
+        .put(K_HIDE, hideNotification).put(K_STOP_BUTTON, notifyStopButton)
+        .toString()
 
     companion object {
         private const val P = "com.chuanyun.compat."
@@ -91,6 +102,36 @@ data class CompatLaunch(
             notifyStopButton = Settings.notifyStopButton,
         )
 
+        /** The saved hand-over (toJson); null when missing, unreadable or without a token. */
+        fun fromJson(text: String?): CompatLaunch? = try {
+            val j = JSONObject(text ?: return null)
+            val token = j.optString(K_TOKEN)
+            if (token.isEmpty()) {
+                null
+            } else {
+                val apps = j.optJSONArray(K_PER_APP_LIST)
+                CompatLaunch(
+                    token = token,
+                    grpcPort = j.optInt(K_PORT, GRPC_PORT_BACK),
+                    configPath = j.optString(K_PATH),
+                    profileName = j.optString(K_NAME),
+                    baseDir = j.optString(K_BASE),
+                    workingDir = j.optString(K_WORK),
+                    tempDir = j.optString(K_TEMP),
+                    debug = j.optBoolean(K_DEBUG, false),
+                    startCore = j.optBoolean(K_START, false),
+                    ipv6 = j.optBoolean(K_IPV6, false),
+                    perAppEnabled = j.optBoolean(K_PER_APP, false),
+                    perAppMode = j.optString(K_PER_APP_MODE),
+                    perAppList = if (apps == null) emptyList() else List(apps.length()) { apps.optString(it) }.filter { it.isNotBlank() },
+                    hideNotification = j.optBoolean(K_HIDE, false),
+                    notifyStopButton = j.optBoolean(K_STOP_BUTTON, true),
+                )
+            }
+        } catch (_: Exception) {
+            null
+        }
+
         /** In the :compat process: null when the intent did not come from the app (no token). */
         fun from(intent: Intent?): CompatLaunch? {
             intent ?: return null
@@ -128,6 +169,24 @@ object CompatState {
     private const val SINCE = "compat_connected_since"
     private const val STOPPED = "compat_stopped_by_user"
     private const val TOKEN = "compat_token"
+    private const val LAUNCH = "compat_launch"
+
+    /**
+     * The running connection's hand-over (app-private file), so that when the system kills the
+     * :compat process and re-creates the service (START_STICKY, no intent) the connection comes
+     * back by itself, like the standard service does. Removed when the user disconnects, the VPN
+     * permission is taken away, or a start fails; no timer or polling is involved.
+     */
+    fun saveLaunch(launch: CompatLaunch) = write(LAUNCH, launch.toJson())
+
+    fun savedLaunch(): CompatLaunch? = try {
+        val f = file(LAUNCH)
+        if (f.exists()) CompatLaunch.fromJson(f.readText()) else null
+    } catch (_: Exception) {
+        null
+    }
+
+    fun clearLaunch() = delete(LAUNCH)
 
     fun connectedSince(): Long? = try {
         val f = file(SINCE)
@@ -168,6 +227,7 @@ object CompatState {
         delete(SINCE)
         delete(STOPPED)
         delete(TOKEN)
+        delete(LAUNCH)
     }
 
     private fun write(name: String, text: String) {

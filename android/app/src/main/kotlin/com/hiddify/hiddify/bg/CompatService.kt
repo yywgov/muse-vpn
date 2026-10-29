@@ -50,6 +50,7 @@ class CompatService(
             if (intent.action == Action.SERVICE_CLOSE) {
                 DisconnectLog.record("断开（兼容内核）")
                 CompatState.markStoppedByUser()
+                CompatState.clearLaunch()
                 stopService()
             }
         }
@@ -57,13 +58,18 @@ class CompatService(
 
     @OptIn(DelicateCoroutinesApi::class)
     fun onStartCommand(intent: Intent?): Int {
-        if (status.value != Status.Stopped) return Service.START_NOT_STICKY
-        // Started by the system without the app's hand-over (e.g. after the process was killed):
-        // nothing to connect with, so stay stopped instead of guessing.
-        val launch = CompatLaunch.from(intent)
-        if (launch == null) {
-            service.stopSelf()
-            return Service.START_NOT_STICKY
+        if (status.value != Status.Stopped) return Service.START_STICKY
+        val launch = CompatLaunch.from(intent) ?: run {
+            // Re-created by the system after it killed the :compat process (START_STICKY): bring
+            // the connection back with the hand-over the last start saved, unless the user
+            // disconnected since. The core starts here, as no app may be around to do it.
+            val saved = if (CompatState.stoppedByUser()) null else CompatState.savedLaunch()
+            if (saved == null) {
+                service.stopSelf()
+                return Service.START_NOT_STICKY
+            }
+            DisconnectLog.record("兼容内核进程曾被系统结束，服务已被系统重新拉起，自动恢复连接")
+            saved.copy(startCore = true)
         }
         Settings.compatLaunch = launch
         GrpcAuth.override = launch.token
@@ -75,7 +81,8 @@ class CompatService(
             receiverRegistered = true
         }
         GlobalScope.launch(Dispatchers.IO) { start(launch) }
-        return Service.START_NOT_STICKY
+        // sticky: the system re-creates the service after killing the process (see above)
+        return Service.START_STICKY
     }
 
     private suspend fun start(launch: CompatLaunch) {
@@ -111,6 +118,7 @@ class CompatService(
             }
             status.postValue(Status.Started)
             CompatState.saveToken(launch.token)
+            CompatState.saveLaunch(launch)
             CompatState.markStarted(System.currentTimeMillis())
             DisconnectLog.record("VPN 服务已启动（兼容内核）")
             ChuanyunAlerts.cancel(ChuanyunAlerts.ID_DISCONNECTED)
@@ -124,6 +132,8 @@ class CompatService(
 
     private suspend fun stopAndAlert(type: Alert, message: String? = null) {
         DisconnectLog.record("启动失败（兼容内核）: ${type.name} ${message ?: ""}".trim())
+        // no retry loop: a failed start is not brought back by the system
+        CompatState.clearLaunch()
         releaseCore()
         withContext(Dispatchers.Main) {
             unregisterReceiver()
@@ -181,6 +191,7 @@ class CompatService(
     fun onRevoke() {
         DisconnectLog.record("VPN 权限被收回（兼容内核）")
         CompatState.markStoppedByUser()
+        CompatState.clearLaunch()
         stopService()
     }
 

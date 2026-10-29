@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/model/directories.dart';
+import 'package:hiddify/features/muse/logic/compat_profile.dart';
 import 'package:hiddify/features/muse/logic/connect_flow.dart';
+import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
@@ -38,7 +40,15 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
     required this.singbox,
     required this.configOptionRepository,
     required this.profilePathResolver,
-  });
+    MuseCoreKind Function()? coreKind,
+    this.compatStore = const MuseCompatProfileStore(),
+  }) : coreKind = coreKind ?? _standard;
+
+  static MuseCoreKind _standard() => MuseCoreKind.standard;
+
+  /// 穿云 1.7.0 M3-4: the core the next connection runs on (compat_profile.dart)
+  final MuseCoreKind Function() coreKind;
+  final MuseCompatProfileStore compatStore;
 
   final Ref ref;
 
@@ -90,7 +100,7 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
   @override
   TaskEither<ConnectionFailure, Unit> connect(ProfileEntity activeProfile, bool disableMemoryLimit) => setup().flatMap(
     // 穿云 1.5.0: check the config first; a sure failure names the setting instead of starting the core
-    (_) => precheck(activeProfile).flatMap((_) => applyConfigOption(activeProfile)).flatMap(
+    (_) => precheck(activeProfile).flatMap((_) => applyConfigOption(activeProfile)).flatMap((_) => prepareProfile(activeProfile)).flatMap(
       (_) => singbox.start(profilePathResolver.file(activeProfile.id).path, activeProfile.name, disableMemoryLimit),
       // .mapLeft(UnexpectedConnectionFailure.new),
     ),
@@ -101,12 +111,33 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
 
   @override
   TaskEither<ConnectionFailure, Unit> reconnect(ProfileEntity activeProfile, bool disableMemoryLimit) =>
-      applyConfigOption(activeProfile).flatMap(
+      applyConfigOption(activeProfile).flatMap((_) => prepareProfile(activeProfile)).flatMap(
         // hot reload when possible, restart otherwise
         (_) => singbox
             .reload(profilePathResolver.file(activeProfile.id).path, activeProfile.name, disableMemoryLimit)
             .mapLeft(UnexpectedConnectionFailure.new),
       );
+
+  /// 穿云 1.7.0 M3-4: the saved subscription in the form the core about to run reads: 标准内核
+  /// converts a body 兼容内核 kept as it came (keeping the original), 兼容内核 gets the original
+  /// back. A failed conversion leaves the profile unchanged and names the reason.
+  @visibleForTesting
+  TaskEither<ConnectionFailure, Unit> prepareProfile(ProfileEntity prof) => TaskEither(() async {
+    final file = File(profilePathResolver.file(prof.id).path);
+    try {
+      final error = await compatStore.prepare(
+        file,
+        coreKind(),
+        (bodyPath) async => (await singbox.validateConfigByPath(file.path, bodyPath, false).run()).fold((l) => l, (_) => null),
+      );
+      if (error == null) return right(unit);
+      loggy.warning("converting the subscription for the standard core failed: $error");
+      return left(ConnectionFailure.invalidConfig(error));
+    } catch (e) {
+      loggy.warning("preparing the profile for the core failed: $e");
+      return left(ConnectionFailure.unexpected(e));
+    }
+  });
 
   /// 穿云 1.5.0: [museConfigPrecheck] on the options the core is about to get.
   @visibleForTesting

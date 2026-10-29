@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/logic/compat_profile.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'dart:async';
 
@@ -173,7 +174,7 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
     if (!isBulk && !state.hasError) {
       try {
         final after = await _profilesRepo.getRawConfig(profile.id).getOrElse((_) => '').run();
-        final diff = museSubDiff(museConfigNodeNames(before), museConfigNodeNames(after));
+        final diff = museSubDiff(museProfileNodeNames(before), museProfileNodeNames(after));
         if (before.isNotEmpty && diff.changed) {
           ref.read(inAppNotificationControllerProvider).showInfoToast('${profile.name}：${diff.summary}');
         }

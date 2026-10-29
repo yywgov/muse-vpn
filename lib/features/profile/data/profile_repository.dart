@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
@@ -5,6 +7,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/db/db.dart';
 
 import 'package:hiddify/core/utils/exception_handler.dart';
+import 'package:hiddify/features/muse/logic/compat_profile.dart';
 import 'package:hiddify/features/profile/data/profile_data_mapper.dart';
 import 'package:hiddify/features/profile/data/profile_data_source.dart';
 import 'package:hiddify/features/profile/data/profile_parser.dart';
@@ -44,7 +47,13 @@ class ProfileRepositoryImpl with ExceptionHandler, InfraLogger implements Profil
     required HiddifyCoreService singbox,
     required ConfigOptionRepository configOptionRepository,
     required ProfileParser profileParser,
-  }) : _profileParser = profileParser,
+    // 穿云 1.7.0 M3-4: Android with 兼容内核 chosen saves subscriptions as they came
+    // (compat_profile.dart); everywhere else the core that is loaded checks and saves them.
+    bool Function()? compatSavesAsIs,
+    MuseCompatProfileStore compatStore = const MuseCompatProfileStore(),
+  }) : _compatSavesAsIs = compatSavesAsIs ?? _never,
+       _compatStore = compatStore,
+       _profileParser = profileParser,
        _configOptionRepo = configOptionRepository,
        _singbox = singbox,
        _profilePathResolver = profilePathResolver,
@@ -55,6 +64,10 @@ class ProfileRepositoryImpl with ExceptionHandler, InfraLogger implements Profil
   final HiddifyCoreService _singbox;
   final ConfigOptionRepository _configOptionRepo;
   final ProfileParser _profileParser;
+  final bool Function() _compatSavesAsIs;
+  final MuseCompatProfileStore _compatStore;
+
+  static bool _never() => false;
 
   @override
   TaskEither<ProfileFailure, Unit> init() {
@@ -98,6 +111,7 @@ class ProfileRepositoryImpl with ExceptionHandler, InfraLogger implements Profil
     return TaskEither.tryCatch(() async {
       await _profileDataSource.deleteById(id, isActive);
       await _profilePathResolver.file(id).delete();
+      await _compatStore.dropOriginal(_profilePathResolver.file(id));
       return unit;
     }, ProfileUnexpectedFailure.new);
   }
@@ -267,7 +281,28 @@ class ProfileRepositoryImpl with ExceptionHandler, InfraLogger implements Profil
       });
 
   @override
-  TaskEither<ProfileFailure, Unit> validateConfig(String path, String tempPath, String? profileOverride, bool debug) =>
+  TaskEither<ProfileFailure, Unit> validateConfig(String path, String tempPath, String? profileOverride, bool debug) {
+    if (_compatSavesAsIs()) {
+      // 兼容内核 (Android): kept exactly as downloaded when it reads that format natively
+      return TaskEither<ProfileFailure, String>.tryCatch(
+        () => File(tempPath).readAsString(),
+        ProfileFailure.unexpected,
+      ).flatMap((body) {
+        if (!museCompatReadsNatively(body)) return _coreValidate(path, tempPath, profileOverride, debug);
+        return TaskEither(() async {
+          final problem = await _compatStore.saveAsIs(File(path), body);
+          if (problem != null) return left(ProfileFailure.invalidConfig(problem));
+          loggy.info("subscription saved as it came (compat core)");
+          return right(unit);
+        });
+      });
+    }
+    return _coreValidate(path, tempPath, profileOverride, debug);
+  }
+
+  /// The loaded core checks the body and saves the profile (标准内核: its conversion; 兼容内核 on
+  /// Windows: the body as it came). A kept original is then older than the profile and dropped.
+  TaskEither<ProfileFailure, Unit> _coreValidate(String path, String tempPath, String? profileOverride, bool debug) =>
       TaskEither.fromEither(_configOptionRepo.fullOptionsOverrided(profileOverride))
           .mapLeft((configOptionFailure) => ProfileFailure.invalidConfig(null, configOptionFailure))
           .flatMap(
@@ -277,6 +312,12 @@ class ProfileRepositoryImpl with ExceptionHandler, InfraLogger implements Profil
                 .flatMap(
                   (_) => _singbox.validateConfigByPath(path, tempPath, debug).mapLeft(ProfileFailure.invalidConfig),
                 ),
+          )
+          .flatMap(
+            (_) => TaskEither.tryCatch(() async {
+              await _compatStore.dropOriginal(File(path));
+              return unit;
+            }, ProfileFailure.unexpected),
           );
 
   @override

@@ -40,18 +40,36 @@ String museFormatDuration(Duration d) {
 /// Short protocol label for a sing-box outbound type.
 /// 1.2.9: the core reports a node whose config sing-box could not start as
 /// `Invalid initialize outbound/vless[tag]: <reason>` in place of its type.
-bool museIsInvalidNodeType(String type) => type.toLowerCase().startsWith('invalid');
+bool museIsInvalidNodeType(String type) {
+  final t = type.toLowerCase();
+  return t.startsWith('invalid') || t.startsWith(museUnsupportedTypePrefix);
+}
+
+/// 1.7.0 M3-4: 兼容内核 lists a subscription node it cannot run as `unsupported:<protocol>`
+/// (kept in the subscription, shown greyed out, never dropped).
+const museUnsupportedTypePrefix = 'unsupported:';
+
+/// The protocol of a node 兼容内核 cannot run ('' for any other node).
+String museUnsupportedProtocol(String type) {
+  final t = type.trim();
+  if (!t.toLowerCase().startsWith(museUnsupportedTypePrefix)) return '';
+  final p = t.substring(museUnsupportedTypePrefix.length).trim();
+  return p.isEmpty ? '未知' : p;
+}
 
 /// The core's full error for an invalid node (without the "Invalid" prefix), for the detail sheet.
 String museInvalidNodeError(String type) {
   final t = type.trim();
   if (!museIsInvalidNodeType(t)) return '';
+  final unsupported = museUnsupportedProtocol(t);
+  if (unsupported.isNotEmpty) return '兼容内核不支持此节点的协议（$unsupported），节点仍保留在订阅里；切换到标准内核可使用。';
   final rest = t.substring('invalid'.length).trim();
   return rest.isEmpty ? '未知错误' : rest;
 }
 
 /// Short Chinese reason for an invalid node, e.g. 「ECH 参数」.
 String museInvalidNodeReason(String type) {
+  if (museUnsupportedProtocol(type).isNotEmpty) return '兼容内核不支持 ${museUnsupportedProtocol(type)}';
   final error = museInvalidNodeError(type);
   // the cause is after the last "]: " (the part before names the outbound and its tag)
   final idx = error.lastIndexOf(']: ');
@@ -75,7 +93,9 @@ String museInvalidNodeReason(String type) {
 }
 
 /// Node subtitle for an invalid node: 「节点配置不兼容：ECH 参数」.
-String museInvalidNodeSubtitle(String type) => '节点配置不兼容：${museInvalidNodeReason(type)}';
+String museInvalidNodeSubtitle(String type) => museUnsupportedProtocol(type).isNotEmpty
+    ? '当前内核不支持：${museUnsupportedProtocol(type)}'
+    : '节点配置不兼容：${museInvalidNodeReason(type)}';
 
 String museProtocolLabel(String type, {bool isGroup = false}) {
   final t = type.toLowerCase();

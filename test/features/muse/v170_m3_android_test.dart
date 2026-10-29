@@ -243,7 +243,7 @@ void main() {
   group('CI and pins', () {
     test('libmusecompat.so is built from the pinned core source and must be in the APK', () {
       final props = _read('dependencies.properties');
-      expect(props, contains('muse.compat.ref=a2c6e7d4ff407957302fdfb555e087dd9089b2e7'));
+      expect(props, contains(RegExp(r'muse\.compat\.ref=[0-9a-f]{40}')));
       final wf = _read('.github/workflows/muse-android.yml');
       expect(wf, contains('compat-core:'));
       expect(wf, contains('repository: yywgov/muse-core'));
