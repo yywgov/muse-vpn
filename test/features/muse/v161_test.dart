@@ -67,7 +67,7 @@ class _ThemeProbe extends ConsumerWidget {
 void main() {
   tearDown(() {
     museApplyAccent(museDefaultAccent);
-    museApplyColorStyle('tonalSpot');
+    museApplyColorStyle(museDefaultColorStyle);
   });
 
   group('1.6.1 订阅 card', () {
@@ -120,19 +120,19 @@ void main() {
   });
 
   group('1.6.1 配色风格', () {
-    test('seven styles offered in order; unknown keys read as 标准', () {
-      expect(MuseColorStyle.offered.map((e) => e.title), ['标准', '鲜艳', '表现力', '柔和', '鲜明', '着色', '单色']);
+    test('styles offered in order (1.7.1: 忠实 first); unknown keys read as 忠实', () {
+      expect(MuseColorStyle.offered.map((e) => e.title), ['忠实', '标准', '鲜艳', '表现力', '柔和', '鲜明', '着色', '单色']);
       expect(MuseColorStyle.offered.toSet(), MuseColorStyle.values.toSet());
-      expect(MuseColorStyle.fromKey('bogus'), MuseColorStyle.tonalSpot);
+      expect(MuseColorStyle.fromKey('bogus'), MuseColorStyle.fidelity);
     });
 
-    testWidgets('外观 shows 配色风格 (标准 by default); picking 鲜艳 saves it', (t) async {
+    testWidgets('外观 shows 配色风格 (1.7.1: 忠实 by default); picking 鲜艳 saves it', (t) async {
       final c = await _container(t);
       await t.pumpWidget(_app(c, const MuseAppearancePage()));
       await t.pump(const Duration(milliseconds: 300));
       final tile = find.byKey(const ValueKey('appearance_color_style'));
       expect(tile, findsOneWidget);
-      expect(find.descendant(of: tile, matching: find.text('标准')), findsOneWidget);
+      expect(find.descendant(of: tile, matching: find.text('忠实')), findsOneWidget);
       await t.tap(tile);
       await t.pumpAndSettle();
       for (final s in MuseColorStyle.offered) {

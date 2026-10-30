@@ -88,10 +88,11 @@ void main() {
       expect(museCoreRelease, '5.0.0-muse.18');
     });
 
-    test('version 1.7.0+170 carries the 1.6.4 fixes in its 更新说明', () {
+    test('1.7.0 carries the 1.6.4 fixes in its 更新说明 (newest entry = pubspec version)', () {
       final pubspec = File('pubspec.yaml').readAsStringSync();
-      expect(RegExp(r'^version: (\S+)', multiLine: true).firstMatch(pubspec)?.group(1), '1.7.0+170');
-      expect(museChangelog.keys.first, '1.7.0');
+      final version = RegExp(r'^version: (\S+)', multiLine: true).firstMatch(pubspec)!.group(1)!;
+      expect(museChangelog.keys.first, version.split('+').first);
+      expect(museChangelog.keys, contains('1.7.0'));
       expect(museChangelog['1.7.0'], hasLength(6));
       final md = File('CHANGELOG.md').readAsStringSync();
       expect(md.indexOf('### 1.7.0'), lessThan(md.indexOf('### 1.6.3')));

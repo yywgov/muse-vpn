@@ -70,7 +70,7 @@ void main() {
     });
     test('migration 1→2 hides the new cards in a saved hidden list, keeps the user choice', () {
       final prefs = <String, Object?>{'muse_home_tiles_hidden': 'exit', 'muse_prefs_version': 1};
-      expect(musePrefsMigrate(prefs), 2);
+      expect(musePrefsMigrate(prefs), musePrefsVersionCurrent);
       final hidden = museParseHiddenTiles(prefs['muse_home_tiles_hidden']! as String);
       expect(hidden, {MuseHomeTile.exit, ...museNewTiles16});
       // idempotent
@@ -85,9 +85,9 @@ void main() {
     test('migration on the store writes back only what changed', () async {
       SharedPreferences.setMockInitialValues({'muse_home_tiles_hidden': '', 'other': 'x'});
       final sp = await SharedPreferences.getInstance();
-      expect(await musePrefsMigrateStore(sp), 2);
+      expect(await musePrefsMigrateStore(sp), musePrefsVersionCurrent);
       expect(museParseHiddenTiles(sp.getString('muse_home_tiles_hidden')!), museNewTiles16);
-      expect(sp.getInt('muse_prefs_version'), 2);
+      expect(sp.getInt('muse_prefs_version'), musePrefsVersionCurrent);
       expect(sp.getString('other'), 'x');
       // second run: unchanged
       await musePrefsMigrateStore(sp);

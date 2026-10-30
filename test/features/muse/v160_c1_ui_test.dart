@@ -35,12 +35,13 @@ void main() {
           } else if (style == MuseColorStyle.vivid || style == MuseColorStyle.soft) {
             expect(museChroma(s.surface), lessThanOrEqualTo(MuseTone.paperChroma + 0.6));
           }
-          if (style == MuseColorStyle.vivid || style == MuseColorStyle.tinted) {
-            final t = museTone(s.primary);
+          // 1.7.1: styles that keep the seed show it exactly in light; in dark it is the seed or a
+          // lifted tone of it that reads on the page.
+          if (style.keepsSeed) {
             if (dark) {
-              expect(t, inInclusiveRange(MuseTone.minDarkAccent - 1, MuseTone.maxDarkAccent + 1));
+              expect(museContrast(s.primary, s.surface), greaterThanOrEqualTo(MuseTone.darkPrimaryContrast - 0.01));
             } else {
-              expect(t, inInclusiveRange(MuseTone.minAccent - 1, MuseTone.maxAccent + 1));
+              expect(s.primary.toARGB32(), museBrandSeed.toARGB32());
             }
           }
         });
@@ -81,7 +82,7 @@ void main() {
       for (final s in MuseColorStyle.values) {
         expect(MuseColorStyle.fromKey(s.key), s);
       }
-      expect(MuseColorStyle.fromKey('nope'), MuseColorStyle.tonalSpot);
+      expect(MuseColorStyle.fromKey('nope'), MuseColorStyle.fidelity);
     });
   });
 

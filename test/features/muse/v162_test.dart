@@ -46,11 +46,11 @@ Future<ProviderContainer> _pump(WidgetTester tester, Map<String, Object> initial
 
 const _expected = [
   ('jingtailan', '景泰蓝', 0xFF2775B6),
-  ('pielan', '苤蓝', 0xFF6B798E),
+  ('baolan', '宝蓝', 0xFF4B5CC4),
   ('zhuqing', '竹青', 0xFF789262),
-  ('yuebai', '月白', 0xFFD6ECF0),
-  ('cangyinghui', '苍蝇灰', 0xFF36282B),
-  ('zhujin', '朱瑾', 0xFFC41E3A),
+  ('songhua', '松花', 0xFFBCE672),
+  ('yanzhi', '胭脂', 0xFF9D2933),
+  ('zaohong', '枣红', 0xFFC32136),
   ('tenghuang', '藤黄', 0xFFFFB61E),
   ('qingbi', '青碧', 0xFF48C0A3),
   ('dingxiang', '丁香', 0xFFCCA4E3),
@@ -76,8 +76,8 @@ void main() {
         'green': MuseAccent.zhuqing,
         'teal': MuseAccent.qingbi,
         'purple': MuseAccent.dingxiang,
-        'indigo': MuseAccent.pielan,
-        'pink': MuseAccent.zhujin,
+        'indigo': MuseAccent.baolan,
+        'pink': MuseAccent.zaohong,
         'orange': MuseAccent.tenghuang,
       };
       map.forEach((old, now) {
@@ -85,7 +85,7 @@ void main() {
         expect(museAccentColors(old), museAccentColors(now.key), reason: old);
       });
       // every new key and every old key resolves; no key collides
-      expect({...MuseAccent.values.map((e) => e.key), ...MuseAccent.legacy.keys}.length, 17);
+      expect({...MuseAccent.values.map((e) => e.key), ...MuseAccent.legacy.keys}.length, 21);
     });
     test('custom "#RRGGBB" still works and seeds the scheme with the colour itself', () {
       final c = museAccentColors('#3A5F0B');
@@ -113,10 +113,10 @@ void main() {
         expect(_contrast(a.brand, MusePalette.white), greaterThanOrEqualTo(museAccentMinContrast), reason: a.title);
         expect(_contrast(museOnColor(a.color), a.color), greaterThanOrEqualTo(museAccentMinContrast), reason: a.title);
       }
-      for (final a in [MuseAccent.yuebai, MuseAccent.tenghuang, MuseAccent.dingxiang, MuseAccent.qingbi]) {
+      for (final a in [MuseAccent.songhua, MuseAccent.tenghuang, MuseAccent.dingxiang, MuseAccent.qingbi]) {
         expect(museOnColor(a.color), MusePalette.ink, reason: a.title);
       }
-      for (final a in [MuseAccent.jingtailan, MuseAccent.zhujin, MuseAccent.cangyinghui, MuseAccent.zheshi]) {
+      for (final a in [MuseAccent.jingtailan, MuseAccent.zaohong, MuseAccent.yanzhi, MuseAccent.zheshi]) {
         expect(museOnColor(a.color), MusePalette.white, reason: a.title);
       }
     });
@@ -130,7 +130,11 @@ void main() {
               expect(_contrast(s.primary, s.onPrimary), greaterThanOrEqualTo(3.0), reason: '$why primary');
               expect(_contrast(s.secondaryContainer, s.onSecondaryContainer), greaterThanOrEqualTo(4.5), reason: '$why selected');
               expect(_contrast(s.primaryContainer, s.onPrimaryContainer), greaterThanOrEqualTo(4.5), reason: '$why container');
-              expect(_contrast(s.primary, MuseSurface.page.color(s)), greaterThanOrEqualTo(2.0), reason: '$why primary on page');
+              // 1.7.1: styles that keep the seed show light colours (藤黄 / 松花 …) exactly in the
+              // light theme, so only the derived styles keep this floor there.
+              if (!(style.keepsSeed && b == Brightness.light)) {
+                expect(_contrast(s.primary, MuseSurface.page.color(s)), greaterThanOrEqualTo(2.0), reason: '$why primary on page');
+              }
             }
           }
         }
@@ -173,16 +177,16 @@ void main() {
   });
 
   group('1.6.2 page and cost', () {
-    testWidgets('ten swatches; tapping 月白 saves it and shows an ink tick', (tester) async {
+    testWidgets('ten swatches; tapping 松花 saves it and shows an ink tick', (tester) async {
       final c = await _pump(tester, {});
       for (final e in _expected) {
         expect(find.byKey(ValueKey('accent_${e.$1}')), findsOneWidget, reason: e.$2);
         expect(find.byTooltip(e.$2), findsOneWidget, reason: e.$2);
       }
-      await tester.tap(find.byKey(const ValueKey('accent_yuebai')));
+      await tester.tap(find.byKey(const ValueKey('accent_songhua')));
       await tester.pump();
-      expect(c.read(MusePrefs.accent), 'yuebai');
-      final tick = tester.widget<Icon>(find.descendant(of: find.byKey(const ValueKey('accent_yuebai')), matching: find.byIcon(Icons.check_outlined)));
+      expect(c.read(MusePrefs.accent), 'songhua');
+      final tick = tester.widget<Icon>(find.descendant(of: find.byKey(const ValueKey('accent_songhua')), matching: find.byIcon(Icons.check_outlined)));
       expect(tick.color, MusePalette.ink);
       expect(tester.takeException(), isNull);
     });
@@ -197,7 +201,7 @@ void main() {
       expect(museSchemeComputations, n);
     });
     test('settings search finds 主题色 by a traditional colour name', () {
-      for (final q in ['景泰蓝', '月白', '中国传统色', '赭石']) {
+      for (final q in ['景泰蓝', '松花', '中国传统色', '赭石']) {
         expect(museSearchSettings(q, android: true, windows: false).first.title, '主题色', reason: q);
       }
     });

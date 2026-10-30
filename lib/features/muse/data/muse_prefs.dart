@@ -5,6 +5,7 @@
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 
 abstract final class MusePrefs {
   // ---- 测速
@@ -21,7 +22,9 @@ abstract final class MusePrefs {
   static final accent = PreferencesNotifier.create<String, String>("muse_accent", museDefaultAccent);
 
   /// 1.6.1 配色风格 (MuseColorStyle key): how the Material 3 scheme is derived from 主题色
-  static final colorStyle = PreferencesNotifier.create<String, String>("muse_color_style", "tonalSpot");
+  /// 1.7.1: 忠实 by default (a saved 标准 = the old default is migrated once, see
+  /// museMigrate2to3).
+  static final colorStyle = PreferencesNotifier.create<String, String>("muse_color_style", museDefaultColorStyle);
 
   /// small / normal / large / huge — 1.4.0–1.5.x 字体大小; 1.6.0 C7 migrates it into 文字缩放 and
   /// no longer reads it (kept so an older device's backup still restores).

@@ -9,9 +9,11 @@ import 'package:flutter/foundation.dart' show clampDouble;
 import 'package:flutter/material.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
 
-/// 配色风格. 1.6.1: 标准 (Material 3 tonal spot) is the default; 鲜艳 / 表现力 are the other
-/// Material 3 variants; 鲜明 keeps the seed itself as the accent; 着色 also tints the surfaces.
+/// 配色风格. 1.7.1: 忠实 (Material 3 fidelity, primary = the colour exactly as picked) is the
+/// default; 标准 (tonal spot) / 鲜艳 / 表现力 / 柔和 / 单色 are the other Material 3 variants and
+/// derive the primary; 鲜明 / 着色 keep the picked colour too (着色 also tints the surfaces).
 enum MuseColorStyle {
+  fidelity('fidelity', '忠实'),
   tonalSpot('tonalSpot', '标准'),
   vibrant('vibrant', '鲜艳'),
   expressive('expressive', '表现力'),
@@ -25,24 +27,30 @@ enum MuseColorStyle {
   final String key;
   final String title;
 
-  static MuseColorStyle fromKey(String? key) => values.where((e) => e.key == key).firstOrNull ?? tonalSpot;
+  static MuseColorStyle fromKey(String? key) => values.where((e) => e.key == key).firstOrNull ?? fidelity;
+
+  /// 1.7.1: styles whose primary is the picked colour itself (see [museExactPrimary]).
+  bool get keepsSeed => this == fidelity || this == vivid || this == tinted;
 
   /// The styles offered in 设置 › 外观 › 配色风格, in this order.
-  static const offered = [tonalSpot, vibrant, expressive, soft, vivid, tinted, monochrome];
+  static const offered = [fidelity, tonalSpot, vibrant, expressive, soft, vivid, tinted, monochrome];
 }
+
+/// 1.7.1: the default 配色风格 key (忠实).
+const museDefaultColorStyle = 'fidelity';
 
 /// 1.6.2: 景泰蓝, the default seed.
 const museBrandSeed = Color(0xFF2775B6);
 
 /// Preset seeds for 主题色: ten Chinese traditional colours, 景泰蓝 first (same order as
-/// MuseAccent): 景泰蓝 苤蓝 竹青 月白 苍蝇灰 朱瑾 藤黄 青碧 丁香 赭石.
+/// MuseAccent): 景泰蓝 宝蓝 竹青 松花 胭脂 枣红 藤黄 青碧 丁香 赭石 (1.7.1, sources on MuseAccent).
 const museSeedPresets = <Color>[
   museBrandSeed,
-  Color(0xFF6B798E),
+  Color(0xFF4B5CC4),
   Color(0xFF789262),
-  Color(0xFFD6ECF0),
-  Color(0xFF36282B),
-  Color(0xFFC41E3A),
+  Color(0xFFBCE672),
+  Color(0xFF9D2933),
+  Color(0xFFC32136),
   Color(0xFFFFB61E),
   Color(0xFF48C0A3),
   Color(0xFFCCA4E3),
@@ -70,11 +78,17 @@ abstract final class MuseTone {
   static const minDarkAccent = 50.0;
   static const maxDarkAccent = 75.0;
   static const darkAccentLift = 3.0;
+
+  /// 1.7.1: in the dark theme an exact primary darker than this contrast against the dark page
+  /// is lifted (same hue / chroma) until it reaches it; the light theme never changes it.
+  static const darkPrimaryContrast = 3.0;
+  static const fidelityContainerChroma = 56.0;
   static const tintDivisor = 6.0;
   static const maxTintChroma = 10.0;
 }
 
 DynamicScheme _scheme(Hct source, bool dark, MuseColorStyle style) => switch (style) {
+  MuseColorStyle.fidelity => SchemeFidelity(sourceColorHct: source, isDark: dark, contrastLevel: 0),
   MuseColorStyle.vivid || MuseColorStyle.tinted => SchemeContent(sourceColorHct: source, isDark: dark, contrastLevel: 0),
   MuseColorStyle.tonalSpot => SchemeTonalSpot(sourceColorHct: source, isDark: dark, contrastLevel: 0),
   MuseColorStyle.vibrant => SchemeVibrant(sourceColorHct: source, isDark: dark, contrastLevel: 0),
@@ -94,7 +108,7 @@ int museSchemeComputations = 0;
 ColorScheme museSeededScheme({
   Color seed = museBrandSeed,
   required Brightness brightness,
-  MuseColorStyle style = MuseColorStyle.tonalSpot,
+  MuseColorStyle style = MuseColorStyle.fidelity,
   bool pureBlack = false,
 }) {
   final dark = brightness == Brightness.dark;
@@ -105,7 +119,11 @@ ColorScheme museSeededScheme({
   final source = Hct.fromInt(seed.toARGB32());
   final scheme = _scheme(source, dark, style);
   final primary = scheme.primaryPalette;
-  final container = TonalPalette.of(primary.hue, min(primary.chroma, MuseTone.containerChroma));
+  // 1.7.1: styles that keep the picked colour build the container from its own hue at a higher
+  // chroma, so large areas stay in the same family as the exact primary.
+  final container = style.keepsSeed
+      ? TonalPalette.of(source.hue, min(max(source.chroma, primary.chroma), MuseTone.fidelityContainerChroma))
+      : TonalPalette.of(primary.hue, min(primary.chroma, MuseTone.containerChroma));
   final tint = style == MuseColorStyle.tinted ? min(source.chroma / MuseTone.tintDivisor, MuseTone.maxTintChroma) : null;
   Color neutral(DynamicColor role, double maxChroma, [double? darkTone]) {
     final palette = role.palette(scheme);
@@ -114,10 +132,8 @@ ColorScheme museSeededScheme({
 
   Color role(DynamicColor c) => Color(c.getArgb(scheme));
   final paper = dark ? MuseTone.surfaceChroma : MuseTone.paperChroma;
-  final accent = switch (style) {
-    MuseColorStyle.vivid || MuseColorStyle.tinted => _accent(seed, source, dark),
-    _ => null,
-  };
+  final darkPage = dark ? neutral(MaterialDynamicColors.surface, paper, MuseTone.darkPage) : null;
+  final accent = style.keepsSeed ? museExactPrimary(seed, darkPage: darkPage) : null;
   final primaryColor = accent?.$1 ?? role(MaterialDynamicColors.primary);
   var out = ColorScheme(
     brightness: brightness,
@@ -163,13 +179,31 @@ ColorScheme museSeededScheme({
   return _cache[key] = out;
 }
 
-(Color, Color) _accent(Color seedColor, Hct seed, bool dark) {
-  final tone = dark
-      ? clampDouble(seed.tone + MuseTone.darkAccentLift, MuseTone.minDarkAccent, MuseTone.maxDarkAccent)
-      : clampDouble(seed.tone, MuseTone.minAccent, MuseTone.maxAccent);
-  final primary = tone == seed.tone ? seedColor : Color(Hct.from(seed.hue, seed.chroma, tone).toInt());
-  final on = tone <= MuseTone.maxAccent ? const Color(0xFFFFFFFF) : Color(TonalPalette.of(seed.hue, seed.chroma).get(10));
-  return (primary, on);
+/// WCAG contrast ratio of two opaque colours.
+double museContrast(Color a, Color b) {
+  final la = a.computeLuminance();
+  final lb = b.computeLuminance();
+  return (max(la, lb) + 0.05) / (min(la, lb) + 0.05);
+}
+
+/// 1.7.1: black or white, whichever has the higher WCAG contrast on [c] (always ≥ 4.58:1).
+Color museOnExact(Color c) =>
+    museContrast(c, const Color(0xFFFFFFFF)) >= museContrast(c, const Color(0xFF000000)) ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
+
+/// 1.7.1: primary / onPrimary for a style that keeps the picked colour: [seed] exactly (light
+/// theme, and dark theme when it already reads on [darkPage]); in the dark theme a colour too dark
+/// for [darkPage] (contrast < [MuseTone.darkPrimaryContrast]) is lifted in tone, same hue and
+/// chroma, just enough. onPrimary is black or white by WCAG contrast.
+(Color, Color) museExactPrimary(Color seed, {Color? darkPage}) {
+  var primary = seed;
+  if (darkPage != null && museContrast(seed, darkPage) < MuseTone.darkPrimaryContrast) {
+    final h = Hct.fromInt(seed.toARGB32());
+    for (var t = h.tone.ceilToDouble(); t <= 100; t++) {
+      primary = Color(Hct.from(h.hue, h.chroma, t).toInt());
+      if (museContrast(primary, darkPage) >= MuseTone.darkPrimaryContrast) break;
+    }
+  }
+  return (primary, museOnExact(primary));
 }
 
 Color _shift(Color c, double delta) {

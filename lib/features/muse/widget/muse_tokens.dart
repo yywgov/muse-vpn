@@ -220,15 +220,25 @@ abstract final class MuseSize {
 
 /// 1.4.0: accent colours to pick from (one at a time). 1.6.0 C7: plus any custom colour stored
 /// as "#RRGGBB" in the same preference. 1.6.2: ten Chinese traditional colours, 景泰蓝 by default.
-/// [color] is the colour itself (the swatch and the seed of the colour scheme); [brand] / [light]
-/// / [deep] are derived from it and keep white text readable (see [museAccentColors]).
+/// [color] is the colour itself (the swatch, the seed of the colour scheme and, in 忠实 / 鲜明 /
+/// 着色, the primary exactly); [brand] / [light] / [deep] are derived from it and keep white text
+/// readable (see [museAccentColors]).
+///
+/// 1.7.1 sources (web-checked 2026-10-30):
+/// - 景泰蓝 #2775B6: 中国色 zhongguose.com (colors.json, 据《色谱》中科院科技情报编委会名词室).
+/// - 宝蓝 #4B5CC4 / 竹青 #789262 / 松花(色) #BCE672 / 胭脂 #9D2933 / 枣红 #C32136 /
+///   藤黄 #FFB61E / 青碧 #48C0A3 / 丁香(色) #CCA4E3 / 赭石 #845A33: 通行「中国传统色彩」色表
+///   (qijishow.com/Colors/color.html、fanzixin.com/colors、h43.cn/tools/peise 三处一致).
+/// - 1.7.1 replaced the greyish 苤蓝 #6B798E (色表名实为菘蓝) → 宝蓝, 月白 #D6ECF0 → 松花,
+///   苍蝇灰 #36282B → 胭脂; 朱瑾 #C41E3A is not in any Chinese colour source (it is the Western
+///   "cardinal") → the nearest listed red, 枣红 #C32136. Old keys map via [legacy].
 enum MuseAccent {
   jingtailan('jingtailan', '景泰蓝', Color(0xFF2775B6)),
-  pielan('pielan', '苤蓝', Color(0xFF6B798E)),
+  baolan('baolan', '宝蓝', Color(0xFF4B5CC4)),
   zhuqing('zhuqing', '竹青', Color(0xFF789262)),
-  yuebai('yuebai', '月白', Color(0xFFD6ECF0)),
-  cangyinghui('cangyinghui', '苍蝇灰', Color(0xFF36282B)),
-  zhujin('zhujin', '朱瑾', Color(0xFFC41E3A)),
+  songhua('songhua', '松花', Color(0xFFBCE672)),
+  yanzhi('yanzhi', '胭脂', Color(0xFF9D2933)),
+  zaohong('zaohong', '枣红', Color(0xFFC32136)),
   tenghuang('tenghuang', '藤黄', Color(0xFFFFB61E)),
   qingbi('qingbi', '青碧', Color(0xFF48C0A3)),
   dingxiang('dingxiang', '丁香', Color(0xFFCCA4E3)),
@@ -248,14 +258,20 @@ enum MuseAccent {
   static const fallback = jingtailan;
 
   /// 1.6.2: keys saved by 1.4.0–1.6.1 (and still synced from an older device) → the new preset.
+  /// 1.7.1: plus the four 1.6.2 colours that were replaced (the stored value is rewritten once by
+  /// the 2→3 preference migration; this map keeps synced old values working).
   static const legacy = <String, MuseAccent>{
     'blue': jingtailan,
     'green': zhuqing,
     'teal': qingbi,
     'purple': dingxiang,
-    'indigo': pielan,
-    'pink': zhujin,
+    'indigo': baolan,
+    'pink': zaohong,
     'orange': tenghuang,
+    'pielan': baolan,
+    'yuebai': songhua,
+    'cangyinghui': yanzhi,
+    'zhujin': zaohong,
   };
 
   static MuseAccent fromKey(String key) => presetOrNull(key) ?? fallback;
@@ -377,7 +393,7 @@ abstract final class MusePalette {
   static bool pureBlack = false;
 
   /// 1.6.1: 配色风格 key (set by museApplyColorStyle before the app builds).
-  static String colorStyle = 'tonalSpot';
+  static String colorStyle = museDefaultColorStyle;
 
   // 1.6.2: status lights in Chinese traditional colours (never follow 主题色):
   // 葱青 ok / 杏黄 warning / 朱砂 error / 墨灰 idle (未测试、未连接)

@@ -4,10 +4,11 @@
 
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/home_tiles.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const musePrefsVersionKey = 'muse_prefs_version';
-const musePrefsVersionCurrent = 2;
+const musePrefsVersionCurrent = 3;
 
 typedef MusePrefsStep = void Function(Map<String, Object?> prefs);
 
@@ -15,7 +16,24 @@ typedef MusePrefsStep = void Function(Map<String, Object?> prefs);
 /// 1→2 (1.6.0): the new dashboard cards start hidden for a saved 首页 layout; 字体大小 becomes
 /// 文字缩放 (C7: 小 90 % / 大 110 % / 特大 120 % turn it on; 标准 leaves it off; an existing
 /// 文字缩放 is never overwritten).
-final Map<int, MusePrefsStep> musePrefsSteps = {1: museMigrate1to2};
+/// 2→3 (1.7.1): 配色风格 标准 (the old default, never picked on purpose) becomes 忠实; the four
+/// replaced 主题色 move to the nearest new colour (苤蓝→宝蓝, 月白→松花, 苍蝇灰→胭脂, 朱瑾→枣红).
+final Map<int, MusePrefsStep> musePrefsSteps = {1: museMigrate1to2, 2: museMigrate2to3};
+
+/// 1.7.1: replaced 1.6.2 主题色 keys → their 1.7.1 successor.
+const museAccentRenames171 = <String, String>{
+  'pielan': 'baolan',
+  'yuebai': 'songhua',
+  'cangyinghui': 'yanzhi',
+  'zhujin': 'zaohong',
+};
+
+void museMigrate2to3(Map<String, Object?> prefs) {
+  if (prefs['muse_color_style'] == 'tonalSpot') prefs['muse_color_style'] = museDefaultColorStyle;
+  final accent = prefs['muse_accent'];
+  final renamed = accent is String ? museAccentRenames171[accent] : null;
+  if (renamed != null) prefs['muse_accent'] = renamed;
+}
 
 void museMigrate1to2(Map<String, Object?> prefs) {
   final hidden = prefs['muse_home_tiles_hidden'];

@@ -157,7 +157,7 @@ void main() {
     test('migration 1→2: 字体大小 becomes 文字缩放', () {
       for (final e in {'small': 90, 'large': 110, 'huge': 120}.entries) {
         final m = <String, Object?>{'muse_text_size': e.key};
-        expect(musePrefsMigrate(m), 2);
+        expect(musePrefsMigrate(m), musePrefsVersionCurrent);
         expect(m['muse_text_scale_on'], isTrue);
         expect(m['muse_text_scale_pct'], e.value);
       }
@@ -176,7 +176,7 @@ void main() {
     test('migration on the store writes bool + int', () async {
       SharedPreferences.setMockInitialValues({'muse_text_size': 'large'});
       final sp = await SharedPreferences.getInstance();
-      expect(await musePrefsMigrateStore(sp), 2);
+      expect(await musePrefsMigrateStore(sp), musePrefsVersionCurrent);
       expect(sp.getBool('muse_text_scale_on'), isTrue);
       expect(sp.getInt('muse_text_scale_pct'), 110);
     });
