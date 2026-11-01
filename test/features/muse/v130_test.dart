@@ -1,6 +1,7 @@
 // 穿云 1.3.0: dashboard tiles (order / hide), 智能保持连接 strategy order, node cache, 去广告 关,
 // theme modes, naming.
 import 'dart:io';
+import '../../support/library_source.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
@@ -228,7 +229,7 @@ void main() {
         'lib/features/settings/overview/settings_page.dart',
         'lib/features/muse/widget/grouped_list.dart',
       ]) {
-        expect(File(f).readAsStringSync(), isNot(contains('Color(0x')), reason: f);
+        expect(museLibrarySource(f), isNot(contains('Color(0x')), reason: f);
       }
     });
     test('changelog has 1.3.0', () {

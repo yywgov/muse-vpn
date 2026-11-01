@@ -2,6 +2,7 @@
 // (按网络自动开关, 我的宽带) and their upgrade migration.
 
 import 'dart:convert';
+import '../../support/library_source.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -52,7 +53,7 @@ void main() {
       expect(museGroupIconKind(type: 'Balancer', name: 'lowest', selectedDisplay: 'PPFlight-Direct'), MuseGroupIcon.autoFastest);
       expect(museGroupIconKind(type: 'URLTest', name: 'auto'), MuseGroupIcon.autoFastest);
       expect(museGroupIconKind(type: 'Selector', name: 'select'), MuseGroupIcon.manual);
-      final home = File('lib/features/muse/nodes/node_list.dart').readAsStringSync();
+      final home = museLibrarySource('lib/features/muse/nodes/node_list.dart');
       // 1.5.0: one line-icon set (outlined)
       expect(home, contains('MuseGroupIcon.loadBalance => Icons.balance_outlined'));
     });
@@ -62,7 +63,7 @@ void main() {
       expect(s, isNot(contains('负载均衡')));
     });
     test('node rows keep the protocol name', () {
-      final home = File('lib/features/muse/nodes/node_list.dart').readAsStringSync();
+      final home = museLibrarySource('lib/features/muse/nodes/node_list.dart');
       expect(home, contains('museProtocolShort(proxy.type)')); // 1.5.3: as a small tag
     });
   });

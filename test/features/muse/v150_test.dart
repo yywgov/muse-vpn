@@ -2,6 +2,7 @@
 // single-column tiles at large text, small updates without the dialog, contrast, default-hidden
 // 去广告 tile, loopback-only ports, one line-icon set.
 import 'dart:io';
+import '../../support/library_source.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -247,7 +248,7 @@ void main() {
       final prefs = File('lib/core/preferences/general_preferences.dart').readAsStringSync();
       expect(prefs, contains('"muse_hide_info_nodes", true, overrideValue: true'));
       for (final f in ['lib/features/settings/overview/settings_page.dart', 'lib/features/muse/settings/more_settings.dart']) {
-        final src = File(f).readAsStringSync();
+        final src = museLibrarySource(f);
         expect(src, isNot(contains("title: '隐藏非节点条目'")), reason: f);
         expect(src, isNot(contains('阈值')), reason: f);
       }
