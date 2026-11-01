@@ -21,6 +21,7 @@ import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
 import 'package:hiddify/gen/fonts.gen.dart';
+import 'package:hiddify/utils/uri_utils.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -371,6 +372,13 @@ class ProfileActionsMenu extends HookConsumerWidget {
               ref.read(inAppNotificationControllerProvider).showSuccessToast('已复制订阅链接');
             } catch (_) {}
           },
+        ),
+      // 1.9.0 #49: the provider's own page (renewal, plans), when the subscription named one
+      if (profile case final RemoteProfileEntity remote when museRenewUrl(remote.webPageUrl, remote.supportUrl) != null)
+        AdaptiveMenuItem(
+          leadingIcon: const Icon(Icons.open_in_new_outlined),
+          title: '打开官网 / 续费',
+          onTap: () => UriUtils.tryLaunch(Uri.parse(museRenewUrl(remote.webPageUrl, remote.supportUrl)!)),
         ),
       // 1.6.0 C6: the saved config, read only and redacted
       AdaptiveMenuItem(

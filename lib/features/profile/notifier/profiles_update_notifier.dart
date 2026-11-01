@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dartx/dartx.dart';
+import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/data/notify.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
@@ -111,7 +112,8 @@ class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifie
           hours: ref.read(Preferences.museAutoUpdateHours),
         );
         final shouldUpdate =
-            force || (updateInterval != null && updateInterval <= DateTime.now().difference(profile.lastUpdate));
+            force ||
+            (updateInterval != null && museJitteredInterval(updateInterval, profile.id) <= DateTime.now().difference(profile.lastUpdate));
         if (!shouldUpdate) {
           loggy.debug(
             "skipping profile [${profile.id}] update. last successful update: [${profile.lastUpdate}] - interval: [${profile.options?.updateInterval}]",

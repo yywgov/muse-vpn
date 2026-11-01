@@ -474,3 +474,30 @@ bool museIsPlainHttpSub(String url) {
 }
 
 const musePlainHttpWarning = '这是明文 http 订阅，链接和节点可能被他人看到，建议向服务商要 https 链接';
+
+// ---------------------------------------------------------------- 1.9.0
+
+/// #49: the page to open to renew a subscription: its web page, else its support link; only
+/// http(s) links with a host (a subscription header is untrusted text). Null when there is none.
+String? museRenewUrl(String? webPageUrl, String? supportUrl) {
+  for (final raw in [webPageUrl, supportUrl]) {
+    final t = raw?.trim() ?? '';
+    if (t.isEmpty || t.length > 2048) continue;
+    final u = Uri.tryParse(t);
+    if (u == null || u.host.isEmpty || !(u.isScheme('http') || u.isScheme('https'))) continue;
+    return t;
+  }
+  return null;
+}
+
+/// #55: [interval] stretched by up to 10 %, the same amount every time for the same
+/// subscription [id] (a stable hash), so many subscriptions or devices do not all ask the server
+/// at the same minute. Never shorter than [interval].
+Duration museJitteredInterval(Duration interval, String id) {
+  var h = 0;
+  for (final c in id.codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
+  final extraMs = interval.inMilliseconds * (h % 1000) ~/ 10000;
+  return interval + Duration(milliseconds: extraMs);
+}
