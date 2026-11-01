@@ -430,10 +430,8 @@ void main() {
       }
     });
 
-    test('version 1.8.0+180, core 5.0.0-muse.19, 兼容内核 source unchanged, 更新说明 and CHANGELOG', () {
-      final pubspec = File('pubspec.yaml').readAsStringSync();
-      expect(RegExp(r'^version: (\S+)', multiLine: true).firstMatch(pubspec)?.group(1), '1.8.0+180');
-      expect(museChangelog.keys.first, '1.8.0');
+    test('1.8.0 notes kept, core 5.0.0-muse.19, 兼容内核 source unchanged, 更新说明 and CHANGELOG', () {
+      expect(museChangelog.keys, contains('1.8.0'));
       expect(museChangelog['1.8.0'], hasLength(3));
       final props = File('dependencies.properties').readAsStringSync();
       expect(RegExp(r'muse\.core\.version=(\S+)').firstMatch(props)?.group(1), '5.0.0-muse.19');
