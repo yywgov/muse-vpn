@@ -215,6 +215,29 @@ object CompatState {
         null
     }
 
+    private const val RESTARTED = "compat_auto_restart"
+
+    /**
+     * 穿云 1.9.0: whether the service may ask to be started again after the system destroyed it:
+     * only with a saved hand-over, not after the user disconnected, and at most once a minute
+     * (so a service the system keeps destroying is not restarted in a loop).
+     */
+    fun mayAutoRestart(now: Long): Boolean {
+        if (stoppedByUser() || savedLaunch() == null) return false
+        val last = try {
+            file(RESTARTED).takeIf { it.exists() }?.readText()?.trim()?.toLongOrNull()
+        } catch (_: Exception) {
+            null
+        }
+        if (!autoRestartAllowed(last, now)) return false
+        write(RESTARTED, now.toString())
+        return true
+    }
+
+    fun autoRestartAllowed(last: Long?, now: Long): Boolean = last == null || now - last >= AUTO_RESTART_GAP_MILLIS
+
+    const val AUTO_RESTART_GAP_MILLIS = 60_000L
+
     fun markStoppedByUser() = write(STOPPED, System.currentTimeMillis().toString())
 
     fun stoppedByUser(): Boolean = try {

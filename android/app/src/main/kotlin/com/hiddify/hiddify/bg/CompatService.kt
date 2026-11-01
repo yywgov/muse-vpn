@@ -44,6 +44,23 @@ class CompatService(
     private var tun: ParcelFileDescriptor? = null
     private var coreSetUp = false
     private var receiverRegistered = false
+    private var current: CompatLaunch? = null
+
+    // 穿云 1.9.0: watchdog + network callback, the same keep-alive the standard service has
+    private val guard = CompatGuard(
+        wanted = { status.value == Status.Started || status.value == Status.Starting },
+        launch = { current },
+        giveUp = {
+            ChuanyunAlerts.show(
+                service,
+                ChuanyunAlerts.ID_DISCONNECTED,
+                "穿云已断开",
+                "自动重连 ${CompatGuard.BACKOFF_MILLIS.size} 次都没有成功，点这里打开穿云重新连接",
+            )
+            CompatState.clearLaunch()
+            withContext(Dispatchers.Main) { stopService() }
+        },
+    )
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -119,11 +136,13 @@ class CompatService(
             status.postValue(Status.Started)
             CompatState.saveToken(launch.token)
             CompatState.saveLaunch(launch)
+            current = launch
             CompatState.markStarted(System.currentTimeMillis())
             DisconnectLog.record("VPN 服务已启动（兼容内核）")
             ChuanyunAlerts.cancel(ChuanyunAlerts.ID_DISCONNECTED)
             withContext(Dispatchers.Main) { notification.show(launch.profileName, R.string.status_started) }
             notification.start()
+            guard.start()
         } catch (e: Throwable) {
             // also UnsatisfiedLinkError when the library cannot load
             stopAndAlert(Alert.StartService, e.message ?: e.javaClass.simpleName)
@@ -146,6 +165,8 @@ class CompatService(
 
     /** Stops the core (if it was set up) and closes this connection's TUN. */
     private fun releaseCore() {
+        guard.stop()
+        current = null
         if (coreSetUp) {
             try {
                 CompatCore.nativeStop()
@@ -196,12 +217,30 @@ class CompatService(
     }
 
     fun onDestroy() {
-        if (status.value == Status.Started || status.value == Status.Starting) {
+        val unexpected = status.value == Status.Started || status.value == Status.Starting
+        if (unexpected) {
             DisconnectLog.record("服务被系统销毁（兼容内核，未经用户断开）")
             releaseCore()
         }
         unregisterReceiver()
         binder.close()
+        // 穿云 1.9.0: destroyed while this process lives on (not by the user): ask once to be
+        // started again from the saved hand-over. START_STICKY covers the process being killed.
+        if (unexpected) restartAfterDestroy()
+    }
+
+    private fun restartAfterDestroy() {
+        if (!CompatState.mayAutoRestart(System.currentTimeMillis())) {
+            DisconnectLog.record("兼容内核服务短时间内多次被销毁，不再自动拉起")
+            return
+        }
+        try {
+            ContextCompat.startForegroundService(service, Intent(service, service.javaClass))
+            DisconnectLog.record("兼容内核服务已请求重新启动")
+        } catch (e: Exception) {
+            // e.g. a background start the system does not allow; the next tile / boot / app start reconnects
+            DisconnectLog.record("兼容内核服务无法自动重新启动: ${e.message ?: e.javaClass.simpleName}")
+        }
     }
 
     companion object {

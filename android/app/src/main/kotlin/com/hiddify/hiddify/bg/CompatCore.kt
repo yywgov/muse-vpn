@@ -29,6 +29,13 @@ object CompatCore {
     @JvmStatic
     external fun nativeStop()
 
+    /**
+     * 穿云 1.9.0: the default network changed; the core drops connections made on the old network
+     * and its cached DNS answers. Returns how many connections were closed (0 when stopped).
+     */
+    @JvmStatic
+    external fun nativeNetworkChanged(): Int
+
     @JvmStatic
     external fun nativeVersion(): String
 }

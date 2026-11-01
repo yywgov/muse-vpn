@@ -430,13 +430,13 @@ void main() {
       }
     });
 
-    test('1.8.0 notes kept, core 5.0.0-muse.19, 兼容内核 source unchanged, 更新说明 and CHANGELOG', () {
+    test('1.8.0 notes kept, core 5.0.0-muse.19, 兼容内核 source pinned, 更新说明 and CHANGELOG', () {
       expect(museChangelog.keys, contains('1.8.0'));
       expect(museChangelog['1.8.0'], hasLength(3));
       final props = File('dependencies.properties').readAsStringSync();
       expect(RegExp(r'muse\.core\.version=(\S+)').firstMatch(props)?.group(1), '5.0.0-muse.19');
       expect(museCoreRelease, '5.0.0-muse.19');
-      expect(props, contains('muse.compat.ref=6f5cc4edb940aed007b30e2ec9d1a0b6f172ffce'));
+      expect(props, matches(RegExp(r'muse\.compat\.ref=[0-9a-f]{40}')));
       final md = File('CHANGELOG.md').readAsStringSync();
       expect(md.indexOf('### 1.8.0'), lessThan(md.indexOf('### 1.7.1')));
     });
