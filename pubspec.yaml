@@ -136,6 +136,8 @@ flutter:
     # - assets/core/geosite.db
     # 穿云 1.2.4: rule-sets the core starts from (no download wait on connect)
     - assets/rule-sets/
+    # 穿云 1.9.0 #14: 兼容内核's default lists (.mrs), only those the default rules use
+    - assets/rule-sets-compat/
     - assets/images/logo.svg
     - assets/images/glyph.svg
     - assets/images/tray_icon.ico

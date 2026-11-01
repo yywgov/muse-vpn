@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:hiddify/features/muse/logic/core_kind.dart';
+import 'package:hiddify/features/muse/data/bundled_compat_rule_sets.dart';
 import 'package:hiddify/features/muse/data/bundled_rule_sets.dart';
 import 'package:hiddify/features/muse/data/muse_prefs_migration.dart';
 import 'package:flutter/foundation.dart';
@@ -192,6 +193,8 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
   await _safeInit("bundled rule-sets", () async {
     final dirs = container.read(appDirectoriesProvider).requireValue;
     await museInstallBundledRuleSets(dirs.baseDir.absolute.path);
+    // 1.9.0 #14: 兼容内核's default lists too (first connect needs no download)
+    await museInstallBundledCompatRuleSets(dirs.workingDir.absolute.path);
   }, timeout: 5000);
   await _safeInit("profile repository", () => container.read(profileRepositoryProvider.future));
 
