@@ -16,7 +16,7 @@ class ActiveProfile extends _$ActiveProfile with AppLogger {
   }
 }
 
-// TODO: move to specific feature
+/// Whether any subscription exists (home first-run guide, profile pages).
 @Riverpod(keepAlive: true)
 Stream<bool> hasAnyProfile(Ref ref) {
   return ref.watch(profileDataSourceProvider).watchProfilesCount().map((event) => event != 0).distinct();

@@ -474,7 +474,7 @@ class ProfileSubscriptionInfo extends HookConsumerWidget {
   }
 }
 
-// TODO change colors
+/// Used share of a subscription's traffic; colours follow the theme (primary on its container).
 class RemainingTrafficIndicator extends StatelessWidget {
   const RemainingTrafficIndicator(this.ratio, {super.key});
 

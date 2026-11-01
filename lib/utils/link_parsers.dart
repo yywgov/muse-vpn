@@ -4,7 +4,8 @@ import 'package:hiddify/utils/validators.dart';
 
 typedef ProfileLink = ({String url, String name});
 
-// TODO: test and improve
+/// Subscription links: plain http(s) URLs and app deep links (chuanyun://, panel schemes).
+/// Tested in test/utils/link_parsers_test.dart.
 abstract class LinkParser {
   static String generateSubShareLink(String url, [String? name]) {
     final uri = Uri.tryParse(url);
@@ -42,15 +43,24 @@ abstract class LinkParser {
         if (queryParams.containsKey('url')) {
           // Doc form: chuanyun://install-config (or hiddify://)?url=<uri>#<name> — the name lives
           // in the fragment. Prefer an explicit `name=` param, else the fragment.
-          final name = (queryParams['name']?.isNotEmpty ?? false) ? queryParams['name']! : uri.fragment;
+          final name = (queryParams['name']?.isNotEmpty ?? false) ? queryParams['name']! : _fragment(uri);
           return (url: queryParams['url']!, name: name);
         } else {
-          return (url: uri.path.substring(1) + (uri.hasQuery ? "?${uri.query}" : ""), name: uri.fragment);
+          return (url: uri.path.substring(1) + (uri.hasQuery ? "?${uri.query}" : ""), name: _fragment(uri));
         }
       case 'v2ray' || 'v2rayn' || 'v2rayng' || 'clash' || 'clashmeta' || 'sing-box':
         return queryParams.containsKey('url') ? (url: queryParams['url']!, name: queryParams['name'] ?? '') : null;
       default:
         return null;
+    }
+  }
+
+  /// The fragment as text (`#%E5%AE%B6` → 家); a malformed escape keeps the raw fragment.
+  static String _fragment(Uri uri) {
+    try {
+      return Uri.decodeComponent(uri.fragment);
+    } catch (_) {
+      return uri.fragment;
     }
   }
 }
