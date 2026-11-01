@@ -32,7 +32,7 @@ void main() {
   setUp(() => dir = Directory.systemTemp.createTempSync('v190_13_'));
   tearDown(() => dir.deleteSync(recursive: true));
 
-  test('a SIP008 document is a subscription body, not 标准内核\'s profile', () {
+  test("a SIP008 document is a subscription body, not 标准内核's profile", () {
     expect(museIsStandardProfile(_sip008), isFalse);
     expect(museIsStandardProfile('{"outbounds":[{"type":"direct","tag":"d"}]}'), isTrue);
     // a sing-box profile that happens to say "servers" (DNS) stays a profile

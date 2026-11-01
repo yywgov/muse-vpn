@@ -3,7 +3,6 @@
 // no download; it refreshes them in the background as usual once they are older than 5 days. Only
 // the lists the default rules use are shipped; a list 兼容内核 downloaded since is never replaced.
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

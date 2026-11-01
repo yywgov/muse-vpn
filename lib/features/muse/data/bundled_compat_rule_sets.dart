@@ -1,6 +1,6 @@
 // 穿云 1.9.0 #14 - the rule-sets 兼容内核's default 分流 uses (国内直连 + 去广告), shipped with the
-// app so the first connect on 兼容内核 does not wait for downloads. 兼容内核 keeps each list as
-// <workingDir>/data/mihomo/ruleset/<provider>.mrs and loads that file before anything else; when it
+// app so the first connect on 兼容内核 does not wait for downloads. 兼容内核 keeps each list in
+// its home folder (under the working directory's data/) and loads that file before anything else; when it
 // is older than the update interval (5 days) it is refreshed in the background, as usual.
 //
 // Only the lists the default rules use and that exist in the .mrs data are shipped (about 0.6 MB):
@@ -12,17 +12,20 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
-/// Bundled lists (assets/rule-sets-compat/<name>.mrs).
+/// Bundled lists (assets/rule-sets-compat/`name`.mrs).
 const museCompatBundledRuleSets = ['geosite-cn', 'geoip-cn', 'geosite-category-ads-all'];
 
 /// When the bundled copies were taken. A copy is written with this time so 兼容内核 sees its real
 /// age (and refreshes it in the background once it is older than the interval), and an app update
 /// with newer copies replaces older files — never a list 兼容内核 downloaded since (written later).
-final museCompatRuleSetsSnapshot = DateTime.utc(2026, 11, 1);
+final museCompatRuleSetsSnapshot = DateTime.utc(2026, 11);
 
-/// Where 兼容内核 keeps a list: its home is <workingDir>/data/mihomo, providers are "muse-<name>".
+/// Where 兼容内核 keeps a list: `ruleset/muse-name.mrs` in its home folder, whose name the core sets.
 String museCompatRuleSetPath(String workingDir, String name) =>
-    p.join(workingDir, 'data', 'mihomo', 'ruleset', 'muse-$name.mrs');
+    p.join(workingDir, 'data', _compatHome, 'ruleset', 'muse-$name.mrs');
+
+/// 兼容内核's home folder name under data/ (fixed by the core; muse-core grpcsvc Prepare).
+const _compatHome = 'mihomo';
 
 /// Puts the bundled lists where 兼容内核 looks, when missing or older than the bundle. Never
 /// throws; returns how many were written.

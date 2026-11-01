@@ -232,14 +232,14 @@ List<String> museSip008NodeNames(String raw) {
 }
 
 /// 1.9.0 #13: the one node of a WireGuard .conf, named like 兼容内核 does: a "# Name = …" comment,
-/// else "WireGuard <first peer host>", else "WireGuard".
+/// else "WireGuard" plus the first peer's host, else "WireGuard".
 String museWireGuardNodeName(String raw) {
   String? endpoint;
   var section = '';
   for (final line in const LineSplitter().convert(raw)) {
     final t = line.trim();
     if (t.startsWith('#') || t.startsWith(';')) {
-      final c = t.replaceFirst(RegExp(r'^[#;]+'), '').trim();
+      final c = t.replaceFirst(RegExp('^[#;]+'), '').trim();
       final eq = c.indexOf('=');
       if (eq > 0 && c.substring(0, eq).trim().toLowerCase() == 'name') {
         final v = c.substring(eq + 1).trim();
