@@ -879,3 +879,56 @@ List<Rule> museApplyBlockedHosts(List<Rule> rules, List<String> hosts) {
   final list = lanFirst ? [rules.first, ...block, ...rules.skip(1)] : [...block, ...rules];
   return [for (var k = 0; k < list.length; k++) list[k].deepCopy()..listOrder = k];
 }
+
+/// 1.9.0 #64: the targets typed or pasted into 规则测试: separated by lines, spaces or commas,
+/// blanks dropped, repeats dropped (case-insensitive), at most [max].
+List<String> museSplitTargets(String text, {int max = 50}) {
+  final seen = <String>{};
+  final out = <String>[];
+  for (final p in text.split(RegExp(r'[\s,，;；、]+'))) {
+    final t = p.trim();
+    if (t.isEmpty) continue;
+    if (!seen.add(t.toLowerCase())) continue;
+    out.add(t);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/// 1.9.0 #67: the user's rules as a sing-box `route.rules` block (JSON), for other tools. Built-in
+/// rules are left out; 代理 maps to the outbound tag `proxy`, 直连 to `direct`, 拦截 to a reject action.
+String museExportRulesSingBox(List<Rule> rules) {
+  Map<String, Object?>? one(Rule r) {
+    if (r.name.startsWith('builtin:') || !r.enabled) return null;
+    final m = <String, Object?>{
+      if (r.domains.isNotEmpty) 'domain': r.domains.toList(),
+      if (r.domainSuffixes.isNotEmpty) 'domain_suffix': r.domainSuffixes.toList(),
+      if (r.domainKeywords.isNotEmpty) 'domain_keyword': r.domainKeywords.toList(),
+      if (r.domainRegexes.isNotEmpty) 'domain_regex': r.domainRegexes.toList(),
+      if (r.ipCidrs.isNotEmpty) 'ip_cidr': r.ipCidrs.toList(),
+      if (r.sourceIpCidrs.isNotEmpty) 'source_ip_cidr': r.sourceIpCidrs.toList(),
+      if (r.processNames.isNotEmpty) 'process_name': r.processNames.toList(),
+      if (r.processPaths.isNotEmpty) 'process_path': r.processPaths.toList(),
+      if (r.packageNames.isNotEmpty) 'package_name': r.packageNames.toList(),
+      if (r.portRanges.isNotEmpty) 'port_range': [for (final p in r.portRanges) p.replaceAll('-', ':')],
+      if (r.network == Network.tcp) 'network': 'tcp',
+      if (r.network == Network.udp) 'network': 'udp',
+    };
+    if (m.isEmpty) return null;
+    switch (r.outbound) {
+      case Outbound.block:
+        m['action'] = 'reject';
+      case Outbound.direct || Outbound.direct_with_fragment:
+        m['outbound'] = 'direct';
+      default:
+        m['outbound'] = 'proxy';
+    }
+    return m;
+  }
+
+  return const JsonEncoder.withIndent('  ').convert({
+    'route': {
+      'rules': [for (final r in rules) ?one(r)],
+    },
+  });
+}

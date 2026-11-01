@@ -23,6 +23,7 @@ import 'package:hiddify/features/muse/logic/lan_sync.dart';
 import 'package:hiddify/features/muse/widget/muse_segmented.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
+import 'package:hiddify/features/muse/logic/help_content.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
@@ -794,6 +795,18 @@ class MuseRoutingPage extends HookConsumerWidget {
                   if (ok) _toast(ref, '已导出');
                 },
               ),
+              // 1.9.0 #67
+              MuseTile(
+                key: const ValueKey('routing_export_singbox'),
+                leading: const Icon(Icons.output_outlined),
+                title: '导出为 sing-box 格式',
+                info: '只导出你自己的规则（route.rules 片段），内置规则和预设不含在内',
+                onTap: () async {
+                  final text = museExportRulesSingBox(ref.read(rulesNotifierProvider));
+                  final ok = await museSaveTextFile(context, 'chuanyun-rules-singbox.json', text);
+                  if (ok) _toast(ref, '已导出');
+                },
+              ),
               MuseTile(
                 key: const ValueKey('routing_import'),
                 leading: const Icon(Icons.file_open_outlined),
@@ -1045,15 +1058,17 @@ class MuseRuleTesterPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = useTextEditingController();
-    final result = useState<MuseRuleMatch?>(null);
+    // 1.9.0 #64: several domains at once (one per line, or separated by spaces / commas)
+    final results = useState<List<(String, MuseRuleMatch)>>(const []);
     final mt = MuseTheme.of(context);
     void run() {
-      final v = controller.text.trim();
-      if (v.isEmpty) return;
-      result.value = museTestRules(museEffectiveRules(ref), v);
+      final targets = museSplitTargets(controller.text);
+      if (targets.isEmpty) return;
+      final rules = museEffectiveRules(ref);
+      results.value = [for (final t in targets) (t, museTestRules(rules, t))];
     }
 
-    final r = result.value;
+    final single = results.value.length == 1;
     return MuseScaffold(
       title: '规则测试',
       body: MuseGroupedBody(
@@ -1063,10 +1078,11 @@ class MuseRuleTesterPage extends HookConsumerWidget {
             child: TextField(
               key: const ValueKey('rule_test_field'),
               controller: controller,
-              onSubmitted: (_) => run(),
-              textInputAction: TextInputAction.search,
+              minLines: 1,
+              maxLines: 5,
+              keyboardType: TextInputType.multiline,
               decoration: InputDecoration(
-                hintText: '输入网址或域名，如 chatgpt.com',
+                hintText: '输入网址或域名，如 chatgpt.com；可一次粘贴多个',
                 filled: true,
                 fillColor: mt.card,
                 border: const OutlineInputBorder(borderRadius: MuseRadius.cardAll, borderSide: BorderSide.none),
@@ -1074,21 +1090,23 @@ class MuseRuleTesterPage extends HookConsumerWidget {
               ),
             ),
           ),
-          if (r != null)
+          if (results.value.isNotEmpty)
             MuseSection(
+              dividerIndent: MuseSpace.s16,
               children: [
-                MuseTile(
-                  key: const ValueKey('rule_test_result'),
-                  leading: Icon(
-                    switch (r.outbound) {
-                      Outbound.direct || Outbound.direct_with_fragment => Icons.near_me_outlined,
-                      Outbound.block => Icons.block_outlined,
-                      _ => Icons.vpn_lock_outlined,
-                    },
+                for (final (i, (target, r)) in results.value.indexed)
+                  MuseTile(
+                    key: ValueKey(single ? 'rule_test_result' : 'rule_test_result_$i'),
+                    leading: Icon(
+                      switch (r.outbound) {
+                        Outbound.direct || Outbound.direct_with_fragment => Icons.near_me_outlined,
+                        Outbound.block => Icons.block_outlined,
+                        _ => Icons.vpn_lock_outlined,
+                      },
+                    ),
+                    title: single ? museOutboundTitle(r.outbound) : '$target → ${museOutboundTitle(r.outbound)}',
+                    subtitle: r.rule == null ? r.reason : '${museRuleDisplayName(r.rule!.name)} · ${r.reason}',
                   ),
-                  title: museOutboundTitle(r.outbound),
-                  subtitle: r.rule == null ? r.reason : '${museRuleDisplayName(r.rule!.name)} · ${r.reason}',
-                ),
               ],
             ),
         ],
@@ -1152,6 +1170,15 @@ class MuseNetworkPage extends HookConsumerWidget {
                   if (picked != null) await ref.read(MusePrefs.dnsPreset.notifier).update(picked);
                 },
               ),
+              // 1.9.0 #78: one tap back to the recommended DNS
+              if (dns.key != museDnsPresets.first.key)
+                MuseTile(
+                  key: const ValueKey('network_dns_restore'),
+                  leading: const Icon(Icons.restart_alt_outlined),
+                  title: '恢复推荐 DNS',
+                  subtitle: '改回「${museDnsPresets.first.title}」',
+                  onTap: () => ref.read(MusePrefs.dnsPreset.notifier).update(museDnsPresets.first.key),
+                ),
             ],
           ),
           // 1.4.1
@@ -1386,6 +1413,15 @@ class MuseSyncPage extends HookConsumerWidget {
                   }
                   await restore(text, password: pw);
                 },
+              ),
+              // 1.9.0 #200
+              MuseSwitchTile(
+                key: const ValueKey('weekly_snapshot'),
+                leading: const Icon(Icons.event_repeat_outlined),
+                title: '每周本地快照',
+                info: '每周自动保存一份设置和订阅到本机（含订阅链接，不上传），保留最近 5 份，可在「自动备份」里恢复',
+                value: ref.watch(MusePrefs.weeklySnapshot),
+                onChanged: (v) => ref.read(MusePrefs.weeklySnapshot.notifier).update(v),
               ),
               // 1.5.0 #197 / #206: taken by itself before a restore or an app update
               MuseTile(
@@ -1760,6 +1796,24 @@ class MuseStatsPage extends HookConsumerWidget {
             header: '本月报告',
             dividerIndent: MuseSpace.s16,
             children: [for (final line in report) MuseTile(title: line)],
+          ),
+          // 1.9.0 #179
+          MuseSection(
+            children: [
+              MuseTile(
+                key: const ValueKey('stats_export_csv'),
+                leading: const Icon(Icons.table_chart_outlined),
+                title: '导出 CSV',
+                subtitle: log.days.isEmpty ? '还没有流量记录' : '每天的上传 / 下载字节数，可用表格软件打开',
+                chevron: log.days.isNotEmpty,
+                onTap: log.days.isEmpty
+                    ? null
+                    : () async {
+                        final ok = await museSaveTextFile(context, 'chuanyun-traffic.csv', museTrafficCsv(log));
+                        if (context.mounted) _toast(ref, ok ? '已导出' : '没有导出');
+                      },
+              ),
+            ],
           ),
         ],
       ),

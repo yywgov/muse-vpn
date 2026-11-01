@@ -15,6 +15,7 @@ import 'package:dio/dio.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/logic/help_content.dart';
 import 'package:hiddify/features/muse/logic/restore_plan.dart';
 import 'package:hiddify/features/muse/logic/sync_core.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
@@ -361,6 +362,24 @@ class MuseSyncService {
 
   /// 1.5.0 #197 / #206: the current settings and subscriptions saved as an automatic backup
   /// (newest 5 kept). Null when it could not be written; never throws.
+  /// 1.9.0 #200: takes the weekly snapshot when it is due (switch on, none in the last 7 days).
+  /// Never throws; true when one was taken.
+  Future<bool> weeklySnapshotIfDue({DateTime? now}) async {
+    try {
+      if (!ref.read(MusePrefs.weeklySnapshot)) return false;
+      final files = await museListAutoBackups();
+      final times = [
+        for (final f in files)
+          if (museParseAutoBackupName(f.uri.pathSegments.last) case final m? when m.reason == 'weekly') m.at,
+      ];
+      final t = now ?? DateTime.now();
+      if (!museWeeklySnapshotDue(times, t)) return false;
+      return await autoBackup('weekly') != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<File?> autoBackup(String reason) async {
     try {
       final dir = await museAutoBackupDir();

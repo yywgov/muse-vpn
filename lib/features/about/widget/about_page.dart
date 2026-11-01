@@ -22,6 +22,7 @@ import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/local_api/local_api_providers.dart' show museEngineVersionProvider;
 import 'package:hiddify/features/muse/logic/resources.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
+import 'package:hiddify/features/muse/logic/help_content.dart' show museFileSizeText;
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart' show MuseStatusDot;
 import 'package:hiddify/gen/assets.gen.dart';
@@ -72,11 +73,12 @@ class AboutPage extends HookConsumerWidget {
           .read(dialogNotifierProvider.notifier)
           .showConfirmation(
             title: '发现新版本 ${release.version}',
-            message: pageOnly
+            message: (museFileSizeText(release.apkSize).isEmpty ? '' : '大小 ${museFileSizeText(release.apkSize)}。') +
+                (pageOnly
                 ? '将在浏览器中打开下载页面。'
                 : PlatformUtils.isWindows
                 ? '下载后自动安装并重新打开穿云，设置和订阅都会保留。'
-                : '下载后打开系统安装界面，安装后设置和订阅都会保留。',
+                : '下载后打开系统安装界面，安装后设置和订阅都会保留。'),
             positiveBtnTxt: pageOnly ? '打开下载页面' : '下载并安装',
           );
       if (!ok) return;

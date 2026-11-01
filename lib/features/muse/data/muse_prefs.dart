@@ -204,6 +204,11 @@ abstract final class MusePrefs {
 
   // ---- 1.6.0 C10
   /// 开发者选项 shown in 设置 (tap 关于 › 版本 7 times); this device only, never synced
+  /// 1.9.0 #191: after importing a subscription link from the clipboard, empty the clipboard
+  static final clearClipboardAfterImport = PreferencesNotifier.create<bool, bool>("muse_clear_clipboard", false);
+
+  /// 1.9.0 #200: a local snapshot of settings + subscriptions once a week (newest 5 kept)
+  static final weeklySnapshot = PreferencesNotifier.create<bool, bool>("muse_weekly_snapshot", false);
   static final devMode = PreferencesNotifier.create<bool, bool>("muse_dev_mode", false);
 
   /// 1.7.0 M3 内核 (MuseCoreKind key, logic/core_kind.dart): only on this device, not synced or

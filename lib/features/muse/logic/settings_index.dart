@@ -19,7 +19,9 @@ enum MuseSettingPage {
   resources('设置 › 资源'),
   themePreview('设置 › 外观 › 主题预览'),
   // 1.8.0
-  activity('设置 › 活动');
+  activity('设置 › 活动'),
+  // 1.9.0
+  help('设置 › 帮助与隐私');
 
   const MuseSettingPage(this.path);
 
@@ -81,6 +83,13 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('DNS 查询', MuseSettingPage.activity, keywords: ['DNS', '域名解析', '解析记录', '缓存命中', 'Fake-IP']),
   MuseSettingEntry('切换节点时关闭旧连接', MuseSettingPage.advanced, keywords: ['关闭连接', '断开旧连接']),
   MuseSettingEntry('测速并发数 / 超时', MuseSettingPage.developer, keywords: ['测速', '并发', '超时']),
+  // 1.9.0
+  MuseSettingEntry('帮助与隐私', MuseSettingPage.help, keywords: ['名词解释', '帮助', '术语', 'TUN', '全局', '规则', '隐私说明', '不上传', '本地保存']),
+  MuseSettingEntry('导入后清空剪贴板', MuseSettingPage.help, keywords: ['剪贴板', '订阅链接', '密钥']),
+  MuseSettingEntry('每周本地快照', MuseSettingPage.sync, keywords: ['快照', '自动备份', '每周']),
+  MuseSettingEntry('导出为 sing-box 格式', MuseSettingPage.routing, keywords: ['规则', '导出']),
+  MuseSettingEntry('恢复推荐 DNS', MuseSettingPage.network, keywords: ['默认', 'DNS', '还原']),
+  MuseSettingEntry('导出 CSV', MuseSettingPage.stats, keywords: ['流量', '表格', 'Excel']),
   MuseSettingEntry('诊断', MuseSettingPage.diagnose, keywords: ['日志', '连不上', '排查', '反馈', '崩溃']),
   MuseSettingEntry('运行模式', MuseSettingPage.main, keywords: ['TUN', '系统代理', '虚拟网卡'], windowsOnly: true),
   MuseSettingEntry('开机自启', MuseSettingPage.main, keywords: ['启动', '开机'], windowsOnly: true),

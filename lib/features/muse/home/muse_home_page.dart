@@ -5,6 +5,8 @@
 
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'dart:async';
+
+import 'package:hiddify/features/muse/data/sync_service.dart' show museSyncServiceProvider;
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
@@ -97,6 +99,13 @@ class MuseHomePage extends HookConsumerWidget {
 
     // 1.3.0: a subscription link on the clipboard puts a dot on 添加 (no banner)
     useMuseClipboardWatcher(ref);
+    // 1.9.0 #200: the weekly snapshot (when switched on), a little after start so it never delays the first frame
+    useEffect(() {
+      final timer = Timer(const Duration(seconds: 20), () {
+        unawaited(ref.read(museSyncServiceProvider).weeklySnapshotIfDue());
+      });
+      return timer.cancel;
+    }, const []);
 
     return MuseScaffold(
       large: true,

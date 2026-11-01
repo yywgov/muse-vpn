@@ -244,14 +244,23 @@ String museAutoBackupName(String reason, DateTime at) {
 String museAutoBackupReasonTitle(String reason) => switch (reason) {
   'restore' => '恢复前',
   'update' => '更新前',
+  'weekly' => '每周快照',
   _ => '自动',
 };
 
 /// Automatic backups to delete so only the newest [keep] stay (other files are left alone).
+/// 1.9.0 #200: weekly snapshots are counted apart from the ones taken before a restore / update,
+/// so one kind never pushes the other out.
 List<String> museAutoBackupsToPrune(Iterable<String> names, {int keep = museAutoBackupKeep}) {
-  final autos = [for (final n in names) if (museParseAutoBackupName(n) != null) n]
-    ..sort((a, b) => museParseAutoBackupName(a)!.at.compareTo(museParseAutoBackupName(b)!.at));
-  return autos.length <= keep ? const [] : autos.sublist(0, autos.length - keep);
+  List<String> oldest(bool weekly) {
+    final autos = [
+      for (final n in names)
+        if (museParseAutoBackupName(n) case final m? when (m.reason == 'weekly') == weekly) n,
+    ]..sort((a, b) => museParseAutoBackupName(a)!.at.compareTo(museParseAutoBackupName(b)!.at));
+    return autos.length <= keep ? const [] : autos.sublist(0, autos.length - keep);
+  }
+
+  return [...oldest(false), ...oldest(true)];
 }
 
 /// 10-24 17:05

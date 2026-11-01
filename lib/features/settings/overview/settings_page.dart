@@ -24,6 +24,7 @@ import 'package:hiddify/features/muse/settings/core_kind_section.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/settings/privacy_page.dart';
+import 'package:hiddify/features/muse/settings/help_page.dart';
 import 'package:hiddify/features/muse/settings/resources_page.dart';
 import 'package:hiddify/features/muse/settings/settings_search.dart';
 import 'package:hiddify/features/muse/settings/theme_preview_page.dart';
@@ -75,6 +76,8 @@ class SettingsPage extends HookConsumerWidget {
           musePushPage(context, const MuseDeveloperPage());
         case MuseSettingPage.resources:
           musePushPage(context, const MuseResourcesPage());
+        case MuseSettingPage.help:
+          musePushPage(context, const MuseHelpPage());
         case MuseSettingPage.themePreview:
           musePushPage(context, const MuseThemePreviewPage());
         case MuseSettingPage.perApp:
@@ -229,6 +232,14 @@ class SettingsPage extends HookConsumerWidget {
                 title: '诊断',
                 chevron: true,
                 onTap: () => showMuseDiagnoseSheet(context),
+              ),
+              // 1.9.0 #234 / #192
+              MuseTile(
+                key: const ValueKey('settings_help'),
+                leading: const Icon(Icons.help_outlined),
+                title: '帮助与隐私',
+                chevron: true,
+                onTap: () => musePushPage(context, const MuseHelpPage()),
               ),
               MuseTile(
                 key: const ValueKey('settings_about'),

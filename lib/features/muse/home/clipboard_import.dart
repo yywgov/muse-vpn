@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
@@ -118,6 +119,12 @@ class MuseClipboardOfferTile extends ConsumerWidget {
           onTap: () async {
             await done();
             await ref.read(addProfileNotifierProvider.notifier).addClipboard(link);
+            // 1.9.0 #191: the link carries a secret; empty the clipboard when asked to
+            if (ref.read(MusePrefs.clearClipboardAfterImport)) {
+              try {
+                await Clipboard.setData(const ClipboardData(text: ''));
+              } catch (_) {}
+            }
           },
         ),
       ),
