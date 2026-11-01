@@ -257,7 +257,7 @@ void main() {
     });
 
     testWidgets('debug build: 主题预览 / 消息样式测试 / 崩溃记录测试 together', (t) async {
-      await _pump(t, const MuseDeveloperPage(debugTools: true), prefs: {'muse_dev_mode': true});
+      await _pump(t, const MuseDeveloperPage() /* tests run as a debug build */, prefs: {'muse_dev_mode': true});
       for (final k in testRows) {
         await t.scrollUntilVisible(find.byKey(ValueKey(k)), 200);
         expect(find.byKey(ValueKey(k)), findsOneWidget, reason: k);
@@ -272,8 +272,8 @@ void main() {
     test('search: 测试页 only in a debug build with 开发者选项 on', () {
       for (final q in ['主题预览', '单选示例', '开关示例', '消息样式测试', '崩溃记录测试']) {
         expect(museSearchSettings(q, android: true, windows: true, developer: true, debugBuild: false), isEmpty, reason: q);
-        expect(museSearchSettings(q, android: true, windows: true, developer: false, debugBuild: true), isEmpty, reason: q);
-        expect(museSearchSettings(q, android: true, windows: true, developer: true, debugBuild: true), isNotEmpty, reason: q);
+        expect(museSearchSettings(q, android: true, windows: true), isEmpty, reason: q);
+        expect(museSearchSettings(q, android: true, windows: true, developer: true), isNotEmpty, reason: q);
       }
       // the rest of 开发者选项 stays searchable in release
       expect(museSearchSettings('调试日志', android: true, windows: true, developer: true, debugBuild: false), isNotEmpty);

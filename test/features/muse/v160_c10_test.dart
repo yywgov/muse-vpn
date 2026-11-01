@@ -422,7 +422,7 @@ void main() {
       expect(museSearchSettings('资源', android: true, windows: false).first.page, MuseSettingPage.resources);
       expect(museSearchSettings('geosite', android: true, windows: false).first.page, MuseSettingPage.resources);
       expect(museSearchSettings('主题预览', android: true, windows: false), isEmpty, reason: '1.9.0 #9: a debug-build 测试页');
-      expect(museSearchSettings('主题预览', android: true, windows: false, developer: true, debugBuild: true).single.page, MuseSettingPage.themePreview);
+      expect(museSearchSettings('主题预览', android: true, windows: false, developer: true).single.page, MuseSettingPage.themePreview);
       expect(museSearchSettings('内核版本', android: true, windows: true).first.page, MuseSettingPage.resources, reason: '1.9.0 #8: 内核与资源');
       expect(museSearchSettings('仅订阅', android: true, windows: true).single.page, MuseSettingPage.sync);
     });
@@ -499,7 +499,7 @@ void main() {
       await _pump(tester, const MuseAppearancePage());
       expect(find.byKey(const ValueKey('appearance_preview'), skipOffstage: false), findsNothing);
       await tester.pumpWidget(const SizedBox());
-      await _pump(tester, const MuseDeveloperPage(debugTools: true), prefs: {'muse_dev_mode': true});
+      await _pump(tester, const MuseDeveloperPage() /* tests run as a debug build */, prefs: {'muse_dev_mode': true});
       await tester.scrollUntilVisible(find.byKey(const ValueKey('dev_theme_preview')), 300);
       await tester.tap(find.byKey(const ValueKey('dev_theme_preview')));
       await tester.pumpAndSettle();
