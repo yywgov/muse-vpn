@@ -26,7 +26,10 @@ String museLogExportText(List<MuseLogLine> lines) => [
 ].join('\n');
 
 class MuseLogsPage extends HookConsumerWidget {
-  const MuseLogsPage({super.key});
+  const MuseLogsPage({super.key, this.header});
+
+  /// 1.8.0: inside 活动 the tab switch sits on top and the page is titled 活动
+  final Widget? header;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,7 +51,7 @@ class MuseLogsPage extends HookConsumerWidget {
     };
 
     return MuseScaffold(
-      title: '日志',
+      title: header == null ? '日志' : '活动',
       actions: [
         IconButton(
           key: const ValueKey('logs_pause'),
@@ -74,6 +77,7 @@ class MuseLogsPage extends HookConsumerWidget {
       ],
       body: Column(
         children: [
+          ?header,
           Padding(
             padding: EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), MuseSpace.s8),
             child: Column(

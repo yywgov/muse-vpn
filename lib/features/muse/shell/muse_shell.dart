@@ -40,8 +40,8 @@ class MuseShellExtra {
   final String path;
 }
 
-const museShellConnections = MuseShellExtra('connections', Icons.swap_vert_outlined, '连接', '/settings/connections');
-const museShellLogs = MuseShellExtra('logs', Icons.article_outlined, '日志', '/settings/logs');
+/// 1.8.0: one entry, 活动 (连接 / 日志 / DNS); the old 连接 / 日志 locations redirect into it.
+const museShellActivity = MuseShellExtra('activity', Icons.swap_vert_outlined, '活动', '/settings/activity');
 
 /// Which navigation a window of [width] gets.
 enum MuseNavForm { dock, rail, sidebar }
@@ -52,11 +52,9 @@ MuseNavForm museNavForm(double width) {
   return MuseNavForm.sidebar;
 }
 
-/// The sidebar extras for the current settings ([logCapture] adds 日志 once it has a page).
-List<MuseShellExtra> museShellExtras({required bool logCapture, bool logsAvailable = false}) => [
-  museShellConnections,
-  if (logCapture && logsAvailable) museShellLogs,
-];
+/// The sidebar extras. 1.8.0: always 活动 (日志 is its tab, so 日志记录 no longer adds an entry);
+/// the parameters stay for callers.
+List<MuseShellExtra> museShellExtras({required bool logCapture, bool logsAvailable = false}) => const [museShellActivity];
 
 class MuseShellFrame extends ConsumerWidget {
   const MuseShellFrame({

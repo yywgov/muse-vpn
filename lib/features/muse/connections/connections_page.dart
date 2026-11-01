@@ -27,7 +27,10 @@ const museConnRowHeight = MuseSize.rowMin + MuseSpace.s16;
 final museConnSortProvider = StateProvider<MuseConnSort>((ref) => MuseConnSort.speed);
 
 class MuseConnectionsPage extends HookConsumerWidget {
-  const MuseConnectionsPage({super.key});
+  const MuseConnectionsPage({super.key, this.header});
+
+  /// 1.8.0: inside 活动 the tab switch sits on top and the page is titled 活动
+  final Widget? header;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -59,7 +62,7 @@ class MuseConnectionsPage extends HookConsumerWidget {
     }
 
     return MuseScaffold(
-      title: '连接',
+      title: header == null ? '连接' : '活动',
       actions: [
         PopupMenuButton<MuseConnSort>(
           key: const ValueKey('conn_sort'),
@@ -85,6 +88,7 @@ class MuseConnectionsPage extends HookConsumerWidget {
       ],
       body: Column(
         children: [
+          ?header,
           Padding(
             padding: EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), MuseSpace.s8),
             child: Column(
@@ -94,7 +98,7 @@ class MuseConnectionsPage extends HookConsumerWidget {
                 SegmentedButton<int>(
                   key: const ValueKey('conn_tabs'),
                   segments: [
-                    ButtonSegment(value: 0, label: Text('活动 ${state.connections.length}')),
+                    ButtonSegment(value: 0, label: Text('进行中 ${state.connections.length}')),
                     ButtonSegment(value: 1, label: Text('请求 ${history.length}')),
                   ],
                   selected: {tab.value},
@@ -153,7 +157,7 @@ class _Summary extends StatelessWidget {
       key: const ValueKey('conn_summary'),
       child: Row(
         children: [
-          cell('活动', '${state.connections.length}'),
+          cell('进行中', '${state.connections.length}'),
           cell('↑ 上传', museSpeedText(up)),
           cell('↓ 下载', museSpeedText(down)),
           cell('本次合计', (state.frame.uploadTotal + state.frame.downloadTotal).size()),

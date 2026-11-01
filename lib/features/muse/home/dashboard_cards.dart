@@ -246,7 +246,7 @@ class _ConnectionsTile extends ConsumerWidget {
         alignment: Alignment.bottomLeft,
         child: Text(!running ? '未连接' : (error ?? '活动连接 · 最近请求 $requests'), style: MuseType.caption(context)),
       ),
-      onTap: () => context.goNamed('connections'),
+      onTap: () => context.go(museActivityLocation(MuseActivityTab.connections)),
     );
   }
 }

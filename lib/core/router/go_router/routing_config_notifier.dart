@@ -1,7 +1,4 @@
 import 'dart:async';
-import 'package:hiddify/features/muse/desktop/launch_control.dart';
-import 'package:hiddify/features/muse/logic/net_tools.dart';
-import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -14,10 +11,12 @@ import 'package:hiddify/core/router/go_router/refresh_listenable.dart';
 import 'package:hiddify/features/about/widget/about_page.dart';
 import 'package:hiddify/features/about/widget/open_source_page.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
+import 'package:hiddify/features/muse/activity/activity_page.dart';
 import 'package:hiddify/features/muse/config/muse_config_page.dart';
-import 'package:hiddify/features/muse/connections/connections_page.dart';
-import 'package:hiddify/features/muse/logs/logs_page.dart';
+import 'package:hiddify/features/muse/desktop/launch_control.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart';
+import 'package:hiddify/features/muse/logic/net_tools.dart';
+import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/nodes/muse_nodes_page.dart';
 import 'package:hiddify/features/muse/settings/per_app_proxy_page.dart';
 import 'package:hiddify/features/profile/details/profile_details_page.dart';
@@ -210,9 +209,10 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                     ),
                     // 1.2.2: 高级 (a page with this one row) is gone; TLS 分片 opens from 设置 directly
                     _slide('tlsTricks', 'tls-tricks', (_) => const TlsTricksPage()),
-                    // 1.6.0 C3: 连接 (live connections + 请求) and 日志; the sidebar opens them on wide windows
-                    _slide('connections', 'connections', (_) => const MuseConnectionsPage()),
-                    _slide('logs', 'logs', (_) => const MuseLogsPage()),
+                    // 1.8.0: 活动 = 连接 / 日志 / DNS (?tab=); the old 连接 and 日志 locations open its tab
+                    _slide(museActivityRoute, 'activity', (state) => MuseActivityPage(initial: MuseActivityTab.fromKey(state.uri.queryParameters['tab']))),
+                    GoRoute(name: 'connections', path: 'connections', redirect: (_, _) => museActivityLocation(MuseActivityTab.connections)),
+                    GoRoute(name: 'logs', path: 'logs', redirect: (_, _) => museActivityLocation(MuseActivityTab.logs)),
                     _slide(
                       'about',
                       'about',

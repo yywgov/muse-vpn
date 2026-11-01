@@ -107,6 +107,9 @@ abstract final class MuseSize {
   static const labelColumn = 72.0;
   static const labelColumnWide = 96.0;
 
+  /// 1.8.0 活动 › DNS: the right-hand column (which DNS answered, time)
+  static const dnsServerColumn = 168.0;
+
   /// the bottom element of a 首页 tile (sparkline, bar, caption)
   static const tileBottom = 20.0;
 

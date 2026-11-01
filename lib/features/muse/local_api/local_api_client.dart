@@ -336,29 +336,66 @@ class MuseLocalApi {
 
   Future<bool> closeAll() async => _ok(await _send('DELETE', '/connections'));
 
+  /// 1.8.0: empties the core's DNS query buffer.
+  Future<bool> clearDnsQueries() async => _ok(await _send('DELETE', '/dns/queries'));
+
   static bool _ok(int code) => code >= 200 && code < 300;
 
   /// A text WebSocket at [path] (frames as strings). Errors close the stream.
-  Stream<String> stream(String path, {Map<String, String>? query}) async* {
+  /// 1.8.0: cancelling the subscription closes the socket at once, also while no frame is
+  /// arriving (an `async*` generator only stops at its next frame, which kept a quiet socket open).
+  Stream<String> stream(String path, {Map<String, String>? query}) {
     final q = {...?query, if (secret.isNotEmpty) 'token': secret};
     final uri = _uri(path, q).replace(scheme: 'ws');
-    WebSocket ws;
-    try {
-      ws = await WebSocket.connect(uri.toString()).timeout(const Duration(seconds: 5));
-    } on TimeoutException {
-      throw const MuseLocalApiError('超时');
-    } on SocketException {
-      throw const MuseLocalApiError('端口未开启');
-    } on WebSocketException catch (e) {
-      throw MuseLocalApiError(e.message.contains('401') ? '密钥不匹配' : '无法连接');
+    WebSocket? ws;
+    StreamSubscription<dynamic>? sub;
+    var cancelled = false;
+    late final StreamController<String> out;
+    void fail(Object e) {
+      if (cancelled) return;
+      out.addError(e);
+      unawaited(out.close());
     }
-    try {
-      await for (final m in ws) {
-        if (m is String) yield m;
+
+    Future<void> open() async {
+      final WebSocket socket;
+      try {
+        socket = await WebSocket.connect(uri.toString()).timeout(const Duration(seconds: 5));
+      } on TimeoutException {
+        return fail(const MuseLocalApiError('超时'));
+      } on SocketException {
+        return fail(const MuseLocalApiError('端口未开启'));
+      } on WebSocketException catch (e) {
+        return fail(MuseLocalApiError(e.message.contains('401') ? '密钥不匹配' : '无法连接'));
+      } catch (e) {
+        return fail(e);
       }
-    } finally {
-      await ws.close();
+      if (cancelled) {
+        await socket.close();
+        return;
+      }
+      ws = socket;
+      sub = socket.listen(
+        (m) {
+          if (m is String && !cancelled) out.add(m);
+        },
+        onError: (Object e) => fail(e),
+        onDone: () {
+          if (!cancelled) unawaited(out.close());
+        },
+        cancelOnError: true,
+      );
     }
+
+    out = StreamController<String>(
+      onListen: () => unawaited(open()),
+      onCancel: () async {
+        cancelled = true;
+        await sub?.cancel();
+        await ws?.close();
+      },
+    );
+    return out.stream;
   }
 
   void close() => _client.close(force: true);

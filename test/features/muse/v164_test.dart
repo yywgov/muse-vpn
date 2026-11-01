@@ -82,10 +82,11 @@ void main() {
       expect(_rules(s).where((r) => r['name'] == 'builtin:bypassRegion'), isNotEmpty);
     });
 
-    test('the app ships core 5.0.0-muse.18 (the DNS / direct-routing fix)', () {
+    test('the app ships core 5.0.0-muse.18 or newer (the DNS / direct-routing fix)', () {
       final props = File('dependencies.properties').readAsStringSync();
-      expect(RegExp(r'muse\.core\.version=(\S+)').firstMatch(props)?.group(1), '5.0.0-muse.18');
-      expect(museCoreRelease, '5.0.0-muse.18');
+      final shipped = RegExp(r'muse\.core\.version=5\.0\.0-muse\.(\d+)').firstMatch(props)?.group(1);
+      expect(int.parse(shipped!), greaterThanOrEqualTo(18));
+      expect(museCoreRelease, '5.0.0-muse.$shipped');
     });
 
     test('1.7.0 carries the 1.6.4 fixes in its 更新说明 (newest entry = pubspec version)', () {

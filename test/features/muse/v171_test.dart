@@ -169,10 +169,11 @@ void main() {
   });
 
   group('1.7.1 release', () {
-    test('version 1.7.1+171, 更新说明 and CHANGELOG', () {
+    test('1.7.1 更新说明 and CHANGELOG (newest entry = pubspec version)', () {
       final pubspec = File('pubspec.yaml').readAsStringSync();
-      expect(RegExp(r'^version: (\S+)', multiLine: true).firstMatch(pubspec)?.group(1), '1.7.1+171');
-      expect(museChangelog.keys.first, '1.7.1');
+      final version = RegExp(r'^version: (\S+)', multiLine: true).firstMatch(pubspec)!.group(1)!;
+      expect(museChangelog.keys.first, version.split('+').first);
+      expect(museChangelog.keys, contains('1.7.1'));
       expect(museChangelog['1.7.1'], hasLength(3));
       final md = File('CHANGELOG.md').readAsStringSync();
       expect(md.indexOf('### 1.7.1'), lessThan(md.indexOf('### 1.7.0')));

@@ -61,9 +61,10 @@ void main() {
     expect(museNavForm(1000), MuseNavForm.sidebar);
   });
 
-  test('extras: 连接 always, 日志 only with 日志记录 on', () {
-    expect(museShellExtras(logCapture: false, logsAvailable: true).map((e) => e.title), ['连接']);
-    expect(museShellExtras(logCapture: true, logsAvailable: true).map((e) => e.title), ['连接', '日志']);
+  // 1.8.0: 连接 / 日志 are tabs of 活动, the one sidebar entry
+  test('extras: 活动 always (日志 is its tab)', () {
+    expect(museShellExtras(logCapture: false, logsAvailable: true).map((e) => e.title), ['活动']);
+    expect(museShellExtras(logCapture: true, logsAvailable: true).map((e) => e.title), ['活动']);
   });
 
   testWidgets('phone: floating dock by default, docked when chosen', (t) async {
@@ -73,7 +74,7 @@ void main() {
     for (final l in ['首页', '节点', '订阅', '设置']) {
       expect(find.text(l), findsOneWidget);
     }
-    expect(find.text('连接'), findsNothing);
+    expect(find.text('活动'), findsNothing);
     await t.tap(find.text('订阅'));
     expect(taps, [2]);
     await _pump(t, size: const Size(390, 800), prefs: {'muse_dock_style': 'docked'});
@@ -85,28 +86,28 @@ void main() {
     expect(find.byKey(const ValueKey('muse_sidebar_collapsed')), findsOneWidget);
     expect(find.byKey(const ValueKey('muse_sidebar_toggle')), findsNothing);
     expect(find.text('订阅'), findsNothing); // tooltip only
-    expect(find.byKey(const ValueKey('muse_nav_connections')), findsOneWidget);
+    expect(find.byKey(const ValueKey('muse_nav_activity')), findsOneWidget);
   });
 
-  testWidgets('1000 wide: expanded sidebar with 连接, collapse is remembered', (t) async {
+  testWidgets('1000 wide: expanded sidebar with 活动, collapse is remembered', (t) async {
     final extras = <String>[];
     final c = await _pump(t, size: const Size(1000, 800), extras: extras);
     expect(find.byKey(const ValueKey('muse_sidebar_expanded')), findsOneWidget);
     expect(find.text('订阅'), findsOneWidget);
-    expect(find.text('连接'), findsOneWidget);
+    expect(find.text('活动'), findsOneWidget);
     expect(find.text('日志'), findsNothing);
-    await t.tap(find.text('连接'));
-    expect(extras, ['connections']);
+    await t.tap(find.text('活动'));
+    expect(extras, ['activity']);
     await t.tap(find.byKey(const ValueKey('muse_sidebar_toggle')));
     await t.pumpAndSettle();
     expect(c.read(MusePrefs.sidebarExpanded), isFalse);
     expect(find.byKey(const ValueKey('muse_sidebar_collapsed')), findsOneWidget);
   });
 
-  testWidgets('sidebar marks 连接 selected on its page and shows 日志 when capturing', (t) async {
-    await _pump(t, size: const Size(1000, 800), index: 3, location: '/settings/connections', prefs: {'muse_log_capture': true});
-    expect(find.text('日志'), findsOneWidget);
-    final sem = t.getSemantics(find.byKey(const ValueKey('muse_nav_connections')));
+  testWidgets('sidebar marks 活动 selected on its page (日志 has no entry of its own)', (t) async {
+    await _pump(t, size: const Size(1000, 800), index: 3, location: '/settings/activity?tab=logs', prefs: {'muse_log_capture': true});
+    expect(find.text('日志'), findsNothing);
+    final sem = t.getSemantics(find.byKey(const ValueKey('muse_nav_activity')));
     expect(sem, containsSemantics(isSelected: true));
   });
 

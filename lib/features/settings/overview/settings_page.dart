@@ -13,18 +13,19 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
+import 'package:hiddify/features/muse/activity/activity_page.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
-import 'package:hiddify/features/muse/logic/settings_index.dart';
-import 'package:hiddify/features/muse/settings/settings_search.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
-import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
-import 'package:hiddify/features/muse/settings/more_settings.dart';
+import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart';
 import 'package:hiddify/features/muse/settings/core_kind_section.dart';
+import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/settings/privacy_page.dart';
 import 'package:hiddify/features/muse/settings/resources_page.dart';
+import 'package:hiddify/features/muse/settings/settings_search.dart';
 import 'package:hiddify/features/muse/settings/theme_preview_page.dart';
 import 'package:hiddify/features/muse/settings/windows_settings.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
@@ -82,6 +83,8 @@ class SettingsPage extends HookConsumerWidget {
           showMuseDiagnoseSheet(context);
         case MuseSettingPage.about:
           context.goNamed('about');
+        case MuseSettingPage.activity:
+          context.go(museActivityLocation(museActivityTabForSetting(e.title)));
       }
     }
 
@@ -314,13 +317,14 @@ class SettingsPage extends HookConsumerWidget {
                   value: ref.watch(MusePrefs.blockQuic),
                   onChanged: (v) => ref.read(MusePrefs.blockQuic.notifier).update(v),
                 ),
-                // 1.6.0 C3: live connections / 请求 and live logs
+                // 1.8.0: 活动 = live connections / 请求, logs and DNS queries in one page
                 MuseTile(
-                  key: const ValueKey('settings_connections'),
+                  key: const ValueKey('settings_activity'),
                   leading: const Icon(Icons.swap_vert_outlined),
-                  title: '连接',
+                  title: '活动',
+                  subtitle: '连接、日志、DNS 查询',
                   chevron: true,
-                  onTap: () => context.goNamed('connections'),
+                  onTap: () => context.go(museActivityLocation(MuseActivityTab.connections)),
                 ),
                 MuseSwitchTile(
                   key: const ValueKey('settings_auto_close'),
@@ -328,14 +332,6 @@ class SettingsPage extends HookConsumerWidget {
                   info: '换节点后，仍走旧节点的连接会立即断开并通过新节点重连',
                   value: ref.watch(MusePrefs.autoCloseConnections),
                   onChanged: (v) => ref.read(MusePrefs.autoCloseConnections.notifier).update(v),
-                ),
-                MuseTile(
-                  key: const ValueKey('settings_logs'),
-                  leading: const Icon(Icons.article_outlined),
-                  title: '日志',
-                  subtitle: ref.watch(MusePrefs.logCapture) ? '日志记录已打开' : '日志记录已关闭',
-                  chevron: true,
-                  onTap: () => context.goNamed('logs'),
                 ),
               ],
             ],

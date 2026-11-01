@@ -17,7 +17,9 @@ enum MuseSettingPage {
   about('设置 › 关于'),
   // 1.6.0 C10
   resources('设置 › 资源'),
-  themePreview('设置 › 外观 › 主题预览');
+  themePreview('设置 › 外观 › 主题预览'),
+  // 1.8.0
+  activity('设置 › 活动');
 
   const MuseSettingPage(this.path);
 
@@ -72,8 +74,11 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('IPv6', MuseSettingPage.advanced, keywords: ['v6']),
   MuseSettingEntry('Fake-IP', MuseSettingPage.advanced, keywords: ['虚拟地址', 'TUN']),
   MuseSettingEntry('屏蔽 QUIC', MuseSettingPage.advanced, keywords: ['UDP', 'YouTube', 'HTTP/3']),
-  MuseSettingEntry('连接', MuseSettingPage.advanced, keywords: ['连接列表', '实时连接', '连接信息', '请求', '屏蔽']),
-  MuseSettingEntry('日志', MuseSettingPage.advanced, keywords: ['日志记录', '实时日志', '导出日志']),
+  // 1.8.0: 连接 / 日志 / DNS are the tabs of 活动
+  MuseSettingEntry('活动', MuseSettingPage.activity, keywords: ['连接', '日志', 'DNS']),
+  MuseSettingEntry('连接', MuseSettingPage.activity, keywords: ['连接列表', '实时连接', '连接信息', '请求', '屏蔽']),
+  MuseSettingEntry('日志', MuseSettingPage.activity, keywords: ['日志记录', '实时日志', '导出日志']),
+  MuseSettingEntry('DNS 查询', MuseSettingPage.activity, keywords: ['DNS', '域名解析', '解析记录', '缓存命中', 'Fake-IP']),
   MuseSettingEntry('切换节点时关闭旧连接', MuseSettingPage.advanced, keywords: ['关闭连接', '断开旧连接']),
   MuseSettingEntry('测速并发数 / 超时', MuseSettingPage.developer, keywords: ['测速', '并发', '超时']),
   MuseSettingEntry('诊断', MuseSettingPage.diagnose, keywords: ['日志', '连不上', '排查', '反馈', '崩溃']),
@@ -120,3 +125,10 @@ List<MuseSettingEntry> museSearchSettings(String query, {required bool android, 
   bool inTitle(MuseSettingEntry e) => words.every(e.title.toLowerCase().contains);
   return [...hits.where(inTitle), ...hits.where((e) => !inTitle(e))];
 }
+
+/// 1.8.0: the 活动 tab a search result opens (by its title: 日志 / DNS 查询 / everything else 连接).
+String museActivityTabKeyForSetting(String title) => switch (title) {
+  '日志' => 'logs',
+  'DNS 查询' => 'dns',
+  _ => 'connections',
+};

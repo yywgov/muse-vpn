@@ -8,9 +8,13 @@ import 'dart:convert';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
+import 'package:hiddify/features/muse/local_api/dns_queries.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
+import 'package:hiddify/features/muse/logic/compat_profile.dart' show museEffectiveCoreKind;
+import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/features/muse/logic/resources.dart' show museEngineVersion;
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 const museWebSecretKey = 'muse_web_secret';
@@ -127,6 +131,78 @@ final museLogsProvider = StreamProvider.autoDispose<List<MuseLogLine>>((ref) asy
     yield buffer.lines;
   }
 });
+
+/// 1.8.0 DNS 查询 ---------------------------------------------------------------------------
+
+/// The queries seen so far (kept while the app runs; the core keeps its own copy).
+final museDnsBufferProvider = Provider<MuseDnsBuffer>((ref) => MuseDnsBuffer());
+
+/// The core the connection runs on (Windows: the one the app started with; Android: the saved
+/// choice, used at every connect).
+final museRunningCoreKindProvider = Provider<MuseCoreKind>(
+  (ref) => museEffectiveCoreKind(desktop: PlatformUtils.isDesktop, savedKey: ref.watch(MusePrefs.coreKind)),
+);
+
+/// What the DNS tab shows.
+class MuseDnsState {
+  const MuseDnsState({this.queries = const [], this.error, this.loading = false, this.unsupported = false});
+
+  final List<MuseDnsQuery> queries;
+  final String? error;
+  final bool loading;
+
+  /// 兼容内核 has no query records
+  final bool unsupported;
+}
+
+/// Live DNS queries. Only while the DNS tab is on screen: no grace period, the WebSocket closes
+/// the moment the tab goes away (and with it the core stops recording).
+final museDnsQueriesProvider = StreamProvider.autoDispose<MuseDnsState>((ref) async* {
+  final buffer = ref.read(museDnsBufferProvider);
+  if (ref.watch(museRunningCoreKindProvider) == MuseCoreKind.compat) {
+    yield const MuseDnsState(unsupported: true);
+    return;
+  }
+  final api = ref.watch(museLocalApiProvider);
+  if (api == null) {
+    yield MuseDnsState(queries: buffer.items, error: '未连接');
+    return;
+  }
+  yield MuseDnsState(queries: buffer.items, loading: true);
+  var first = true;
+  try {
+    await for (final raw in museUntilDisposed(ref, api.stream('/dns/queries'))) {
+      final batch = museParseDnsFrame(raw);
+      if (first) {
+        buffer.reset(batch);
+        first = false;
+      } else {
+        buffer.addAll(batch);
+      }
+      yield MuseDnsState(queries: buffer.items);
+    }
+    yield MuseDnsState(queries: buffer.items, error: '连接已断开');
+  } on MuseLocalApiError catch (e) {
+    yield MuseDnsState(queries: buffer.items, error: e.message);
+  } catch (_) {
+    yield MuseDnsState(queries: buffer.items, error: '暂不可用');
+  }
+});
+
+/// 清空: the app's list and the core's buffer.
+Future<void> museClearDnsQueries(WidgetRef ref) async {
+  ref.read(museDnsBufferProvider).clear();
+  final api = ref.read(museLocalApiProvider);
+  if (api != null) {
+    try {
+      await api.clearDnsQueries();
+    } catch (_) {
+      // the core's copy just stays until it fills up
+    }
+  }
+  // show the empty list now (the reopened stream starts from the core's emptied buffer)
+  ref.invalidate(museDnsQueriesProvider);
+}
 
 /// 屏蔽此域名: hosts sent to the core as one 拦截 rule (hot-reloaded while connected).
 List<String> museParseBlockedHosts(String raw) {
