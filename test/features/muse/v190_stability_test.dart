@@ -110,6 +110,12 @@ void main() {
       expect(ps, contains('AddSeconds(60)'));
       expect(ps.contains('WaitConnected 45'), isFalse);
     });
+
+    test('a request is tried 3 times; the stale check records the state before the kill', () {
+      expect(RegExp(r'for \(\$i = 0; \$i -lt 3; \$i\+\+\)').allMatches(ps).length, 2);
+      expect(ps, contains('\$pre = Ctl "/state"'));
+      expect(ps, contains('before the kill: '));
+    });
   });
 
   group('TODO clean-up', () {

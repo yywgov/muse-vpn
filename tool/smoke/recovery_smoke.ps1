@@ -97,8 +97,14 @@ function RunGuard([string[]]$guardArgs) {
 }
 function GuardStatus { return (RunGuard @("status", $env:TEMP, "$Port")) }
 # a request through 127.0.0.1:<mixed port> (proves the core forwards)
+# 1.9.0: up to 3 tries 2 s apart (one lost request on a CI runner is not a broken tunnel)
 function ViaProxy {
-  $code = & curl.exe -s -o NUL -w "%{http_code}" --max-time 15 -x "http://127.0.0.1:$Port" "https://www.google.com/generate_204"
+  $code = ""
+  for ($i = 0; $i -lt 3; $i++) {
+    $code = & curl.exe -s -o NUL -w "%{http_code}" --max-time 15 -x "http://127.0.0.1:$Port" "https://www.google.com/generate_204"
+    if ("$code" -eq "204") { break }
+    Start-Sleep -Seconds 2
+  }
   return "$code"
 }
 # a request with the CURRENT Windows proxy settings (what every app on the PC gets)
@@ -112,7 +118,12 @@ function ViaSystemSettings {
 }
 # without any proxy
 function Direct {
-  $code = & curl.exe -s -o NUL -w "%{http_code}" --noproxy "*" --max-time 15 "https://www.google.com/generate_204"
+  $code = ""
+  for ($i = 0; $i -lt 3; $i++) {
+    $code = & curl.exe -s -o NUL -w "%{http_code}" --noproxy "*" --max-time 15 "https://www.google.com/generate_204"
+    if ("$code" -eq "204") { break }
+    Start-Sleep -Seconds 2
+  }
   return "$code"
 }
 function LaunchApp {
@@ -286,6 +297,10 @@ Rec "crash-reconnect" "relaunched app reconnected on its own (window stays in th
 Shot "8-after-crash-relaunch"
 
 # ---- (d) killed together with its guard: the stale proxy is left; next launch clears it ----
+# 1.9.0: let the relaunched app settle (its saved state written) before pulling the plug, and keep
+# what it said right before, so a failed reconnect below tells which side lost the intent
+Start-Sleep -Seconds 5
+$pre = Ctl "/state"
 $procs = AppProcs
 Get-Process -Name ChuanyunGuard -ErrorAction SilentlyContinue | Stop-Process -Force
 $procs | Stop-Process -Force
@@ -300,7 +315,7 @@ $glog = if ($dataDir) { Get-Content -Path (Join-Path $dataDir "guard.log") -Erro
 $startupRestore = @($glog | Where-Object { $_ -match "restore\(startup\)" }).Count -ge 1
 Rec "stale-cleared" "next launch restored the leftover proxy at start-up (guard.log: restore(startup))" $startupRestore (($glog | Where-Object { $_ -match "restore\(startup\)" } | Select-Object -Last 1) -join "")
 $c = WaitConnected 90
-Rec "stale-reconnect" "and reconnected" $c[0] (StateText $c[1])
+Rec "stale-reconnect" "and reconnected" $c[0] ((StateText $c[1]) + "; before the kill: " + (StateText $pre))
 
 # ---- the user disconnects: own settings back, no auto-reconnect ----
 Ctl "/disconnect" | Out-Null
