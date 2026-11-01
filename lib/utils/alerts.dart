@@ -1,4 +1,3 @@
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/notification/toast_hover_pause.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
@@ -19,9 +18,9 @@ enum AlertType {
 class CustomToast extends StatelessWidget {
   const CustomToast(this.message, {this.type = AlertType.info, this.icon});
 
-  const CustomToast.error(this.message) : type = AlertType.error, icon = FluentIcons.error_circle_24_regular;
+  const CustomToast.error(this.message) : type = AlertType.error, icon = Icons.error_outline;
 
-  const CustomToast.success(this.message) : type = AlertType.success, icon = FluentIcons.checkmark_24_regular;
+  const CustomToast.success(this.message) : type = AlertType.success, icon = Icons.check;
 
   final String message;
   final AlertType type;
