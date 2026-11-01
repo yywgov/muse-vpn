@@ -420,10 +420,10 @@ void main() {
       expect(museSearchSettings('调试日志', android: true, windows: false, developer: true).single.page, MuseSettingPage.developer);
       expect(museSearchSettings('清除缓存', android: false, windows: true, developer: true), isNotEmpty);
       expect(museSearchSettings('资源', android: true, windows: false).first.page, MuseSettingPage.resources);
-      expect(museSearchSettings('geosite', android: true, windows: false).first.title, '资源');
+      expect(museSearchSettings('geosite', android: true, windows: false).first.page, MuseSettingPage.resources);
       expect(museSearchSettings('主题预览', android: true, windows: false), isEmpty, reason: '1.9.0 #9: a debug-build 测试页');
       expect(museSearchSettings('主题预览', android: true, windows: false, developer: true, debugBuild: true).single.page, MuseSettingPage.themePreview);
-      expect(museSearchSettings('内核版本', android: true, windows: true).single.page, MuseSettingPage.about);
+      expect(museSearchSettings('内核版本', android: true, windows: true).first.page, MuseSettingPage.resources, reason: '1.9.0 #8: 内核与资源');
       expect(museSearchSettings('仅订阅', android: true, windows: true).single.page, MuseSettingPage.sync);
     });
 

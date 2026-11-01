@@ -74,9 +74,11 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('远程 DNS', MuseSettingPage.network, keywords: ['DNS', '解析']),
   MuseSettingEntry('每天定时连接 / 断开', MuseSettingPage.autoConnect, keywords: ['定时', '计划', '网络']),
   MuseSettingEntry('连接质量提醒', MuseSettingPage.network, keywords: ['延迟', '提醒', '通知']),
-  MuseSettingEntry('局域网同步', MuseSettingPage.sync, keywords: ['配对码', '扫码', '多设备']),
-  MuseSettingEntry('WebDAV 同步', MuseSettingPage.sync, keywords: ['坚果云', '云同步']),
-  MuseSettingEntry('导出 / 恢复备份', MuseSettingPage.sync, keywords: ['备份', '恢复', '自动备份', '脱敏', '导出脱敏备份', '加密']),
+  MuseSettingEntry('局域网同步', MuseSettingPage.sync, keywords: ['配对码', '扫码', '多设备', '同步与备份']),
+  MuseSettingEntry('WebDAV 同步', MuseSettingPage.sync, keywords: ['坚果云', '云同步', '立即同步', '同步与备份']),
+  MuseSettingEntry('导出 / 恢复备份', MuseSettingPage.sync, keywords: ['备份', '恢复', '自动备份', '脱敏', '导出脱敏备份', '加密', '同步与备份']),
+  // 1.9.0 #8/#10: the page itself; 同步与备份 is its old name
+  MuseSettingEntry('备份与同步', MuseSettingPage.sync, keywords: ['同步与备份', '同步', '备份', 'WebDAV', '局域网']),
   MuseSettingEntry('流量统计', MuseSettingPage.stats, keywords: ['图表', '月报', '用量']),
   MuseSettingEntry('负载均衡策略', MuseSettingPage.advanced, keywords: ['负载均衡']),
   MuseSettingEntry('TLS 分片', MuseSettingPage.advanced, keywords: ['分片', '混淆']),
@@ -121,10 +123,14 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('检查更新', MuseSettingPage.about, keywords: ['版本', '更新内容']),
   // 1.6.0 C10
   // 1.7.0 M3
-  MuseSettingEntry('内核', MuseSettingPage.resources, keywords: ['切换内核', '标准内核', '兼容内核', '双内核', '引擎', '代理组']),
-  MuseSettingEntry('资源', MuseSettingPage.resources, keywords: ['规则集', '规则文件', 'geosite', 'geoip', '更新规则', '数据库']),
+  MuseSettingEntry('内核', MuseSettingPage.resources, keywords: ['切换内核', '标准内核', '兼容内核', '双内核', '引擎', '代理组', '内核与资源']),
+  // 1.9.0 #8/#10: 资源 is now 内核与资源 (the old name still finds it)
+  MuseSettingEntry('内核与资源', MuseSettingPage.resources, keywords: ['资源', '内核', '规则集', '规则文件', '更新规则', '数据库']),
+  MuseSettingEntry('Geo 数据库', MuseSettingPage.resources, keywords: ['geosite', 'geoip', '数据库', '内置规则集', '检查并修复', '资源']),
+  MuseSettingEntry('规则集', MuseSettingPage.resources, keywords: ['远程规则集', '规则文件', '更新规则', '资源']),
   MuseSettingEntry('主题预览', MuseSettingPage.themePreview, keywords: ['预览', '主题', '配色', '样式', '单选示例', '开关示例', '开发者选项'], debugOnly: true),
-  MuseSettingEntry('内核版本', MuseSettingPage.about, keywords: ['内核', '构建号', '版本号', '开源许可', '致谢']),
+  MuseSettingEntry('内核版本', MuseSettingPage.resources, keywords: ['内核', '版本号', '内核与资源']),
+  MuseSettingEntry('版本与构建号', MuseSettingPage.about, keywords: ['构建号', '版本号', '开源许可', '致谢']),
   MuseSettingEntry('恢复范围 / 恢复策略', MuseSettingPage.sync, keywords: ['仅订阅', '仅设置', '合并', '覆盖', '预览', '恢复']),
   MuseSettingEntry('调试日志', MuseSettingPage.developer, keywords: ['debug', '日志级别']),
   MuseSettingEntry('清除缓存', MuseSettingPage.developer, keywords: ['缓存', '临时文件']),

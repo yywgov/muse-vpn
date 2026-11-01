@@ -1,4 +1,4 @@
-// 穿云 1.7.0 M3 - 设置 › 内核: which core runs the connection (标准内核 by default) and its version.
+// 穿云 1.7.0 M3 - 设置 › 内核 (1.9.0 #8: the top of 设置 › 内核与资源): which core runs the connection (标准内核 by default) and its version.
 // Switching needs the connection off; Windows then offers to restart the app (the core library is
 // loaded once per run), Android uses the new core from the next connect.
 // Part of 穿云 (GPLv3).

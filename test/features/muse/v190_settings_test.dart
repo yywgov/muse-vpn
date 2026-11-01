@@ -1,4 +1,4 @@
-// 穿云 1.9.0 设置整理：#5 自动连接页、#6 后台保活、#7 导出备份合一、#8 备份与同步 / 内核与资源、#9 测试页仅调试版（后续项继续追加在本文件）。
+// 穿云 1.9.0 设置整理：#5 自动连接页、#6 后台保活、#7 导出备份合一、#8 备份与同步 / 内核与资源、#9 测试页仅调试版、#10 搜索索引与旧入口（后续项继续追加在本文件）。
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -277,6 +277,54 @@ void main() {
       }
       // the rest of 开发者选项 stays searchable in release
       expect(museSearchSettings('调试日志', android: true, windows: true, developer: true, debugBuild: false), isNotEmpty);
+    });
+  });
+
+  group('#10 搜索索引：旧名仍能搜到并跳到新位置', () {
+    test('old names → the new page, first hit', () {
+      const moved = <String, MuseSettingPage>{
+        '同步与备份': MuseSettingPage.sync,
+        '导出脱敏备份': MuseSettingPage.sync,
+        '脱敏': MuseSettingPage.sync,
+        '资源': MuseSettingPage.resources,
+        '内核': MuseSettingPage.resources,
+        '兼容内核': MuseSettingPage.resources,
+        '内核版本': MuseSettingPage.resources,
+        'geoip': MuseSettingPage.resources,
+        'Geo 数据库': MuseSettingPage.resources,
+        '内置规则集': MuseSettingPage.resources,
+        '自动运行': MuseSettingPage.autoConnect,
+        '按需运行': MuseSettingPage.autoConnect,
+        '定时连接': MuseSettingPage.autoConnect,
+        '允许后台运行': MuseSettingPage.keepAlive,
+      };
+      moved.forEach((q, page) {
+        final hits = museSearchSettings(q, android: true, windows: true);
+        expect(hits, isNotEmpty, reason: q);
+        expect(hits.first.page, page, reason: q);
+      });
+    });
+
+    test('nothing still points at a page that moved', () {
+      for (final e in museSettingEntries) {
+        expect(e.page.path, isNot(contains('同步与备份')), reason: e.title);
+        expect(e.page.path, isNot(endsWith('› 资源')), reason: e.title);
+        expect(e.page.path, isNot(contains('外观 › 主题预览')), reason: e.title);
+        if (e.title == '内核' || e.title == '内核版本') expect(e.page, MuseSettingPage.resources);
+      }
+      // each title once
+      final titles = museSettingEntries.map((e) => '${e.title}|${e.androidOnly}|${e.windowsOnly}').toList();
+      expect(titles.toSet().length, titles.length);
+    });
+
+    test('old entry points open the new pages', () {
+      final s = _src('lib/features/settings/overview/settings_page.dart');
+      expect(s, contains('case MuseSettingPage.sync:\n          musePushPage(context, const MuseSyncPage());'));
+      expect(s, contains('case MuseSettingPage.resources:\n          musePushPage(context, const MuseResourcesPage());'));
+      // the 资源 row (same key) now opens 内核与资源
+      expect(s, contains("key: const ValueKey('settings_resources')"));
+      expect(_src('lib/features/muse/activity/dns_view.dart'), contains('设置 › 内核与资源'));
+      expect(_src('lib/features/muse/settings/sync_pages.dart'), contains('设置 › 备份与同步 › 扫码或输入配对码'));
     });
   });
 }

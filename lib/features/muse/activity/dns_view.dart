@@ -38,7 +38,7 @@ class MuseDnsPage extends HookConsumerWidget {
 
     final Widget content;
     if (state.unsupported) {
-      content = const _Hint(icon: Icons.dns_outlined, text: '$museDnsUnsupportedText\nDNS 查询记录需要标准内核（设置 › 内核）');
+      content = const _Hint(icon: Icons.dns_outlined, text: '$museDnsUnsupportedText\nDNS 查询记录需要标准内核（设置 › 内核与资源）');
     } else if (state.queries.isEmpty && state.error != null) {
       content = _Hint(icon: Icons.cloud_off_outlined, text: state.error == '未连接' ? '连接后可查看 DNS 查询' : '暂不可用（${state.error}）');
     } else if (list.isEmpty) {
