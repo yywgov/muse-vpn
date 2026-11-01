@@ -8,8 +8,13 @@ part of 'more_settings.dart';
 /// 1.5.0: tuning nobody needs day to day (测速 并发数 / 超时 moved here from 设置 › 节点).
 /// 1.6.0 C10 (#127): hidden until 关于 › 版本 is tapped 7 times; adds 调试日志, 清除缓存,
 /// 消息样式测试, 崩溃记录测试, 重置引导 and a switch to hide it again.
+/// 1.9.0 #9: the 测试页 (主题预览 with its 单选 / 开关示例, 消息样式测试, 崩溃记录测试) only in debug
+/// builds; a release build never shows them.
 class MuseDeveloperPage extends HookConsumerWidget {
-  const MuseDeveloperPage({super.key});
+  const MuseDeveloperPage({super.key, this.debugTools = kDebugMode});
+
+  /// tests pass false to see the release page
+  final bool debugTools;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -88,34 +93,48 @@ class MuseDeveloperPage extends HookConsumerWidget {
                   _toast(ref, freed == 0 ? '没有可清除的缓存' : '已清除 ${museBytes(freed)}');
                 },
               ),
-              MuseTile(
-                key: const ValueKey('dev_toast_test'),
-                leading: const Icon(Icons.chat_bubble_outline_outlined),
-                title: '消息样式测试',
-                subtitle: '依次显示 成功 / 提示 / 错误 三种消息',
-                onTap: () {
-                  try {
-                    final n = ref.read(inAppNotificationControllerProvider);
-                    n.showSuccessToast('成功消息示例');
-                    n.showInfoToast('提示消息示例');
-                    n.showErrorToast('错误消息示例');
-                  } catch (_) {}
-                },
-              ),
-              MuseTile(
-                key: const ValueKey('dev_crash_test'),
-                leading: const Icon(Icons.report_outlined),
-                title: '崩溃记录测试',
-                subtitle: '写入一条测试崩溃，用来检查「诊断 › 导出崩溃记录」',
-                onTap: () async {
-                  final ok = await museConfirm(context, title: '崩溃记录测试', message: '写入一条测试用的崩溃记录（不会真的退出）？', okText: '写入');
-                  if (!ok) return;
-                  MuseCrashRecorder.record(StateError('穿云崩溃记录测试'), StackTrace.current);
-                  _toast(ref, '已写入测试崩溃记录');
-                },
-              ),
             ],
           ),
+          if (debugTools)
+            MuseSection(
+              header: '测试页 · 仅调试版',
+              children: [
+                MuseTile(
+                  key: const ValueKey('dev_theme_preview'),
+                  leading: const Icon(Icons.preview_outlined),
+                  title: '主题预览',
+                  subtitle: '首页、节点、列表、单选示例、开关示例',
+                  chevron: true,
+                  onTap: () => musePushPage(context, const MuseThemePreviewPage()),
+                ),
+                MuseTile(
+                  key: const ValueKey('dev_toast_test'),
+                  leading: const Icon(Icons.chat_bubble_outline_outlined),
+                  title: '消息样式测试',
+                  subtitle: '依次显示 成功 / 提示 / 错误 三种消息',
+                  onTap: () {
+                    try {
+                      final n = ref.read(inAppNotificationControllerProvider);
+                      n.showSuccessToast('成功消息示例');
+                      n.showInfoToast('提示消息示例');
+                      n.showErrorToast('错误消息示例');
+                    } catch (_) {}
+                  },
+                ),
+                MuseTile(
+                  key: const ValueKey('dev_crash_test'),
+                  leading: const Icon(Icons.report_outlined),
+                  title: '崩溃记录测试',
+                  subtitle: '写入一条测试崩溃，用来检查「诊断 › 导出崩溃记录」',
+                  onTap: () async {
+                    final ok = await museConfirm(context, title: '崩溃记录测试', message: '写入一条测试用的崩溃记录（不会真的退出）？', okText: '写入');
+                    if (!ok) return;
+                    MuseCrashRecorder.record(StateError('穿云崩溃记录测试'), StackTrace.current);
+                    _toast(ref, '已写入测试崩溃记录');
+                  },
+                ),
+              ],
+            ),
           MuseSection(
             children: [
               MuseTile(

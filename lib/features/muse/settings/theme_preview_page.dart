@@ -1,4 +1,4 @@
-// 穿云 1.6.0 C10 (C7 顺延) - 外观 › 主题预览: small, static copies of the main pieces (首页 card,
+// 穿云 1.6.0 C10 (C7 顺延) - 主题预览 (1.9.0 #9: 开发者选项, debug builds only): small, static copies of the main pieces (首页 card,
 // 节点 cards, a settings list, a dialog, buttons) in the current 深浅色 / 主题色 / 文字缩放, so a
 // change can be judged without leaving 外观. Nothing here is live data and nothing can be changed.
 // Part of 穿云 (GPLv3).

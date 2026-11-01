@@ -1,4 +1,4 @@
-// 穿云 1.9.0 设置整理：#5 自动连接页、#6 后台保活、#7 导出备份合一、#8 备份与同步 / 内核与资源（后续项继续追加在本文件）。
+// 穿云 1.9.0 设置整理：#5 自动连接页、#6 后台保活、#7 导出备份合一、#8 备份与同步 / 内核与资源、#9 测试页仅调试版（后续项继续追加在本文件）。
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -240,6 +240,43 @@ void main() {
       expect(s, isNot(contains("title: '同步与备份'")));
       expect(MuseSettingPage.sync.path, '设置 › 备份与同步');
       expect(MuseSettingPage.resources.path, '设置 › 内核与资源');
+    });
+  });
+
+  group('#9 测试页仅调试版', () {
+    const testRows = ['dev_theme_preview', 'dev_toast_test', 'dev_crash_test'];
+
+    testWidgets('release build: no 测试页 on 开发者选项', (t) async {
+      await _pump(t, const MuseDeveloperPage(debugTools: false), prefs: {'muse_dev_mode': true});
+      for (final k in testRows) {
+        expect(find.byKey(ValueKey(k), skipOffstage: false), findsNothing, reason: k);
+      }
+      expect(find.text('测试页 · 仅调试版', skipOffstage: false), findsNothing);
+      await t.scrollUntilVisible(find.byKey(const ValueKey('dev_turn_off')), 300);
+      expect(find.byKey(const ValueKey('dev_debug_log'), skipOffstage: false), findsOneWidget);
+    });
+
+    testWidgets('debug build: 主题预览 / 消息样式测试 / 崩溃记录测试 together', (t) async {
+      await _pump(t, const MuseDeveloperPage(debugTools: true), prefs: {'muse_dev_mode': true});
+      for (final k in testRows) {
+        await t.scrollUntilVisible(find.byKey(ValueKey(k)), 200);
+        expect(find.byKey(ValueKey(k)), findsOneWidget, reason: k);
+      }
+    });
+
+    test('default follows kDebugMode; 外观 has no 主题预览', () {
+      expect(_src('lib/features/muse/settings/developer_page.dart'), contains('this.debugTools = kDebugMode'));
+      expect(_src('lib/features/muse/settings/appearance_page.dart'), isNot(contains('MuseThemePreviewPage')));
+    });
+
+    test('search: 测试页 only in a debug build with 开发者选项 on', () {
+      for (final q in ['主题预览', '单选示例', '开关示例', '消息样式测试', '崩溃记录测试']) {
+        expect(museSearchSettings(q, android: true, windows: true, developer: true, debugBuild: false), isEmpty, reason: q);
+        expect(museSearchSettings(q, android: true, windows: true, developer: false, debugBuild: true), isEmpty, reason: q);
+        expect(museSearchSettings(q, android: true, windows: true, developer: true, debugBuild: true), isNotEmpty, reason: q);
+      }
+      // the rest of 开发者选项 stays searchable in release
+      expect(museSearchSettings('调试日志', android: true, windows: true, developer: true, debugBuild: false), isNotEmpty);
     });
   });
 }

@@ -132,14 +132,7 @@ class MuseAppearancePage extends HookConsumerWidget {
                 value: ref.watch(MusePrefs.privacyMask),
                 onChanged: (v) => ref.read(MusePrefs.privacyMask.notifier).update(v),
               ),
-              // 1.6.0 C10
-              MuseTile(
-                key: const ValueKey('appearance_preview'),
-                leading: const Icon(Icons.preview_outlined),
-                title: '主题预览',
-                chevron: true,
-                onTap: () => musePushPage(context, const MuseThemePreviewPage()),
-              ),
+              // 1.9.0 #9: 主题预览 moved to 开发者选项 (debug builds only)
             ],
           ),
         ],

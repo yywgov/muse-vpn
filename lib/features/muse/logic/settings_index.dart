@@ -1,6 +1,8 @@
 // 穿云 1.5.0 #101 - 设置 search: every setting with the page it lives on (pure logic, unit-tested).
 // Part of 穿云 (GPLv3).
 
+import 'package:flutter/foundation.dart' show kDebugMode;
+
 /// The page a setting lives on.
 enum MuseSettingPage {
   main('设置'),
@@ -17,7 +19,7 @@ enum MuseSettingPage {
   about('设置 › 关于'),
   // 1.6.0 C10
   resources('设置 › 内核与资源'),
-  themePreview('设置 › 外观 › 主题预览'),
+  themePreview('设置 › 开发者选项 › 主题预览'),
   // 1.8.0
   activity('设置 › 活动'),
   // 1.9.0
@@ -31,13 +33,16 @@ enum MuseSettingPage {
 }
 
 class MuseSettingEntry {
-  const MuseSettingEntry(this.title, this.page, {this.keywords = const [], this.androidOnly = false, this.windowsOnly = false});
+  const MuseSettingEntry(this.title, this.page, {this.keywords = const [], this.androidOnly = false, this.windowsOnly = false, this.debugOnly = false});
 
   final String title;
   final MuseSettingPage page;
   final List<String> keywords;
   final bool androidOnly;
   final bool windowsOnly;
+
+  /// 1.9.0 #9: a 测试页 under 开发者选项, found only in debug builds
+  final bool debugOnly;
 }
 
 const museSettingEntries = <MuseSettingEntry>[
@@ -118,23 +123,27 @@ const museSettingEntries = <MuseSettingEntry>[
   // 1.7.0 M3
   MuseSettingEntry('内核', MuseSettingPage.resources, keywords: ['切换内核', '标准内核', '兼容内核', '双内核', '引擎', '代理组']),
   MuseSettingEntry('资源', MuseSettingPage.resources, keywords: ['规则集', '规则文件', 'geosite', 'geoip', '更新规则', '数据库']),
-  MuseSettingEntry('主题预览', MuseSettingPage.themePreview, keywords: ['预览', '主题', '配色', '样式']),
+  MuseSettingEntry('主题预览', MuseSettingPage.themePreview, keywords: ['预览', '主题', '配色', '样式', '单选示例', '开关示例', '开发者选项'], debugOnly: true),
   MuseSettingEntry('内核版本', MuseSettingPage.about, keywords: ['内核', '构建号', '版本号', '开源许可', '致谢']),
   MuseSettingEntry('恢复范围 / 恢复策略', MuseSettingPage.sync, keywords: ['仅订阅', '仅设置', '合并', '覆盖', '预览', '恢复']),
   MuseSettingEntry('调试日志', MuseSettingPage.developer, keywords: ['debug', '日志级别']),
   MuseSettingEntry('清除缓存', MuseSettingPage.developer, keywords: ['缓存', '临时文件']),
-  MuseSettingEntry('消息样式测试', MuseSettingPage.developer, keywords: ['提示', 'toast']),
-  MuseSettingEntry('崩溃记录测试', MuseSettingPage.developer, keywords: ['崩溃', 'crash']),
+  MuseSettingEntry('消息样式测试', MuseSettingPage.developer, keywords: ['提示', 'toast'], debugOnly: true),
+  MuseSettingEntry('崩溃记录测试', MuseSettingPage.developer, keywords: ['崩溃', 'crash'], debugOnly: true),
   MuseSettingEntry('重置引导', MuseSettingPage.developer, keywords: ['引导', '新手']),
 ];
 
 /// Settings matching [query] (title, keywords or page; case-insensitive, every word must match),
 /// title matches first. Empty query = nothing. 1.6.0 C10: 开发者选项 entries only with [developer].
-List<MuseSettingEntry> museSearchSettings(String query, {required bool android, required bool windows, bool developer = false}) {
+/// 1.9.0 #9: 测试页 entries only with [developer] in a debug build ([debugBuild]).
+List<MuseSettingEntry> museSearchSettings(String query, {required bool android, required bool windows, bool developer = false, bool debugBuild = kDebugMode}) {
   final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return const [];
   bool visible(MuseSettingEntry e) =>
-      (!e.androidOnly || android) && (!e.windowsOnly || windows) && (developer || e.page != MuseSettingPage.developer);
+      (!e.androidOnly || android) &&
+      (!e.windowsOnly || windows) &&
+      (developer || e.page != MuseSettingPage.developer) &&
+      (!e.debugOnly || (developer && debugBuild));
   String hay(MuseSettingEntry e) => [e.title, ...e.keywords, e.page.path].join(' ').toLowerCase();
   final hits = [for (final e in museSettingEntries) if (visible(e) && words.every(hay(e).contains)) e];
   bool inTitle(MuseSettingEntry e) => words.every(e.title.toLowerCase().contains);
