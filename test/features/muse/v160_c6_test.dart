@@ -80,7 +80,7 @@ void main() {
       expect(tile, contains('showConfirmation('));
       expect(tile, contains("title: '查看运行配置'"));
       final page = File('lib/features/muse/config/muse_config_page.dart').readAsStringSync();
-      expect(page, contains('profile_override_entry'));
+      expect(page, contains('profile_rules_entry'));
       expect(page, contains('_MuseProfileGrid'));
       final add = File('lib/features/profile/add/add_profile_modal.dart').readAsStringSync();
       expect(add, contains('museImportLinkBatch'));

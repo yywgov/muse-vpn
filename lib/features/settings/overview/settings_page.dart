@@ -14,6 +14,7 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
+import 'package:hiddify/features/muse/config/rules_page.dart';
 import 'package:hiddify/features/muse/activity/activity_page.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
@@ -80,7 +81,9 @@ class SettingsPage extends HookConsumerWidget {
         case MuseSettingPage.nodes:
           musePushPage(context, const MuseNodeSettingsPage());
         case MuseSettingPage.routing:
-          musePushPage(context, const MuseRoutingPage());
+          museOpenRules(context);
+        case MuseSettingPage.overrides:
+          museOpenRules(context, tab: MuseRulesTab.overrides);
         case MuseSettingPage.network:
           musePushPage(context, const MuseNetworkPage());
         case MuseSettingPage.sync:
@@ -207,9 +210,11 @@ class SettingsPage extends HookConsumerWidget {
               MuseTile(
                 key: const ValueKey('settings_routing'),
                 leading: const Icon(Icons.alt_route_outlined),
-                title: '分流',
+                // 1.9.0 #17: 分流 + 订阅覆写
+                title: '规则',
+                subtitle: '分流 · 订阅覆写',
                 chevron: true,
-                onTap: () => musePushPage(context, const MuseRoutingPage()),
+                onTap: () => museOpenRules(context),
               ),
               MuseTile(
                 key: const ValueKey('settings_network'),

@@ -2,11 +2,10 @@
 // Part of 穿云 (Chuanyun), a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
-import 'package:hiddify/features/muse/config/sub_override_page.dart';
+import 'package:hiddify/features/muse/config/rules_page.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/profile_tools.dart';
@@ -86,21 +85,14 @@ class MuseConfigPage extends HookConsumerWidget {
           ),
           MuseSection(
             children: [
+              // 1.9.0 #17: 路由规则 and 订阅覆写 are one 「规则」 page (分流 / 订阅覆写 tabs)
               MuseTile(
-                leading: const Icon(Icons.route_outlined),
-                title: '路由规则',
+                key: const ValueKey('profile_rules_entry'),
+                leading: const Icon(Icons.rule_outlined),
+                title: '规则',
+                subtitle: '分流 · 订阅覆写',
                 chevron: true,
-                onTap: () => context.goNamed('routingOptions'),
-              ),
-              // 1.9.0 #15: 订阅覆写 (form; the JSON under 高级) replaces the placeholder
-              MuseTile(
-                key: const ValueKey('profile_override_entry'),
-                leading: const Icon(Icons.tune_outlined),
-                title: '订阅覆写',
-                chevron: true,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const MuseScaffold(title: '订阅覆写', body: MuseOverrideList())),
-                ),
+                onTap: () => museOpenRules(context),
               ),
             ],
           ),

@@ -9,7 +9,7 @@ enum MuseSettingPage {
   advanced('设置 › 高级'),
   appearance('设置 › 外观'),
   nodes('设置 › 节点'),
-  routing('设置 › 分流'),
+  routing('设置 › 规则 › 分流'),
   network('设置 › 网络'),
   sync('设置 › 备份与同步'),
   stats('设置 › 统计'),
@@ -25,7 +25,9 @@ enum MuseSettingPage {
   // 1.9.0
   help('设置 › 帮助与隐私'),
   autoConnect('设置 › 自动连接'),
-  keepAlive('设置 › 后台保活');
+  keepAlive('设置 › 后台保活'),
+  // 1.9.0 #17
+  overrides('设置 › 规则 › 订阅覆写');
 
   const MuseSettingPage(this.path);
 
@@ -65,6 +67,8 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('订阅 UA', MuseSettingPage.nodes, keywords: ['User-Agent', '格式', '客户端']),
   MuseSettingEntry('订阅更新方式', MuseSettingPage.nodes, keywords: ['走代理', '直连', '订阅下载']),
   MuseSettingEntry('清除测速记录', MuseSettingPage.nodes, keywords: ['延迟', '缓存']),
+  MuseSettingEntry('订阅覆写', MuseSettingPage.overrides, keywords: ['覆写', '覆写脚本', '追加节点', '代理组', '自定义规则', 'override']),
+  MuseSettingEntry('规则', MuseSettingPage.routing, keywords: ['路由规则', '分流', '自定义规则列表']),
   MuseSettingEntry('分流预设', MuseSettingPage.routing, keywords: ['规则', 'ChatGPT', 'Netflix', 'Telegram', '国内直连']),
   MuseSettingEntry('指定节点', MuseSettingPage.routing, keywords: ['网站走某个节点', '应用走某个节点']),
   MuseSettingEntry('远程规则集', MuseSettingPage.routing, keywords: ['规则订阅', 'rule-set']),

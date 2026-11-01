@@ -25,7 +25,10 @@ List<Rule> museEffectiveRules(WidgetRef ref) {
 }
 
 class MuseRoutingPage extends HookConsumerWidget {
-  const MuseRoutingPage({super.key});
+  const MuseRoutingPage({super.key, this.embedded = false});
+
+  /// 1.9.0 #17: shown as the 「分流」 tab of 「规则」 (body only, plus the rule list entry)
+  final bool embedded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,13 +37,20 @@ class MuseRoutingPage extends HookConsumerWidget {
     final nodeRules = museParseNodeRules(ref.watch(MusePrefs.nodeRules));
     final remoteSets = museParseRemoteRuleSets(ref.watch(MusePrefs.remoteRuleSets));
 
-    return MuseScaffold(
-      title: '分流',
-      body: MuseGroupedBody(
+    final body = MuseGroupedBody(
         children: [
           // 1.5.0: changes reach a running connection by themselves (hot reload)
           MuseSection(
             children: [
+              // 1.9.0 #17: the custom rule list (formerly 订阅 › 路由规则) lives under 「规则」 too
+              if (embedded)
+                MuseTile(
+                  key: const ValueKey('routing_rule_list'),
+                  leading: const Icon(Icons.route_outlined),
+                  title: '自定义规则列表',
+                  chevron: true,
+                  onTap: () => context.goNamed('routingOptions'),
+                ),
               MuseTile(
                 key: const ValueKey('routing_presets'),
                 leading: const Icon(Icons.playlist_add_check_outlined),
@@ -140,8 +150,8 @@ class MuseRoutingPage extends HookConsumerWidget {
             ],
           ),
         ],
-      ),
-    );
+      );
+    return embedded ? body : MuseScaffold(title: '分流', body: body);
   }
 }
 
