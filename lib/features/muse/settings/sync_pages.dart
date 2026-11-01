@@ -73,9 +73,7 @@ class MuseSyncPage extends HookConsumerWidget {
       await run(() async => (await service.applyRestore(plan)).summary);
     }
 
-    Future<String?> askPassword(String title) => museAskText(context, title, hint: '留空 = 不加密', obscure: true);
-
-    return MuseScaffold(
+        return MuseScaffold(
       title: '同步与备份',
       body: MuseGroupedBody(
         children: [
@@ -124,32 +122,22 @@ class MuseSyncPage extends HookConsumerWidget {
           MuseSection(
             header: '本地备份',
             children: [
+              // 1.9.0 #7: one 导出备份; 脱敏 is a checkbox in its dialog
               MuseTile(
                 key: const ValueKey('backup_export'),
                 leading: const Icon(Icons.save_alt_outlined),
                 title: '导出备份',
+                subtitle: '可选加密，或脱敏（不含订阅链接）后分享',
                 onTap: () async {
-                  final pw = await askPassword('备份密码');
-                  if (pw == null || !context.mounted) return;
+                  final choice = await showMuseExportBackupDialog(context);
+                  if (choice == null || !context.mounted) return;
                   await run(() async {
-                    final text = await ref.read(museSyncServiceProvider).exportBackup(password: pw);
+                    final text = await ref.read(museSyncServiceProvider).exportBackup(password: choice.password, redact: choice.redact);
                     if (!context.mounted) return '';
-                    final ok = await museSaveTextFile(context, 'chuanyun-backup.json', text);
+                    final ok = await museSaveTextFile(context, museBackupFileName(redact: choice.redact), text);
                     return ok ? '已导出' : '已取消';
                   });
                 },
-              ),
-              MuseTile(
-                key: const ValueKey('backup_export_redacted'),
-                leading: const Icon(Icons.shield_outlined),
-                title: '导出脱敏备份',
-                subtitle: '不含订阅链接',
-                onTap: () => run(() async {
-                  final text = await ref.read(museSyncServiceProvider).exportBackup(redact: true);
-                  if (!context.mounted) return '';
-                  final ok = await museSaveTextFile(context, 'chuanyun-backup-redacted.json', text);
-                  return ok ? '已导出' : '已取消';
-                }),
               ),
               MuseTile(
                 key: const ValueKey('backup_import'),
@@ -220,6 +208,59 @@ class MuseSyncPage extends HookConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 1.9.0 #7: what 导出备份 writes. [redact] drops subscription links (and is never encrypted, it is
+/// meant to be shared); otherwise [password] empty = plain JSON.
+typedef MuseExportBackupChoice = ({bool redact, String password});
+
+String museBackupFileName({required bool redact}) => redact ? 'chuanyun-backup-redacted.json' : 'chuanyun-backup.json';
+
+/// 1.9.0 #7: the 导出备份 dialog (脱敏 checkbox + optional password); null when cancelled.
+Future<MuseExportBackupChoice?> showMuseExportBackupDialog(BuildContext context) =>
+    showDialog<MuseExportBackupChoice>(context: context, builder: (_) => const MuseExportBackupDialog());
+
+class MuseExportBackupDialog extends HookWidget {
+  const MuseExportBackupDialog({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final redact = useState(false);
+    final password = useTextEditingController();
+    return AlertDialog(
+      title: const Text('导出备份'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CheckboxListTile(
+            key: const ValueKey('backup_export_redact'),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: redact.value,
+            title: const Text('脱敏'),
+            subtitle: const Text('不含订阅链接，可放心发给别人帮忙排查'),
+            onChanged: (v) => redact.value = v ?? false,
+          ),
+          const SizedBox(height: MuseSpace.s8),
+          TextField(
+            key: const ValueKey('backup_export_password'),
+            controller: password,
+            enabled: !redact.value,
+            obscureText: true,
+            decoration: InputDecoration(labelText: '备份密码', hintText: redact.value ? '脱敏备份不加密' : '留空 = 不加密'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(key: const ValueKey('backup_export_cancel'), onPressed: () => Navigator.of(context).pop(), child: const Text('取消')),
+        FilledButton(
+          key: const ValueKey('backup_export_ok'),
+          onPressed: () => Navigator.of(context).pop<MuseExportBackupChoice>((redact: redact.value, password: redact.value ? '' : password.text)),
+          child: const Text('导出'),
+        ),
+      ],
     );
   }
 }

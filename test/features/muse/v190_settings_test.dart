@@ -1,4 +1,4 @@
-// 穿云 1.9.0 设置整理：#5 自动连接页（后续项继续追加在本文件）。
+// 穿云 1.9.0 设置整理：#5 自动连接页、#6 后台保活、#7 导出备份合一（后续项继续追加在本文件）。
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -10,6 +10,7 @@ import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
 import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -138,6 +139,54 @@ void main() {
         expect(hits.first.page, MuseSettingPage.keepAlive, reason: q);
       }
       expect(museSearchSettings('保活', android: false, windows: true), isEmpty);
+    });
+  });
+
+  group('#7 导出备份合一', () {
+    Future<List<MuseExportBackupChoice?>> open(WidgetTester t) async {
+      final got = <MuseExportBackupChoice?>[];
+      await _pump(
+        t,
+        Builder(builder: (c) => Scaffold(body: TextButton(key: const ValueKey('open'), onPressed: () async => got.add(await showMuseExportBackupDialog(c)), child: const Text('open')))),
+      );
+      await t.tap(find.byKey(const ValueKey('open')));
+      await t.pumpAndSettle();
+      return got;
+    }
+
+    testWidgets('plain with password', (t) async {
+      final got = await open(t);
+      await t.enterText(find.byKey(const ValueKey('backup_export_password')), 'pw1');
+      await t.tap(find.byKey(const ValueKey('backup_export_ok')));
+      await t.pumpAndSettle();
+      expect(got.single, (redact: false, password: 'pw1'));
+    });
+
+    testWidgets('脱敏 ticked: password field off and ignored', (t) async {
+      final got = await open(t);
+      await t.enterText(find.byKey(const ValueKey('backup_export_password')), 'pw1');
+      await t.tap(find.byKey(const ValueKey('backup_export_redact')));
+      await t.pump();
+      expect(t.widget<TextField>(find.byKey(const ValueKey('backup_export_password'))).enabled, isFalse);
+      await t.tap(find.byKey(const ValueKey('backup_export_ok')));
+      await t.pumpAndSettle();
+      expect(got.single, (redact: true, password: ''));
+    });
+
+    testWidgets('cancel = null', (t) async {
+      final got = await open(t);
+      await t.tap(find.byKey(const ValueKey('backup_export_cancel')));
+      await t.pumpAndSettle();
+      expect(got.single, isNull);
+    });
+
+    test('one button on the page, file name follows the choice', () {
+      final page = _src('lib/features/muse/settings/sync_pages.dart');
+      expect(page, contains("ValueKey('backup_export')"));
+      expect(page, isNot(contains('backup_export_redacted')));
+      expect(page, isNot(contains("'导出脱敏备份'")));
+      expect(museBackupFileName(redact: true), 'chuanyun-backup-redacted.json');
+      expect(museBackupFileName(redact: false), 'chuanyun-backup.json');
     });
   });
 }
