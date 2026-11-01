@@ -190,8 +190,9 @@ void main() {
     test('the profile is prepared for the core before every start and reload', () {
       final c = _code('lib/features/connection/data/connection_repository.dart');
       const core = 'sing' 'box'; // the repository's field name for the core service
-      expect(RegExp('prepareProfile\\(activeProfile\\)\\)\\.flatMap\\(\\s*\\(_\\) => $core\\.start\\(').hasMatch(c), isTrue);
-      expect(RegExp('prepareProfile\\(activeProfile\\)\\)\\.flatMap\\([\\s\\S]{0,80}$core\\s*\\.reload\\(').hasMatch(c), isTrue);
+      // 1.9.0 #15: then the file to run is picked (the profile itself unless an override changes it)
+      expect(RegExp('prepareProfile\\(activeProfile\\)\\)\\.flatMap\\(\\s*\\(_\\) => runPath\\(activeProfile\\)\\.flatMap\\(\\(path\\) => $core\\.start\\(path').hasMatch(c), isTrue);
+      expect(RegExp('prepareProfile\\(activeProfile\\)\\)\\.flatMap\\(\\(_\\) => runPath\\(activeProfile\\)\\)\\.flatMap\\([\\s\\S]{0,120}$core\\.reload\\(path').hasMatch(c), isTrue);
       expect(c, contains('$core.validateConfigByPath(file.path, bodyPath, false)'));
       expect(_code('lib/features/connection/data/connection_data_providers.dart'), contains('museEffectiveCoreKind('));
     });

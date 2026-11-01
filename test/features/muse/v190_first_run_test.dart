@@ -13,7 +13,7 @@ void main() {
     expect(museFirstRunActions(qr: false).map((e) => e.$4), [MuseAddAction.paste, MuseAddAction.file]);
   });
 
-  test('the guide runs the add sheet\'s own import (same functions as its options)', () {
+  test("the guide runs the add sheet's own import (same functions as its options)", () {
     final modal = File('lib/features/profile/add/add_profile_modal.dart').readAsStringSync();
     expect(modal, contains("'粘贴链接', () => museAddFromClipboard(context, ref))"));
     expect(modal, contains("'扫描二维码', () => museAddByQr(ref))"));

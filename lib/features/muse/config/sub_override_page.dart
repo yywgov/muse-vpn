@@ -71,7 +71,7 @@ class MuseSubOverridePage extends HookConsumerWidget {
                   subtitle: '${o.rules[i].match.label} → ${o.rules[i].target.label}',
                   trailing: IconButton(
                     tooltip: '删除',
-                    icon: Icon(Icons.delete_outline, size: MuseIconSize.small, color: mt.text2),
+                    icon: Icon(Icons.delete_outlined, size: MuseIconSize.small, color: mt.text2),
                     onPressed: () => save(o.copyWith(rules: [...o.rules]..removeAt(i))),
                   ),
                 ),
@@ -97,7 +97,7 @@ class MuseSubOverridePage extends HookConsumerWidget {
                   subtitle: '${o.groups[i].urlTest ? '自动选择' : '手动选择'}${o.groups[i].filter.isEmpty ? ' · 全部节点' : ' · ${o.groups[i].filter}'}',
                   trailing: IconButton(
                     tooltip: '删除',
-                    icon: Icon(Icons.delete_outline, size: MuseIconSize.small, color: mt.text2),
+                    icon: Icon(Icons.delete_outlined, size: MuseIconSize.small, color: mt.text2),
                     onPressed: () => save(o.copyWith(groups: [...o.groups]..removeAt(i))),
                   ),
                 ),

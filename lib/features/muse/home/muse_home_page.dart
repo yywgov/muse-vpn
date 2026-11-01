@@ -3,11 +3,7 @@
 // Long-press a tile to reorder / hide. On a wide window the node list sits in a right column.
 // Part of 穿云 (GPLv3).
 
-import 'package:hiddify/features/profile/add/add_profile_modal.dart' show MuseAddAction;
-import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'dart:async';
-
-import 'package:hiddify/features/muse/data/sync_service.dart' show museSyncServiceProvider;
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
@@ -25,6 +21,7 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/activity/activity_page.dart';
 import 'package:hiddify/features/muse/data/changelog.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/data/sync_service.dart' show museSyncServiceProvider;
 import 'package:hiddify/features/muse/home/background_guard.dart';
 import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
@@ -54,6 +51,8 @@ import 'package:hiddify/features/muse/widget/muse_segmented.dart';
 import 'package:hiddify/features/muse/widget/muse_sheet.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
+import 'package:hiddify/features/profile/add/add_profile_modal.dart' show MuseAddAction;
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';

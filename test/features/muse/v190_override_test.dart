@@ -8,10 +8,11 @@ import 'package:hiddify/features/muse/logic/rules_tools.dart' show museLanRuleNa
 import 'package:hiddify/features/muse/logic/sub_override.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 
-const _json = '{"outbounds":[{"type":"vless","tag":"香港 01","server":"a"},{"type":"vless","tag":"日本 01","server":"b"},'
-    '{"type":"selector","tag":"select","outbounds":["香港 01","日本 01"]},{"type":"direct","tag":"direct"}]}';
+const _json =
+    '{"outbounds":[{"type":"vless","tag":"香港 01","server":"a"},{"type":"vless","tag":"日本 01","server":"b"},{"type":"selector","tag":"select","outbounds":["香港 01","日本 01"]},{"type":"direct","tag":"direct"}]}';
 
-const _yaml = '''proxies:
+const _yaml = '''
+proxies:
   - {name: 香港 01, type: ss, server: a, port: 1, cipher: aes-128-gcm, password: x}
 proxy-groups:
   - {name: 节点选择, type: select, proxies: [香港 01]}
@@ -110,7 +111,7 @@ void main() {
       final out = museOverrideBody(_yaml, const MuseSubOverride(nodes: ['ss://a@b:1#x'], groups: [_group]), nodesPath: '/p/1.json.override-nodes')!;
       expect(out, contains('proxy-groups:\n  - {name: "港", type: select, include-all: true, filter: "香港"}\n  - {name: 节点选择'));
       expect(out, contains('proxy-providers:\n  $museOverrideProvider: {type: file, path: "/p/1.json.override-nodes"}'));
-      expect(out, startsWith(_yaml.split('\n').first));
+      expect(out, startsWith('proxies:'));
       expect(out, contains('MATCH,节点选择'));
     });
 

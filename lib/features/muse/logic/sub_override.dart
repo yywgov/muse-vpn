@@ -124,7 +124,7 @@ class MuseSubOverride {
     return MuseSubOverride(
       enabled: j['enabled'] != false,
       rules: [for (final r in (j['rules'] is List ? j['rules'] as List : const [])) ?MuseOverrideRule.fromJson(r)],
-      nodes: museOverrideLinks((j['nodes'] is List ? (j['nodes'] as List).join('\n') : (j['nodes'] ?? '').toString())),
+      nodes: museOverrideLinks(j['nodes'] is List ? (j['nodes'] as List).join('\n') : (j['nodes'] ?? '').toString()),
       groups: [for (final g in (j['groups'] is List ? j['groups'] as List : const [])) ?MuseOverrideGroup.fromJson(g)],
     );
   }
@@ -229,7 +229,7 @@ String? _jsonBody(String body, MuseSubOverride o, List<Map<String, dynamic>> ext
     return null;
   }
   final isMap = root is Map<String, dynamic>;
-  final outbounds = <dynamic>[...(isMap ? (root['outbounds'] as List? ?? const []) : root as List)];
+  final outbounds = <dynamic>[...(isMap ? (root['outbounds'] as List? ?? const []) : root! as List)];
   final tags = <String>{for (final ob in outbounds) if (ob is Map && ob['tag'] is String) ob['tag'] as String};
   for (final ob in extra) {
     final copy = Map<String, dynamic>.of(ob);
@@ -270,8 +270,7 @@ String? _yamlBody(String body, MuseSubOverride o, String? nodesPath) {
   final out = <String>[...lines];
   final groupLines = [
     for (final g in o.groups)
-      '  - {name: ${_yamlQuote(g.name)}, type: ${g.urlTest ? 'url-test' : 'select'}, include-all: true'
-          '${g.filter.trim().isEmpty ? '' : ', filter: ${_yamlQuote(g.filter)}'}}',
+      '  - {name: ${_yamlQuote(g.name)}, type: ${g.urlTest ? 'url-test' : 'select'}, include-all: true${g.filter.trim().isEmpty ? '' : ', filter: ${_yamlQuote(g.filter)}'}}',
   ];
   final providerLines = o.nodes.isEmpty || nodesPath == null
       ? const <String>[]
