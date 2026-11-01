@@ -1,11 +1,13 @@
 // 穿云 - 设置 › 隐私与后台 (Android): hide the launcher icon, stay out of recents, quiet
 // notification, and the 后台运行 / 自启动 rows while they still need doing.
 // 1.3.0: one group inside 设置 instead of its own page.
+// 1.9.0 #6: the 后台 rows moved to 设置 › 后台保活 (keep_alive_page.dart); one row leads there.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/home/background_guard.dart';
+import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart' show musePushPage;
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
@@ -46,57 +48,33 @@ class MusePrivacySection extends HookConsumerWidget {
     }
 
     final hideNotification = ref.watch(Preferences.hideNotification);
-    final excludeRecents = ref.watch(Preferences.excludeFromRecents);
-    final batteryIgnored = ref.watch(batteryOptimizationNotifierProvider).valueOrNull;
-    final needsBattery = batteryIgnored == false;
-    final needsAutostart = !ref.watch(Preferences.autostartVisited);
+    final needsAttention = museKeepAliveNeedsAttention(
+      batteryIgnored: ref.watch(batteryOptimizationNotifierProvider).valueOrNull,
+      autostartVisited: ref.watch(Preferences.autostartVisited),
+    );
     final killCount = ref.watch(MusePrefs.killCount);
 
     return MuseSection(
       header: '隐私与后台',
       children: [
-        if (needsBattery)
-          MuseTile(
-            leading: const MuseRowIcon(Icons.battery_alert_outlined, color: MusePalette.orange),
-            title: '允许后台运行',
-            trailing: const Icon(Icons.error_outlined, color: MusePalette.orange, size: MuseIconSize.small),
-            chevron: true,
-            onTap: () => ref.read(batteryOptimizationNotifierProvider.notifier).requestToIgnore(),
-          ),
-        if (needsAutostart)
-          MuseTile(
-            leading: const MuseRowIcon(Icons.rocket_launch_outlined, color: MusePalette.orange),
-            title: '自启动',
-            trailing: const Icon(Icons.error_outlined, color: MusePalette.orange, size: MuseIconSize.small),
-            chevron: true,
-            onTap: () async {
-              await ChuanyunPlatform.openAutostartSettings();
-              await ref.read(Preferences.autostartVisited.notifier).update(true);
-            },
-          ),
-        // 1.4.1: per-brand steps (also shown after the system killed 穿云 in the background)
+        // 1.9.0 #6: 允许后台运行 / 自启动 / 不在最近任务显示 / 本机设置步骤 live on 后台保活
         MuseTile(
-          key: const ValueKey('settings_background_guide'),
-          leading: const Icon(Icons.shield_moon_outlined),
-          title: '后台保活指南',
-          trailing: killCount > 0 ? Text('被关闭 $killCount 次') : null,
+          key: const ValueKey('settings_keep_alive'),
+          leading: needsAttention
+              ? const MuseRowIcon(Icons.shield_moon_outlined, color: MusePalette.orange)
+              : const Icon(Icons.shield_moon_outlined),
+          title: '后台保活',
+          trailing: needsAttention
+              ? const Icon(Icons.error_outlined, color: MusePalette.orange, size: MuseIconSize.small)
+              : (killCount > 0 ? Text('被关闭 $killCount 次') : null),
           chevron: true,
-          onTap: () => showMuseBackgroundGuide(context),
+          onTap: () => musePushPage(context, const MuseKeepAlivePage()),
         ),
         MuseSwitchTile(
           leading: const Icon(Icons.visibility_off_outlined),
           title: '隐藏桌面图标',
           value: iconHidden.value ?? false,
           onChanged: iconHidden.value == null ? null : toggleIcon,
-        ),
-        MuseSwitchTile(
-          leading: const Icon(Icons.layers_clear_outlined),
-          title: '不在最近任务显示',
-          value: excludeRecents,
-          onChanged: (value) async {
-            await ref.read(Preferences.excludeFromRecents.notifier).update(value);
-            await ChuanyunPlatform.setExcludeFromRecents(value);
-          },
         ),
         MuseSwitchTile(
           leading: const Icon(Icons.notifications_off_outlined),

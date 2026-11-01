@@ -22,7 +22,8 @@ enum MuseSettingPage {
   activity('设置 › 活动'),
   // 1.9.0
   help('设置 › 帮助与隐私'),
-  autoConnect('设置 › 自动连接');
+  autoConnect('设置 › 自动连接'),
+  keepAlive('设置 › 后台保活');
 
   const MuseSettingPage(this.path);
 
@@ -106,9 +107,12 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('自动运行', MuseSettingPage.autoConnect, keywords: ['打开即连接', '自动连接', '启动时连接'], androidOnly: true),
   MuseSettingEntry('自动连接', MuseSettingPage.autoConnect, keywords: ['自动运行', '按需运行', '定时连接', '定时断开']),
   MuseSettingEntry('通知栏断开按钮', MuseSettingPage.main, keywords: ['通知', '断开', '停止按钮'], androidOnly: true),
-  MuseSettingEntry('允许后台运行', MuseSettingPage.main, keywords: ['保活', '电池', '后台'], androidOnly: true),
-  MuseSettingEntry('自启动', MuseSettingPage.main, keywords: ['开机', '保活'], androidOnly: true),
-  MuseSettingEntry('隐藏桌面图标 / 最近任务 / 通知', MuseSettingPage.main, keywords: ['隐私', '隐藏'], androidOnly: true),
+  MuseSettingEntry('允许后台运行', MuseSettingPage.keepAlive, keywords: ['保活', '电池', '后台', '电池优化'], androidOnly: true),
+  MuseSettingEntry('自启动', MuseSettingPage.keepAlive, keywords: ['开机', '保活'], androidOnly: true),
+  MuseSettingEntry('隐藏桌面图标 / 通知', MuseSettingPage.main, keywords: ['隐私', '隐藏'], androidOnly: true),
+  // 1.9.0 #6
+  MuseSettingEntry('后台保活', MuseSettingPage.keepAlive, keywords: ['保活', '后台保活指南', '被系统关闭', '被关闭', '本机设置步骤'], androidOnly: true),
+  MuseSettingEntry('不在最近任务显示', MuseSettingPage.keepAlive, keywords: ['最近任务', '隐藏', '多任务'], androidOnly: true),
   MuseSettingEntry('检查更新', MuseSettingPage.about, keywords: ['版本', '更新内容']),
   // 1.6.0 C10
   // 1.7.0 M3

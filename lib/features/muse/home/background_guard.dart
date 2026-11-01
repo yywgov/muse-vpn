@@ -6,6 +6,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
@@ -93,12 +94,12 @@ class _BackgroundGuideDialog extends ConsumerWidget {
         if (!ignored)
           TextButton(
             key: const ValueKey('background_guide_battery'),
-            onPressed: () => ref.read(batteryOptimizationNotifierProvider.notifier).requestToIgnore(),
+            onPressed: () => museAllowBackground(ref),
             child: const Text('允许后台运行'),
           ),
         TextButton(
           key: const ValueKey('background_guide_settings'),
-          onPressed: () => ChuanyunPlatform.openAutostartSettings(),
+          onPressed: () => museOpenAutostart(ref),
           child: const Text('打开设置'),
         ),
         FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('好的')),

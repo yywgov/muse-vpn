@@ -4,7 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/settings/data/battery_optimization_repository.dart';
 import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
@@ -59,7 +59,7 @@ class _KeepAliveGuideDialog extends ConsumerWidget {
               color: ignored ? MusePalette.green : MusePalette.orange,
             ),
             title: const Text('允许后台运行'),
-            onTap: ignored ? null : () => ref.read(batteryOptimizationNotifierProvider.notifier).requestToIgnore(),
+            onTap: ignored ? null : () => museAllowBackground(ref),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -68,10 +68,7 @@ class _KeepAliveGuideDialog extends ConsumerWidget {
               color: autostartVisited ? MusePalette.green : MusePalette.orange,
             ),
             title: const Text('自启动'),
-            onTap: () async {
-              await ChuanyunPlatform.openAutostartSettings();
-              await ref.read(Preferences.autostartVisited.notifier).update(true);
-            },
+            onTap: () => museOpenAutostart(ref),
           ),
         ],
       ),

@@ -21,6 +21,7 @@ import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
+import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/settings/core_kind_section.dart';
@@ -70,6 +71,8 @@ class SettingsPage extends HookConsumerWidget {
           break;
         case MuseSettingPage.autoConnect:
           musePushPage(context, const MuseAutoConnectPage());
+        case MuseSettingPage.keepAlive:
+          musePushPage(context, const MuseKeepAlivePage());
         case MuseSettingPage.advanced:
           advancedOpen.value = true;
         case MuseSettingPage.appearance:

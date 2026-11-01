@@ -7,15 +7,18 @@ import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
+import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
+import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<ProviderContainer> _pump(WidgetTester t, Widget home, {Map<String, Object> prefs = const {}}) async {
+Future<ProviderContainer> _pump(WidgetTester t, Widget home, {Map<String, Object> prefs = const {}, List<Override> overrides = const []}) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sp = await SharedPreferences.getInstance();
-  final c = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) async => sp)]);
+  final c = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) async => sp), ...overrides]);
   addTearDown(c.dispose);
   await t.runAsync(() => c.read(sharedPreferencesProvider.future));
   t.view.physicalSize = const Size(400, 860);
@@ -87,4 +90,59 @@ void main() {
       }
     });
   });
+
+  group('#6 后台保活', () {
+    testWidgets('one page: 允许后台运行, 自启动, 不在最近任务显示, 本机设置步骤', (t) async {
+      final c = await _pump(
+        t,
+        const MuseKeepAlivePage(),
+        prefs: {'muse_kill_count': 2},
+        overrides: [batteryOptimizationNotifierProvider.overrideWith(_FakeBattery.new)],
+      );
+      expect(find.byKey(const ValueKey('keep_alive_battery')), findsOneWidget);
+      expect(find.byKey(const ValueKey('keep_alive_autostart')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings_background_guide')), findsOneWidget);
+      expect(find.text('去开启'), findsOneWidget);
+      expect(find.text('去设置'), findsOneWidget);
+      expect(c.read(Preferences.excludeFromRecents), isFalse);
+      expect(t.takeException(), isNull);
+    });
+
+    test('needs attention while either is missing', () {
+      expect(museKeepAliveNeedsAttention(batteryIgnored: true, autostartVisited: true), isFalse);
+      expect(museKeepAliveNeedsAttention(batteryIgnored: null, autostartVisited: true), isFalse);
+      expect(museKeepAliveNeedsAttention(batteryIgnored: false, autostartVisited: true), isTrue);
+      expect(museKeepAliveNeedsAttention(batteryIgnored: true, autostartVisited: false), isTrue);
+    });
+
+    test('no duplicates: guide, kill dialog and 设置 share the actions; privacy keeps one row', () {
+      final privacy = _src('lib/features/muse/settings/privacy_page.dart');
+      for (final s in ["'允许后台运行'", "'自启动'", "'不在最近任务显示'", 'openAutostartSettings', 'requestToIgnore', 'showMuseBackgroundGuide']) {
+        expect(privacy, isNot(contains(s)), reason: s);
+      }
+      expect(privacy, contains("ValueKey('settings_keep_alive')"));
+      for (final p in ['lib/features/muse/home/keep_alive_guide.dart', 'lib/features/muse/home/background_guard.dart']) {
+        final s = _src(p);
+        expect(s, isNot(contains('openAutostartSettings')), reason: p);
+        expect(s, isNot(contains('requestToIgnore')), reason: p);
+        expect(s, contains('museOpenAutostart(ref)'), reason: p);
+      }
+      // the only callers of the platform actions outside the page itself are gone
+      final page = _src('lib/features/muse/settings/keep_alive_page.dart');
+      expect('openAutostartSettings'.allMatches(page).length, 1);
+    });
+
+    test('search: old names land on 后台保活', () {
+      for (final q in ['允许后台运行', '自启动', '最近任务', '后台保活指南', '保活']) {
+        final hits = museSearchSettings(q, android: true, windows: false);
+        expect(hits.first.page, MuseSettingPage.keepAlive, reason: q);
+      }
+      expect(museSearchSettings('保活', android: false, windows: true), isEmpty);
+    });
+  });
+}
+
+class _FakeBattery extends BatteryOptimizationNotifier {
+  @override
+  Future<bool> build() async => false;
 }
