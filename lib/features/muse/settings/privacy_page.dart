@@ -5,13 +5,13 @@
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
-import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
-import 'package:hiddify/features/muse/settings/more_settings.dart' show musePushPage;
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart' show musePushPage;
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';

@@ -3,15 +3,15 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
-import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
 import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
-import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
+import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
