@@ -57,7 +57,7 @@ class BottomSheetsNotifier extends _$BottomSheetsNotifier {
     return host.isNotEmpty ? host : target;
   }
 
-  Future<void> showAddProfile({String? url, bool triggeredByDeepLink = false}) async {
+  Future<void> showAddProfile({String? url, bool triggeredByDeepLink = false, MuseAddAction? action}) async {
     if (url != null && triggeredByDeepLink) {
       // Preventing Zero-click SSRF
       final t = ref.watch(translationsProvider).requireValue;
@@ -71,7 +71,7 @@ class BottomSheetsNotifier extends _$BottomSheetsNotifier {
         await _show(isScrollControlled: true, child: AddProfileModal(url: url));
       }
     } else {
-      await _show(isScrollControlled: true, child: AddProfileModal(url: url));
+      await _show(isScrollControlled: true, child: AddProfileModal(url: url, action: action));
     }
   }
 }

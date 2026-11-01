@@ -277,6 +277,18 @@ void main() {
     await _done(tester);
   });
 
+  testWidgets('1.9.0 #18 first run: 粘贴链接 / 从文件导入 (扫码 on phones) on the empty home, 320 px 2× fits', (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await _pump(tester, page: const MuseHomePage(), brightness: Brightness.light, size: small, hasProfile: false, connected: false);
+    expect(find.byKey(const ValueKey('first_run_paste')), findsOneWidget);
+    expect(find.byKey(const ValueKey('first_run_file')), findsOneWidget);
+    expect(find.byKey(const ValueKey('first_run_qr')), museFirstRunQr() ? findsOneWidget : findsNothing);
+    expect(find.text('粘贴链接'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _done(tester);
+  });
+
   testWidgets('准备配置 shows while the config is prepared (status still 未连接)', (tester) async {
     await _pump(tester, page: const MuseHomePage(), brightness: Brightness.light, size: phone, connected: false, preparing: true);
     expect(find.byKey(const ValueKey('home_stage_preparing')), findsOneWidget);

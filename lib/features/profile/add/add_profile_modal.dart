@@ -20,8 +20,54 @@ import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+/// 1.9.0 #18: the ways to add a subscription, shared by this sheet's options and the home guide.
+enum MuseAddAction { paste, qr, file }
+
+/// 粘贴链接: the clipboard (several links → imported one by one, then one summary).
+Future<void> museAddFromClipboard(BuildContext context, WidgetRef ref) async {
+  final cr = await Clipboard.getData(Clipboard.kTextPlain).then((value) => value?.text ?? '');
+  // 1.6.0 C6: several subscription links at once → imported one by one, then one summary
+  if (museIsLinkBatch(cr) && context.mounted) {
+    final container = ProviderScope.containerOf(context);
+    if (context.canPop()) context.pop();
+    await museImportLinkBatch(container, museSplitSubLinks(cr));
+    return;
+  }
+  await ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
+}
+
+/// 扫描二维码 (phones).
+Future<void> museAddByQr(WidgetRef ref) async {
+  final cr = await ref.read(dialogNotifierProvider.notifier).showQrScanner();
+  if (cr == null) return;
+  await ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
+}
+
+/// 从文件导入.
+Future<void> museAddFromFile(WidgetRef ref) async {
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: ['txt', 'json', 'yaml', 'yml', 'conf', 'ovpn'],
+  );
+  if (result == null) return;
+  final picked = result.files.single;
+  var bytes = picked.bytes;
+  if (bytes == null) {
+    final path = picked.path;
+    if (path == null) return;
+    final file = File(path);
+    if (!await file.exists()) return;
+    bytes = await file.readAsBytes();
+  }
+  await ref.read(addProfileNotifierProvider.notifier).addClipboard(decodeTextBytes(bytes));
+}
+
 class AddProfileModal extends HookConsumerWidget {
-  const AddProfileModal({super.key, this.url});
+  const AddProfileModal({super.key, this.url, this.action});
+
+  /// 1.9.0 #18: run one way to add right away (the home guide's buttons); the sheet shows the
+  /// progress and closes when done, as when the option is tapped inside it
+  final MuseAddAction? action;
   final String? url;
 
   @override
@@ -41,6 +87,12 @@ class AddProfileModal extends HookConsumerWidget {
       if (url != null && context.mounted) {
         if (isLoading) return;
         ref.read(addProfileNotifierProvider.notifier).addClipboard(url!);
+      } else if (action != null && context.mounted && !isLoading) {
+        await switch (action!) {
+          MuseAddAction.paste => museAddFromClipboard(context, ref),
+          MuseAddAction.qr => museAddByQr(ref),
+          MuseAddAction.file => museAddFromFile(ref),
+        };
       }
     });
     return SafeArea(
@@ -72,40 +124,10 @@ class AddProfileOptions extends HookConsumerWidget {
       onTap: onTap,
     );
     final options = <Widget>[
-      option(const ValueKey('add_from_clipboard_button'), Icons.content_paste_outlined, '粘贴链接', () async {
-        final cr = await Clipboard.getData(Clipboard.kTextPlain).then((value) => value?.text ?? '');
-        // 1.6.0 C6: several subscription links at once → imported one by one, then one summary
-        if (museIsLinkBatch(cr) && context.mounted) {
-          final container = ProviderScope.containerOf(context);
-          if (context.canPop()) context.pop();
-          await museImportLinkBatch(container, museSplitSubLinks(cr));
-          return;
-        }
-        ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
-      }),
+      option(const ValueKey('add_from_clipboard_button'), Icons.content_paste_outlined, '粘贴链接', () => museAddFromClipboard(context, ref)),
       if (!PlatformUtils.isDesktop)
-        option(const ValueKey('add_by_qr_code_button'), Icons.qr_code_scanner_outlined, '扫描二维码', () async {
-          final cr = await ref.read(dialogNotifierProvider.notifier).showQrScanner();
-          if (cr == null) return;
-          ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
-        }),
-      option(const ValueKey('add_from_file_button'), Icons.insert_drive_file_outlined, '从文件导入', () async {
-        final result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['txt', 'json', 'yaml', 'yml', 'conf', 'ovpn'],
-        );
-        if (result == null) return;
-        final picked = result.files.single;
-        var bytes = picked.bytes;
-        if (bytes == null) {
-          final path = picked.path;
-          if (path == null) return;
-          final file = File(path);
-          if (!await file.exists()) return;
-          bytes = await file.readAsBytes();
-        }
-        ref.read(addProfileNotifierProvider.notifier).addClipboard(decodeTextBytes(bytes));
-      }),
+        option(const ValueKey('add_by_qr_code_button'), Icons.qr_code_scanner_outlined, '扫描二维码', () => museAddByQr(ref)),
+      option(const ValueKey('add_from_file_button'), Icons.insert_drive_file_outlined, '从文件导入', () => museAddFromFile(ref)),
       option(const ValueKey('add_manually_button'), Icons.edit_outlined, '手动输入链接', () {
         ref.read(addProfilePageNotifierProvider.notifier).goManual();
       }),

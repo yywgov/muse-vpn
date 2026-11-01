@@ -3,6 +3,7 @@
 // Long-press a tile to reorder / hide. On a wide window the node list sits in a right column.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/profile/add/add_profile_modal.dart' show MuseAddAction;
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'dart:async';
 
@@ -1334,6 +1335,16 @@ class _TileEditor extends ConsumerWidget {
 
 // ---------------------------------------------------------------- empty state
 
+/// 1.9.0 #18: the first-run choices (key, icon, label, action); 扫码 only where there is a camera
+/// scanner (phones).
+List<(String, IconData, String, MuseAddAction)> museFirstRunActions({required bool qr}) => [
+  ('first_run_paste', Icons.content_paste_outlined, '粘贴链接', MuseAddAction.paste),
+  if (qr) ('first_run_qr', Icons.qr_code_scanner_outlined, '扫码', MuseAddAction.qr),
+  ('first_run_file', Icons.insert_drive_file_outlined, '从文件导入', MuseAddAction.file),
+];
+
+bool museFirstRunQr() => !PlatformUtils.isDesktop;
+
 class _EmptyState extends ConsumerWidget {
   const _EmptyState();
 
@@ -1365,16 +1376,37 @@ class _EmptyState extends ConsumerWidget {
                 ),
                 const SizedBox(height: MuseSpace.s16),
                 Text('还没有订阅', style: MuseType.title(context)),
+                const SizedBox(height: MuseSpace.s8),
+                // 1.9.0 #18: first run — three ways to add, the same import the add sheet uses
+                Text('选一种方式导入订阅', style: MuseType.caption(context).copyWith(color: mt.text2)),
                 const SizedBox(height: MuseSpace.s24),
-                SizedBox(
-                  width: double.infinity,
-                  height: MuseSize.button,
-                  child: FilledButton(
-                    key: const ValueKey('empty_add_button'),
-                    style: FilledButton.styleFrom(backgroundColor: museBrandOf(context), shape: MuseShape.full),
-                    onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
-                    child: const Text('添加订阅'),
+                for (final (key, icon, label, action) in museFirstRunActions(qr: museFirstRunQr()))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: MuseSpace.s8),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: MuseSize.button,
+                      child: action == MuseAddAction.paste
+                          ? FilledButton.icon(
+                              key: ValueKey(key),
+                              style: FilledButton.styleFrom(backgroundColor: museBrandOf(context), shape: MuseShape.full),
+                              onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(action: action),
+                              icon: Icon(icon),
+                              label: Text(label),
+                            )
+                          : OutlinedButton.icon(
+                              key: ValueKey(key),
+                              style: OutlinedButton.styleFrom(shape: MuseShape.full),
+                              onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(action: action),
+                              icon: Icon(icon),
+                              label: Text(label),
+                            ),
+                    ),
                   ),
+                TextButton(
+                  key: const ValueKey('empty_add_button'),
+                  onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
+                  child: Text('更多方式（手动输入等）', style: TextStyle(color: museBrandOf(context))),
                 ),
               ],
             ),
