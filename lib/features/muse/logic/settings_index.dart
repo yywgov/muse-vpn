@@ -21,7 +21,8 @@ enum MuseSettingPage {
   // 1.8.0
   activity('设置 › 活动'),
   // 1.9.0
-  help('设置 › 帮助与隐私');
+  help('设置 › 帮助与隐私'),
+  autoConnect('设置 › 自动连接');
 
   const MuseSettingPage(this.path);
 
@@ -65,7 +66,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('自定义 hosts', MuseSettingPage.routing, keywords: ['hosts', '域名解析']),
   MuseSettingEntry('导入 / 导出 / 粘贴规则', MuseSettingPage.routing, keywords: ['Clash', 'Surge', '规则']),
   MuseSettingEntry('远程 DNS', MuseSettingPage.network, keywords: ['DNS', '解析']),
-  MuseSettingEntry('每天定时连接 / 断开', MuseSettingPage.network, keywords: ['定时', '计划']),
+  MuseSettingEntry('每天定时连接 / 断开', MuseSettingPage.autoConnect, keywords: ['定时', '计划', '网络']),
   MuseSettingEntry('连接质量提醒', MuseSettingPage.network, keywords: ['延迟', '提醒', '通知']),
   MuseSettingEntry('局域网同步', MuseSettingPage.sync, keywords: ['配对码', '扫码', '多设备']),
   MuseSettingEntry('WebDAV 同步', MuseSettingPage.sync, keywords: ['坚果云', '云同步']),
@@ -92,17 +93,18 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('导出 CSV', MuseSettingPage.stats, keywords: ['流量', '表格', 'Excel']),
   MuseSettingEntry('诊断', MuseSettingPage.diagnose, keywords: ['日志', '连不上', '排查', '反馈', '崩溃']),
   MuseSettingEntry('运行模式', MuseSettingPage.main, keywords: ['TUN', '系统代理', '虚拟网卡'], windowsOnly: true),
-  MuseSettingEntry('开机自启', MuseSettingPage.main, keywords: ['启动', '开机'], windowsOnly: true),
+  MuseSettingEntry('开机自启', MuseSettingPage.autoConnect, keywords: ['启动', '开机'], windowsOnly: true),
   MuseSettingEntry('静默启动', MuseSettingPage.main, keywords: ['托盘', '后台启动', '不弹窗口', '隐藏窗口'], windowsOnly: true),
   MuseSettingEntry('关闭窗口时', MuseSettingPage.main, keywords: ['托盘', '最小化', '退出'], windowsOnly: true),
   // 1.6.0 C8
-  MuseSettingEntry('开机自启时静默', MuseSettingPage.main, keywords: ['开机', '托盘', '不弹窗口'], windowsOnly: true),
+  MuseSettingEntry('开机自启时静默', MuseSettingPage.autoConnect, keywords: ['开机', '托盘', '不弹窗口'], windowsOnly: true),
   MuseSettingEntry('穿云标题栏', MuseSettingPage.main, keywords: ['标题栏', '系统标题栏', '窗口边框'], windowsOnly: true),
   MuseSettingEntry('窗口置顶', MuseSettingPage.main, keywords: ['置顶', '最前面', '总在最前'], windowsOnly: true),
-  MuseSettingEntry('按需运行', MuseSettingPage.main, keywords: ['Wi-Fi', 'WiFi', '无线', '暂停', '家里', '公司']),
+  MuseSettingEntry('按需运行', MuseSettingPage.autoConnect, keywords: ['Wi-Fi', 'WiFi', '无线', '暂停', '家里', '公司']),
   MuseSettingEntry('快捷键', MuseSettingPage.main, keywords: ['全局快捷键', '热键', '键盘'], windowsOnly: true),
   // 1.6.0 C9 (Android 通用)
-  MuseSettingEntry('自动运行', MuseSettingPage.main, keywords: ['打开即连接', '自动连接', '启动时连接'], androidOnly: true),
+  MuseSettingEntry('自动运行', MuseSettingPage.autoConnect, keywords: ['打开即连接', '自动连接', '启动时连接'], androidOnly: true),
+  MuseSettingEntry('自动连接', MuseSettingPage.autoConnect, keywords: ['自动运行', '按需运行', '定时连接', '定时断开']),
   MuseSettingEntry('通知栏断开按钮', MuseSettingPage.main, keywords: ['通知', '断开', '停止按钮'], androidOnly: true),
   MuseSettingEntry('允许后台运行', MuseSettingPage.main, keywords: ['保活', '电池', '后台'], androidOnly: true),
   MuseSettingEntry('自启动', MuseSettingPage.main, keywords: ['开机', '保活'], androidOnly: true),

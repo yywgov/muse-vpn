@@ -11,23 +11,6 @@ class MuseNetworkPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dns = museDnsPreset(ref.watch(MusePrefs.dnsPreset));
-    final schedule = MuseSchedule.parse(ref.watch(MusePrefs.schedule));
-
-    Future<void> pickTime(bool connect) async {
-      final cur = connect ? schedule.connectAt : schedule.disconnectAt;
-      final picked = await showTimePicker(
-        context: context,
-        initialTime: cur < 0 ? TimeOfDay(hour: connect ? 8 : 23, minute: 0) : TimeOfDay(hour: cur ~/ 60, minute: cur % 60),
-        helpText: connect ? '每天定时连接' : '每天定时断开',
-        cancelText: '关闭',
-      );
-      final m = picked == null ? -1 : picked.hour * 60 + picked.minute;
-      final next = connect
-          ? MuseSchedule(connectAt: m, disconnectAt: schedule.disconnectAt)
-          : MuseSchedule(connectAt: schedule.connectAt, disconnectAt: m);
-      await ref.read(MusePrefs.schedule.notifier).update(next.toRaw());
-    }
-
     return MuseScaffold(
       title: '网络',
       body: MuseGroupedBody(
@@ -56,29 +39,7 @@ class MuseNetworkPage extends HookConsumerWidget {
                 ),
             ],
           ),
-          // 1.4.1
-          MuseSection(
-            header: '定时',
-            footer: '穿云需在运行（可在后台）；时间到时只执行一次，手动操作随时优先',
-            children: [
-              MuseTile(
-                key: const ValueKey('network_schedule_connect'),
-                leading: const Icon(Icons.alarm_on_outlined),
-                title: '每天定时连接',
-                trailing: Text(museMinuteLabel(schedule.connectAt)),
-                chevron: true,
-                onTap: () => pickTime(true),
-              ),
-              MuseTile(
-                key: const ValueKey('network_schedule_disconnect'),
-                leading: const Icon(Icons.alarm_off_outlined),
-                title: '每天定时断开',
-                trailing: Text(museMinuteLabel(schedule.disconnectAt)),
-                chevron: true,
-                onTap: () => pickTime(false),
-              ),
-            ],
-          ),
+          // 1.9.0 #5: 定时连接 / 断开 moved to 设置 › 自动连接
           MuseSection(
             children: [
               MuseSwitchTile(

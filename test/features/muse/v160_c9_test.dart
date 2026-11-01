@@ -454,17 +454,13 @@ void main() {
   });
 
   group('设置 › 通用 (Android)', () {
-    testWidgets('自动运行 and 通知栏断开按钮 switches; 按需运行 row', (t) async {
+    testWidgets('通知栏断开按钮 switch (自动运行 / 按需运行 moved to 自动连接 in 1.9.0)', (t) async {
       final c = await _pump(t, const Scaffold(body: SingleChildScrollView(child: MuseAndroidGeneralSection())));
-      expect(c.read(MusePrefs.autoRun), isFalse);
       expect(c.read(MusePrefs.notifyStopButton), isTrue);
-      await t.tap(find.byKey(const ValueKey('settings_auto_run')));
       await t.tap(find.byKey(const ValueKey('settings_notify_stop')));
       await t.pumpAndSettle();
-      expect(c.read(MusePrefs.autoRun), isTrue);
       expect(c.read(MusePrefs.notifyStopButton), isFalse);
-      expect(find.byKey(const ValueKey('settings_on_demand')), findsOneWidget);
-      expect(find.text('关'), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings_auto_run')), findsNothing);
     });
 
     test('search entries', () {

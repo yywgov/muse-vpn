@@ -20,6 +20,9 @@ import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart';
+import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
+import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
+import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/settings/core_kind_section.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
@@ -52,12 +55,21 @@ class SettingsPage extends HookConsumerWidget {
     final advancedOpen = useState(false);
     final devMode = ref.watch(MusePrefs.devMode);
     final ipv6 = MuseIpv6Policy.fromKey(ref.watch(MusePrefs.ipv6Policy));
+    // 1.9.0 #5
+    final autoSummary = museAutoConnectSummary(
+      autoRun: android && ref.watch(MusePrefs.autoRun),
+      onDemand: ref.watch(MusePrefs.onDemand) && museOnDemandSsids(ref.watch(MusePrefs.wifiRules)).isNotEmpty,
+      schedule: MuseSchedule.parse(ref.watch(MusePrefs.schedule)),
+      autoStart: PlatformUtils.isWindows && (ref.watch(autoStartNotifierProvider).valueOrNull ?? false),
+    );
 
     // 1.5.0 #101: jump to a setting found by search
     void openEntry(MuseSettingEntry e) {
       switch (e.page) {
         case MuseSettingPage.main:
           break;
+        case MuseSettingPage.autoConnect:
+          musePushPage(context, const MuseAutoConnectPage());
         case MuseSettingPage.advanced:
           advancedOpen.value = true;
         case MuseSettingPage.appearance:
@@ -126,6 +138,15 @@ class SettingsPage extends HookConsumerWidget {
                 title: '智能保持连接',
                 value: ref.watch(Preferences.museKeepAlive),
                 onChanged: (v) => ref.read(Preferences.museKeepAlive.notifier).update(v),
+              ),
+              // 1.9.0 #5: 自动运行 / 按需运行 / 定时 / 开机自启 on one page
+              MuseTile(
+                key: const ValueKey('settings_auto_connect'),
+                leading: const Icon(Icons.schedule_outlined),
+                title: '自动连接',
+                trailing: Text(autoSummary),
+                chevron: true,
+                onTap: () => musePushPage(context, const MuseAutoConnectPage()),
               ),
               MuseTile(
                 key: const ValueKey('ad_block_level'),

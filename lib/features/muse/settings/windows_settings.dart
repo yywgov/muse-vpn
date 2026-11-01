@@ -1,14 +1,13 @@
 // 穿云 Windows - the desktop-only rows of 设置: 运行模式 (系统代理 / TUN), 开机自启, 静默启动 (1.6.0 C7),
 // 关闭窗口时; 1.6.0 C8: 开机自启时静默, 穿云标题栏, 窗口置顶, 按需运行, 快捷键.
+// 1.9.0 #5: 开机自启 / 开机自启时静默 / 按需运行 moved to 设置 › 自动连接 (auto_connect_page.dart).
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
-import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/data/windows_admin.dart';
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart' show musePushPage;
@@ -33,9 +32,7 @@ class WindowsSettingsSection extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final mode = ref.watch(ConfigOptions.serviceMode);
     final tunNeedsAdmin = mode == ServiceMode.tun && !WindowsAdmin.isElevated;
-    final autoStart = ref.watch(autoStartNotifierProvider).valueOrNull ?? false;
     final closing = ref.watch(Preferences.actionAtClose);
-    final onDemandOn = ref.watch(MusePrefs.onDemand) && museOnDemandSsids(ref.watch(MusePrefs.wifiRules)).isNotEmpty;
     final hotkeyCount = ref.watch(MusePrefs.hotkeysOn) ? museParseHotkeys(ref.watch(MusePrefs.hotkeys)).length : 0;
 
     return MuseSection(
@@ -64,26 +61,6 @@ class WindowsSettingsSection extends ConsumerWidget {
             await museSwitchServiceMode(ref.read, picked);
           },
         ),
-        // 1.2.2: same switch tile as every other 设置 row
-        MuseSwitchTile(
-          leading: const Icon(Icons.power_settings_new_outlined),
-          title: '开机自启',
-          value: autoStart,
-          onChanged: (value) async {
-            final notifier = ref.read(autoStartNotifierProvider.notifier);
-            value ? await notifier.enable() : await notifier.disable();
-          },
-        ),
-        // 1.6.0 C8: a start by 开机自启 (--autostart) can stay in the tray on its own
-        if (autoStart)
-          MuseSwitchTile(
-            key: const ValueKey('settings_autostart_silent'),
-            leading: const Icon(Icons.nights_stay_outlined),
-            title: '开机自启时静默',
-            info: '电脑开机自动启动穿云时只在托盘里运行，不弹出窗口；自己打开穿云时照常显示窗口',
-            value: ref.watch(MusePrefs.autostartSilent),
-            onChanged: (v) => ref.read(MusePrefs.autostartSilent.notifier).update(v),
-          ),
         // 1.6.0 C7 (#146): the existing silent_start preference, now on screen
         MuseSwitchTile(
           key: const ValueKey('settings_silent_start'),
@@ -108,14 +85,6 @@ class WindowsSettingsSection extends ConsumerWidget {
           title: '窗口置顶',
           value: ref.watch(MusePrefs.alwaysOnTop),
           onChanged: (v) => ref.read(windowNotifierProvider.notifier).setAlwaysOnTop(v),
-        ),
-        MuseTile(
-          key: const ValueKey('settings_on_demand'),
-          leading: const Icon(Icons.wifi_outlined),
-          title: '按需运行',
-          trailing: Text(onDemandOn ? '开' : '关'),
-          chevron: true,
-          onTap: () => musePushPage(context, const MuseOnDemandPage()),
         ),
         MuseTile(
           key: const ValueKey('settings_hotkeys'),
