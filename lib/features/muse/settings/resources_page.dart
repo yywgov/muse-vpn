@@ -1,8 +1,9 @@
 // 穿云 1.6.0 C10 - 设置 › 资源: the rule-sets the app ships (name, kind, size, when the copy on this
 // device was written, 修复 = copy the missing / damaged ones again) and the remote rule-sets the
-// user added (managed in 分流 › 远程规则集, one tap away). 数据库 and 脚本 are placeholders for
-// the dual-core version. Reading the files happens off the first frame, so opening 设置 is not
-// slowed down.
+// user added (managed in 分流 › 远程规则集, one tap away). Reading the files happens off the first
+// frame, so opening 设置 is not slowed down.
+// 1.9.0 #8: 内核与资源 — one page for 内核 / 内核版本 (Windows and Android), Geo 数据库 (the
+// geosite / geoip files that ship with the app) and 规则集 (the ones the user added).
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
@@ -15,15 +16,23 @@ import 'package:hiddify/features/muse/logic/node_order.dart' show museBytes;
 import 'package:hiddify/features/muse/logic/resources.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:hiddify/features/muse/logic/sync_core.dart' show museShortDateTime;
+import 'package:hiddify/features/muse/settings/core_kind_section.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart' show MuseRemoteRuleSetsPage, musePushPage;
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class MuseResourcesPage extends HookConsumerWidget {
-  const MuseResourcesPage({super.key, this.baseDir});
+  const MuseResourcesPage({super.key, this.baseDir, this.showCore, this.desktop});
 
   /// for tests; otherwise the app's base directory
   final String? baseDir;
+
+  /// 1.9.0 #8: the 内核 section; null = on Windows and Android (tests pass it)
+  final bool? showCore;
+
+  /// passed to the 内核 section (tests); null = the real platform
+  final bool? desktop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -71,17 +80,18 @@ class MuseResourcesPage extends HookConsumerWidget {
     final mt = MuseTheme.of(context);
 
     return MuseScaffold(
-      title: '资源',
+      title: museCoreResourcesTitle,
       body: MuseGroupedBody(
         children: [
+          if (showCore ?? (PlatformUtils.isWindows || PlatformUtils.isAndroid)) MuseCoreKindSection(desktop: desktop),
           MuseSection(
-            header: '内置规则集',
-            footer: '随穿云提供，连接时直接使用，不用等下载；连接后每 $museRuleSetUpdateDays 天在后台自动更新为最新版',
+            header: 'Geo 数据库',
+            footer: 'GeoSite（域名）/ GeoIP（IP）规则集，随穿云提供，连接时直接使用，不用等下载；连接后每 $museRuleSetUpdateDays 天在后台自动更新为最新版',
             children: [
               MuseTile(
                 key: const ValueKey('res_builtin_summary'),
                 leading: const Icon(Icons.inventory_2_outlined),
-                title: '规则集',
+                title: '内置数据',
                 subtitle: list == null ? '读取中…' : '本机 ${present.length} / ${list.length} 个 · 共 ${museBytes(museRuleSetTotal(present))}',
               ),
               if (list != null)
@@ -110,8 +120,8 @@ class MuseResourcesPage extends HookConsumerWidget {
             ],
           ),
           MuseSection(
-            header: '远程规则集',
-            footer: '你添加的规则集链接：首次连接时下载，之后每 $museRuleSetUpdateDays 天在后台更新',
+            header: '规则集',
+            footer: '你添加的远程规则集链接：首次连接时下载，之后每 $museRuleSetUpdateDays 天在后台更新',
             children: [
               for (var i = 0; i < remote.length; i++)
                 MuseTile(
@@ -130,26 +140,11 @@ class MuseResourcesPage extends HookConsumerWidget {
               ),
             ],
           ),
-          // placeholders, grey: these come with the dual-core version
-          MuseSection(
-            header: '数据库与脚本 · 双内核版本提供',
-            children: [
-              MuseTile(
-                key: const ValueKey('res_geo_placeholder'),
-                leading: Icon(Icons.public_outlined, color: mt.text3),
-                title: 'Geo 数据库',
-                subtitle: '查看与编辑 GeoIP / GeoSite 文件',
-              ),
-              MuseTile(
-                key: const ValueKey('res_script_placeholder'),
-                leading: Icon(Icons.code_outlined, color: mt.text3),
-                title: '脚本',
-                subtitle: '订阅覆写脚本',
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 }
+
+/// 1.9.0 #8
+const museCoreResourcesTitle = '内核与资源';

@@ -292,9 +292,9 @@ void main() {
       }
     });
 
-    test('the settings page shows 内核 on Windows and Android', () {
-      final s = File('lib/features/settings/overview/settings_page.dart').readAsStringSync();
-      expect(s, contains('if (PlatformUtils.isWindows || android) const MuseCoreKindSection()'));
+    test('内核 on Windows and Android: 1.9.0 #8 moved to 内核与资源', () {
+      final s = File('lib/features/muse/settings/resources_page.dart').readAsStringSync();
+      expect(s, contains('if (showCore ?? (PlatformUtils.isWindows || PlatformUtils.isAndroid)) MuseCoreKindSection(desktop: desktop)'));
     });
   });
 }

@@ -1,9 +1,13 @@
-// 穿云 - 设置 › 同步与备份（局域网、WebDAV、备份）. Split out of more_settings.dart in 1.9.0 (same library, behaviour unchanged).
+// 穿云 - 设置 › 备份与同步（备份、WebDAV、局域网）. Split out of more_settings.dart in 1.9.0; #8 renamed to 备份与同步,
+// one page in that order: 导出 / 恢复 / 自动备份, WebDAV (status + 立即同步 here, details one tap away), 局域网同步.
 // Part of 穿云 (GPLv3).
 
 part of 'more_settings.dart';
 
-// ======================================================================= 同步与备份
+// ======================================================================= 备份与同步
+
+/// 1.9.0 #8
+const museBackupSyncTitle = '备份与同步';
 
 class MuseSyncPage extends HookConsumerWidget {
   const MuseSyncPage({super.key});
@@ -74,53 +78,11 @@ class MuseSyncPage extends HookConsumerWidget {
     }
 
         return MuseScaffold(
-      title: '同步与备份',
+      title: museBackupSyncTitle,
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            header: '局域网同步',
-            footer: '两台设备连同一 Wi‑Fi / 局域网，无需账号；配对码 3 分钟内有效、只能用一次，数据全程加密',
-            children: [
-              MuseTile(
-                key: const ValueKey('lan_host'),
-                leading: const Icon(Icons.qr_code_2_outlined),
-                title: '显示配对码',
-                subtitle: '在另一台设备上扫码或输入',
-                chevron: true,
-                onTap: busy.value ? null : () => showMuseLanHostSheet(context),
-              ),
-              if (PlatformUtils.isAndroid || PlatformUtils.isIOS)
-                MuseTile(
-                  key: const ValueKey('lan_scan'),
-                  leading: busy.value
-                      ? const SizedBox(
-                          width: MuseIconSize.small,
-                          height: MuseIconSize.small,
-                          child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke),
-                        )
-                      : const Icon(Icons.qr_code_scanner_outlined),
-                  title: '扫码配对',
-                  chevron: true,
-                  onTap: busy.value ? null : () async => join(await ref.read(dialogNotifierProvider.notifier).showQrScanner()),
-                ),
-              MuseTile(
-                key: const ValueKey('lan_type'),
-                leading: const Icon(Icons.keyboard_outlined),
-                title: '输入配对码',
-                chevron: true,
-                onTap: busy.value ? null : () async => join(await museAskText(context, '配对码', hint: '192.168.1.5:43125 ABCD-EFGH-…')),
-              ),
-              if (lastAt != 0)
-                MuseTile(
-                  key: const ValueKey('sync_last'),
-                  leading: const Icon(Icons.history_outlined),
-                  title: '上次同步',
-                  trailing: Text(museUpdatedAgo(DateTime.fromMillisecondsSinceEpoch(lastAt), now: DateTime.now()).replaceAll('更新', '')),
-                ),
-            ],
-          ),
-          MuseSection(
-            header: '本地备份',
+            header: '备份',
             children: [
               // 1.9.0 #7: one 导出备份; 脱敏 is a checkbox in its dialog
               MuseTile(
@@ -194,16 +156,66 @@ class MuseSyncPage extends HookConsumerWidget {
             ],
           ),
           MuseSection(
-            header: '更多',
+            header: 'WebDAV 同步',
+            footer: '支持任意 WebDAV 服务；文件加密后上传',
             children: [
               MuseTile(
                 key: const ValueKey('sync_webdav'),
                 leading: const Icon(Icons.cloud_sync_outlined),
-                title: 'WebDAV 同步',
+                title: 'WebDAV 设置',
                 trailing: Text(webdavUser.isEmpty ? '未设置' : '已设置'),
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseWebdavPage()),
               ),
+              if (webdavUser.isNotEmpty)
+                MuseTile(
+                  key: const ValueKey('backup_sync_webdav_now'),
+                  leading: const Icon(Icons.sync_outlined),
+                  title: '立即同步',
+                  onTap: busy.value ? null : () => run(() async => (await ref.read(museSyncServiceProvider).syncNow()).summary),
+                ),
+            ],
+          ),
+          MuseSection(
+            header: '局域网同步',
+            footer: '两台设备连同一 Wi‑Fi / 局域网，无需账号；配对码 3 分钟内有效、只能用一次，数据全程加密',
+            children: [
+              MuseTile(
+                key: const ValueKey('lan_host'),
+                leading: const Icon(Icons.qr_code_2_outlined),
+                title: '显示配对码',
+                subtitle: '在另一台设备上扫码或输入',
+                chevron: true,
+                onTap: busy.value ? null : () => showMuseLanHostSheet(context),
+              ),
+              if (PlatformUtils.isAndroid || PlatformUtils.isIOS)
+                MuseTile(
+                  key: const ValueKey('lan_scan'),
+                  leading: busy.value
+                      ? const SizedBox(
+                          width: MuseIconSize.small,
+                          height: MuseIconSize.small,
+                          child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke),
+                        )
+                      : const Icon(Icons.qr_code_scanner_outlined),
+                  title: '扫码配对',
+                  chevron: true,
+                  onTap: busy.value ? null : () async => join(await ref.read(dialogNotifierProvider.notifier).showQrScanner()),
+                ),
+              MuseTile(
+                key: const ValueKey('lan_type'),
+                leading: const Icon(Icons.keyboard_outlined),
+                title: '输入配对码',
+                chevron: true,
+                onTap: busy.value ? null : () async => join(await museAskText(context, '配对码', hint: '192.168.1.5:43125 ABCD-EFGH-…')),
+              ),
+              if (lastAt != 0)
+                MuseTile(
+                  key: const ValueKey('sync_last'),
+                  leading: const Icon(Icons.history_outlined),
+                  title: '上次同步',
+                  trailing: Text(museUpdatedAgo(DateTime.fromMillisecondsSinceEpoch(lastAt), now: DateTime.now()).replaceAll('更新', '')),
+                ),
             ],
           ),
         ],
@@ -360,7 +372,7 @@ class _MuseLanHostSheetState extends ConsumerState<MuseLanHostSheet> {
           ),
           const SizedBox(height: MuseSpace.s8),
           Text(
-            '${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')} 后失效 · 另一台设备：设置 › 同步与备份 › 扫码或输入配对码',
+            '${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')} 后失效 · 另一台设备：设置 › 备份与同步 › 扫码或输入配对码',
             textAlign: TextAlign.center,
             style: MuseType.caption(context),
           ),
@@ -423,7 +435,7 @@ class _MuseLanHostSheetState extends ConsumerState<MuseLanHostSheet> {
   }
 }
 
-/// 1.4.1: WebDAV (any server) — the secondary sync, under 同步与备份 › 更多.
+/// 1.4.1: WebDAV (any server); 1.9.0 #8: opened from 备份与同步 › WebDAV 同步.
 class MuseWebdavPage extends HookConsumerWidget {
   const MuseWebdavPage({super.key});
 

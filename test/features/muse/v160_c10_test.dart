@@ -288,7 +288,7 @@ void main() {
       expect(museReadRuleSetFiles('/nonexistent-c10', ['geosite-cn']).single.present, isFalse);
     });
 
-    testWidgets('page: built-in list, remote sets, 管理 opens 远程规则集, placeholders', (tester) async {
+    testWidgets('page: built-in list, remote sets, 管理 opens 远程规则集 (1.9.0 #8: 内核与资源, no placeholders)', (tester) async {
       final dir = Directory.systemTemp.createTempSync('c10-page');
       addTearDown(() => dir.deleteSync(recursive: true));
       Directory('${dir.path}/rule-sets').createSync();
@@ -300,16 +300,15 @@ void main() {
       );
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump();
-      expect(find.text('资源'), findsOneWidget);
+      expect(find.text('内核与资源'), findsOneWidget);
       expect(find.textContaining('1 / ${museBundledRuleSets.length} 个'), findsOneWidget);
       expect(find.byKey(const ValueKey('res_builtin_geosite-cn')), findsOneWidget);
       expect(find.textContaining('本机缺少'), findsWidgets);
       await tester.scrollUntilVisible(find.byKey(const ValueKey('res_remote_0')), 300);
       expect(find.text('ads.srs'), findsOneWidget);
       expect(find.textContaining('r.example · ads.srs'), findsOneWidget);
-      await tester.scrollUntilVisible(find.byKey(const ValueKey('res_script_placeholder')), 300);
-      expect(find.text('Geo 数据库'), findsOneWidget);
-      expect(find.text('数据库与脚本 · 双内核版本提供'), findsOneWidget);
+      expect(find.byKey(const ValueKey('res_script_placeholder')), findsNothing);
+      expect(find.text('数据库与脚本 · 双内核版本提供'), findsNothing);
       await tester.scrollUntilVisible(find.byKey(const ValueKey('res_remote_manage')), -300);
       await tester.tap(find.byKey(const ValueKey('res_remote_manage')));
       await tester.pumpAndSettle();

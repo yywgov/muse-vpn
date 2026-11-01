@@ -1,6 +1,6 @@
 // 穿云 1.4.1: the new / changed screens render without overflow (phone light / dark, Windows ~900
-// and 1280): 分流 预设 (sections + search), 指定节点, 远程规则集, 同步 (局域网 first, WebDAV under
-// 更多), the pairing sheet, 网络 (定时 / 质量提醒), 节点 多选, the 流量 tile at large text.
+// and 1280): 分流 预设 (sections + search), 指定节点, 远程规则集, 同步 (1.9.0: 备份 → WebDAV →
+// 局域网), the pairing sheet, 网络 (定时 / 质量提醒), 节点 多选, the 流量 tile at large text.
 // MUSE_SHOTS=<dir> writes PNG screenshots for review.
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -274,14 +274,15 @@ void main() {
     await _done(tester);
   });
 
-  testWidgets('sync: 局域网 first, WebDAV under 更多, not branded', (tester) async {
+  // 1.9.0 #8: 备份与同步 — 备份 first, then WebDAV, then 局域网
+  testWidgets('sync: 备份 → WebDAV → 局域网, not branded', (tester) async {
     await _pump(tester, page: const MuseSyncPage(), brightness: Brightness.light, size: phone, tab: 3);
-    expect(find.byKey(const ValueKey('lan_host')), findsOneWidget);
-    expect(find.byKey(const ValueKey('lan_type')), findsOneWidget);
-    expect(find.byKey(const ValueKey('sync_webdav')), findsOneWidget);
-    expect(find.textContaining('坚果云'), findsNothing);
-    final dy = (Key k) => tester.getTopLeft(find.byKey(k)).dy;
-    expect(dy(const ValueKey('lan_host')), lessThan(dy(const ValueKey('sync_webdav'))));
+    expect(find.byKey(const ValueKey('lan_host'), skipOffstage: false), findsOneWidget);
+    expect(find.byKey(const ValueKey('lan_type'), skipOffstage: false), findsOneWidget);
+    expect(find.byKey(const ValueKey('sync_webdav'), skipOffstage: false), findsOneWidget);
+    expect(find.textContaining('坚果云', skipOffstage: false), findsNothing);
+    final dy = (Key k) => tester.getTopLeft(find.byKey(k, skipOffstage: false)).dy;
+    expect(dy(const ValueKey('sync_webdav')), lessThan(dy(const ValueKey('lan_host'))));
     await _done(tester);
   });
 

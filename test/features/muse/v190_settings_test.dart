@@ -1,4 +1,4 @@
-// 穿云 1.9.0 设置整理：#5 自动连接页、#6 后台保活、#7 导出备份合一（后续项继续追加在本文件）。
+// 穿云 1.9.0 设置整理：#5 自动连接页、#6 后台保活、#7 导出备份合一、#8 备份与同步 / 内核与资源（后续项继续追加在本文件）。
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
 import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
+import 'package:hiddify/features/muse/settings/resources_page.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -187,6 +188,58 @@ void main() {
       expect(page, isNot(contains("'导出脱敏备份'")));
       expect(museBackupFileName(redact: true), 'chuanyun-backup-redacted.json');
       expect(museBackupFileName(redact: false), 'chuanyun-backup.json');
+    });
+  });
+
+  group('#8 备份与同步 / 内核与资源', () {
+    testWidgets('备份与同步: 备份 → WebDAV → 局域网 on one page', (t) async {
+      await _pump(t, const MuseSyncPage(), prefs: {'muse_webdav_user': 'u'});
+      expect(find.text('备份与同步'), findsOneWidget);
+      double y(String k) => t.getTopLeft(find.byKey(ValueKey(k), skipOffstage: false)).dy;
+      for (final k in ['backup_export', 'backup_import', 'backup_auto', 'sync_webdav', 'backup_sync_webdav_now', 'lan_host']) {
+        await t.scrollUntilVisible(find.byKey(ValueKey(k)), 200);
+        expect(find.byKey(ValueKey(k)), findsOneWidget, reason: k);
+      }
+      expect(y('backup_auto') < y('sync_webdav'), isTrue);
+      expect(y('sync_webdav') < y('lan_host'), isTrue);
+      expect(t.takeException(), isNull);
+    });
+
+    testWidgets('立即同步 only once WebDAV is set', (t) async {
+      await _pump(t, const MuseSyncPage());
+      await t.scrollUntilVisible(find.byKey(const ValueKey('sync_webdav')), 200);
+      expect(find.byKey(const ValueKey('backup_sync_webdav_now')), findsNothing);
+    });
+
+    testWidgets('内核与资源: 内核 + 内核版本 + Geo 数据库 + 规则集', (t) async {
+      final dir = Directory.systemTemp.createTempSync('v190-res');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      await _pump(t, MuseResourcesPage(baseDir: dir.path, showCore: true, desktop: false));
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pump();
+      expect(find.text('内核与资源'), findsOneWidget);
+      expect(find.byKey(const ValueKey('core_kind')), findsOneWidget);
+      expect(find.byKey(const ValueKey('core_kind_version')), findsOneWidget);
+      expect(find.text('Geo 数据库'), findsOneWidget);
+      await t.scrollUntilVisible(find.byKey(const ValueKey('res_remote_manage')), 300);
+      expect(find.text('规则集'), findsOneWidget);
+      expect(find.textContaining('双内核版本提供'), findsNothing);
+      expect(t.takeException(), isNull);
+    });
+
+    testWidgets('内核与资源 without 内核 where there is no choice', (t) async {
+      await _pump(t, MuseResourcesPage(baseDir: Directory.systemTemp.path, showCore: false));
+      expect(find.byKey(const ValueKey('core_kind')), findsNothing);
+    });
+
+    test('设置: one 内核与资源 row, no separate 内核 section; 备份与同步 row', () {
+      final s = _src('lib/features/settings/overview/settings_page.dart');
+      expect(s, isNot(contains('const MuseCoreKindSection()')));
+      expect(s, contains("title: '内核与资源'"));
+      expect(s, contains("title: '备份与同步'"));
+      expect(s, isNot(contains("title: '同步与备份'")));
+      expect(MuseSettingPage.sync.path, '设置 › 备份与同步');
+      expect(MuseSettingPage.resources.path, '设置 › 内核与资源');
     });
   });
 }

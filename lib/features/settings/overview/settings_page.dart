@@ -18,12 +18,12 @@ import 'package:hiddify/features/muse/activity/activity_page.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/home/changelog_dialog.dart';
+import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
-import 'package:hiddify/features/muse/settings/core_kind_section.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
 import 'package:hiddify/features/muse/settings/help_page.dart';
 import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
@@ -221,7 +221,7 @@ class SettingsPage extends HookConsumerWidget {
               MuseTile(
                 key: const ValueKey('settings_sync'),
                 leading: const Icon(Icons.cloud_sync_outlined),
-                title: '同步与备份',
+                title: '备份与同步',
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseSyncPage()),
               ),
@@ -232,18 +232,17 @@ class SettingsPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseStatsPage()),
               ),
-              // 1.6.0 C10
+              // 1.6.0 C10; 1.9.0 #8: 内核 (Windows / Android) + 资源 on one page
               MuseTile(
                 key: const ValueKey('settings_resources'),
-                leading: const Icon(Icons.inventory_2_outlined),
-                title: '资源',
+                leading: const Icon(Icons.memory_outlined),
+                title: '内核与资源',
+                trailing: (PlatformUtils.isWindows || android) ? Text(MuseCoreKind.fromKey(ref.watch(MusePrefs.coreKind)).title) : null,
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseResourcesPage()),
               ),
             ],
           ),
-          // 1.7.0 M3
-          if (PlatformUtils.isWindows || android) const MuseCoreKindSection(),
           if (PlatformUtils.isWindows) const WindowsSettingsSection(),
           if (android) const MuseAndroidGeneralSection(),
           if (android) const MusePrivacySection(),
