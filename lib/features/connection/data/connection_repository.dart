@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
@@ -5,6 +6,8 @@ import 'package:hiddify/core/model/directories.dart';
 import 'package:hiddify/features/muse/logic/compat_profile.dart';
 import 'package:hiddify/features/muse/logic/connect_flow.dart';
 import 'package:hiddify/features/muse/logic/core_kind.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/logic/sub_override.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
@@ -42,9 +45,22 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
     required this.profilePathResolver,
     MuseCoreKind Function()? coreKind,
     this.compatStore = const MuseCompatProfileStore(),
-  }) : coreKind = coreKind ?? _standard;
+    MuseSubOverride? Function(String profileId)? overrideFor,
+  }) : coreKind = coreKind ?? _standard,
+       overrideFor = overrideFor ?? _overrideFromPrefs(ref);
 
   static MuseCoreKind _standard() => MuseCoreKind.standard;
+
+  static MuseSubOverride? Function(String) _overrideFromPrefs(Ref ref) => (id) {
+    try {
+      return museParseOverrides(ref.read(MusePrefs.subOverrides))[id];
+    } catch (_) {
+      return null;
+    }
+  };
+
+  /// 穿云 1.9.0 #15: the profile's 订阅覆写, or null (sub_override.dart)
+  final MuseSubOverride? Function(String profileId) overrideFor;
 
   /// 穿云 1.7.0 M3-4: the core the next connection runs on (compat_profile.dart)
   final MuseCoreKind Function() coreKind;
@@ -101,7 +117,7 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
   TaskEither<ConnectionFailure, Unit> connect(ProfileEntity activeProfile, bool disableMemoryLimit) => setup().flatMap(
     // 穿云 1.5.0: check the config first; a sure failure names the setting instead of starting the core
     (_) => precheck(activeProfile).flatMap((_) => applyConfigOption(activeProfile)).flatMap((_) => prepareProfile(activeProfile)).flatMap(
-      (_) => singbox.start(profilePathResolver.file(activeProfile.id).path, activeProfile.name, disableMemoryLimit),
+      (_) => runPath(activeProfile).flatMap((path) => singbox.start(path, activeProfile.name, disableMemoryLimit)),
       // .mapLeft(UnexpectedConnectionFailure.new),
     ),
   );
@@ -111,12 +127,49 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
 
   @override
   TaskEither<ConnectionFailure, Unit> reconnect(ProfileEntity activeProfile, bool disableMemoryLimit) =>
-      applyConfigOption(activeProfile).flatMap((_) => prepareProfile(activeProfile)).flatMap(
+      applyConfigOption(activeProfile).flatMap((_) => prepareProfile(activeProfile)).flatMap((_) => runPath(activeProfile)).flatMap(
         // hot reload when possible, restart otherwise
-        (_) => singbox
-            .reload(profilePathResolver.file(activeProfile.id).path, activeProfile.name, disableMemoryLimit)
-            .mapLeft(UnexpectedConnectionFailure.new),
+        (path) => singbox.reload(path, activeProfile.name, disableMemoryLimit).mapLeft(UnexpectedConnectionFailure.new),
       );
+
+  /// 穿云 1.9.0 #15: the file the core runs. Without an override that changes the body it is the
+  /// profile itself (as before); otherwise a runtime copy with the extra nodes and groups, written
+  /// next to it. The profile is never written. A copy that cannot be made falls back to the
+  /// profile, so an override never stops a connection.
+  @visibleForTesting
+  TaskEither<ConnectionFailure, String> runPath(ProfileEntity prof) => TaskEither(() async {
+    final path = profilePathResolver.file(prof.id).path;
+    try {
+      return right(await museComposeRunFile(path, overrideFor(prof.id), convertLinks: (links) => _convertLinks(path, links)));
+    } catch (e) {
+      loggy.warning("composing the subscription override failed, using the subscription as is: $e");
+      return right(path);
+    }
+  });
+
+  /// The extra share links in the JSON form, converted by the core the same way a subscription is.
+  Future<List<Map<String, dynamic>>> _convertLinks(String profilePath, List<String> links) async {
+    final src = File('$profilePath.override-src');
+    final out = File('$profilePath.override-conv');
+    try {
+      await src.writeAsString(links.join('\n'), flush: true);
+      final error = (await singbox.validateConfigByPath(out.path, src.path, false).run()).fold((l) => l, (_) => null);
+      if (error != null || !await out.exists()) {
+        loggy.warning("converting the override's extra nodes failed: $error");
+        return const [];
+      }
+      final j = jsonDecode(await out.readAsString());
+      final list = j is Map ? j['outbounds'] : j;
+      return [
+        for (final ob in (list is List ? list : const []))
+          if (ob is Map<String, dynamic> && !const {'selector', 'urltest', 'direct', 'block', 'dns'}.contains(ob['type'])) ob,
+      ];
+    } finally {
+      for (final f in [src, out]) {
+        if (await f.exists()) await f.delete();
+      }
+    }
+  }
 
   /// 穿云 1.7.0 M3-4: the saved subscription in the form the core about to run reads: 标准内核
   /// converts a body 兼容内核 kept as it came (keeping the original), 兼容内核 gets the original
@@ -176,8 +229,12 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
               // 穿云 1.1.1: never chain through WARP / Psiphon, whatever a profile or an old
               // preference says (the chain path, its licence dialogs and consent prefs are gone).
               final options = overridedOptions.copyWith(chainStatus: ChainStatus.off);
+              // the snapshot stays the app's own options (compared with the settings for hot reload)
               _configOptionsSnapshot = options;
-              await singbox.changeOptions(options).run();
+              // 1.9.0 #15: the subscription's override rules go to the core only (both cores read this list)
+              final o = overrideFor(prof.id);
+              final rr = museApplyOverrideRules(options.routeRule, o);
+              await singbox.changeOptions(identical(rr, options.routeRule) ? options : options.copyWith(routeRule: rr)).run();
               return unit;
             }, (err, st) => err is ConnectionFailure ? err : ConnectionFailure.unexpected(err, st)),
           );

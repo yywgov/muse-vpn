@@ -64,6 +64,8 @@ final museSyncedPrefs = <String, ProviderOrFamily>{
   'muse_sub_user_agent': MusePrefs.subUserAgent,
   // 1.5.0
   'muse_sub_fetch': MusePrefs.subFetch,
+  // 1.9.0 #15
+  'muse_sub_overrides': MusePrefs.subOverrides,
 };
 
 const museSyncFileName = 'chuanyun-sync.json';

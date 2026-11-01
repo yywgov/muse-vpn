@@ -117,6 +117,9 @@ abstract final class MusePrefs {
   /// remote rule-sets: JSON list of {"url": …, "outbound": "proxy|direct|block"}
   static final remoteRuleSets = PreferencesNotifier.create<String, String>("muse_remote_rule_sets", "[]");
 
+  /// 1.9.0 #15: 订阅覆写 by profile id (sub_override.dart); applied at connect, never written into the subscription
+  static final subOverrides = PreferencesNotifier.create<String, String>("muse_sub_overrides", "{}");
+
   /// 全局模式 also sends 中国大陆 direct
   static final globalBypassCn = PreferencesNotifier.create<bool, bool>("muse_global_bypass_cn", false);
 

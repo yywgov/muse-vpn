@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
-import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/features/muse/config/sub_override_page.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/profile_tools.dart';
@@ -92,17 +92,15 @@ class MuseConfigPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => context.goNamed('routingOptions'),
               ),
-              // 1.6.0 C6: reserved for the two-core version (not editable yet)
+              // 1.9.0 #15: 订阅覆写 (form; the JSON under 高级) replaces the placeholder
               MuseTile(
-                key: const ValueKey('profile_override_placeholder'),
-                leading: const Icon(Icons.code_outlined),
-                title: '覆写脚本',
-                subtitle: '双内核版本提供',
-                onTap: () {
-                  try {
-                    ref.read(inAppNotificationControllerProvider).showInfoToast('覆写脚本需要第二个内核，会在 1.7.0 提供；现在可以用「路由规则」调整分流');
-                  } catch (_) {}
-                },
+                key: const ValueKey('profile_override_entry'),
+                leading: const Icon(Icons.tune_outlined),
+                title: '订阅覆写',
+                chevron: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const MuseScaffold(title: '订阅覆写', body: MuseOverrideList())),
+                ),
               ),
             ],
           ),

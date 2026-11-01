@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:hiddify/features/connection/data/connection_data_providers.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/core_extras_provider.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -51,6 +52,11 @@ class ConfigOptionNotifier extends _$ConfigOptionNotifier with AppLogger {
     // the options sent beside them (hosts, 指定节点, 测速) are applied the same way
     ref.listen(museCoreExtrasProvider, (previous, next) {
       if (!serviceRunning || previous == null || jsonEncode(previous) == jsonEncode(next)) return;
+      debounce(() => apply(force: true).catchError((Object e) => loggy.warning("applying settings failed", e)));
+    });
+    // 1.9.0 #15: a 订阅覆写 saved while connected is applied the same way (event driven, no polling)
+    ref.listen(MusePrefs.subOverrides, (previous, next) {
+      if (!serviceRunning || previous == null || previous == next) return;
       debounce(() => apply(force: true).catchError((Object e) => loggy.warning("applying settings failed", e)));
     });
     return false;
