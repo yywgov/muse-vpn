@@ -26,11 +26,19 @@ String museCompatOriginalPath(String profilePath) => '$profilePath.compat';
 /// before every 标准内核 connect, and only a body 兼容内核 kept (YAML, links) needs converting.
 bool museIsStandardProfile(String content) {
   final s = content.trimLeft();
-  return s.startsWith('{') || s.startsWith('[');
+  if (!s.startsWith('{') && !s.startsWith('[')) return false;
+  // a WireGuard .conf starts with "[Interface]" (kept as it came by 兼容内核 on Windows)
+  if (s.startsWith('[Interface]')) return false;
+  // 1.9.0 #13: 兼容内核 on Windows keeps a SIP008 document as it came (it reads it natively);
+  // that JSON is a subscription, not 标准内核's profile. Only decoded when it could be one.
+  if (s.contains('"servers"') && museDetectSubFormat(s) == MuseSubFormat.sip008) return false;
+  return true;
 }
 
-/// Formats 兼容内核 reads natively and keeps as they came. Others (SIP008, a WireGuard .conf) are
-/// converted by 标准内核 first, which 兼容内核 then reads as well.
+/// Formats 兼容内核 on Android keeps as they came. Others (SIP008, a WireGuard .conf) are converted
+/// by 标准内核 there first, which 兼容内核 then reads as well. On Windows only one core is loaded, so
+/// 兼容内核 reads SIP008 and WireGuard .conf itself (1.9.0 #13, muse.compat.ref) and keeps them as
+/// they came; switching back to 标准内核 converts them like any other subscription body.
 bool museCompatReadsNatively(String body) {
   if (museIsWireGuardConf(body)) return false;
   return switch (museDetectSubFormat(body)) {
@@ -135,11 +143,14 @@ String? museCompatBodyProblem(String body) {
 /// subscription (top-level `proxies:` entries), or share links (base64 or plain). Used for the
 /// 「新增 / 移除」 summary after an update, whichever core saved it.
 List<String> museProfileNodeNames(String raw) {
+  if (museIsWireGuardConf(raw)) return [museWireGuardNodeName(raw)];
   switch (museDetectSubFormat(raw)) {
     case MuseSubFormat.singBox:
       return museConfigNodeNames(raw);
     case MuseSubFormat.clash:
       return _yamlProxyNames(raw);
+    case MuseSubFormat.sip008:
+      return museSip008NodeNames(raw);
     case MuseSubFormat.links || MuseSubFormat.base64:
       return [
         for (final line in const LineSplitter().convert(museSubPlainText(raw)))
@@ -184,4 +195,72 @@ List<String> _yamlProxyNames(String raw) {
     if (name.isNotEmpty) names.add(name);
   }
   return names;
+}
+
+/// 1.9.0 #13: node names of a SIP008 document, named the way 兼容内核 names them (remarks, else the
+/// server; repeats get "-01", "-02", …).
+List<String> museSip008NodeNames(String raw) {
+  try {
+    final j = jsonDecode(raw.trim());
+    final servers = j is Map ? j['servers'] : j;
+    if (servers is! List) return const [];
+    final seen = <String, int>{};
+    final out = <String>[];
+    for (final s in servers.whereType<Map>()) {
+      var name = '${s['remarks'] ?? ''}'.trim();
+      if (name.isEmpty) name = '${s['server'] ?? ''}'.trim();
+      if (name.isEmpty) continue;
+      if (!seen.containsKey(name)) {
+        seen[name] = 0;
+        out.add(name);
+        continue;
+      }
+      var n = seen[name]!;
+      String candidate;
+      do {
+        n++;
+        candidate = '$name-${n.toString().padLeft(2, '0')}';
+      } while (seen.containsKey(candidate));
+      seen[name] = n;
+      seen[candidate] = 0;
+      out.add(candidate);
+    }
+    return out;
+  } catch (_) {
+    return const [];
+  }
+}
+
+/// 1.9.0 #13: the one node of a WireGuard .conf, named like 兼容内核 does: a "# Name = …" comment,
+/// else "WireGuard <first peer host>", else "WireGuard".
+String museWireGuardNodeName(String raw) {
+  String? endpoint;
+  var section = '';
+  for (final line in const LineSplitter().convert(raw)) {
+    final t = line.trim();
+    if (t.startsWith('#') || t.startsWith(';')) {
+      final c = t.replaceFirst(RegExp(r'^[#;]+'), '').trim();
+      final eq = c.indexOf('=');
+      if (eq > 0 && c.substring(0, eq).trim().toLowerCase() == 'name') {
+        final v = c.substring(eq + 1).trim();
+        if (v.isNotEmpty) return v;
+      }
+      continue;
+    }
+    if (t.startsWith('[')) {
+      section = t.toLowerCase();
+      continue;
+    }
+    final eq = t.indexOf('=');
+    if (section == '[peer]' && eq > 0 && endpoint == null && t.substring(0, eq).trim().toLowerCase() == 'endpoint') {
+      endpoint = t.substring(eq + 1).trim();
+    }
+  }
+  if (endpoint != null && endpoint.isNotEmpty) {
+    final host = endpoint.startsWith('[')
+        ? endpoint.substring(1, endpoint.contains(']') ? endpoint.indexOf(']') : endpoint.length)
+        : (endpoint.lastIndexOf(':') > 0 ? endpoint.substring(0, endpoint.lastIndexOf(':')) : endpoint);
+    if (host.isNotEmpty) return 'WireGuard $host';
+  }
+  return 'WireGuard';
 }
