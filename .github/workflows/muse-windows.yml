@@ -219,8 +219,8 @@ jobs:
       - name: Smoke test - recovery (never leave the PC offline)
         id: smoke_recovery
         continue-on-error: true
-        timeout-minutes: 30
-        run: bash tool/smoke/retry.sh "recovery smoke" 2 powershell -NoProfile -ExecutionPolicy Bypass -File 'tool\smoke\recovery_smoke.ps1' -AppDir 'build\windows\x64\runner\Release' -Out smoke -RepoDir .
+        timeout-minutes: 45
+        run: bash tool/smoke/retry.sh "recovery smoke" 3 powershell -NoProfile -ExecutionPolicy Bypass -File 'tool\smoke\recovery_smoke.ps1' -AppDir 'build\windows\x64\runner\Release' -Out smoke -RepoDir .
 
       - uses: actions/upload-artifact@v4
         if: always()

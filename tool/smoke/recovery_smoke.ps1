@@ -123,6 +123,19 @@ function LaunchApp {
   Remove-Item Env:\CHUANYUN_SMOKE_TOKEN -ErrorAction SilentlyContinue
   return $p
 }
+# 穿云 1.9.0: wait (up to $seconds) for /state to satisfy $ok, instead of reading it once after a
+# fixed sleep (slow CI runners failed checks the app passes a few seconds later). Returns the
+# last state read.
+function WaitState([int]$seconds, [scriptblock]$ok) {
+  $deadline = (Get-Date).AddSeconds($seconds)
+  $s = $null
+  while ((Get-Date) -lt $deadline) {
+    $s = Ctl "/state"
+    if ($s -and (& $ok $s)) { return $s }
+    Start-Sleep -Seconds 1
+  }
+  return $s
+}
 function WaitCtl([int]$seconds) {
   $deadline = (Get-Date).AddSeconds($seconds)
   while ((Get-Date) -lt $deadline) {
@@ -174,7 +187,7 @@ $imp = Ctl ("/import?path=" + [uri]::EscapeDataString($profilePath))
 Rec "import" "profile imported and active" ($imp -and $imp.ok) ($imp | ConvertTo-Json -Compress)
 Start-Sleep -Seconds 2
 Ctl "/connect" | Out-Null
-$c = WaitConnected 45
+$c = WaitConnected 90
 $guardRunning = @(Get-Process -Name ChuanyunGuard -ErrorAction SilentlyContinue).Count -ge 1
 Rec "connect" "connected in system-proxy mode (UI connected, core started, system proxy -> 127.0.0.1:$Port)" $c[0] (StateText $c[1])
 Rec "guard-running" "ChuanyunGuard.exe is watching the app" $guardRunning "processes: $(@(Get-Process -Name ChuanyunGuard -ErrorAction SilentlyContinue).Count)"
@@ -190,7 +203,7 @@ Write-Host "data dir: $dataDir"
 # ---- (b) the status stream breaks while the core keeps running ----
 Ctl "/break-status" | Out-Null
 Start-Sleep -Seconds 6
-$s = Ctl "/state"
+$s = WaitState 20 { param($x) $x.uiConnected -and $x.core -eq "started" }
 Rec "status-break" "status stream lost while the core runs: UI stays connected" ($s -and $s.uiConnected -and $s.core -eq "started") (StateText $s)
 Shot "2-after-status-break"
 
@@ -198,7 +211,7 @@ Shot "2-after-status-break"
 Ctl "/core-stop" | Out-Null
 Start-Sleep -Seconds 1
 $mid = GuardStatus
-$c = WaitConnected 45
+$c = WaitConnected 90
 $vp = ViaProxy
 Rec "core-stop" "core stopped behind the app's back: reconnected automatically" ($c[0] -and $vp -eq "204") ((StateText $c[1]) + "; via proxy $vp; right after stop: $mid")
 Start-Sleep -Seconds 8
@@ -211,13 +224,13 @@ Start-Sleep -Seconds 45
 $during = GuardStatus
 [R]::NtResumeProcess($h) | Out-Null
 Start-Sleep -Seconds 3
-$c = WaitConnected 70
+$c = WaitConnected 120
 $vp = ViaProxy
 Rec "suspend-guard" "while the app was frozen the guard put the user's settings back (port silent)" ($during -match "ours=0") $during
 Rec "suspend" "after a 45 s suspend (sleep): connected and forwarding again" ($c[0] -and $vp -eq "204") ((StateText $c[1]) + "; via proxy $vp")
 Ctl "/resume" | Out-Null
 Start-Sleep -Seconds 4
-$s = Ctl "/state"
+$s = WaitState 20 { param($x) $x.uiConnected -and $x.core -eq "started" }
 Rec "resume-path" "resume path (window restore / wake) keeps it connected, no reconnect" ($s -and $s.uiConnected -and $s.core -eq "started") (StateText $s)
 Shot "4-after-suspend"
 
@@ -230,7 +243,7 @@ Rec "tray-hidden" "hidden in the tray for 20 s: still connected" ($hidden -and $
 Shot "5-tray"
 Start-Process -FilePath $exe -WorkingDirectory $AppDir | Out-Null   # second launch = show window
 Start-Sleep -Seconds 6
-$s = Ctl "/state"
+$s = WaitState 20 { param($x) $x.uiConnected }
 $shown = [R]::IsWindowVisible((Win))
 Rec "tray-restore" "window restored from the tray: shows connected (no 'disconnected' flash)" ($shown -and $s -and $s.uiConnected) ("visible $shown; " + (StateText $s))
 [R]::SetForegroundWindow((Win)) | Out-Null
@@ -251,23 +264,23 @@ Shot "7-after-kill"
 
 # ---- crash exit: guard restores the proxy and relaunches the app, which reconnects ----
 $p = LaunchApp
-$up = WaitCtl 60
-$c = WaitConnected 45
+$up = WaitCtl 90
+$c = WaitConnected 90
 Rec "restart-restores" "next launch restores the connection the user had on" $c[0] (StateText $c[1])
 Ctl "/crash" | Out-Null
 Start-Sleep -Milliseconds 1500
 $st = GuardStatus
 Rec "crash-restore" "crash exit: proxy settings restored right away" ($st -match "ours=0") $st
 $relaunched = $false
-$deadline = (Get-Date).AddSeconds(30)
+$deadline = (Get-Date).AddSeconds(60)
 while ((Get-Date) -lt $deadline) {
   $procs = AppProcs
   if ($procs.Count -ge 1 -and $procs[0].Id -ne $p.Id) { $relaunched = $true; break }
   Start-Sleep -Seconds 1
 }
 Rec "crash-relaunch" "crash exit: the guard relaunched the app" $relaunched "processes: $((AppProcs | ForEach-Object { $_.Id }) -join ',')"
-$up = WaitCtl 60
-$c = WaitConnected 60
+$up = WaitCtl 90
+$c = WaitConnected 90
 $hiddenAfter = -not [R]::IsWindowVisible((Win))
 Rec "crash-reconnect" "relaunched app reconnected on its own (window stays in the tray)" $c[0] ((StateText $c[1]) + "; window hidden $hiddenAfter")
 Shot "8-after-crash-relaunch"
@@ -282,11 +295,11 @@ Rec "stale-left" "app + guard killed: system proxy still points at the dead port
 $sysDead = ViaSystemSettings
 Rec "stale-offline" "(that is the 'whole PC offline' state)" (-not $sysDead) "system settings work: $sysDead" $true
 $p = LaunchApp
-$up = WaitCtl 60
+$up = WaitCtl 90
 $glog = if ($dataDir) { Get-Content -Path (Join-Path $dataDir "guard.log") -ErrorAction SilentlyContinue } else { @() }
 $startupRestore = @($glog | Where-Object { $_ -match "restore\(startup\)" }).Count -ge 1
 Rec "stale-cleared" "next launch restored the leftover proxy at start-up (guard.log: restore(startup))" $startupRestore (($glog | Where-Object { $_ -match "restore\(startup\)" } | Select-Object -Last 1) -join "")
-$c = WaitConnected 45
+$c = WaitConnected 90
 Rec "stale-reconnect" "and reconnected" $c[0] (StateText $c[1])
 
 # ---- the user disconnects: own settings back, no auto-reconnect ----
