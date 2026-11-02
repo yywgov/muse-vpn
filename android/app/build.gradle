@@ -62,9 +62,8 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = '17'
-    }
+    // 穿云 1.10.0: Kotlin 2.2 turned the kotlinOptions DSL into an error; jvmTarget is set in the
+    // kotlin { compilerOptions } block below
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
@@ -170,4 +169,11 @@ dependencies {
 
 
 
+}
+
+// 穿云 1.10.0: replaces android { kotlinOptions { jvmTarget = '17' } } (Kotlin 2.2+)
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
 }

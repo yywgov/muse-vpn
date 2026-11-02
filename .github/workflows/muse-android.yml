@@ -241,8 +241,10 @@ jobs:
           flutter analyze --no-fatal-infos lib test/features/muse
           flutter test test/features/muse
 
+      # 1.10.0: a failed build puts the Gradle / Flutter error lines into the run's annotations (the
+      # raw log needs a signed-in account to read)
       - name: Build APKs
-        run: make android-apk-release
+        run: bash tool/ci/annotate_failure.sh make android-apk-release
 
       # 穿云 1.1: the fastforge copy in dist/ (hiddify-*.apk) is not published
       - name: Collect APK (arm64-v8a)
@@ -255,7 +257,7 @@ jobs:
         run: |
           pkill -f GradleDaemon || true
           rm -rf build/app/outputs/flutter-apk dist
-          make android-apk-release ANDROID_PLATFORM=android-arm
+          bash tool/ci/annotate_failure.sh make android-apk-release ANDROID_PLATFORM=android-arm
           tool/ci/collect_apk.sh armeabi-v7a Chuanyun-Android-armeabi-v7a.apk
 
       - name: Build + collect APK (x86_64)
@@ -264,7 +266,7 @@ jobs:
         run: |
           pkill -f GradleDaemon || true
           rm -rf build/app/outputs/flutter-apk dist
-          make android-apk-release ANDROID_PLATFORM=android-x64
+          bash tool/ci/annotate_failure.sh make android-apk-release ANDROID_PLATFORM=android-x64
           tool/ci/collect_apk.sh x86_64 Chuanyun-Android-x86_64.apk
 
       - uses: actions/upload-artifact@v4
@@ -273,11 +275,17 @@ jobs:
           path: out/*.apk
           retention-days: 14
 
+      # 1.10.0: the release body = this version's in-app changelog (the 「发现新版本」 dialog shows it)
+      - name: Release notes
+        if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-win')
+        run: dart run tool/ci/release_notes.dart "${{ github.ref_name }}" out/release-notes.md
+
       # Windows-only test tags (v*-win*) are published by muse-windows.yml alone
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-win')
         uses: softprops/action-gh-release@v2
         with:
+          body_path: out/release-notes.md
           files: |
             out/Chuanyun-Android-arm64.apk
             out/Chuanyun-Android-arm64.apk.sha256
