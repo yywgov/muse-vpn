@@ -13,6 +13,12 @@ analyzer:
     - "lib/features/profile/details/json_editor.dart"
     - "build/**"
     - "dist/**"
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
   errors:
     invalid_annotation_target: ignore
 

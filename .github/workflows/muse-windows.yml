@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FLUTTER_VERSION: '3.38.5'
+  FLUTTER_VERSION: '3.47.8'
 
 jobs:
   # 穿云 1.7.0: 兼容内核 (muse-compat.dll) from the core repository's source at the commit pinned in
