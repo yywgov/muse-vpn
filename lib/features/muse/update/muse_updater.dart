@@ -4,6 +4,7 @@
 // after the upgrade); a release with only the portable zip opens the release page instead.
 // Part of 穿云 (GPLv3).
 
+import 'dart:ffi' show Abi;
 import 'dart:io';
 
 import 'package:hiddify/features/muse/data/sync_service.dart';
@@ -31,6 +32,15 @@ const museReleaseDownloadPrefix = 'https://github.com/yywgov/muse-vpn/releases/d
 
 /// Release asset the app updates from (signed with the fixed 穿云 key).
 const museApkAssetName = 'Chuanyun-Android-arm64.apk';
+
+/// 1.9.1: the release asset that matches the architecture this app runs as (an APK of another
+/// ABI cannot be installed over it). arm64 is the default and stays the one name older releases
+/// carry; 32-bit ARM and x86_64 have their own packages.
+String museApkAssetFor(Abi abi) {
+  if (abi == Abi.androidArm) return 'Chuanyun-Android-armeabi-v7a.apk';
+  if (abi == Abi.androidX64) return 'Chuanyun-Android-x86_64.apk';
+  return museApkAssetName;
+}
 
 /// 1.5.0 #207: whether [path] already holds the whole byte range [range] (inclusive).
 bool museRangePartDone(String path, (int, int) range) {
@@ -100,7 +110,7 @@ class MuseUpdateDownloading extends MuseUpdateState {
 /// Prereleases and drafts are never used (1.5.1: stable releases only). Asset URLs outside this
 /// repository's release downloads are ignored (release info that came through a mirror can't
 /// point elsewhere).
-MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false}) {
+MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false, String apkAsset = museApkAssetName}) {
   final tag = json['tag_name'] as String? ?? '';
   final version = tag.replaceFirst(RegExp('^v'), '').split('+').first;
   if (version.isEmpty || json['prerelease'] == true || json['draft'] == true) return null;
@@ -124,14 +134,17 @@ MuseRelease? museParseRelease(Map<String, dynamic> json, {bool windows = false})
     }
     return null;
   }
-  // the re-signed asset the release workflow uploads is Chuanyun-Android-arm64.apk; prefer it
+  // 1.9.1: the package for this app's architecture. Non-arm64 builds only take their own file (an
+  // arm64 APK would be refused by the installer); arm64 keeps the earlier name-contains-arm64 rule.
   assets.sort((a, b) {
-    bool exact(Map<String, dynamic> e) => (e['name'] as String? ?? '').toLowerCase() == museApkAssetName.toLowerCase();
+    bool exact(Map<String, dynamic> e) => (e['name'] as String? ?? '').toLowerCase() == apkAsset.toLowerCase();
     return (exact(a) ? 0 : 1).compareTo(exact(b) ? 0 : 1);
   });
+  final wanted = apkAsset.toLowerCase();
   for (final asset in assets) {
     final name = (asset['name'] as String? ?? '').toLowerCase();
-    if (name.endsWith('.apk') && name.contains('arm64')) {
+    final isArm64 = wanted == museApkAssetName.toLowerCase();
+    if (name.endsWith('.apk') && (isArm64 ? name.contains('arm64') : name == wanted)) {
       final url = asset['browser_download_url'] as String?;
       if (url == null || !url.startsWith(museReleaseDownloadPrefix)) continue;
       return (
@@ -414,9 +427,9 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
       if (data is List) {
         // a mirror that answers with a release list: its newest stable entry
         final picked = musePickRelease([for (final e in data) if (e is Map<String, dynamic>) e]);
-        release = picked == null ? null : museParseRelease(picked, windows: windows);
+        release = picked == null ? null : museParseRelease(picked, windows: windows, apkAsset: museApkAssetFor(Abi.current()));
       } else if (data is Map<String, dynamic>) {
-        release = museParseRelease(data, windows: windows);
+        release = museParseRelease(data, windows: windows, apkAsset: museApkAssetFor(Abi.current()));
       }
       final current = ref.read(appInfoProvider).requireValue.version;
       if (release == null || !museIsNewer(release.version, current)) return null;

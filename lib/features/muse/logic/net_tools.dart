@@ -240,6 +240,8 @@ bool museStartSilently({required bool silentStart, required bool afterCrash, req
 List<String> museApkAssetsFor(String abi) {
   final a = abi.toLowerCase();
   if (a.contains('arm64') || a.contains('aarch64')) return ['Chuanyun-Android-arm64.apk', 'Chuanyun-Android-universal.apk'];
+  if (a.contains('armeabi') || a == 'arm') return ['Chuanyun-Android-armeabi-v7a.apk', 'Chuanyun-Android-universal.apk'];
+  if (a.contains('x86_64') || a.contains('x64')) return ['Chuanyun-Android-x86_64.apk', 'Chuanyun-Android-universal.apk'];
   return ['Chuanyun-Android-universal.apk'];
 }
 

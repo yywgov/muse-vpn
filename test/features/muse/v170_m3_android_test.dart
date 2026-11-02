@@ -251,11 +251,13 @@ void main() {
       expect(wf, contains(r'-o "$GITHUB_WORKSPACE/out/libmusecompat.so" ./android'));
       expect(wf, contains('aarch64-linux-android21-clang'));
       expect(wf, contains('Java_com_hiddify_hiddify_bg_CompatCore_'));
-      expect(wf, contains('path: android/app/src/main/jniLibs/arm64-v8a'));
-      expect(wf, contains("grep -q 'lib/arm64-v8a/libmusecompat.so' /tmp/apk.txt"));
-      // the APK size check stays (warn > 60 MB, fail > 80 MB)
-      expect(wf, contains('83886080'));
-      expect(wf, contains('62914560'));
+      // 1.9.1: one library per architecture, the APK check lives in tool/ci/collect_apk.sh
+      expect(wf, contains('muse-compat-android-'));
+      expect(wf, contains(r'android/app/src/main/jniLibs/$abi/libmusecompat.so'));
+      expect(_read('tool/ci/collect_apk.sh'), contains(r'grep -q "lib/$abi/libmusecompat.so"'));
+      // the APK size check stays (warn > 60 MB, fail > 80 MB), now in the collect script
+      expect(_read('tool/ci/collect_apk.sh'), contains('83886080'));
+      expect(_read('tool/ci/collect_apk.sh'), contains('62914560'));
       expect(_read('.gitignore'), contains('android/app/src/main/jniLibs/arm64-v8a/libmusecompat.so'));
       // Windows builds 兼容内核 from the same pin
       expect(_read('.github/workflows/muse-windows.yml'), contains(r'muse\.compat\.ref='));

@@ -348,7 +348,9 @@ void main() {
     });
     test('update asset per ABI and stable releases only', () {
       expect(museApkAssetsFor('arm64-v8a').first, 'Chuanyun-Android-arm64.apk');
-      expect(museApkAssetsFor('armeabi-v7a'), ['Chuanyun-Android-universal.apk']);
+      expect(museApkAssetsFor('armeabi-v7a'), ['Chuanyun-Android-armeabi-v7a.apk', 'Chuanyun-Android-universal.apk']);
+      expect(museApkAssetsFor('x86_64').first, 'Chuanyun-Android-x86_64.apk');
+      expect(museApkAssetsFor('riscv'), ['Chuanyun-Android-universal.apk']);
       final list = [
         {'tag_name': 'v1.5.0-beta1', 'prerelease': true},
         {'tag_name': 'v1.4.1', 'draft': true},

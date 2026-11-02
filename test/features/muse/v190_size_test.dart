@@ -38,7 +38,7 @@ void main() {
   });
 
   test('APK size is still recorded and capped on every Android CI run', () {
-    final ci = File('.github/workflows/muse-android.yml').readAsStringSync();
+    final ci = File('tool/ci/collect_apk.sh').readAsStringSync();
     expect(ci, contains('APK size'));
     expect(ci, contains('83886080'));
   });

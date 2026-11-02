@@ -268,13 +268,15 @@ gen_translations: #generating missing translations using google translate
 
 android-release: android-apk-release android-aab-release
 
+# 1.9.1: android-arm64 (default), android-arm or android-x64 (CI builds one package per architecture)
+ANDROID_PLATFORM ?= android-arm64
 android-apk-release:
 	fastforge package \
 	  --platform android \
 	  --targets apk \
 	  --skip-clean \
 	  --build-target=$(TARGET) \
-	  --build-target-platform=android-arm64 \
+	  --build-target-platform=$(ANDROID_PLATFORM) \
 	  --build-dart-define=sentry_dsn=$(SENTRY_DSN)
 	ls -R build/app/outputs
 
