@@ -1,7 +1,7 @@
 name: hiddify
 description: 穿云 - Android proxy client (fork of Hiddify, GPLv3).
 publish_to: "none"
-version: 1.9.0+190
+version: 1.9.1+191
 
 environment:
   sdk: ^3.10.4

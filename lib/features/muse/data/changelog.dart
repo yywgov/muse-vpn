@@ -3,6 +3,9 @@
 
 /// version → what changed, newest first. Keep each line short.
 const museChangelog = <String, List<String>>{
+  '1.9.1': [
+    'Android 新增 32 位 ARM（armeabi-v7a）与 x86_64 安装包，发布页按设备架构选择；应用内更新会自动下载与当前架构对应的安装包',
+  ],
   '1.9.0': [
     '新增「设置 › 帮助与隐私」：常用名词（节点、订阅、规则 / 全局、TUN、系统代理…）一句话说明，可搜索；说明穿云在本机保存什么、不上传什么；可设置导入订阅后清空剪贴板',
     '统计可导出 CSV；备份与同步新增「每周本地快照」（默认关，保留最近 5 份）',
