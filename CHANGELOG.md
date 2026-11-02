@@ -4,6 +4,11 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.9.2 - 2026-11-02
+
+- 安全：构建工具链升级到 Flutter 3.47.8（Dart 3.13.7），Android / Windows 上应用自身的 HTTPS 连接（订阅拉取、应用内更新、同步）不再信任已泄露私钥的 eMudhra 中间证书（GHSA-frr6-h895-5pxp）
+- 安全：兼容内核改用 Go 1.26.10 构建，内核的 TLS 校验同样拒绝这批证书（CVE-2026-111943）
+
 ### 1.9.1 - 2026-11-02
 
 - Android 发布 armeabi-v7a（32 位 ARM，约 63 MB）与 x86_64（约 67 MB）安装包，各自带对应架构的标准内核与兼容内核及 .sha256；arm64 包不变

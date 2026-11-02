@@ -3,6 +3,9 @@
 
 /// version → what changed, newest first. Keep each line short.
 const museChangelog = <String, List<String>>{
+  '1.9.2': [
+    '安全更新：修复一处证书校验问题，避免在不安全的网络中拉取订阅、检查更新时被冒充的服务器欺骗；建议所有用户升级',
+  ],
   '1.9.1': [
     'Android 新增 32 位 ARM（armeabi-v7a）与 x86_64 安装包，发布页按设备架构选择；应用内更新会自动下载与当前架构对应的安装包',
   ],
