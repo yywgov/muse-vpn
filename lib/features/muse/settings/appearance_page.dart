@@ -1,4 +1,5 @@
-// 穿云 - 设置 › 外观 (深浅色、主题色、配色风格、文字缩放、隐私模式). Split out of more_settings.dart in 1.9.0 (same library, behaviour unchanged).
+// 穿云 - 设置 › 外观 (深浅色、主题色、配色风格、文字缩放、隐私模式; 1.10.0: 导入后清空剪贴板, Android 通知与图标,
+// Windows 窗口). Split out of more_settings.dart in 1.9.0 (same library, behaviour unchanged).
 // Part of 穿云 (GPLv3).
 
 part of 'more_settings.dart';
@@ -6,7 +7,11 @@ part of 'more_settings.dart';
 // ======================================================================= 外观
 
 class MuseAppearancePage extends HookConsumerWidget {
-  const MuseAppearancePage({super.key});
+  const MuseAppearancePage({super.key, this.android, this.windows});
+
+  /// Platform overrides for tests; null = the running platform.
+  final bool? android;
+  final bool? windows;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -132,9 +137,21 @@ class MuseAppearancePage extends HookConsumerWidget {
                 value: ref.watch(MusePrefs.privacyMask),
                 onChanged: (v) => ref.read(MusePrefs.privacyMask.notifier).update(v),
               ),
+              // 1.10.0: from the removed 帮助与隐私 page (same preference)
+              MuseSwitchTile(
+                key: const ValueKey('clear_clipboard_switch'),
+                leading: const Icon(Icons.content_paste_off_outlined),
+                title: '导入后清空剪贴板',
+                info: '从剪贴板导入订阅链接后，立即清空剪贴板（链接里带有密钥）',
+                value: ref.watch(MusePrefs.clearClipboardAfterImport),
+                onChanged: (v) => ref.read(MusePrefs.clearClipboardAfterImport.notifier).update(v),
+              ),
               // 1.9.0 #9: 主题预览 moved to 开发者选项 (debug builds only)
             ],
           ),
+          // 1.10.0: the platform rows that used to be groups on the 设置 home page
+          if (android ?? PlatformUtils.isAndroid) const MuseAndroidAppearanceSection(),
+          if (windows ?? PlatformUtils.isWindows) const MuseWindowsWindowSection(),
         ],
       ),
     );

@@ -1,7 +1,9 @@
 // 穿云 1.8.0 - 活动: 连接 / 日志 / DNS in one page. Only the visible tab is built, so only its
 // stream runs; switching tabs ends the one that was left right away (no grace period).
-// Routes: /settings/activity?tab=connections|logs|dns; the old /settings/connections and
-// /settings/logs open the matching tab.
+// 1.10.0: 统计 and 诊断 are tabs here too (they were rows of the 设置 home page); 诊断 runs its
+// checks once when the tab opens, 统计 reads the saved traffic log (no stream).
+// Routes: /settings/activity?tab=connections|logs|dns|stats|diagnose; the old /settings/connections
+// and /settings/logs open the matching tab.
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
@@ -11,6 +13,8 @@ import 'package:hiddify/features/muse/connections/connections_page.dart';
 import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart' show museActivityTabKeyForSetting;
 import 'package:hiddify/features/muse/logs/logs_page.dart';
+import 'package:hiddify/features/muse/settings/diagnose_sheet.dart' show MuseDiagnosePage;
+import 'package:hiddify/features/muse/settings/more_settings.dart' show MuseStatsPage;
 import 'package:hiddify/features/muse/widget/muse_segmented.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -18,7 +22,9 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 enum MuseActivityTab {
   connections('connections', '连接'),
   logs('logs', '日志'),
-  dns('dns', 'DNS');
+  dns('dns', 'DNS'),
+  stats('stats', '统计'),
+  diagnose('diagnose', '诊断');
 
   const MuseActivityTab(this.key, this.title);
 
@@ -29,6 +35,8 @@ enum MuseActivityTab {
   static MuseActivityTab fromKey(String? key) => switch (key) {
     'logs' => MuseActivityTab.logs,
     'dns' => MuseActivityTab.dns,
+    'stats' => MuseActivityTab.stats,
+    'diagnose' => MuseActivityTab.diagnose,
     _ => MuseActivityTab.connections,
   };
 }
@@ -43,11 +51,12 @@ const museActivityPath = '/settings/activity';
 /// The location that opens [tab].
 String museActivityLocation(MuseActivityTab tab) => '$museActivityPath?tab=${tab.key}';
 
-/// The stream behind [tab]; ended when the tab is left.
-ProviderOrFamily museActivityStream(MuseActivityTab tab) => switch (tab) {
+/// The stream behind [tab]; ended when the tab is left (null = the tab has none).
+ProviderOrFamily? museActivityStream(MuseActivityTab tab) => switch (tab) {
   MuseActivityTab.connections => museConnectionsProvider,
   MuseActivityTab.logs => museLogsProvider,
   MuseActivityTab.dns => museDnsQueriesProvider,
+  MuseActivityTab.stats || MuseActivityTab.diagnose => null,
 };
 
 class MuseActivityPage extends HookConsumerWidget {
@@ -70,7 +79,8 @@ class MuseActivityPage extends HookConsumerWidget {
       // the old tab's widgets are gone after this frame; then its stream ends at once (connections
       // and logs otherwise linger for their short grace period)
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted && tab.value != left) ref.invalidate(museActivityStream(left));
+        final stream = museActivityStream(left);
+        if (stream != null && context.mounted && tab.value != left) ref.invalidate(stream);
       });
     }
 
@@ -88,6 +98,8 @@ class MuseActivityPage extends HookConsumerWidget {
       MuseActivityTab.connections => MuseConnectionsPage(key: const ValueKey('activity_connections'), header: header),
       MuseActivityTab.logs => MuseLogsPage(key: const ValueKey('activity_logs'), header: header),
       MuseActivityTab.dns => MuseDnsPage(key: const ValueKey('activity_dns'), header: header),
+      MuseActivityTab.stats => MuseStatsPage(key: const ValueKey('activity_stats'), header: header),
+      MuseActivityTab.diagnose => MuseDiagnosePage(key: const ValueKey('activity_diagnose'), header: header),
     };
   }
 }

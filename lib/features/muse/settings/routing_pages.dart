@@ -36,9 +36,31 @@ class MuseRoutingPage extends HookConsumerWidget {
     final hosts = museParseHosts(ref.watch(MusePrefs.hosts));
     final nodeRules = museParseNodeRules(ref.watch(MusePrefs.nodeRules));
     final remoteSets = museParseRemoteRuleSets(ref.watch(MusePrefs.remoteRuleSets));
+    final adLevel = MuseAdBlockLevel.fromKey(ref.watch(Preferences.museAdBlockLevel));
 
     final body = MuseGroupedBody(
         children: [
+          // 1.10.0: 去广告 moved here from the 设置 home page (same preference)
+          MuseSection(
+            children: [
+              MuseTile(
+                key: const ValueKey('ad_block_level'),
+                leading: const Icon(Icons.block_outlined),
+                title: '去广告',
+                trailing: Text(adLevel.title),
+                chevron: true,
+                onTap: () async {
+                  final picked = await musePick<MuseAdBlockLevel>(
+                    context,
+                    '去广告',
+                    [for (final l in MuseAdBlockLevel.values) (l, l.title)],
+                    adLevel,
+                  );
+                  if (picked != null) await ref.read(Preferences.museAdBlockLevel.notifier).update(picked.key);
+                },
+              ),
+            ],
+          ),
           // 1.5.0: changes reach a running connection by themselves (hot reload)
           MuseSection(
             children: [

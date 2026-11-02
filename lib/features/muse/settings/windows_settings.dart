@@ -1,6 +1,9 @@
-// 穿云 Windows - the desktop-only rows of 设置: 运行模式 (系统代理 / TUN), 开机自启, 静默启动 (1.6.0 C7),
-// 关闭窗口时; 1.6.0 C8: 开机自启时静默, 穿云标题栏, 窗口置顶, 按需运行, 快捷键.
-// 1.9.0 #5: 开机自启 / 开机自启时静默 / 按需运行 moved to 设置 › 自动连接 (auto_connect_page.dart).
+// 穿云 Windows - the desktop-only settings rows. 1.10.0: there is no 「电脑」 group on the 设置 home
+// page any more; each row sits on the page it belongs to:
+//   运行模式 (系统代理 / TUN) → 设置 › 网络 (MuseWindowsModeTile)
+//   静默启动 → 设置 › 自动连接 (MuseWindowsSilentStartTile, next to 开机自启)
+//   穿云标题栏 / 窗口置顶 / 快捷键 / 关闭窗口时 → 设置 › 外观 › 窗口 (MuseWindowsWindowSection)
+// Preferences and behaviour are unchanged.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
@@ -24,52 +27,69 @@ String _modeTitle(ServiceMode mode) => switch (mode) {
   _ => '系统代理',
 };
 
-class WindowsSettingsSection extends ConsumerWidget {
-  const WindowsSettingsSection({super.key});
+/// 运行模式 (设置 › 网络).
+class MuseWindowsModeTile extends ConsumerWidget {
+  const MuseWindowsModeTile({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(ConfigOptions.serviceMode);
+    final tunNeedsAdmin = mode == ServiceMode.tun && !WindowsAdmin.isElevated;
+    return MuseTile(
+      key: const ValueKey('settings_service_mode'),
+      leading: const Icon(Icons.swap_horiz_outlined),
+      title: '运行模式',
+      trailing: tunNeedsAdmin
+          ? const Icon(Icons.error_outlined, color: MusePalette.orange, size: MuseIconSize.small)
+          : Text(mode == ServiceMode.tun ? 'TUN' : '系统代理'),
+      chevron: true,
+      onTap: () async {
+        final dialogs = ref.read(dialogNotifierProvider.notifier);
+        final picked = await dialogs.showSettingPicker<ServiceMode>(
+          title: '运行模式',
+          selected: mode,
+          options: const [ServiceMode.systemProxy, ServiceMode.tun],
+          getTitle: _modeTitle,
+        );
+        if (picked == null) {
+          // tapping the row again while TUN still waits for administrator rights
+          if (tunNeedsAdmin) await museOfferElevation(ref.read);
+          return;
+        }
+        await museSwitchServiceMode(ref.read, picked);
+      },
+    );
+  }
+}
+
+/// 静默启动 (设置 › 自动连接 › 开机). 1.6.0 C7 (#146): the existing silent_start preference.
+class MuseWindowsSilentStartTile extends ConsumerWidget {
+  const MuseWindowsSilentStartTile({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => MuseSwitchTile(
+    key: const ValueKey('settings_silent_start'),
+    leading: const Icon(Icons.visibility_off_outlined),
+    title: '静默启动',
+    info: '打开穿云时不弹出窗口，只在托盘里运行（点托盘图标显示窗口）',
+    value: ref.watch(Preferences.silentStart),
+    onChanged: (v) => ref.read(Preferences.silentStart.notifier).update(v),
+  );
+}
+
+/// 穿云标题栏 / 窗口置顶 / 快捷键 / 关闭窗口时 (设置 › 外观 › 窗口).
+class MuseWindowsWindowSection extends ConsumerWidget {
+  const MuseWindowsWindowSection({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final mode = ref.watch(ConfigOptions.serviceMode);
-    final tunNeedsAdmin = mode == ServiceMode.tun && !WindowsAdmin.isElevated;
     final closing = ref.watch(Preferences.actionAtClose);
     final hotkeyCount = ref.watch(MusePrefs.hotkeysOn) ? museParseHotkeys(ref.watch(MusePrefs.hotkeys)).length : 0;
-
     return MuseSection(
-      header: '电脑',
+      key: const ValueKey('appearance_windows'),
+      header: '窗口',
       children: [
-        MuseTile(
-          leading: const Icon(Icons.swap_horiz_outlined),
-          title: '运行模式',
-          trailing: tunNeedsAdmin
-              ? const Icon(Icons.error_outlined, color: MusePalette.orange, size: MuseIconSize.small)
-              : Text(mode == ServiceMode.tun ? 'TUN' : '系统代理'),
-          chevron: true,
-          onTap: () async {
-            final dialogs = ref.read(dialogNotifierProvider.notifier);
-            final picked = await dialogs.showSettingPicker<ServiceMode>(
-              title: '运行模式',
-              selected: mode,
-              options: const [ServiceMode.systemProxy, ServiceMode.tun],
-              getTitle: _modeTitle,
-            );
-            if (picked == null) {
-              // tapping the row again while TUN still waits for administrator rights
-              if (tunNeedsAdmin) await museOfferElevation(ref.read);
-              return;
-            }
-            await museSwitchServiceMode(ref.read, picked);
-          },
-        ),
-        // 1.6.0 C7 (#146): the existing silent_start preference, now on screen
-        MuseSwitchTile(
-          key: const ValueKey('settings_silent_start'),
-          leading: const Icon(Icons.visibility_off_outlined),
-          title: '静默启动',
-          info: '打开穿云时不弹出窗口，只在托盘里运行（点托盘图标显示窗口）',
-          value: ref.watch(Preferences.silentStart),
-          onChanged: (v) => ref.read(Preferences.silentStart.notifier).update(v),
-        ),
         // 1.6.0 C8: 穿云's own title bar (off = the Windows one) and 窗口置顶
         MuseSwitchTile(
           key: const ValueKey('settings_custom_title_bar'),
@@ -95,6 +115,7 @@ class WindowsSettingsSection extends ConsumerWidget {
           onTap: () => musePushPage(context, const MuseHotkeysPage()),
         ),
         MuseTile(
+          key: const ValueKey('settings_close_action'),
           leading: const Icon(Icons.close_outlined),
           title: '关闭窗口时',
           trailing: Text(closing.present(t)),

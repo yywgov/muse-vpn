@@ -7,7 +7,6 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
@@ -82,11 +81,11 @@ class MuseShellFrame extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final offer = ref.watch(museClipboardOfferProvider) != null;
-    final changelogDot = ref.watch(museChangelogDotProvider);
     final scheme = Theme.of(context).colorScheme;
     Widget icon(int i, Color color) {
       final ic = Icon(museShellActions[i].icon, color: color);
-      if (i == 3) return MuseDot(show: changelogDot, child: ic);
+      // 1.10.0: no unread dot on 设置 (关于 has no 更新内容 row any more; a feature release still
+      // shows its notes once by itself)
       return i == 2 && offer ? Badge(smallSize: MuseSize.dot, backgroundColor: scheme.primary, child: ic) : ic;
     }
 

@@ -30,7 +30,6 @@ import 'package:hiddify/features/connection/widget/connection_wrapper.dart';
 import 'package:hiddify/features/muse/home/auto_fastest.dart';
 import 'package:hiddify/features/muse/desktop/connection_keeper.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
-import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/subscription_alert.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
@@ -92,7 +91,6 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     // 穿云 1.3.0 智能保持连接 (one switch, logic/keep_alive.dart): node failover, timed-out node
     // folding, core watchdog, Windows connection keeper (recovery, system proxy restore, wake)
     ref.listen(museNodeFailoverProvider, (_, _) {});
-    ref.listen(museBadNodesProvider, (_, _) {});
     ref.listen(museAutoFastestProvider, (_, _) {});
     ref.listen(museCoreWatchdogProvider, (_, _) {});
     ref.listen(museConnectionKeeperProvider, (_, _) {});

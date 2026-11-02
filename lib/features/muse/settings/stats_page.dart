@@ -6,7 +6,10 @@ part of 'more_settings.dart';
 // ======================================================================= 统计
 
 class MuseStatsPage extends HookConsumerWidget {
-  const MuseStatsPage({super.key});
+  const MuseStatsPage({super.key, this.header});
+
+  /// 1.10.0: the 活动 tabs (统计 is a tab of 设置 › 活动)
+  final Widget? header;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -27,9 +30,7 @@ class MuseStatsPage extends HookConsumerWidget {
     final report = museMonthlyReport(log, museMonthKey(now), bytes: museBytes);
     final mt = MuseTheme.of(context);
 
-    return MuseScaffold(
-      title: '统计',
-      body: MuseGroupedBody(
+    final body = MuseGroupedBody(
         children: [
           MuseSection(
             dividerIndent: MuseSpace.s16,
@@ -91,7 +92,10 @@ class MuseStatsPage extends HookConsumerWidget {
             ],
           ),
         ],
-      ),
+      );
+    return MuseScaffold(
+      title: header == null ? '统计' : '活动',
+      body: header == null ? body : Column(children: [header!, Expanded(child: body)]),
     );
   }
 }

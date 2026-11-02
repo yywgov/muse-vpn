@@ -53,7 +53,7 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('settings_search_field')), 'quic');
     await tester.pump();
     expect(find.text('屏蔽 QUIC'), findsOneWidget);
-    expect(find.text('设置 › 高级'), findsOneWidget);
+    expect(find.text('设置 › 网络 › 高级'), findsWidgets); // 1.10.0: 高级 is a group of 网络
     await tester.tap(find.byKey(const ValueKey('settings_hit_0')));
     await tester.pumpAndSettle();
     expect(picked?.title, '屏蔽 QUIC');

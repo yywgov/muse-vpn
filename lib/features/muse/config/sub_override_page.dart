@@ -1,4 +1,5 @@
-// 穿云 1.9.0 #15 - 订阅覆写 editor (form first; the raw JSON under 「高级」).
+// 穿云 1.9.0 #15 - 订阅覆写 editor (form). 1.10.0: the raw JSON moved to 「规则」 › ⋯ › 编辑覆写 JSON
+// (MuseOverrideJsonPage below); the editor no longer has a 「高级」 section.
 // Saved by profile id; applied at connect / hot reload, never written into the subscription.
 // Part of 穿云 (GPLv3).
 
@@ -113,7 +114,6 @@ class MuseSubOverridePage extends HookConsumerWidget {
             ],
           ),
           _NodesSection(key: ValueKey('override_nodes_${o.nodes.join('|')}'), initial: o.nodes, onSave: (n) => save(o.copyWith(nodes: n))),
-          _AdvancedSection(key: ValueKey('override_json_${jsonEncode(o.toJson())}'), value: o, onSave: save),
         ],
       ),
     );
@@ -155,61 +155,82 @@ class _NodesSection extends HookWidget {
   }
 }
 
-/// 「高级」: the override as JSON. The earlier 覆写脚本 entry kept its place here; no script
-/// runs, the same data the form edits is shown and can be pasted (e.g. from another device).
-class _AdvancedSection extends HookWidget {
-  const _AdvancedSection({super.key, required this.value, required this.onSave});
+/// 1.10.0: one subscription's override as JSON (「规则」 › ⋯ › 编辑覆写 JSON). No script runs: the same
+/// data the form edits, e.g. pasted from another device.
+class MuseOverrideJsonPage extends HookConsumerWidget {
+  const MuseOverrideJsonPage({super.key, required this.profileId, required this.profileName});
 
-  final MuseSubOverride value;
-  final Future<void> Function(MuseSubOverride) onSave;
+  final String profileId;
+  final String profileName;
 
   @override
-  Widget build(BuildContext context) {
-    final open = useState(false);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = museOverrideOf(ref, profileId);
     final c = useTextEditingController(text: const JsonEncoder.withIndent('  ').convert(value.toJson()));
     final error = useState<String?>(null);
-    return MuseSection(
-      header: '高级',
-      children: [
-        MuseTile(
-          key: const ValueKey('override_advanced'),
-          leading: const Icon(Icons.code_outlined),
-          title: '覆写脚本（JSON）',
-          subtitle: '与上面的表单是同一份数据',
-          trailing: Icon(open.value ? Icons.expand_less_outlined : Icons.expand_more_outlined),
-          onTap: () => open.value = !open.value,
-        ),
-        if (open.value) ...[
-          Padding(
-            padding: const EdgeInsets.all(MuseSpace.s12),
-            child: TextField(
-              key: const ValueKey('override_json_field'),
-              controller: c,
-              minLines: 4,
-              maxLines: 14,
-              style: MuseType.caption(context),
-              decoration: InputDecoration(errorText: error.value),
-            ),
-          ),
-          MuseTile(
-            key: const ValueKey('override_json_apply'),
-            leading: const Icon(Icons.check_outlined),
-            title: '应用',
-            onTap: () async {
-              try {
-                final j = jsonDecode(c.text);
-                if (j is! Map) throw const FormatException();
-                error.value = null;
-                await onSave(MuseSubOverride.fromJson(j));
-              } catch (_) {
-                error.value = '不是有效的覆写 JSON';
-              }
-            },
+    return MuseScaffold(
+      title: '覆写 JSON · $profileName',
+      body: MuseGroupedBody(
+        children: [
+          MuseSection(
+            footer: '与「订阅覆写」里的表单是同一份数据',
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(MuseSpace.s12),
+                child: TextField(
+                  key: const ValueKey('override_json_field'),
+                  controller: c,
+                  minLines: 6,
+                  maxLines: 20,
+                  style: MuseType.caption(context),
+                  decoration: InputDecoration(errorText: error.value),
+                ),
+              ),
+              MuseTile(
+                key: const ValueKey('override_json_apply'),
+                leading: const Icon(Icons.check_outlined),
+                title: '应用',
+                onTap: () async {
+                  try {
+                    final j = jsonDecode(c.text);
+                    if (j is! Map) throw const FormatException();
+                    error.value = null;
+                    await museSaveOverride(ref, profileId, MuseSubOverride.fromJson(j));
+                    if (context.mounted) Navigator.of(context).maybePop();
+                  } catch (_) {
+                    error.value = '不是有效的覆写 JSON';
+                  }
+                },
+              ),
+            ],
           ),
         ],
-      ],
+      ),
     );
   }
+}
+
+/// 1.10.0: 「规则」 › ⋯ › 编辑覆写 JSON — picks the subscription when there are several.
+Future<void> museOpenOverrideJson(BuildContext context, List<ProfileEntity> profiles) async {
+  if (profiles.isEmpty) return;
+  var p = profiles.first;
+  if (profiles.length > 1) {
+    final picked = await showDialog<ProfileEntity>(
+      context: context,
+      builder: (c) => SimpleDialog(
+        key: const ValueKey('override_json_pick'),
+        title: const Text('编辑哪个订阅的覆写'),
+        children: [
+          for (final e in profiles)
+            SimpleDialogOption(key: ValueKey('override_json_pick_${e.id}'), onPressed: () => Navigator.of(c).pop(e), child: Text(e.name)),
+        ],
+      ),
+    );
+    if (picked == null) return;
+    p = picked;
+  }
+  if (!context.mounted) return;
+  await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MuseOverrideJsonPage(profileId: p.id, profileName: p.name)));
 }
 
 class _RuleDialog extends HookWidget {

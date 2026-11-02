@@ -4,11 +4,13 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/failures.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/muse/config/rules_page.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/profile_tools.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart' show musePick;
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
@@ -43,6 +45,30 @@ class MuseConfigPage extends HookConsumerWidget {
               icon: const Icon(Icons.swap_vert_outlined),
               tooltip: '排序',
             ),
+          // 1.10.0: 订阅自动更新 moved here from the 设置 home page (same preference)
+          PopupMenuButton<String>(
+            key: const ValueKey('profile_more'),
+            tooltip: '更多',
+            icon: const Icon(Icons.more_horiz_outlined),
+            onSelected: (v) async {
+              if (v != 'auto_update') return;
+              final hours = ref.read(Preferences.museAutoUpdateHours);
+              final picked = await musePick<int>(
+                context,
+                '订阅自动更新',
+                [for (final h in museAutoUpdateChoices) (h, museAutoUpdateLabel(h))],
+                hours,
+              );
+              if (picked != null) await ref.read(Preferences.museAutoUpdateHours.notifier).update(picked);
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem<String>(
+                key: const ValueKey('auto_update_hours'),
+                value: 'auto_update',
+                child: Text('订阅自动更新：${museAutoUpdateLabel(ref.read(Preferences.museAutoUpdateHours))}'),
+              ),
+            ],
+          ),
           IconButton(
             key: const ValueKey('profile_add_button'),
             onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),

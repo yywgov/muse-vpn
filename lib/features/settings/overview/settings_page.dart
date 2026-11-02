@@ -2,12 +2,15 @@
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 //
 // 1.3.0: grouped cards (icon | label | trailing control), no explanatory small text.
-// 智能保持连接 replaces the separate recovery switches; 出口检测 / 隐藏非节点条目 / 自动收起不可用节点
-// switches are gone (part of 首页 / always on / part of 智能保持连接); 隐私与后台 is a group here;
-// 负载均衡策略 / TLS 分片 / 连接信息 sit under a collapsed 高级.
+// 1.10.0: eight rows — 外观, 自动连接, 分应用代理 (Android), 网络, 活动, 备份与同步, 内核与资源, 关于 —
+// plus 开发者选项 once it was turned on. Everything else moved to the page it belongs to:
+// 智能保持连接 → 自动连接; 高级 → 网络 › 高级; 统计 / 诊断 → 活动 tabs; 去广告 → 规则 › 分流;
+// 订阅自动更新 → 订阅 › ⋯; 节点 → 节点 › ⋯ › 节点设置; Android 通用 / 隐私与后台 → 外观;
+// Windows 电脑 → 网络 (运行模式), 自动连接 (静默启动), 外观 (窗口). 帮助与隐私 and 后台保活 are gone.
+// Old names still find their new place through search (logic/settings_index.dart); every
+// preference keeps its storage key.
 
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -18,28 +21,30 @@ import 'package:hiddify/features/muse/activity/activity_page.dart';
 import 'package:hiddify/features/muse/config/rules_page.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
-import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
-import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
-import 'package:hiddify/features/muse/settings/android_settings.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
-import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
-import 'package:hiddify/features/muse/settings/help_page.dart';
-import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
-import 'package:hiddify/features/muse/settings/privacy_page.dart';
 import 'package:hiddify/features/muse/settings/resources_page.dart';
 import 'package:hiddify/features/muse/settings/settings_search.dart';
 import 'package:hiddify/features/muse/settings/theme_preview_page.dart';
-import 'package:hiddify/features/muse/settings/windows_settings.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
-import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
-import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+/// 1.10.0: the rows of the 设置 home page, in order (pure, for tests).
+List<String> museSettingsHomeRows({required bool android, required bool developer}) => [
+  '外观',
+  '自动连接',
+  if (android) '分应用代理',
+  '网络',
+  '活动',
+  '备份与同步',
+  '内核与资源',
+  '关于',
+  if (developer) '开发者选项',
+];
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
@@ -49,14 +54,9 @@ class SettingsPage extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final android = PlatformUtils.isAndroid;
     final perAppOn = ref.watch(Preferences.perAppProxyModeInUse) != null;
-    final adLevel = MuseAdBlockLevel.fromKey(ref.watch(Preferences.museAdBlockLevel));
-    final autoHours = ref.watch(Preferences.museAutoUpdateHours);
     final themeMode = ref.watch(themePreferencesProvider);
     final shownTheme = themeMode == AppThemeMode.black ? AppThemeMode.dark : themeMode;
-    final balancer = ref.watch(ConfigOptions.balancerStrategy);
-    final advancedOpen = useState(false);
     final devMode = ref.watch(MusePrefs.devMode);
-    final ipv6 = MuseIpv6Policy.fromKey(ref.watch(MusePrefs.ipv6Policy));
     // 1.9.0 #5
     final autoSummary = museAutoConnectSummary(
       autoRun: android && ref.watch(MusePrefs.autoRun),
@@ -65,17 +65,13 @@ class SettingsPage extends HookConsumerWidget {
       autoStart: PlatformUtils.isWindows && (ref.watch(autoStartNotifierProvider).valueOrNull ?? false),
     );
 
-    // 1.5.0 #101: jump to a setting found by search
+    // 1.5.0 #101: jump to a setting found by search (1.10.0: at its new place)
     void openEntry(MuseSettingEntry e) {
       switch (e.page) {
-        case MuseSettingPage.main:
-          break;
         case MuseSettingPage.autoConnect:
           musePushPage(context, const MuseAutoConnectPage());
-        case MuseSettingPage.keepAlive:
-          musePushPage(context, const MuseKeepAlivePage());
-        case MuseSettingPage.advanced:
-          advancedOpen.value = true;
+        case MuseSettingPage.advanced || MuseSettingPage.network:
+          musePushPage(context, const MuseNetworkPage());
         case MuseSettingPage.appearance:
           musePushPage(context, const MuseAppearancePage());
         case MuseSettingPage.nodes:
@@ -84,26 +80,26 @@ class SettingsPage extends HookConsumerWidget {
           museOpenRules(context);
         case MuseSettingPage.overrides:
           museOpenRules(context, tab: MuseRulesTab.overrides);
-        case MuseSettingPage.network:
-          musePushPage(context, const MuseNetworkPage());
+        case MuseSettingPage.subscriptions:
+          context.goNamed('config');
         case MuseSettingPage.sync:
           musePushPage(context, const MuseSyncPage());
         case MuseSettingPage.stats:
-          musePushPage(context, const MuseStatsPage());
+          context.go(museActivityLocation(MuseActivityTab.stats));
+        case MuseSettingPage.diagnose:
+          context.go(museActivityLocation(MuseActivityTab.diagnose));
         case MuseSettingPage.developer:
           musePushPage(context, const MuseDeveloperPage());
         case MuseSettingPage.resources:
           musePushPage(context, const MuseResourcesPage());
-        case MuseSettingPage.help:
-          musePushPage(context, const MuseHelpPage());
         case MuseSettingPage.themePreview:
           musePushPage(context, const MuseThemePreviewPage());
         case MuseSettingPage.perApp:
           context.goNamed('perAppProxy');
-        case MuseSettingPage.diagnose:
-          showMuseDiagnoseSheet(context);
         case MuseSettingPage.about:
           context.goNamed('about');
+        case MuseSettingPage.openSource:
+          context.goNamed('openSource');
         case MuseSettingPage.activity:
           context.go(museActivityLocation(museActivityTabForSetting(e.title)));
       }
@@ -125,9 +121,7 @@ class SettingsPage extends HookConsumerWidget {
       ],
       body: MuseGroupedBody(
         children: [
-          // 1.6.1: labelled groups (常用 / 功能 / 其他), the way the tools page groups its rows
           MuseSection(
-            header: '常用',
             children: [
               MuseTile(
                 key: const ValueKey('theme_mode'),
@@ -137,15 +131,7 @@ class SettingsPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseAppearancePage()),
               ),
-              // 1.3.0: one switch for reconnect → switch node → restart core (logic/keep_alive.dart)
-              MuseSwitchTile(
-                key: const ValueKey('keep_alive'),
-                leading: const Icon(Icons.autorenew_outlined),
-                title: '智能保持连接',
-                value: ref.watch(Preferences.museKeepAlive),
-                onChanged: (v) => ref.read(Preferences.museKeepAlive.notifier).update(v),
-              ),
-              // 1.9.0 #5: 自动运行 / 按需运行 / 定时 / 开机自启 on one page
+              // 1.9.0 #5: 自动运行 / 按需运行 / 定时 / 开机自启; 1.10.0: + 智能保持连接
               MuseTile(
                 key: const ValueKey('settings_auto_connect'),
                 leading: const Icon(Icons.schedule_outlined),
@@ -154,68 +140,15 @@ class SettingsPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseAutoConnectPage()),
               ),
-              MuseTile(
-                key: const ValueKey('ad_block_level'),
-                leading: const Icon(Icons.block_outlined),
-                title: '去广告',
-                trailing: Text(adLevel.title),
-                chevron: true,
-                onTap: () async {
-                  final picked = await museSettingPick<MuseAdBlockLevel>(
-                    context,
-                    '去广告',
-                    [for (final l in MuseAdBlockLevel.values) (l, l.title)],
-                    adLevel,
-                  );
-                  if (picked != null) await ref.read(Preferences.museAdBlockLevel.notifier).update(picked.key);
-                },
-              ),
-              MuseTile(
-                key: const ValueKey('auto_update_hours'),
-                leading: const Icon(Icons.update_outlined),
-                title: '订阅自动更新',
-                trailing: Text(museAutoUpdateLabel(autoHours)),
-                chevron: true,
-                onTap: () async {
-                  final picked = await museSettingPick<int>(
-                    context,
-                    '订阅自动更新',
-                    [for (final h in museAutoUpdateChoices) (h, museAutoUpdateLabel(h))],
-                    autoHours,
-                  );
-                  if (picked != null) await ref.read(Preferences.museAutoUpdateHours.notifier).update(picked);
-                },
-              ),
               if (android)
                 MuseTile(
+                  key: const ValueKey('settings_per_app'),
                   leading: const Icon(Icons.apps_outlined),
                   title: '分应用代理',
                   trailing: perAppOn ? const MuseStatusDot() : null,
                   chevron: true,
                   onTap: () => context.goNamed('perAppProxy'),
                 ),
-            ],
-          ),
-          // 1.4.0
-          MuseSection(
-            header: '功能',
-            children: [
-              MuseTile(
-                key: const ValueKey('settings_nodes'),
-                leading: const Icon(Icons.public_outlined),
-                title: '节点',
-                chevron: true,
-                onTap: () => musePushPage(context, const MuseNodeSettingsPage()),
-              ),
-              MuseTile(
-                key: const ValueKey('settings_routing'),
-                leading: const Icon(Icons.alt_route_outlined),
-                // 1.9.0 #17: 分流 + 订阅覆写
-                title: '规则',
-                subtitle: '分流 · 订阅覆写',
-                chevron: true,
-                onTap: () => museOpenRules(context),
-              ),
               MuseTile(
                 key: const ValueKey('settings_network'),
                 leading: const Icon(Icons.lan_outlined),
@@ -223,19 +156,20 @@ class SettingsPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseNetworkPage()),
               ),
+              // 1.8.0; 1.10.0: + 统计 / 诊断 tabs
+              MuseTile(
+                key: const ValueKey('settings_activity'),
+                leading: const Icon(Icons.swap_vert_outlined),
+                title: '活动',
+                chevron: true,
+                onTap: () => context.go(museActivityLocation(MuseActivityTab.connections)),
+              ),
               MuseTile(
                 key: const ValueKey('settings_sync'),
                 leading: const Icon(Icons.cloud_sync_outlined),
                 title: '备份与同步',
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseSyncPage()),
-              ),
-              MuseTile(
-                key: const ValueKey('settings_stats'),
-                leading: const Icon(Icons.bar_chart_outlined),
-                title: '统计',
-                chevron: true,
-                onTap: () => musePushPage(context, const MuseStatsPage()),
               ),
               // 1.6.0 C10; 1.9.0 #8: 内核 (Windows / Android) + 资源 on one page
               MuseTile(
@@ -246,40 +180,19 @@ class SettingsPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseResourcesPage()),
               ),
-            ],
-          ),
-          if (PlatformUtils.isWindows) const WindowsSettingsSection(),
-          if (android) const MuseAndroidGeneralSection(),
-          if (android) const MusePrivacySection(),
-          MuseSection(
-            header: '其他',
-            children: [
-              MuseTile(
-                key: const ValueKey('diagnose'),
-                leading: const Icon(Icons.health_and_safety_outlined),
-                title: '诊断',
-                chevron: true,
-                onTap: () => showMuseDiagnoseSheet(context),
-              ),
-              // 1.9.0 #234 / #192
-              MuseTile(
-                key: const ValueKey('settings_help'),
-                leading: const Icon(Icons.help_outlined),
-                title: '帮助与隐私',
-                chevron: true,
-                onTap: () => musePushPage(context, const MuseHelpPage()),
-              ),
               MuseTile(
                 key: const ValueKey('settings_about'),
                 leading: const Icon(Icons.info_outlined),
                 title: '关于',
-                // 1.5.0: unread 更新内容 after a small update
-                trailing: ref.watch(museChangelogDotProvider) ? const MuseStatusDot(color: MusePalette.red) : null,
                 chevron: true,
                 onTap: () => context.goNamed('about'),
               ),
-              // 1.6.0 C10 (#127): only after 关于 › 版本 was tapped 7 times
-              if (devMode)
+            ],
+          ),
+          // 1.6.0 C10 (#127): only after 关于's icon was tapped 7 times
+          if (devMode)
+            MuseSection(
+              children: [
                 MuseTile(
                   key: const ValueKey('settings_developer'),
                   leading: const Icon(Icons.developer_mode_outlined),
@@ -287,94 +200,8 @@ class SettingsPage extends HookConsumerWidget {
                   chevron: true,
                   onTap: () => musePushPage(context, const MuseDeveloperPage()),
                 ),
-              MuseTile(
-                key: const ValueKey('advanced_toggle'),
-                leading: const Icon(Icons.tune_outlined),
-                title: '高级',
-                trailing: AnimatedRotation(
-                  turns: advancedOpen.value ? 0.5 : 0,
-                  duration: museMotion(context),
-                  child: Icon(Icons.expand_more_outlined, size: MuseIconSize.small, color: MuseTheme.of(context).text3),
-                ),
-                onTap: () => advancedOpen.value = !advancedOpen.value,
-              ),
-              if (advancedOpen.value) ...[
-                MuseTile(
-                  key: const ValueKey('balancer_strategy'),
-                  leading: const Icon(Icons.balance_outlined),
-                  title: '负载均衡策略',
-                  trailing: Text(balancer.present(t)),
-                  chevron: true,
-                  onTap: () async {
-                    final picked = await museSettingPick<BalancerStrategy>(
-                      context,
-                      '负载均衡策略',
-                      [for (final b in BalancerStrategy.values) (b, b.present(t))],
-                      balancer,
-                    );
-                    if (picked != null) await ref.read(ConfigOptions.balancerStrategy.notifier).update(picked);
-                  },
-                ),
-                MuseTile(
-                  leading: const Icon(Icons.call_split_outlined),
-                  title: 'TLS 分片',
-                  chevron: true,
-                  onTap: () => context.goNamed('tlsTricks'),
-                ),
-                // 1.5.0: network options that can break a working setup, all off by default
-                MuseTile(
-                  key: const ValueKey('ipv6_policy'),
-                  leading: const Icon(Icons.language_outlined),
-                  title: 'IPv6',
-                  info: '只在本地网络和节点都支持 IPv6 时开启，否则可能打不开网页',
-                  trailing: Text(ipv6.title),
-                  chevron: true,
-                  onTap: () async {
-                    final picked = await museSettingPick<MuseIpv6Policy>(
-                      context,
-                      'IPv6',
-                      [for (final p in MuseIpv6Policy.values) (p, p.title)],
-                      ipv6,
-                    );
-                    if (picked != null) await ref.read(MusePrefs.ipv6Policy.notifier).update(picked.key);
-                  },
-                ),
-                MuseSwitchTile(
-                  key: const ValueKey('fake_ip'),
-                  leading: const Icon(Icons.dns_outlined),
-                  title: 'Fake-IP',
-                  info: '仅 TUN 模式生效：域名先拿到虚拟地址，打开网页更快；局域网、对时和联网检测仍用真实地址。个别 App 或游戏异常时请关闭',
-                  value: ref.watch(ConfigOptions.enableFakeDns),
-                  onChanged: (v) => ref.read(ConfigOptions.enableFakeDns.notifier).update(v),
-                ),
-                // 1.5.0 #9
-                MuseSwitchTile(
-                  key: const ValueKey('block_quic'),
-                  leading: const Icon(Icons.block_outlined),
-                  title: '屏蔽 QUIC',
-                  info: '节点 UDP 不稳时打开：YouTube 等网站改走 TCP，播放更稳',
-                  value: ref.watch(MusePrefs.blockQuic),
-                  onChanged: (v) => ref.read(MusePrefs.blockQuic.notifier).update(v),
-                ),
-                // 1.8.0: 活动 = live connections / 请求, logs and DNS queries in one page
-                MuseTile(
-                  key: const ValueKey('settings_activity'),
-                  leading: const Icon(Icons.swap_vert_outlined),
-                  title: '活动',
-                  subtitle: '连接、日志、DNS 查询',
-                  chevron: true,
-                  onTap: () => context.go(museActivityLocation(MuseActivityTab.connections)),
-                ),
-                MuseSwitchTile(
-                  key: const ValueKey('settings_auto_close'),
-                  title: '切换节点时关闭旧连接',
-                  info: '换节点后，仍走旧节点的连接会立即断开并通过新节点重连',
-                  value: ref.watch(MusePrefs.autoCloseConnections),
-                  onChanged: (v) => ref.read(MusePrefs.autoCloseConnections.notifier).update(v),
-                ),
               ],
-            ],
-          ),
+            ),
         ],
       ),
     );

@@ -14,7 +14,6 @@ import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
 import 'package:hiddify/features/muse/desktop/on_demand.dart';
-import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
@@ -66,7 +65,6 @@ Future<ProviderContainer> _pumpNodes(WidgetTester t, {Map<String, Object> prefs 
       museNodeGroupProvider.overrideWith((ref) => AsyncData(ref.watch(_groupState))),
       museActiveConfigProvider.overrideWith((ref) async => ''),
       museConnectedSinceProvider.overrideWith((ref) async => null),
-      museHiddenNodesProvider.overrideWith((ref) => const <String>{}),
     ],
   );
   addTearDown(c.dispose);

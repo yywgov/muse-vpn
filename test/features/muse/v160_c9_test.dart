@@ -453,9 +453,9 @@ void main() {
     });
   });
 
-  group('设置 › 通用 (Android)', () {
+  group('设置 › 外观 › 通知与图标 (Android, 1.10.0; was 设置 › 通用)', () {
     testWidgets('通知栏断开按钮 switch (自动运行 / 按需运行 moved to 自动连接 in 1.9.0)', (t) async {
-      final c = await _pump(t, const Scaffold(body: SingleChildScrollView(child: MuseAndroidGeneralSection())));
+      final c = await _pump(t, const Scaffold(body: SingleChildScrollView(child: MuseAndroidAppearanceSection())));
       expect(c.read(MusePrefs.notifyStopButton), isTrue);
       await t.tap(find.byKey(const ValueKey('settings_notify_stop')));
       await t.pumpAndSettle();

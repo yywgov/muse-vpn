@@ -105,6 +105,23 @@ class MuseUpdateDownloading extends MuseUpdateState {
   final double? progress;
 }
 
+/// 1.10.0: a release's notes (its body, written by the release CI from the in-app changelog) as
+/// lines for the 「发现新版本」 dialog: list items without their marker, headings and blank lines
+/// dropped, at most [max] lines.
+List<String> museReleaseNotes(Object? body, {int max = 12}) {
+  if (body is! String) return const [];
+  final out = <String>[];
+  for (final raw in body.split(RegExp(r'\r?\n'))) {
+    final line = raw.trim();
+    if (line.isEmpty || line.startsWith('#') || line.startsWith('<!--')) continue;
+    final item = line.replaceFirst(RegExp(r'^([-*·•]|\d+[.)])\s+'), '').trim();
+    if (item.isEmpty) continue;
+    out.add(item);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 /// Picks the arm64 APK (or with [windows] the Windows zip) out of a GitHub release
 /// (JSON of the releases API), or null.
 /// Prereleases and drafts are never used (1.5.1: stable releases only). Asset URLs outside this
@@ -390,6 +407,9 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
   /// Whether the last [check] got the release info through a mirror (see museCanInstallSilently).
   bool lastCheckViaMirror = false;
 
+  /// 1.10.0: the notes of the release the last [check] found (empty when it had none).
+  List<String> lastNotes = const [];
+
   /// The latest release when it is newer than this build, null when up to date. Throws on failure.
   /// The latest stable release (1.5.1: no Beta 通道) and, when GitHub can't be reached, the API mirrors.
   Future<MuseRelease?> check() async {
@@ -424,12 +444,15 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
       if (data == null) throw lastError ?? const FileSystemException('release check failed');
       final windows = PlatformUtils.isWindows;
       MuseRelease? release;
+      lastNotes = const [];
       if (data is List) {
         // a mirror that answers with a release list: its newest stable entry
         final picked = musePickRelease([for (final e in data) if (e is Map<String, dynamic>) e]);
         release = picked == null ? null : museParseRelease(picked, windows: windows, apkAsset: museApkAssetFor(Abi.current()));
+        if (picked != null) lastNotes = museReleaseNotes(picked['body']);
       } else if (data is Map<String, dynamic>) {
         release = museParseRelease(data, windows: windows, apkAsset: museApkAssetFor(Abi.current()));
+        lastNotes = museReleaseNotes(data['body']);
       }
       final current = ref.read(appInfoProvider).requireValue.version;
       if (release == null || !museIsNewer(release.version, current)) return null;

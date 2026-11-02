@@ -85,9 +85,19 @@ String museRemoteRuleSetSource(String url) {
   return file == null ? u.host : '${u.host} · $file';
 }
 
-// ---------------------------------------------------------------- 关于 › 版本 ×7 (#127)
+/// 1.10.0: the core release as 关于 shows it ('5.0.0-muse.20' → 'muse.20').
+String museCoreShort([String release = museCoreRelease]) {
+  final i = release.lastIndexOf('-');
+  return i < 0 || i == release.length - 1 ? release : release.substring(i + 1);
+}
 
-/// Taps on 关于 › 版本 needed to turn 开发者选项 on.
+/// 1.10.0: the one small line under the name on 关于: 「1.10.0（193）· 内核 muse.20」.
+String museAboutVersionLine({required String version, required String build, String release = museCoreRelease}) =>
+    '$version${build.isEmpty ? '' : '（$build）'} · 内核 ${museCoreShort(release)}';
+
+// ---------------------------------------------------------------- 关于 › 图标 ×7 (#127; 1.10.0: the icon, the version line checks for updates)
+
+/// Taps on 关于's icon needed to turn 开发者选项 on.
 const museDevTapsNeeded = 7;
 
 /// Counts taps on the version; a pause longer than [gap] starts over.

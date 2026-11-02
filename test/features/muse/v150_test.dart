@@ -240,8 +240,10 @@ void main() {
   group('#118 / #119 / #120 already in place (verified)', () {
     test('检查更新 lives on 关于 (no separate update page)', () {
       final about = File('lib/features/about/widget/about_page.dart').readAsStringSync();
-      expect(about, contains("title: '检查更新'"));
-      expect(about, contains("title: '更新内容'"));
+      // 1.10.0: tapping the version line checks; a new version's dialog carries its 更新内容
+      expect(about, contains("label: idle ? '检查更新' : null"));
+      expect(about, contains('onTap: idle ? checkUpdate : null'));
+      expect(about, contains('notes: updater.lastNotes'));
     });
 
     test('隐藏非节点条目 is always on, no switch; no 不可用 threshold setting', () {

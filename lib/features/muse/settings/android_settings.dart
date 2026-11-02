@@ -1,21 +1,58 @@
-// 穿云 1.6.0 C9 - 设置 › 通用 (Android): 通知栏「断开」按钮.
-// 1.9.0 #5: 自动运行 / 按需运行 moved to 设置 › 自动连接 (auto_connect_page.dart).
+// 穿云 1.6.0 C9 - Android-only settings rows. 1.10.0: the 「通用」 and 「隐私与后台」 groups of the 设置
+// home page are gone; 通知栏断开按钮, 隐藏通知 and 隐藏桌面图标 sit on 设置 › 外观 › 通知与图标
+// (MuseAndroidAppearanceSection). 自动运行 / 按需运行 are on 设置 › 自动连接 since 1.9.0 #5; the
+// 后台保活 page was removed in 1.10.0 (only the one-time hint on the first connection stays).
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class MuseAndroidGeneralSection extends ConsumerWidget {
-  const MuseAndroidGeneralSection({super.key});
+/// 设置 › 自动连接 (Android): what other apps can send to connect / disconnect.
+const museAndroidAutomationNote = '其他应用（如自动化工具）可发送 com.chuanyun.app.action.START / STOP / TOGGLE 来连接、断开或切换。';
+
+class MuseAndroidAppearanceSection extends HookConsumerWidget {
+  const MuseAndroidAppearanceSection({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stopButton = ref.watch(MusePrefs.notifyStopButton);
+    final hideNotification = ref.watch(Preferences.hideNotification);
+    final iconHidden = useState<bool?>(null);
+    useEffect(() {
+      ChuanyunPlatform.isLauncherIconHidden().then((value) {
+        if (context.mounted) iconHidden.value = value;
+      });
+      return null;
+    }, const []);
+
+    Future<void> toggleIcon(bool hide) async {
+      if (hide) {
+        final ok = await ref
+            .read(dialogNotifierProvider.notifier)
+            .showConfirmation(
+              title: '隐藏桌面图标？',
+              message:
+                  '隐藏后桌面上不再显示穿云。重新打开的方法：\n\n'
+                  '1. 下拉通知栏，长按「穿云开关」快捷开关（需先在快捷开关编辑里添加），即可打开穿云；\n'
+                  '2. 系统设置 > 应用 > 穿云 也能找到它。\n\n'
+                  '部分系统（Android 10 及以上）可能仍会显示一个跳转到应用信息的图标，这是系统行为。',
+              positiveBtnTxt: '隐藏',
+            );
+        if (!ok) return;
+      }
+      if (await ChuanyunPlatform.setLauncherIconHidden(hide)) iconHidden.value = hide;
+    }
+
     return MuseSection(
-      header: '通用',
-      footer: '「通知栏断开按钮」从下次连接起生效。其他应用（如自动化工具）可发送 com.chuanyun.app.action.START / STOP / TOGGLE 来连接、断开或切换。',
+      key: const ValueKey('appearance_android'),
+      header: '通知与图标',
+      footer: '「通知栏断开按钮」从下次连接起生效。',
       children: [
         MuseSwitchTile(
           key: const ValueKey('settings_notify_stop'),
@@ -23,6 +60,20 @@ class MuseAndroidGeneralSection extends ConsumerWidget {
           title: '通知栏断开按钮',
           value: stopButton,
           onChanged: (v) => ref.read(MusePrefs.notifyStopButton.notifier).update(v),
+        ),
+        MuseSwitchTile(
+          key: const ValueKey('settings_hide_notification'),
+          leading: const Icon(Icons.notifications_off_outlined),
+          title: '隐藏通知',
+          value: hideNotification,
+          onChanged: ref.read(Preferences.hideNotification.notifier).update,
+        ),
+        MuseSwitchTile(
+          key: const ValueKey('settings_hide_icon'),
+          leading: const Icon(Icons.visibility_off_outlined),
+          title: '隐藏桌面图标',
+          value: iconHidden.value ?? false,
+          onChanged: iconHidden.value == null ? null : toggleIcon,
         ),
       ],
     );

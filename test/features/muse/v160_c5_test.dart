@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/sync_service.dart';
-import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/node_style.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart';
@@ -43,7 +42,6 @@ Future<ProviderContainer> _pump(
       museNodeGroupProvider.overrideWithValue(AsyncData(group)),
       museActiveConfigProvider.overrideWith((ref) async => ''),
       museConnectedSinceProvider.overrideWith((ref) async => null),
-      museHiddenNodesProvider.overrideWith((ref) => const <String>{}),
     ],
   );
   addTearDown(c.dispose);
@@ -122,13 +120,17 @@ void main() {
     testWidgets('样式 menu switches layout and density (saved)', (tester) async {
       final c = await _pump(tester, group: _group(20));
       final h0 = tester.getSize(find.byKey(const ValueKey('节点 0'))).height;
-      await tester.tap(find.byKey(const ValueKey('node_style_button')));
+      await tester.tap(find.byKey(const ValueKey('node_more_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('node_more_layout')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('node_density_compact')));
       await tester.pumpAndSettle();
       expect(c.read(MusePrefs.nodeDensity), 'compact');
       expect(tester.getSize(find.byKey(const ValueKey('节点 0'))).height, lessThan(h0));
-      await tester.tap(find.byKey(const ValueKey('node_style_button')));
+      await tester.tap(find.byKey(const ValueKey('node_more_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('node_more_layout')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('node_layout_grid')));
       await tester.pumpAndSettle();
@@ -136,19 +138,32 @@ void main() {
       expect(find.byKey(const ValueKey('node_card')), findsWidgets);
     });
 
-    testWidgets('滚动到当前节点 reaches a node far down a 1000-node list', (tester) async {
+    testWidgets('1.10.0 the 节点 page opens at the node in use, far down a 1000-node list', (tester) async {
       await _pump(tester, group: _group(1000, selected: 870));
-      expect(find.byKey(const ValueKey('节点 870')), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('node_style_button')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('node_locate')));
       for (var i = 0; i < 300 && find.byKey(const ValueKey('节点 870')).evaluate().isEmpty; i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('节点 870')), findsOneWidget);
-      final y = tester.getTopLeft(find.byKey(const ValueKey('节点 870'))).dy;
-      expect(y, inInclusiveRange(0, 900));
+      expect(tester.getTopLeft(find.byKey(const ValueKey('节点 870'))).dy, inInclusiveRange(0, 900));
+    });
+
+    testWidgets('⋯ › 滚动到当前节点 brings it back after scrolling away', (tester) async {
+      await _pump(tester, group: _group(1000, selected: 870));
+      await tester.pumpAndSettle();
+      final scrollable = find.byType(Scrollable).first;
+      tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('节点 870')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('node_more_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('node_more_locate')));
+      for (var i = 0; i < 300 && find.byKey(const ValueKey('节点 870')).evaluate().isEmpty; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('节点 870')), findsOneWidget);
+      expect(tester.getTopLeft(find.byKey(const ValueKey('节点 870'))).dy, inInclusiveRange(0, 900));
     });
 
     testWidgets('2× text, 320 px, 卡片 紧凑: no overflow', (tester) async {

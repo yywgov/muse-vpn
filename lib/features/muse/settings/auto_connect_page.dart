@@ -1,14 +1,18 @@
 // 穿云 1.9.0 #5 - 设置 › 自动连接: everything that connects or disconnects without a tap, on one page:
 // 自动运行 (Android), 按需运行, 每天定时连接 / 断开, 开机自启 and 开机自启时静默 (Windows).
 // The rows moved here from 设置 › 通用 / 电脑 / 网络; preferences and behaviour are unchanged.
+// 1.10.0: 智能保持连接 (from the 设置 home page) and Windows 静默启动 are here too.
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
+import 'package:hiddify/features/muse/settings/android_settings.dart' show museAndroidAutomationNote;
 import 'package:hiddify/features/muse/settings/more_settings.dart' show musePushPage;
+import 'package:hiddify/features/muse/settings/windows_settings.dart' show MuseWindowsSilentStartTile;
 import 'package:hiddify/features/muse/settings/windows_extras.dart' show MuseOnDemandPage;
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -58,7 +62,21 @@ class MuseAutoConnectPage extends ConsumerWidget {
       title: '自动连接',
       body: MuseGroupedBody(
         children: [
+          // 1.10.0: 智能保持连接 moved here (1.3.0: one switch for reconnect → switch node → restart core)
           MuseSection(
+            children: [
+              MuseSwitchTile(
+                key: const ValueKey('keep_alive'),
+                leading: const Icon(Icons.autorenew_outlined),
+                title: '智能保持连接',
+                info: '断线后自动重连；当前节点失效时自动换到可用节点，必要时重启内核',
+                value: ref.watch(Preferences.museKeepAlive),
+                onChanged: (v) => ref.read(Preferences.museKeepAlive.notifier).update(v),
+              ),
+            ],
+          ),
+          MuseSection(
+            footer: isAndroid ? museAndroidAutomationNote : null,
             children: [
               if (isAndroid)
                 MuseSwitchTile(
@@ -108,7 +126,7 @@ class MuseAutoConnectPage extends ConsumerWidget {
   }
 }
 
-/// 开机自启 + 开机自启时静默 (Windows only; the auto-start notifier is never built elsewhere).
+/// 静默启动 + 开机自启 + 开机自启时静默 (Windows only; the auto-start notifier is never built elsewhere).
 class _WindowsStartSection extends ConsumerWidget {
   const _WindowsStartSection();
 
@@ -116,8 +134,9 @@ class _WindowsStartSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final autoStart = ref.watch(autoStartNotifierProvider).valueOrNull ?? false;
     return MuseSection(
-      header: '开机',
+      header: '启动',
       children: [
+        const MuseWindowsSilentStartTile(),
         MuseSwitchTile(
           key: const ValueKey('settings_autostart'),
           leading: const Icon(Icons.power_settings_new_outlined),

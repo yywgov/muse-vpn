@@ -1,7 +1,7 @@
 // 穿云 1.3.0 - 诊断: the one sheet for every check (was 一键诊断 + 出口检测 + 外网检测).
 // 网络 → DNS → 节点 → 系统代理/VPN → 外网 → 出口 (IP / region, Google · ChatGPT · Netflix), each in
 // plain Chinese (logic/diagnosis.dart), plus 复制 / 导出 the redacted log.
-// Opened from the 首页 出口 IP tile and from 设置.
+// Opened from the 首页 出口 IP tile; 1.10.0: also the 「诊断」 tab of 设置 › 活动 (MuseDiagnosePage).
 // Part of 穿云 (GPLv3).
 
 import 'package:hiddify/utils/uri_utils.dart';
@@ -19,6 +19,7 @@ import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/features/muse/data/diagnostics.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart';
+import 'package:hiddify/features/muse/shell/muse_shell.dart' show museScrollEndGap;
 import 'package:hiddify/features/muse/settings/more_settings.dart' show museSaveTextFile;
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
@@ -38,17 +39,34 @@ Future<void> showMuseDiagnoseSheet(BuildContext context) => showModalBottomSheet
   showDragHandle: true,
   isScrollControlled: true,
   backgroundColor: MuseColors.card(context),
-  builder: (_) => const _DiagnoseSheet(),
+  builder: (_) => const MuseDiagnoseView(),
 );
 
-class _DiagnoseSheet extends ConsumerStatefulWidget {
-  const _DiagnoseSheet();
+/// 1.10.0: 设置 › 活动 › 诊断 — the same checks as the sheet, below the 活动 tabs. The checks run once
+/// when the tab opens (no polling).
+class MuseDiagnosePage extends StatelessWidget {
+  const MuseDiagnosePage({super.key, required this.header});
+
+  final Widget header;
 
   @override
-  ConsumerState<_DiagnoseSheet> createState() => _DiagnoseSheetState();
+  Widget build(BuildContext context) => MuseScaffold(
+    title: '活动',
+    body: Column(children: [header, const Expanded(child: MuseDiagnoseView(inSheet: false))]),
+  );
 }
 
-class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
+class MuseDiagnoseView extends ConsumerStatefulWidget {
+  const MuseDiagnoseView({super.key, this.inSheet = true});
+
+  /// in the bottom sheet (closes itself for 切换节点 / 连接) rather than the 活动 tab
+  final bool inSheet;
+
+  @override
+  ConsumerState<MuseDiagnoseView> createState() => _DiagnoseSheetState();
+}
+
+class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
   final _items = <MuseDiagItem>[];
   var _running = true;
 
@@ -150,7 +168,7 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
           final ok = await WindowsProxyGuard.repairStale();
           _toast(ok ? '已修复系统代理' : '修复失败，请在 Windows 设置 › 网络 › 代理 中关闭「使用代理服务器」', error: !ok);
         case MuseDiagAction.switchNode:
-          if (mounted) Navigator.of(context).pop();
+          if (mounted && widget.inSheet) Navigator.of(context).pop();
           if (mounted) await showMuseNodePicker(context);
           return;
         case MuseDiagAction.testNodes:
@@ -163,7 +181,7 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
           await ref.read(connectionNotifierProvider.notifier).reconnect(await ref.read(activeProfileProvider.future));
           _toast('已重新连接');
         case MuseDiagAction.connect:
-          if (mounted) Navigator.of(context).pop();
+          if (mounted && widget.inSheet) Navigator.of(context).pop();
           await ref.read(connectionNotifierProvider.notifier).toggleConnection();
           return;
         case MuseDiagAction.fixClock:
@@ -218,16 +236,21 @@ class _DiagnoseSheetState extends ConsumerState<_DiagnoseSheet> {
     );
     final info = exit?.info;
     return SafeArea(
+      top: widget.inSheet,
       child: SingleChildScrollView(
         child: Padding(
           key: const ValueKey('diagnose_sheet'),
-          padding: const EdgeInsets.fromLTRB(MuseSpace.s24, 0, MuseSpace.s24, MuseSpace.s16),
+          padding: widget.inSheet
+              ? const EdgeInsets.fromLTRB(MuseSpace.s24, 0, MuseSpace.s24, MuseSpace.s16)
+              : EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), museScrollEndGap(context, MuseSpace.s16)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('诊断', style: MuseType.title(context)),
-              const SizedBox(height: MuseSpace.s8),
+              if (widget.inSheet) ...[
+                Text('诊断', style: MuseType.title(context)),
+                const SizedBox(height: MuseSpace.s8),
+              ],
               for (final item in _items)
                 line(
                   Icon(icon(item.level).$1, color: icon(item.level).$2, size: MuseIconSize.small),

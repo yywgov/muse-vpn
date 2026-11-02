@@ -87,12 +87,24 @@ void main() {
     expect(all['p1']!.rules.single.value, 'a.com');
     expect(find.text('example.com'), findsOneWidget);
 
-    // 高级: the same data as JSON
-    await t.scrollUntilVisible(find.byKey(const ValueKey('override_advanced')), 200, scrollable: find.byType(Scrollable).last);
-    await t.tap(find.byKey(const ValueKey('override_advanced')));
+    // 1.10.0: the same data as JSON sits in 规则 › ⋯ › 编辑覆写 JSON (no JSON entry in 设置 any more)
+    expect(find.byKey(const ValueKey('override_advanced')), findsNothing);
+    await t.pageBack();
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('rules_more')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('rules_more_override_json')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('override_json_pick_p0')));
     await t.pumpAndSettle();
     final field = t.widget<TextField>(find.byKey(const ValueKey('override_json_field')));
     expect(field.controller!.text, contains('"example.com"'));
+    // invalid JSON is refused and changes nothing
+    await t.enterText(find.byKey(const ValueKey('override_json_field')), '[1]');
+    await t.tap(find.byKey(const ValueKey('override_json_apply')));
+    await t.pumpAndSettle();
+    expect(find.text('不是有效的覆写 JSON'), findsOneWidget);
+    expect(museParseOverrides(sp.getString('muse_sub_overrides')!)['p0']!.rules.single.value, 'example.com');
   });
 
   test('旧入口都打开「规则」：订阅页、设置、设置搜索', () {
@@ -107,6 +119,6 @@ void main() {
     expect(settings, isNot(contains('musePushPage(context, const MuseRoutingPage())')));
     expect(museSearchSettings('覆写', android: true, windows: false).first.page, MuseSettingPage.overrides);
     expect(museSearchSettings('路由规则', android: true, windows: false).map((e) => e.page), contains(MuseSettingPage.routing));
-    expect(MuseSettingPage.routing.path, '设置 › 规则 › 分流');
+    expect(MuseSettingPage.routing.path, '订阅 › 规则 › 分流'); // 1.10.0: the only entry is under 订阅
   });
 }
