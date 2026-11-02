@@ -27,6 +27,7 @@ import 'package:hiddify/features/muse/nodes/node_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/hiddifycore/generated/google/protobuf/timestamp.pb.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -272,18 +273,18 @@ void main() {
   for (final b in [Brightness.light, Brightness.dark]) {
     final label = b == Brightness.light ? 'light' : 'dark';
     for (final s in [(phone, 'phone', false), (narrow, 'windows-narrow', true), (wide, 'windows-wide', true)]) {
-      testWidgets('${s.$2} $label: 设置 › 高级 shows IPv6 and Fake-IP, both off', (tester) async {
+      testWidgets('${s.$2} $label: 设置 › 网络 › 高级 shows IPv6 and Fake-IP, both off', (tester) async {
+        // 1.10.0: the collapsed 「高级」 of the 设置 home page is a group on 设置 › 网络
         await _pump(tester, page: const SettingsPage(), brightness: b, size: s.$1, desktop: s.$3, tab: 3);
-        // 1.6.1: the settings list is longer (group headers); on a short window the row is built lazily
+        expect(find.byKey(const ValueKey('advanced_toggle')), findsNothing);
+        expect(find.byKey(const ValueKey('settings_network')), findsOneWidget);
+        await _done(tester);
+        await _pump(tester, page: const MuseNetworkPage(), brightness: b, size: s.$1, desktop: s.$3, tab: 3);
         await tester.scrollUntilVisible(
-          find.byKey(const ValueKey('advanced_toggle')),
+          find.byKey(const ValueKey('fake_ip')),
           200,
-          scrollable: find.descendant(of: find.byType(SettingsPage), matching: find.byType(Scrollable)).first,
+          scrollable: find.descendant(of: find.byType(MuseNetworkPage), matching: find.byType(Scrollable)).first,
         );
-        await tester.ensureVisible(find.byKey(const ValueKey('advanced_toggle')));
-        await tester.pump(const Duration(milliseconds: 300));
-        await tester.tap(find.byKey(const ValueKey('advanced_toggle')));
-        await tester.pump(const Duration(milliseconds: 400));
         await tester.ensureVisible(find.byKey(const ValueKey('fake_ip')));
         await tester.pump(const Duration(milliseconds: 300));
         expect(find.byKey(const ValueKey('ipv6_policy')), findsOneWidget);
@@ -323,8 +324,8 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
         expect(tester.takeException(), isNull);
         expect(find.descendant(of: find.byType(CustomScrollView).first, matching: find.textContaining('东京 0000')), findsNothing);
-        // 1.6.0 #38: the node in use stays pinned above the list
-        expect(find.byKey(const ValueKey('node_current_card')), findsOneWidget);
+        // 1.10.0: no pinned 当前节点 card (the row itself is highlighted)
+        expect(find.byKey(const ValueKey('node_current_card')), findsNothing);
         await _done(tester);
       });
     }

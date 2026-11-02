@@ -335,7 +335,7 @@ void main() {
     await _done(tester);
   });
 
-  testWidgets('更新内容: dot on 设置 and 关于 after a small update, gone once read', (tester) async {
+  testWidgets('1.10.0 更新内容: no unread dot on 设置 / 关于 after a small update (关于 has no 更新内容 row)', (tester) async {
     await _pump(
       tester,
       page: const SettingsPage(),
@@ -345,8 +345,7 @@ void main() {
       appVersion: '1.4.1',
       initialPrefs: {'muse_changelog_seen': '1.4.0'},
     );
-    expect(find.byKey(const ValueKey('muse_dot')), findsOneWidget); // 设置 tab
-    expect(find.byType(MuseStatusDot), findsWidgets); // 关于 row
+    expect(find.byKey(const ValueKey('muse_dot')), findsNothing); // 设置 tab
     await _shot(tester, 'phone-light-settings-dot');
     await _done(tester);
     final prefs = await tester.runAsync(SharedPreferences.getInstance);

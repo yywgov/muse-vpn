@@ -304,8 +304,11 @@ void main() {
 
   testWidgets('节点 多选: pick rows, the action bar counts them', (tester) async {
     await _pump(tester, page: const MuseNodesPage(), brightness: Brightness.light, size: phone, tab: 1);
-    await tester.tap(find.byKey(const ValueKey('node_select_button')));
-    await tester.pump();
+    // 1.10.0: 多选 is in the ⋯ menu
+    await tester.tap(find.byKey(const ValueKey('node_more_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('node_more_select')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('node_batch_bar')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('node_check_🇭🇰 香港 01')));
     await tester.pump();

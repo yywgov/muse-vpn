@@ -60,6 +60,23 @@ List<T> museOrderNodes<T>(
   }
 }
 
+/// 1.10.0: nodes whose last test timed out go to the end (there is no folded 「不可用」 group any
+/// more); everything else keeps its order. Groups and untested nodes (delay 0) never move.
+List<T> museTimeoutsLast<T>(
+  List<T> items, {
+  required bool Function(T) isGroup,
+  required int Function(T) delay,
+  required bool Function(int) isValidDelay,
+}) {
+  bool timedOut(T e) {
+    if (isGroup(e)) return false;
+    final d = delay(e);
+    return d != 0 && !isValidDelay(d);
+  }
+
+  return [...items.where((e) => !timedOut(e)), ...items.where(timedOut)];
+}
+
 /// Consecutive runs of the same region in an already ordered list: where 「🇭🇰 香港 · 5」 headers
 /// go in 按地区 mode. Groups are left out (no header). Each section holds the items in order.
 List<({String? region, List<T> items})> museRegionSections<T>(

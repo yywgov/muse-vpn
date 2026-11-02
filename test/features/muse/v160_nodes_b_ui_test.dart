@@ -1,5 +1,6 @@
 // 穿云 1.6.0 (batch 2, nodes B): #30 节点二维码, #31 去重规则, #34 收藏排序, #35 复制三种格式,
-// #36 中转入口/出口, #38 顶部固定当前节点卡, #40 清除不可用前预览且可撤销.
+// #36 中转入口/出口. 1.10.0: #38 当前节点卡 and #40 清除不可用 were removed (节点页精简 / 删「不可用」);
+// their tests now check the replacement: no card, timed-out nodes at the end showing 超时.
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -8,7 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/logic/node_share.dart';
@@ -122,7 +122,6 @@ Future<ProviderContainer> _pump(
   Map<String, Object> prefs = const {},
   Size size = const Size(412, 900),
   double scale = 1,
-  bool pin = false,
   Set<String> unavailable = const {},
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
@@ -134,10 +133,16 @@ Future<ProviderContainer> _pump(
       museHasProfileProvider.overrideWithValue(true),
       museActiveProfileIdProvider.overrideWithValue('p1'),
       museActiveProfileNameProvider.overrideWithValue('机场'),
-      museNodeGroupProvider.overrideWithValue(AsyncData(_group)),
+      museNodeGroupProvider.overrideWithValue(
+        AsyncData(
+          unavailable.isEmpty
+              ? _group
+              : (_group.deepCopy()
+                  ..items.where((e) => unavailable.contains(e.tag)).forEach((e) => e.urlTestDelay = 65535)),
+        ),
+      ),
       museActiveConfigProvider.overrideWith((ref) async => _config),
       museConnectedSinceProvider.overrideWith((ref) async => null),
-      museHiddenNodesProvider.overrideWith((ref) => unavailable),
     ],
   );
   addTearDown(c.dispose);
@@ -151,7 +156,7 @@ Future<ProviderContainer> _pump(
       child: MaterialApp(
         home: MediaQuery(
           data: MediaQueryData(size: size, textScaler: TextScaler.linear(scale)),
-          child: Scaffold(body: MuseNodeList(pinCurrent: pin)),
+          child: const Scaffold(body: MuseNodeList()),
         ),
       ),
     ),
@@ -312,7 +317,9 @@ void main() {
       final c = await _pump(tester, prefs: {'muse_favorite_nodes': '🇸🇬 新加坡 03\n🇺🇸 洛杉矶 01\n别的订阅', 'muse_node_sort': 'original'});
       // not arranged yet: the list's own order (美 after 新)
       expect(_y(tester, '🇸🇬 新加坡 03'), lessThan(_y(tester, '🇺🇸 洛杉矶 01')));
-      await tester.tap(find.byKey(const ValueKey('node_sort_button')));
+      await tester.tap(find.byKey(const ValueKey('node_more_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('node_more_sort')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('node_sort_favorites')));
       await tester.pumpAndSettle();
@@ -331,7 +338,9 @@ void main() {
       expect(c.read(MusePrefs.favoriteManualOrder), isTrue);
       expect(_y(tester, '🇺🇸 洛杉矶 01'), lessThan(_y(tester, '🇸🇬 新加坡 03')));
       // 按列表顺序 goes back
-      await tester.tap(find.byKey(const ValueKey('node_sort_button')));
+      await tester.tap(find.byKey(const ValueKey('node_more_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('node_more_sort')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('node_sort_favorites')));
       await tester.pumpAndSettle();
@@ -387,95 +396,44 @@ void main() {
     });
 
     for (final scale in [1.0, 2.0]) {
-      testWidgets('#38 the node in use stays pinned while the list scrolls (${scale}x)', (tester) async {
-        await _pump(tester, pin: true, size: scale == 1 ? const Size(412, 600) : const Size(320, 600), scale: scale);
+      testWidgets('1.10.0 no 当前节点 card; the node in use is the highlighted row in the list (${scale}x)', (tester) async {
+        await _pump(tester, size: scale == 1 ? const Size(412, 600) : const Size(320, 600), scale: scale);
         expect(tester.takeException(), isNull);
-        expect(find.byKey(const ValueKey('node_current_card')), findsOneWidget);
-        expect(find.descendant(of: find.byKey(const ValueKey('node_current_card')), matching: find.text('东京 02')), findsOneWidget);
-        final top = tester.getTopLeft(find.byKey(const ValueKey('node_current_card'))).dy;
-        await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
-        await tester.pump(const Duration(milliseconds: 300));
-        expect(tester.takeException(), isNull);
-        expect(tester.getTopLeft(find.byKey(const ValueKey('node_current_card'))).dy, top);
-        await tester.tap(find.byKey(const ValueKey('node_current_card')));
-        await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('node_detail_sheet')), findsOneWidget);
+        expect(find.byKey(const ValueKey('node_current_card')), findsNothing);
+        expect(find.byKey(const ValueKey('🇯🇵 东京 02')), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
       });
     }
 
-    testWidgets('#38 no pinned card in the 首页 picker / side column', (tester) async {
-      await _pump(tester);
-      expect(find.byKey(const ValueKey('node_current_card')), findsNothing);
-      await tester.pumpWidget(const SizedBox.shrink());
-    });
-
-    testWidgets('#40 清除不可用 previews, keeps favourites and the node in use, hides the rest', (tester) async {
+    testWidgets('1.10.0 no 「不可用」 group or 清除不可用: timed-out nodes go to the end and show 超时', (tester) async {
       final c = await _pump(
         tester,
         size: const Size(412, 1400),
-        prefs: {'muse_favorite_nodes': '🇸🇬 新加坡 03'},
-        unavailable: {'🇭🇰 香港 01', '🇸🇬 新加坡 03', '🇺🇸 洛杉矶 01'},
+        unavailable: {'🇭🇰 香港 01', '🇸🇬 新加坡 03'},
       );
-      expect(find.textContaining('不可用 · 3'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('clear_unavailable')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('clear_unavailable_dialog')), findsOneWidget);
-      expect(find.text('清除 2 个不可用节点'), findsOneWidget);
-      final preview = find.byKey(const ValueKey('clear_unavailable_preview'));
-      expect(find.descendant(of: preview, matching: find.text('🇭🇰 香港 01')), findsOneWidget);
-      expect(find.descendant(of: preview, matching: find.text('🇸🇬 新加坡 03')), findsNothing);
-      expect(find.textContaining('保留'), findsOneWidget);
-      // cancel changes nothing
-      await tester.tap(find.text('取消'));
-      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('不可用'), findsNothing);
+      expect(find.byKey(const ValueKey('clear_unavailable')), findsNothing);
+      expect(find.text('超时'), findsNWidgets(2));
+      // still in the list (nothing folded away), below every node that did not time out
+      final hk = tester.getTopLeft(find.byKey(const ValueKey('🇭🇰 香港 01'))).dy;
+      final sg = tester.getTopLeft(find.byKey(const ValueKey('🇸🇬 新加坡 03'))).dy;
+      for (final ok in ['沪日 IPLC 01', '🇺🇸 洛杉矶 01', 'dupD']) {
+        final y = tester.getTopLeft(find.byKey(ValueKey(ok))).dy;
+        expect(y, lessThan(hk), reason: ok);
+        expect(y, lessThan(sg), reason: ok);
+      }
+      // the original order is kept among the timed-out ones
+      expect(hk, lessThan(sg));
+      // nothing was hidden
       expect(MuseNodeMetas.parse(c.read(MusePrefs.nodeMeta)).hiddenTags, isEmpty);
-      await tester.tap(find.byKey(const ValueKey('clear_unavailable')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('clear_unavailable_confirm')));
-      await tester.pumpAndSettle();
-      expect(MuseNodeMetas.parse(c.read(MusePrefs.nodeMeta)).hiddenTags, {'🇭🇰 香港 01', '🇺🇸 洛杉矶 01'});
-      expect(find.textContaining('已隐藏 · 2'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
-    testWidgets('#40 撤销 shows the cleared nodes again (other hidden nodes stay hidden)', (tester) async {
-      final before = MuseNodeMetas.empty.set('dupA', const MuseNodeMeta(hidden: true, note: 'x'));
-      final c = await _pump(tester, prefs: {'muse_node_meta': before.toRaw()});
-      Future<void> Function()? undo;
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: c,
-          child: MaterialApp(
-            home: Consumer(
-              builder: (context, r, _) {
-                return TextButton(
-                  onPressed: () async => undo = await museClearUnavailable(
-                    context,
-                    r,
-                    tags: const ['a', 'b', 'c'],
-                    names: const {'a': 'A', 'b': 'B', 'c': 'C'},
-                    unavailable: const {'a', 'b', 'c'},
-                    selected: 'a',
-                    favorites: const {},
-                  ),
-                  child: const Text('go'),
-                );
-              },
-            ),
-          ),
-        ),
-      );
-      await tester.tap(find.text('go'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('clear_unavailable_confirm')));
-      await tester.pumpAndSettle();
-      expect(MuseNodeMetas.parse(c.read(MusePrefs.nodeMeta)).hiddenTags, {'dupA', 'b', 'c'});
-      expect(undo, isNotNull);
-      await tester.runAsync(() => undo!());
-      final after = MuseNodeMetas.parse(c.read(MusePrefs.nodeMeta));
-      expect(after.hiddenTags, {'dupA'});
-      expect(after.of('dupA').note, 'x');
+    testWidgets('1.10.0 the node in use keeps its row even when it timed out', (tester) async {
+      await _pump(tester, size: const Size(412, 1400), unavailable: {'🇯🇵 东京 02'});
+      expect(find.byKey(const ValueKey('🇯🇵 东京 02')), findsOneWidget);
+      expect(find.text('超时'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     });
   });

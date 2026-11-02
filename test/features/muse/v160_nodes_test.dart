@@ -134,8 +134,11 @@ void main() {
   group('node list', () {
     testWidgets('#28 protocol filter narrows the list and says so', (tester) async {
       final c = await _pump(tester);
-      expect(find.byKey(const ValueKey('node_filter_button')), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('node_filter_button')));
+      // 1.10.0: 筛选 is in the ⋯ menu
+      expect(find.byKey(const ValueKey('node_filter_button')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('node_more_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('node_more_filter')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('node_filter_p_VLESS')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('node_filter_p_Trojan')));

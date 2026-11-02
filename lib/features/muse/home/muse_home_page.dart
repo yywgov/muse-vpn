@@ -223,18 +223,15 @@ class MuseHeroCard extends HookConsumerWidget {
     debugBuilds++;
     final mt = MuseTheme.of(context);
     final connection = ref.watch(museConnectionProvider);
-    // first time connected: one-time 后台运行/自启动 guide
+    // first time connected: one-time 「允许后台运行」 hint (1.10.0: the only background prompt left)
     ref.listen(museConnectionProvider, (prev, next) {
       if (prev?.valueOrNull is! Connected && next.valueOrNull is Connected) museMaybeShowKeepAliveGuide(context, ref);
     });
-    // 1.4.1 Android: killed by the system in the background since the last start → the steps
+    // 1.4.1 Android: killed by the system in the background since the last start → recorded only
+    // (1.10.0: no dialog)
     useEffect(() {
       if (!PlatformUtils.isAndroid) return null;
-      unawaited(
-        museCheckBackgroundKill(ref).then((killed) {
-          if (killed && context.mounted) unawaited(showMuseBackgroundGuide(context, killed: true));
-        }),
-      );
+      unawaited(museCheckBackgroundKill(ref));
       return null;
     }, const []);
     final since = ref.watch(museConnectedSinceProvider).valueOrNull;

@@ -188,7 +188,8 @@ class _NodeSection extends StatelessWidget {
   }
 }
 
-/// One node: flag | name + protocol | status dot + latency (right-aligned, tabular).
+/// One node: flag | name + protocol | latency (right-aligned, tabular, coloured by speed; 1.10.0: no
+/// status dot).
 /// Selected = light-blue background with a 4 px blue bar on the left.
 class MuseNodeRow extends StatelessWidget {
   const MuseNodeRow({
@@ -253,7 +254,6 @@ class MuseNodeRow extends StatelessWidget {
       cached: cachedDelay,
     );
     final delayText = view.text;
-    final stale = view.kind != MuseDelayKind.live && view.kind != MuseDelayKind.timeout;
     final Color delayColor = switch (view.kind) {
       MuseDelayKind.live => MuseColors.delay(context, view.delay),
       MuseDelayKind.timeout => MusePalette.red,
@@ -361,12 +361,7 @@ class MuseNodeRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: MuseSpace.s8),
-                  AnimatedContainer(
-                    duration: museMotion(context),
-                    width: MuseSize.dot,
-                    height: MuseSize.dot,
-                    decoration: BoxDecoration(color: delayColor, shape: BoxShape.circle),
-                  ),
+                  // 1.10.0: no status dot; the number itself is coloured by speed (超时 in red)
                   SizedBox(
                     width: MuseSize.latencyColumn,
                     child: AnimatedSwitcher(
@@ -378,7 +373,7 @@ class MuseNodeRow extends StatelessWidget {
                         delayText,
                         key: ValueKey(delayText),
                         textAlign: TextAlign.right,
-                        style: MuseType.body(context).copyWith(color: stale ? mt.text2 : mt.text1, fontFeatures: MuseType.tabular),
+                        style: MuseType.body(context).copyWith(color: delayColor, fontFeatures: MuseType.tabular),
                       ),
                     ),
                   ),
@@ -411,7 +406,7 @@ class MuseNodeRow extends StatelessWidget {
   }
 }
 
-/// 1.5.3: the protocol as a small grey tag (instead of a whole second line).
+/// 1.5.3: the protocol as a small grey tag (instead of a whole second line). 1.10.0: plain tertiary text.
 class MuseProtocolTag extends StatelessWidget {
   const MuseProtocolTag({super.key, required this.text});
 
@@ -433,11 +428,12 @@ class MuseProtocolTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mt = MuseTheme.of(context);
-    return Container(
+    // 1.10.0: weaker — plain small text in the secondary grey, no filled box (the tertiary grey is
+    // for icons only: too little contrast for text, #83)
+    return Padding(
       key: const ValueKey('node_protocol_tag'),
       padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s4),
-      decoration: BoxDecoration(color: mt.inner, borderRadius: MuseRadius.smallAll),
-      child: Text(text, maxLines: 1, softWrap: false, style: MuseType.caption(context)),
+      child: Text(text, maxLines: 1, softWrap: false, style: MuseType.caption(context).copyWith(color: mt.text2)),
     );
   }
 }

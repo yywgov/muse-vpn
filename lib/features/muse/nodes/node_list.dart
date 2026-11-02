@@ -1,6 +1,9 @@
 // 穿云 1.3.0 - the node list: the 节点 tab, the 首页 node picker sheet and the right-hand column on
 // wide Windows windows all use this widget. Search, sort (按延迟 / 订阅顺序 / 按地区), favourites,
-// region headers, long-press detail, single-node test, timed-out nodes folded into 「不可用」.
+// region headers, long-press detail, single-node test.
+// 1.10.0: no 「不可用」 group — timed-out nodes sort to the end and show 「超时」; no 当前节点 card on
+// the 节点 page (the row is highlighted and the page scrolls to it once); the toolbar is 搜索, 测速 and
+// one ⋯ menu (筛选 / 排序 / 布局 / 多选 / 滚动到当前节点 / 节点设置).
 // Works while disconnected from the cached list (picking then only remembers the node).
 // Part of 穿云 (GPLv3).
 
@@ -14,7 +17,6 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/home/bad_nodes.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/home/node_memory.dart';
@@ -32,6 +34,7 @@ import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:hiddify/features/muse/data/speed_test.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart' show MuseNodeSettingsPage, musePushPage;
 import 'package:hiddify/features/muse/settings/sub_filter_dialog.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
@@ -180,10 +183,8 @@ int museFreshDelay(OutboundInfo proxy, DateTime? since) {
 /// The node list. [embedded] = inside a sheet or side column (no pull-to-test, no outer padding
 /// for a page). [onPicked] runs after a node was tapped.
 class MuseNodeList extends HookConsumerWidget {
-  const MuseNodeList({super.key, this.controller, this.embedded = false, this.onPicked, this.listKey, this.pinCurrent = false});
+  const MuseNodeList({super.key, this.controller, this.embedded = false, this.onPicked, this.listKey});
 
-  /// 1.6.0 #38: the node in use as a card above the list that stays while it scrolls (节点 page)
-  final bool pinCurrent;
   final ScrollController? controller;
   final bool embedded;
   final VoidCallback? onPicked;
@@ -202,8 +203,6 @@ class MuseNodeList extends HookConsumerWidget {
     final testing = testStarted != null;
     final frozenOrder = useRef<List<String>>(const []);
     final frozenSort = useRef<MuseNodeSort>(MuseNodeSort.delay);
-    final showHidden = useState(false);
-    final hidden = running ? ref.watch(museHiddenNodesProvider) : const <String>{};
     final searching = useState(false);
     final query = useState('');
     final searchController = useTextEditingController();
@@ -277,6 +276,75 @@ class MuseNodeList extends HookConsumerWidget {
           metas.of(e.tag).note.toLowerCase().contains(q.trim().toLowerCase());
     }
 
+    // 1.10.0: one ⋯ menu instead of the 多选 / 筛选 / 布局 / 排序 icons
+    final canFilter = nodeTotal > 1 && (protocols.length > 1 || nodeTags.isNotEmpty);
+    final moreItems = <(String, String)>[
+      if (canFilter) ('filter', '筛选：${nodeFilter.label}'),
+      if (nodeTotal > 1) ('sort', '排序：${sortMode.title}'),
+      if (!embedded && nodeTotal > 0) ('layout', '布局：${layout.title} · ${density.title}'),
+      if (!embedded && nodeTotal > 1) ('select', '多选'),
+      if (group != null && group.selected.isNotEmpty) ('locate', '滚动到当前节点'),
+      if (!embedded) ('settings', '节点设置'),
+    ];
+    Future<void> onMore(String v) async {
+      switch (v) {
+        case 'filter':
+          final raw = await _museNodeChoice<String>(context, '筛选', [
+            ('node_filter_all', '', '全部', nodeFilter.isNone),
+            for (final p in protocols)
+              if (protocols.length > 1) ('node_filter_p_$p', MuseNodeFilter.protocol(p).toRaw(), p, nodeFilter == MuseNodeFilter.protocol(p)),
+            for (final t in nodeTags) ('node_filter_t_$t', MuseNodeFilter.tag(t).toRaw(), '标签：$t', nodeFilter == MuseNodeFilter.tag(t)),
+          ]);
+          if (raw != null) await ref.read(MusePrefs.protocolFilter.notifier).update(raw);
+        case 'sort':
+          final favCount = group == null ? 0 : group.items.where((e) => !e.isGroup && favorites.contains(e.tag)).length;
+          final picked = await _museNodeChoice<String>(context, '排序', [
+            for (final m in MuseNodeSort.values) ('node_sort_${m.key}', m.key, m.title, m == sortMode),
+            // 1.6.0 #34: arrange favourites by dragging
+            if (favCount > 1) ('node_sort_favorites', _favoriteOrderItem, '收藏排序…', false),
+          ]);
+          if (picked == null) return;
+          if (picked != _favoriteOrderItem) return ref.read(Preferences.museNodeSort.notifier).update(picked);
+          if (group != null && context.mounted) await showMuseFavoriteOrder(context, ref, group);
+        case 'layout':
+          final picked = await _museNodeChoice<String>(context, '布局', [
+            for (final l in MuseNodeLayout.values) ('node_layout_${l.key}', 'layout_${l.key}', l.title, l == layout),
+            for (final d in MuseNodeDensity.values) ('node_density_${d.key}', 'density_${d.key}', d.title, d == density),
+          ], dividerAfter: MuseNodeLayout.values.length);
+          if (picked == null) return;
+          final l = MuseNodeLayout.values.where((e) => 'layout_${e.key}' == picked).firstOrNull;
+          if (l != null) return ref.read(MusePrefs.nodeLayout.notifier).update(l.key);
+          final d = MuseNodeDensity.values.where((e) => 'density_${e.key}' == picked).firstOrNull;
+          if (d != null) return ref.read(MusePrefs.nodeDensity.notifier).update(d.key);
+        case 'select':
+          selecting.value = true;
+          picked.value = const {};
+        case 'locate':
+          final found = await museScrollToKey(scroll, selectedKey);
+          if (!found) {
+            try {
+              ref.read(inAppNotificationControllerProvider).showInfoToast('当前节点不在列表里（可能已折叠或被筛选）');
+            } catch (_) {}
+          }
+        case 'settings':
+          await musePushPage(context, const MuseNodeSettingsPage());
+      }
+    }
+
+    // 1.10.0: the 节点 page opens at the node in use (once per visit; the row is highlighted)
+    final autoScrolled = useRef(false);
+    final hasSelection = group != null && group.selected.isNotEmpty;
+    useEffect(() {
+      if (embedded || autoScrolled.value || !hasSelection) return null;
+      autoScrolled.value = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!context.mounted || !scroll.hasClients) return;
+        final found = await museScrollToKey(scroll, selectedKey);
+        if (!found && scroll.hasClients) scroll.jumpTo(scroll.position.minScrollExtent);
+      });
+      return null;
+    }, [hasSelection]);
+
     final toolbar = Padding(
       padding: EdgeInsets.fromLTRB(margin + MuseSpace.s4, 0, margin - MuseSpace.s8, MuseSpace.s4),
       child: Row(
@@ -297,163 +365,68 @@ class MuseNodeList extends HookConsumerWidget {
               style: MuseType.caption(context),
             ),
           ),
-          if (!embedded && nodeTotal > 1)
+          if (selecting.value)
             IconButton(
               key: const ValueKey('node_select_button'),
-              tooltip: selecting.value ? '完成' : '多选',
+              tooltip: '完成',
               visualDensity: VisualDensity.compact,
-              icon: Icon(selecting.value ? Icons.close_outlined : Icons.checklist_outlined, size: MuseIconSize.small),
+              icon: const Icon(Icons.close_outlined, size: MuseIconSize.small),
               onPressed: () {
-                selecting.value = !selecting.value;
+                selecting.value = false;
                 picked.value = const {};
               },
-            ),
-          if (nodeTotal > 6)
-            IconButton(
-              key: const ValueKey('node_search_button'),
-              tooltip: searching.value ? '关闭搜索' : '搜索节点',
-              visualDensity: VisualDensity.compact,
-              icon: Icon(searching.value ? Icons.search_off_outlined : Icons.search_outlined, size: MuseIconSize.small),
-              onPressed: () {
-                searching.value = !searching.value;
-                if (!searching.value) {
-                  searchController.clear();
-                  query.value = '';
-                }
-              },
-            ),
-          if (nodeTotal > 1 && (protocols.length > 1 || nodeTags.isNotEmpty))
-            PopupMenuButton<String>(
-              key: const ValueKey('node_filter_button'),
-              tooltip: '筛选：${nodeFilter.label}',
-              icon: Icon(
-                Icons.filter_list_outlined,
-                size: MuseIconSize.small,
-                color: nodeFilter.isNone ? null : museBrandOf(context),
-              ),
-              style: const ButtonStyle(visualDensity: VisualDensity.compact),
-              onSelected: (raw) => ref.read(MusePrefs.protocolFilter.notifier).update(raw),
-              itemBuilder: (context) => [
-                CheckedPopupMenuItem<String>(
-                  key: const ValueKey('node_filter_all'),
-                  value: '',
-                  checked: nodeFilter.isNone,
-                  child: const Text('全部'),
-                ),
-                if (protocols.length > 1) ...[
-                  const PopupMenuDivider(),
-                  for (final p in protocols)
-                    CheckedPopupMenuItem<String>(
-                      key: ValueKey('node_filter_p_$p'),
-                      value: MuseNodeFilter.protocol(p).toRaw(),
-                      checked: nodeFilter == MuseNodeFilter.protocol(p),
-                      child: Text(p),
-                    ),
-                ],
-                if (nodeTags.isNotEmpty) ...[
-                  const PopupMenuDivider(),
-                  for (final t in nodeTags)
-                    CheckedPopupMenuItem<String>(
-                      key: ValueKey('node_filter_t_$t'),
-                      value: MuseNodeFilter.tag(t).toRaw(),
-                      checked: nodeFilter == MuseNodeFilter.tag(t),
-                      child: Text('标签：$t'),
-                    ),
-                ],
-              ],
-            ),
-          // hidden while 测速 / 多选 runs (the toolbar needs the room at 320 px + 2× text)
-          if (!embedded && nodeTotal > 0 && !testing && !selecting.value)
-            PopupMenuButton<String>(
-              key: const ValueKey('node_style_button'),
-              tooltip: '样式',
-              icon: const Icon(Icons.view_agenda_outlined, size: MuseIconSize.small),
-              style: const ButtonStyle(visualDensity: VisualDensity.compact),
-              onSelected: (v) async {
-                if (v == _locateItem) {
-                  final found = await museScrollToKey(scroll, selectedKey);
-                  if (!found) {
-                    try {
-                      ref.read(inAppNotificationControllerProvider).showInfoToast('当前节点不在列表里（可能已折叠或被筛选）');
-                    } catch (_) {}
+            )
+          else ...[
+            if (nodeTotal > 6)
+              IconButton(
+                key: const ValueKey('node_search_button'),
+                tooltip: searching.value ? '关闭搜索' : '搜索节点',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(searching.value ? Icons.search_off_outlined : Icons.search_outlined, size: MuseIconSize.small),
+                onPressed: () {
+                  searching.value = !searching.value;
+                  if (!searching.value) {
+                    searchController.clear();
+                    query.value = '';
                   }
-                  return;
-                }
-                final l = MuseNodeLayout.values.where((e) => 'layout_${e.key}' == v).firstOrNull;
-                if (l != null) return ref.read(MusePrefs.nodeLayout.notifier).update(l.key);
-                final d = MuseNodeDensity.values.where((e) => 'density_${e.key}' == v).firstOrNull;
-                if (d != null) return ref.read(MusePrefs.nodeDensity.notifier).update(d.key);
-              },
-              itemBuilder: (context) => [
-                if (group != null && group.selected.isNotEmpty) ...[
-                  const PopupMenuItem<String>(key: ValueKey('node_locate'), value: _locateItem, child: Text('滚动到当前节点')),
-                  const PopupMenuDivider(),
-                ],
-                for (final l in MuseNodeLayout.values)
-                  CheckedPopupMenuItem<String>(
-                    key: ValueKey('node_layout_${l.key}'),
-                    value: 'layout_${l.key}',
-                    checked: l == layout,
-                    child: Text(l.title),
-                  ),
-                const PopupMenuDivider(),
-                for (final d in MuseNodeDensity.values)
-                  CheckedPopupMenuItem<String>(
-                    key: ValueKey('node_density_${d.key}'),
-                    value: 'density_${d.key}',
-                    checked: d == density,
-                    child: Text(d.title),
-                  ),
-              ],
+                },
+              ),
+            TextButton(
+              key: const ValueKey('node_test_button'),
+              onPressed: group == null || !running ? null : () => testing ? museStopNodeTest(ref) : museRunNodeTest(ref),
+              child: testing
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: MuseSpace.s12,
+                          height: MuseSpace.s12,
+                          child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke),
+                        ),
+                        const SizedBox(width: MuseSpace.s8),
+                        Text('停止', style: MuseType.body(context).copyWith(color: museBrandOf(context))),
+                      ],
+                    )
+                  : const Text('测速'),
             ),
-          if (nodeTotal > 1)
-            PopupMenuButton<String>(
-              key: const ValueKey('node_sort_button'),
-              tooltip: '排序：${sortMode.title}',
-              icon: const Icon(Icons.sort_outlined, size: MuseIconSize.small),
-              style: const ButtonStyle(visualDensity: VisualDensity.compact),
-              initialValue: sortMode.key,
-              onSelected: (v) async {
-                if (v != _favoriteOrderItem) return ref.read(Preferences.museNodeSort.notifier).update(v);
-                if (group != null) await showMuseFavoriteOrder(context, ref, group);
-              },
-              itemBuilder: (context) => [
-                for (final m in MuseNodeSort.values)
-                  CheckedPopupMenuItem<String>(
-                    key: ValueKey('node_sort_${m.key}'),
-                    value: m.key,
-                    checked: m == sortMode,
-                    child: Text(m.title),
-                  ),
-                // 1.6.0 #34: arrange favourites by dragging
-                if (group != null && group.items.where((e) => !e.isGroup && favorites.contains(e.tag)).length > 1) ...[
-                  const PopupMenuDivider(),
-                  const PopupMenuItem<String>(
-                    key: ValueKey('node_sort_favorites'),
-                    value: _favoriteOrderItem,
-                    child: Text('收藏排序…'),
-                  ),
+            if (moreItems.isNotEmpty)
+              PopupMenuButton<String>(
+                key: const ValueKey('node_more_button'),
+                tooltip: '更多',
+                icon: Badge(
+                  isLabelVisible: !nodeFilter.isNone,
+                  smallSize: MuseSize.dot,
+                  backgroundColor: museBrandOf(context),
+                  child: const Icon(Icons.more_horiz_outlined, size: MuseIconSize.small),
+                ),
+                style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                onSelected: onMore,
+                itemBuilder: (context) => [
+                  for (final (value, label) in moreItems)
+                    PopupMenuItem<String>(key: ValueKey('node_more_$value'), value: value, child: Text(label)),
                 ],
-              ],
-            ),
-          TextButton(
-            key: const ValueKey('node_test_button'),
-            onPressed: group == null || !running ? null : () => testing ? museStopNodeTest(ref) : museRunNodeTest(ref),
-            child: testing
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(
-                        width: MuseSpace.s12,
-                        height: MuseSpace.s12,
-                        child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke),
-                      ),
-                      const SizedBox(width: MuseSpace.s8),
-                      Text('停止', style: MuseType.body(context).copyWith(color: museBrandOf(context))),
-                    ],
-                  )
-                : const Text('测速'),
-          ),
+              ),
+          ],
         ],
       ),
     );
@@ -561,7 +534,7 @@ class MuseNodeList extends HookConsumerWidget {
           )
           .toList();
       final userHidden = {for (final t in metas.hiddenTags) if (t != group.selected) t};
-      final sorted = museFavoritesFirst<OutboundInfo>(
+      final favoredOrder = museFavoritesFirst<OutboundInfo>(
         museOrderNodes<OutboundInfo>(
           listed,
           sort: sortMode,
@@ -575,6 +548,15 @@ class MuseNodeList extends HookConsumerWidget {
         favorites: favorites,
         favoriteOrder: favoriteManual ? favorites.toList() : null,
       );
+      // 1.10.0: timed-out nodes at the end (按地区 already orders each region by delay)
+      final sorted = sortMode == MuseNodeSort.region
+          ? favoredOrder
+          : museTimeoutsLast<OutboundInfo>(
+              favoredOrder,
+              isGroup: (e) => e.isGroup,
+              delay: (e) => museFreshDelay(e, since),
+              isValidDelay: ConnectionConst.isValidDelay,
+            );
       final List<OutboundInfo> ordered;
       if (testing && frozenOrder.value.isNotEmpty && frozenSort.value == sortMode) {
         // keep the order from before 测速 while its results arrive
@@ -587,8 +569,7 @@ class MuseNodeList extends HookConsumerWidget {
         frozenSort.value = sortMode;
       }
       final filtering = searching.value && query.value.trim().isNotEmpty;
-      final visible = ordered.where((e) => !hidden.contains(e.tag) && !userHidden.contains(e.tag) && matches(e)).toList();
-      final folded = ordered.where((e) => hidden.contains(e.tag) && !userHidden.contains(e.tag) && matches(e)).toList();
+      final visible = ordered.where((e) => !userHidden.contains(e.tag) && matches(e)).toList();
       final hiddenByUser = ordered.where((e) => userHidden.contains(e.tag) && matches(e)).toList();
       final nodeCount = listed.where((e) => !e.isGroup).length;
       final latencyCache = ref.watch(museLatencyCacheProvider);
@@ -712,7 +693,7 @@ class MuseNodeList extends HookConsumerWidget {
             ),
           );
 
-      if (filtering && visible.isEmpty && folded.isEmpty) {
+      if (filtering && visible.isEmpty) {
         children.add(
           Padding(
             padding: EdgeInsets.symmetric(horizontal: margin + MuseSpace.s4, vertical: MuseSpace.s16),
@@ -757,35 +738,6 @@ class MuseNodeList extends HookConsumerWidget {
       } else if (nodes.isNotEmpty) {
         children.add(section(null, nodes));
       }
-      if (folded.isNotEmpty) {
-        children.add(
-          foldToggle(
-            key: const ValueKey('hidden_nodes_toggle'),
-            icon: Icons.block_outlined,
-            label: '不可用 · ${folded.length}',
-            open: showHidden.value,
-            onTap: () => showHidden.value = !showHidden.value,
-            // 1.6.0 #40: hide them all after a preview; 撤销 brings them back
-            action: selecting.value
-                ? null
-                : TextButton(
-                    key: const ValueKey('clear_unavailable'),
-                    style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                    onPressed: () => museClearUnavailable(
-                      context,
-                      ref,
-                      tags: [for (final e in folded) if (!e.isGroup) e.tag],
-                      names: {for (final e in folded) e.tag: shownName(e)},
-                      unavailable: hidden,
-                      selected: group.selected,
-                      favorites: favorites,
-                    ),
-                    child: const Text('清除…'),
-                  ),
-          ),
-        );
-        if (showHidden.value || filtering) children.add(section(null, folded, dimmed: true));
-      }
       if (hiddenByUser.isNotEmpty) {
         children.add(
           foldToggle(
@@ -829,27 +781,6 @@ class MuseNodeList extends HookConsumerWidget {
       },
     );
     if (embedded) return list;
-    // 1.6.0 #38: the node in use stays on top while the list scrolls
-    final inUseNode = pinCurrent && group != null ? group.items.where((e) => e.tag == group.selected).firstOrNull : null;
-    Widget pinned(Widget body) => inUseNode == null
-        ? body
-        : Column(
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(margin, MuseSpace.s4, margin, MuseSpace.s4),
-                child: MuseCurrentNodeCard(
-                  proxy: inUseNode,
-                  name: inUseNode.isGroup ? museNodeName(inUseNode) : shownName(inUseNode),
-                  pick: inUseNode.isGroup && inUseNode.groupSelectedTagDisplay.isNotEmpty ? museStripFlags(shownPick(inUseNode.groupSelectedTagDisplay)) : '',
-                  region: inUseNode.isGroup ? null : regionOf(inUseNode),
-                  delay: museFreshDelay(inUseNode, since),
-                  running: running,
-                  onTap: () => showMuseNodeDetails(context, ref, inUseNode, since: since, groupTag: group!.tag),
-                ),
-              ),
-              Expanded(child: body),
-            ],
-          );
     final refresh = RefreshIndicator(
       key: const ValueKey('nodes_pull_refresh'),
       onRefresh: () => museNodePull(ref),
@@ -857,7 +788,7 @@ class MuseNodeList extends HookConsumerWidget {
       notificationPredicate: (n) => hasProfile && n.depth == 0 && !selecting.value,
       child: list,
     );
-    if (!selecting.value || group == null) return pinned(refresh);
+    if (!selecting.value || group == null) return refresh;
     final sel = picked.value;
     final allNodes = [for (final e in group.items) if (!e.isGroup) e.tag];
     void toast(String t) {
@@ -883,7 +814,7 @@ class MuseNodeList extends HookConsumerWidget {
 
     return Column(
       children: [
-        Expanded(child: pinned(refresh)),
+        Expanded(child: refresh),
         Material(
           color: mt.card,
           child: SafeArea(
@@ -929,3 +860,25 @@ class MuseNodeList extends HookConsumerWidget {
     );
   }
 }
+
+/// 1.10.0: a choice from the ⋯ menu as a dialog (the current entries checked); null when dismissed.
+/// Each option: (key, value, label, checked).
+Future<T?> _museNodeChoice<T>(BuildContext context, String title, List<(String, T, String, bool)> options, {int? dividerAfter}) =>
+    showDialog<T>(
+      context: context,
+      builder: (c) => SimpleDialog(
+        key: ValueKey('node_choice_$title'),
+        title: Text(title),
+        children: [
+          for (var i = 0; i < options.length; i++) ...[
+            if (dividerAfter != null && i == dividerAfter) const Divider(),
+            ListTile(
+              key: ValueKey(options[i].$1),
+              title: Text(options[i].$3),
+              trailing: options[i].$4 ? Icon(Icons.check_outlined, color: museBrandOf(c), size: MuseIconSize.small) : null,
+              onTap: () => Navigator.of(c).pop(options[i].$2),
+            ),
+          ],
+        ],
+      ),
+    );

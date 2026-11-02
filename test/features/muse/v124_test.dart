@@ -1,10 +1,10 @@
-// 穿云 1.2.4: update download sources / ranges, 不可用 after one timeout, bundled rule-sets.
+// 穿云 1.2.4: update download sources / ranges, 超时节点排到末尾 (was 不可用 after one timeout), bundled rule-sets.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/muse/data/bundled_rule_sets.dart';
-import 'package:hiddify/features/muse/logic/bad_nodes.dart';
 import 'package:hiddify/features/muse/logic/failover_tracker.dart';
+import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 
 void main() {
@@ -24,18 +24,21 @@ void main() {
     expect(museByteRanges(45895392, 4).last.$2, 45895391);
   });
 
-  test('a node shown as 超时 is folded at once and back on its first good test', () {
-    final t = MuseBadNodeTracker();
-    t.update(selected: 'auto', items: [
-      const MuseNodeSample(tag: 'a', delay: 65535, testedAt: 1, isGroup: false),
-      const MuseNodeSample(tag: 'b', delay: 300, testedAt: 1, isGroup: false),
-    ]);
-    expect(t.hidden, {'a'});
-    t.update(selected: 'auto', items: [
-      const MuseNodeSample(tag: 'a', delay: 280, testedAt: 2, isGroup: false),
-      const MuseNodeSample(tag: 'b', delay: 300, testedAt: 2, isGroup: false),
-    ]);
-    expect(t.hidden, isEmpty);
+  test('a node shown as 超时 goes to the end at once and is back in place on its first good test (1.10.0)', () {
+    List<String> order(List<MuseNodeSample> items) => museTimeoutsLast<MuseNodeSample>(
+      items,
+      isGroup: (e) => e.isGroup,
+      delay: (e) => e.delay,
+      isValidDelay: MuseFailoverTracker.isValid,
+    ).map((e) => e.tag).toList();
+    expect(order(const [
+      MuseNodeSample(tag: 'a', delay: 65535, testedAt: 1, isGroup: false),
+      MuseNodeSample(tag: 'b', delay: 300, testedAt: 1, isGroup: false),
+    ]), ['b', 'a']);
+    expect(order(const [
+      MuseNodeSample(tag: 'a', delay: 280, testedAt: 2, isGroup: false),
+      MuseNodeSample(tag: 'b', delay: 300, testedAt: 2, isGroup: false),
+    ]), ['a', 'b']);
   });
 
   test('every bundled rule-set is in assets', () {

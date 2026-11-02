@@ -1,10 +1,10 @@
 // 穿云 1.2.2: keeper vs. a system proxy the user changed, guard status parsing, update digests,
-// 自动收起不可用节点.
+// 自动收起不可用节点 (1.10.0: no 「不可用」 group; timed-out nodes sort to the end instead).
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
 import 'package:hiddify/features/muse/desktop/connection_keeper.dart';
-import 'package:hiddify/features/muse/logic/bad_nodes.dart';
 import 'package:hiddify/features/muse/logic/failover_tracker.dart';
+import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 
@@ -78,84 +78,40 @@ void main() {
     expect(MuseRouteMode.fromKey('global'), MuseRouteMode.global);
   });
 
-  group('自动收起不可用节点', () {
+  group('1.10.0: 超时节点排到末尾（替代「不可用」分组）', () {
     const timeout = 65000;
-    var clock = 0;
-    List<MuseNodeSample> round(Map<String, int> delays, {Set<String> groups = const {}}) {
-      clock += 1000;
-      return [
-        for (final e in delays.entries)
-          MuseNodeSample(tag: e.key, delay: e.value, testedAt: clock, isGroup: groups.contains(e.key)),
-      ];
-    }
+    List<MuseNodeSample> round(Map<String, int> delays, {Set<String> groups = const {}}) => [
+      for (final e in delays.entries) MuseNodeSample(tag: e.key, delay: e.value, testedAt: 1, isGroup: groups.contains(e.key)),
+    ];
+    List<String> order(List<MuseNodeSample> items) => museTimeoutsLast<MuseNodeSample>(
+      items,
+      isGroup: (e) => e.isGroup,
+      delay: (e) => e.delay,
+      isValidDelay: MuseFailoverTracker.isValid,
+    ).map((e) => e.tag).toList();
 
-    test('hidden after 3 failed tests in a row, back after 2 good ones', () {
-      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
-      for (var i = 0; i < 2; i++) {
-        t.update(selected: 'a', items: round({'a': 100, 'b': timeout}));
-      }
-      expect(t.hidden, isEmpty);
-      expect(t.update(selected: 'a', items: round({'a': 100, 'b': timeout})), isTrue);
-      expect(t.hidden, {'b'});
-      t.update(selected: 'a', items: round({'a': 100, 'b': 200}));
-      expect(t.hidden, {'b'});
-      expect(t.update(selected: 'a', items: round({'a': 100, 'b': 200})), isTrue);
-      expect(t.hidden, isEmpty);
+    test('a timed-out node moves to the end, nothing is hidden', () {
+      expect(order(round({'a': timeout, 'b': 100, 'c': 200})), ['b', 'c', 'a']);
     });
 
-    test('a good result in between resets the count', () {
-      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
-      t.update(selected: 'a', items: round({'a': 100, 'b': timeout}));
-      t.update(selected: 'a', items: round({'a': 100, 'b': timeout}));
-      t.update(selected: 'a', items: round({'a': 100, 'b': 300}));
-      t.update(selected: 'a', items: round({'a': 100, 'b': timeout}));
-      expect(t.hidden, isEmpty);
+    test('back in place on its first good test', () {
+      expect(order(round({'a': 90, 'b': 100, 'c': 200})), ['a', 'b', 'c']);
     });
 
-    test('the same result seen again does not count twice', () {
-      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
-      final same = round({'a': 100, 'b': timeout});
-      for (var i = 0; i < 5; i++) {
-        t.update(selected: 'a', items: same);
-      }
-      expect(t.hidden, isEmpty);
+    test('untested nodes (delay 0) keep their place', () {
+      expect(order(round({'a': 0, 'b': timeout, 'c': 200})), ['a', 'c', 'b']);
     });
 
-    test('untested nodes are not counted', () {
-      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
-      for (var i = 0; i < 4; i++) {
-        t.update(selected: 'a', items: round({'a': 100, 'b': 0}));
-      }
-      expect(t.hidden, isEmpty);
+    test('groups never move, even when their test timed out', () {
+      expect(order(round({'auto': timeout, 'a': timeout, 'b': 100}, groups: {'auto'})), ['auto', 'b', 'a']);
     });
 
-    test('groups and the selected node are never hidden', () {
-      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
-      for (var i = 0; i < 3; i++) {
-        t.update(selected: 'b', items: round({'auto': timeout, 'a': 100, 'b': timeout}, groups: {'auto'}));
-      }
-      expect(t.hidden, isEmpty);
-      // once the user picks another node the dead one folds away on the next result
-      t.update(selected: 'a', items: round({'auto': timeout, 'a': 100, 'b': timeout}, groups: {'auto'}));
-      expect(t.hidden, {'b'});
+    test('every node timed out: all kept, order unchanged', () {
+      expect(order(round({'a': timeout, 'b': timeout})), ['a', 'b']);
     });
 
-    test('never hides every node', () {
-      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
-      for (var i = 0; i < 4; i++) {
-        t.update(selected: 'auto', items: round({'auto': 0, 'a': timeout, 'b': timeout}, groups: {'auto'}));
-      }
-      expect(t.hidden, isEmpty);
-    });
-
-    test('nodes that left the profile are forgotten', () {
-      final t = MuseBadNodeTracker(hideAfter: 3, restoreAfter: 2);
-      for (var i = 0; i < 3; i++) {
-        t.update(selected: 'a', items: round({'a': 100, 'b': timeout}));
-      }
-      expect(t.hidden, {'b'});
-      t.update(selected: 'a', items: round({'a': 100}));
-      expect(t.hidden, isEmpty);
+    test('relative order among timed-out nodes is kept', () {
+      expect(order(round({'x': timeout, 'a': 100, 'y': timeout, 'b': 50})), ['a', 'b', 'x', 'y']);
     });
   });
 }

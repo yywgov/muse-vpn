@@ -1,4 +1,4 @@
-// 穿云 1.3.0 - 节点 tab: the full node list (moved off 首页).
+// 穿云 1.3.0 - 节点 tab: the full node list (moved off 首页). 1.10.0: no 当前节点 card above it.
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
@@ -22,7 +22,7 @@ class MuseNodesPage extends ConsumerWidget {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: grid ? double.infinity : MuseSize.nodeListMax),
           // key kept for the e2e driver's scroll steps
-          child: const MuseNodeList(listKey: ValueKey('home_node_list'), pinCurrent: true),
+          child: const MuseNodeList(listKey: ValueKey('home_node_list')),
         ),
       ),
     );
