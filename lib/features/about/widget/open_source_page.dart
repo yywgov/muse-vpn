@@ -1,4 +1,5 @@
-// 穿云 - 关于 › 开源许可 · 源代码: the GPL credit and where the source is.
+// 穿云 - 关于 › 开源许可与致谢: the license, where the source is and the GPL credits.
+// 1.10.0: the credits moved here from 关于 (the only place in the app the upstream projects are named).
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
@@ -14,7 +15,7 @@ class OpenSourcePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     void open(String url) => UriUtils.tryLaunch(Uri.parse(url));
     return MuseScaffold(
-      title: '开源许可',
+      title: '开源许可与致谢',
       body: MuseGroupedBody(
         children: [
           const MuseSection(
@@ -30,8 +31,10 @@ class OpenSourcePage extends ConsumerWidget {
             ],
           ),
           MuseSection(
+            header: '许可与源代码',
             children: [
               MuseTile(
+                key: const ValueKey('open_source_code'),
                 leading: const Icon(Icons.code_outlined),
                 title: '穿云源代码',
                 chevron: true,
@@ -44,14 +47,32 @@ class OpenSourcePage extends ConsumerWidget {
                 onTap: () => open('https://github.com/yywgov/muse-core'),
               ),
               MuseTile(
+                key: const ValueKey('open_source_license'),
                 leading: const Icon(Icons.description_outlined),
                 title: 'GPLv3 许可证',
                 chevron: true,
                 onTap: () => open(Constants.licenseUrl),
               ),
+            ],
+          ),
+          // the GPL credits — the only place in the app the upstream projects are named
+          MuseSection(
+            header: '致谢',
+            footer: '穿云以 GPL-3.0 协议开源',
+            children: [
               MuseTile(
-                leading: const Icon(Icons.favorite_outlined),
-                title: 'Hiddify',
+                key: const ValueKey('about_credit_ui'),
+                leading: const Icon(Icons.design_services_outlined),
+                title: '界面设计参考 FlClash',
+                subtitle: 'chen08209 · GPL-3.0',
+                chevron: true,
+                onTap: () => open('https://github.com/chen08209/FlClash'),
+              ),
+              MuseTile(
+                key: const ValueKey('about_credit_base'),
+                leading: const Icon(Icons.account_tree_outlined),
+                title: '基于 Hiddify 开发',
+                subtitle: 'GPL-3.0',
                 chevron: true,
                 onTap: () => open('https://github.com/hiddify/hiddify-app'),
               ),

@@ -14,6 +14,7 @@ import 'package:hiddify/core/model/app_info_entity.dart';
 import 'package:hiddify/core/model/environment.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/about/widget/about_page.dart';
+import 'package:hiddify/features/about/widget/open_source_page.dart';
 import 'package:hiddify/features/muse/data/bundled_rule_sets.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/sync_service.dart';
@@ -26,9 +27,20 @@ import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/settings/resources_page.dart';
 import 'package:hiddify/features/muse/settings/restore_preview.dart';
 import 'package:hiddify/features/muse/settings/theme_preview_page.dart';
+import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// 1.10.0: counts 检查更新 calls from the 关于 version line; never touches the network.
+class _CountingUpdater extends MuseUpdater {
+  static int checks = 0;
+  @override
+  Future<MuseRelease?> check() async {
+    checks++;
+    return null;
+  }
+}
 
 class _Info extends AppInfo {
   @override
@@ -50,6 +62,7 @@ Future<ProviderContainer> _pump(
   Size size = const Size(412, 915),
   double textScale = 1,
   String? engine,
+  List<Override> extra = const [],
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sp = await SharedPreferences.getInstance();
@@ -59,6 +72,7 @@ Future<ProviderContainer> _pump(
       museRunningProvider.overrideWithValue(false),
       appInfoProvider.overrideWith(_Info.new),
       museEngineVersionProvider.overrideWith((ref) async => engine),
+      ...extra,
     ],
   );
   addTearDown(container.dispose);
@@ -326,11 +340,21 @@ void main() {
   });
 
   group('C10 关于', () {
-    testWidgets('版本与构建号, 内核版本, GPL credits', (tester) async {
+    testWidgets('1.10.0 only icon, name and one version line; credits on 开源许可与致谢', (tester) async {
       await _pump(tester, const AboutPage(), engine: '1.12.3');
       await tester.pump();
-      expect(find.text('1.6.0（构建 160）'), findsOneWidget);
-      expect(find.text('$museCoreRelease · 引擎 1.12.3'), findsOneWidget);
+      expect(find.text('1.6.0（160） · 内核 ${museCoreShort()}'), findsOneWidget);
+      expect(find.byKey(const ValueKey('about_open_source')), findsOneWidget);
+      expect(find.text('界面设计参考 FlClash'), findsNothing);
+      expect(find.byType(ListTile), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('开源许可与致谢: license, source and the GPL credits', (tester) async {
+      await _pump(tester, const OpenSourcePage());
+      await tester.pump();
+      expect(find.byKey(const ValueKey('open_source_code')), findsOneWidget);
+      expect(find.byKey(const ValueKey('open_source_license')), findsOneWidget);
       await tester.scrollUntilVisible(find.byKey(const ValueKey('about_credit_base')), 300);
       expect(find.text('界面设计参考 FlClash'), findsOneWidget);
       expect(find.text('chen08209 · GPL-3.0'), findsOneWidget);
@@ -344,22 +368,34 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('disconnected: only the bundled release', (tester) async {
+    testWidgets('disconnected: the bundled core release in the version line', (tester) async {
       await _pump(tester, const AboutPage());
       await tester.pump();
-      expect(find.text(museCoreRelease), findsOneWidget);
+      expect(find.textContaining('内核 ${museCoreShort(museCoreRelease)}'), findsOneWidget);
     });
 
-    testWidgets('tapping the version 7 times turns 开发者选项 on', (tester) async {
+    testWidgets('tapping the icon 7 times turns 开发者选项 on (1.10.0: the version line checks for updates)', (tester) async {
       final c = await _pump(tester, const AboutPage());
       for (var i = 0; i < 6; i++) {
-        await tester.tap(find.byKey(const ValueKey('about_version')));
+        await tester.tap(find.byKey(const ValueKey('about_icon')));
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(c.read(MusePrefs.devMode), isFalse);
-      await tester.tap(find.byKey(const ValueKey('about_version')));
+      await tester.tap(find.byKey(const ValueKey('about_icon')));
       await tester.pump(const Duration(milliseconds: 100));
       expect(c.read(MusePrefs.devMode), isTrue);
+      await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets('1.10.0: tapping the version line checks for updates (no 检查更新 row)', (tester) async {
+      _CountingUpdater.checks = 0;
+      await _pump(tester, const AboutPage(), extra: [museUpdaterProvider.overrideWith(_CountingUpdater.new)]);
+      expect(find.text('检查更新'), findsNothing);
+      expect(find.text('更新内容'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('about_version')));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(_CountingUpdater.checks, 1);
+      expect(find.byKey(const ValueKey('about_icon')), findsOneWidget);
       await tester.pump(const Duration(seconds: 5));
     });
 
@@ -379,7 +415,7 @@ void main() {
       expect(u.tap(t0.add(const Duration(seconds: 2))), museDevTapsNeeded - 1, reason: 'counts again from scratch');
     });
 
-    test('the GPL credits name the upstream projects only on 关于', () {
+    test('the GPL credits name the upstream projects only on 关于 › 开源许可与致谢', () {
       for (final p in [
         'lib/features/muse/logic/restore_plan.dart',
         'lib/features/muse/logic/resources.dart',
@@ -392,19 +428,17 @@ void main() {
           expect(s.contains(w), isFalse, reason: '$p: $w');
         }
       }
-      final about = File('lib/features/about/widget/about_page.dart').readAsStringSync();
-      expect(about, contains("'界面设计参考 FlClash'"));
+      // 1.10.0: the credits sit on 关于 › 开源许可与致谢
+      final credits = File('lib/features/about/widget/open_source_page.dart').readAsStringSync();
+      expect(credits, contains("'界面设计参考 FlClash'"));
     });
   });
 
   group('C10 开发者选项', () {
     testWidgets('设置: hidden by default, shown after it was turned on', (tester) async {
       await _pump(tester, const SettingsPage());
-      await tester.scrollUntilVisible(find.byKey(const ValueKey('advanced_toggle')), 300);
+      await tester.scrollUntilVisible(find.byKey(const ValueKey('settings_about')), 300);
       expect(find.byKey(const ValueKey('settings_developer')), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('advanced_toggle')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('settings_developer')), findsNothing, reason: 'no longer under 高级');
       expect(find.byKey(const ValueKey('settings_resources')), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
 
