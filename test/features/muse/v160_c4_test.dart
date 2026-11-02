@@ -31,9 +31,34 @@ class _Iface implements NetworkInterface {
   @override
   final String name;
   @override
-  final List<InternetAddress> addresses;
+  final List<InterfaceAddress> addresses;
   @override
   int get index => 0;
+}
+
+/// 1.10.0: Dart 3.13 lists [InterfaceAddress]es on a [NetworkInterface].
+class _Addr implements InterfaceAddress {
+  _Addr(String address) : _a = InternetAddress(address);
+
+  final InternetAddress _a;
+  @override
+  String get address => _a.address;
+  @override
+  InternetAddressType get type => _a.type;
+  @override
+  String get host => _a.host;
+  @override
+  bool get isLoopback => _a.isLoopback;
+  @override
+  bool get isLinkLocal => _a.isLinkLocal;
+  @override
+  bool get isMulticast => _a.isMulticast;
+  @override
+  int get prefixLength => _a.type == InternetAddressType.IPv4 ? 24 : 64;
+  @override
+  InternetAddress? get broadcast => null;
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _Exit extends MuseExitNotifier {
@@ -184,10 +209,10 @@ void main() {
   group('C4 内网 IP / 内存 / 代理组 / 网络接管', () {
     test('LAN addresses: IPv4 first, no loopback / link-local / TUN', () {
       final list = museLanAddresses([
-        _Iface('lo', [InternetAddress('127.0.0.1')]),
-        _Iface('tun0', [InternetAddress('172.19.0.1'), InternetAddress('198.18.0.1')]),
-        _Iface('wlan0', [InternetAddress('2408:8207::1234'), InternetAddress('192.168.1.23'), InternetAddress('fe80::1')]),
-        _Iface('eth0', [InternetAddress('10.0.0.5'), InternetAddress('192.168.1.23')]),
+        _Iface('lo', [_Addr('127.0.0.1')]),
+        _Iface('tun0', [_Addr('172.19.0.1'), _Addr('198.18.0.1')]),
+        _Iface('wlan0', [_Addr('2408:8207::1234'), _Addr('192.168.1.23'), _Addr('fe80::1')]),
+        _Iface('eth0', [_Addr('10.0.0.5'), _Addr('192.168.1.23')]),
       ]);
       expect(list, ['192.168.1.23', '10.0.0.5', '2408:8207::1234']);
     });

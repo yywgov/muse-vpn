@@ -146,9 +146,9 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
               theme: theme.lightTheme(null),
               darkTheme: theme.darkTheme(null),
               title: Constants.appName,
-              builder: (context, child) {
+              builder: (context, routed) {
                 final theme = Theme.of(context);
-                child = child ?? const SizedBox();
+                var child = routed ?? const SizedBox();
                 if (kDebugMode && _debugAccessibility) {
                   return AccessibilityTools(checkFontOverflows: true, child: child);
                 }

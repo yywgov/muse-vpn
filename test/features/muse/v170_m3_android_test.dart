@@ -247,7 +247,7 @@ void main() {
       final wf = _read('.github/workflows/muse-android.yml');
       expect(wf, contains('compat-core:'));
       expect(wf, contains('repository: yywgov/muse-core'));
-      expect(wf, contains('needs: compat-core'));
+      expect(wf, matches(RegExp(r'needs: (compat-core|\[compat-core[^\]]*\])')));
       expect(wf, contains(r'-o "$GITHUB_WORKSPACE/out/libmusecompat.so" ./android'));
       expect(wf, contains('aarch64-linux-android21-clang'));
       expect(wf, contains('Java_com_hiddify_hiddify_bg_CompatCore_'));

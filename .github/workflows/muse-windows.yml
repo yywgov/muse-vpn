@@ -22,6 +22,8 @@ concurrency:
 
 env:
   FLUTTER_VERSION: '3.47.8'
+  # 穿云 1.10.0: code generation only (tool/ci/codegen.sh)
+  CODEGEN_FLUTTER_VERSION: '3.38.5'
 
 jobs:
   # 穿云 1.7.0: 兼容内核 (muse-compat.dll) from the core repository's source at the commit pinned in
@@ -99,8 +101,32 @@ jobs:
           path: out/muse-compat.dll
           retention-days: 3
 
+  # 穿云 1.10.0: build_runner + slang with the codegen toolchain (tool/ci/codegen.sh says why: the
+  # generators' analyzer 7.x cannot read the Flutter 3.47 framework and build_runner hangs). Only the
+  # generated .dart sources are handed to the build job; the app itself is built with FLUTTER_VERSION.
+  codegen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@v2.21.0
+        with:
+          flutter-version: ${{ env.CODEGEN_FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Generate sources
+        run: bash tool/ci/codegen.sh "$(dirname "$(command -v flutter)")" codegen.tar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: muse-codegen
+          path: codegen.tar
+          retention-days: 3
+
   windows:
-    needs: compat-core
+    needs: [compat-core, codegen]
     runs-on: windows-latest
     permissions:
       contents: write
@@ -116,9 +142,20 @@ jobs:
           channel: stable
           cache: true
 
-      # codegen + slang + prebuilt core (hiddify-lib-windows-amd64.tar.gz from yywgov/muse-core)
-      - name: Prepare (codegen + prebuilt core)
-        run: make windows-prepare
+      # generated sources from the codegen job; prebuilt core (hiddify-lib-windows-amd64.tar.gz from yywgov/muse-core) below
+      - uses: actions/download-artifact@v4
+        with:
+          name: muse-codegen
+
+      - name: Generated sources
+        run: |
+          tar xf codegen.tar && rm codegen.tar
+          test -s lib/gen/translations.g.dart || { echo "::error::generated sources missing"; exit 1; }
+          flutter pub get
+
+      - name: Prepare (prebuilt core)
+        timeout-minutes: 15
+        run: make windows-libs
 
       - uses: actions/download-artifact@v4
         with:

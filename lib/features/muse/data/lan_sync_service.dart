@@ -112,7 +112,7 @@ class MuseLanHost {
     _busy = true;
     try {
       final body = await _readBody(req);
-      if (body == null) return reply(HttpStatus.requestEntityTooLarge);
+      if (body == null) return await reply(HttpStatus.requestEntityTooLarge);
       final MuseLanMessage msg;
       try {
         msg = await _openAsync(body, p.key, 'push');

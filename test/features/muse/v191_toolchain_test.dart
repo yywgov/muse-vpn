@@ -35,7 +35,7 @@ void main() {
     final files = Directory('.github/workflows').listSync().whereType<File>().where((f) => f.path.endsWith('.yml'));
     var pins = 0;
     for (final f in files) {
-      for (final m in RegExp(r"FLUTTER_VERSION:\s*'([\d.]+)'").allMatches(f.readAsStringSync())) {
+      for (final m in RegExp(r"(?<![A-Z_])FLUTTER_VERSION:\s*'([\d.]+)'").allMatches(f.readAsStringSync())) {
         pins++;
         expect(_atLeast(m.group(1)!, '3.47.8'), isTrue, reason: '${f.path}: ${m.group(1)}');
       }

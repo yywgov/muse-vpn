@@ -115,7 +115,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('订阅排序'), findsOneWidget);
       // drag c to the top (the list's own reorder callback, as a drag ends)
-      tester.widget<ReorderableListView>(find.byKey(const ValueKey('profile_order_list'))).onReorder(2, 0);
+      tester.widget<ReorderableListView>(find.byKey(const ValueKey('profile_order_list'))).onReorder!(2, 0);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('profile_order_save')));
       await tester.pumpAndSettle();

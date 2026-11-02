@@ -116,7 +116,7 @@ class MuseSyncService {
     try {
       final repo = await ref.read(profileRepositoryProvider.future);
       final all = await repo.watchAll().first;
-      return all.fold((_) => const [], (l) => l.whereType<RemoteProfileEntity>().toList());
+      return all.fold<List<RemoteProfileEntity>>((_) => const [], (l) => l.whereType<RemoteProfileEntity>().toList());
     } catch (_) {
       return const [];
     }
@@ -296,7 +296,7 @@ class MuseSyncService {
       } on DioException catch (e) {
         throw MuseSyncException('上传失败：${e.message ?? e.type.name}');
       }
-      return applyMerged(merged);
+      return await applyMerged(merged);
     } finally {
       dio.close(force: true);
     }

@@ -85,10 +85,11 @@ void main() {
     expect(src.toLowerCase(), isNot(contains('mihomo.')));
   });
 
+  // 1.10.0: 4ced7dc (Go 1.26.10) is a descendant of e2ef6a1 and keeps that change
   test('兼容内核 pinned to the commit that stops mapping lists the .mrs data lacks', () {
     final ref = RegExp(r'^muse\.compat\.ref=([0-9a-f]{40})$', multiLine: true)
         .firstMatch(File('dependencies.properties').readAsStringSync())
         ?.group(1);
-    expect(ref, 'e2ef6a14b0ab6d32cea4000bdaad2b16cd0ab14a');
+    expect(ref, '4ced7dc76ba4fa192dfce25a5a51e2949d93967d');
   });
 }

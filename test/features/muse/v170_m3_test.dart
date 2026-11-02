@@ -262,7 +262,7 @@ void main() {
       final wf = File('.github/workflows/muse-windows.yml').readAsStringSync();
       expect(wf, contains('compat-core:'));
       expect(wf, contains('repository: yywgov/muse-core'));
-      expect(wf, contains('needs: compat-core'));
+      expect(wf, matches(RegExp(r'needs: (compat-core|\[compat-core[^\]]*\])')));
       expect(wf, contains('-o "\$GITHUB_WORKSPACE/out/muse-compat.dll" ./bridge'));
       expect(wf, contains('muse-compat.dll not bundled'));
       expect(wf, contains('core_smoke.dart --kind standard'));

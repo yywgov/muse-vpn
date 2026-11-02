@@ -15,9 +15,36 @@ concurrency:
 
 env:
   FLUTTER_VERSION: '3.47.8'
+  # 穿云 1.10.0: code generation only (tool/ci/codegen.sh)
+  CODEGEN_FLUTTER_VERSION: '3.38.5'
 
 jobs:
+  # 穿云 1.10.0: build_runner + slang with the codegen toolchain (tool/ci/codegen.sh says why: the
+  # generators' analyzer 7.x cannot read the Flutter 3.47 framework and build_runner hangs). Only the
+  # generated .dart sources are handed to the build job; the app itself is built with FLUTTER_VERSION.
+  codegen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@v2.21.0
+        with:
+          flutter-version: ${{ env.CODEGEN_FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Generate sources
+        run: bash tool/ci/codegen.sh "$(dirname "$(command -v flutter)")" codegen.tar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: muse-codegen
+          path: codegen.tar
+          retention-days: 3
+
   e2e:
+    needs: codegen
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -62,8 +89,20 @@ jobs:
           make android-install-deps
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
 
-      - name: Prepare (codegen + prebuilt core)
-        run: make android-prepare
+      - uses: actions/download-artifact@v4
+        with:
+          name: muse-codegen
+
+      - name: Generated sources
+        run: |
+          tar xf codegen.tar && rm codegen.tar
+          test -s lib/gen/translations.g.dart || { echo "::error::generated sources missing"; exit 1; }
+          flutter pub get
+
+
+      - name: Prepare (prebuilt core)
+        timeout-minutes: 15
+        run: make android-libs
 
       - name: Build e2e APK (debug, x86_64, driver target)
         env:
