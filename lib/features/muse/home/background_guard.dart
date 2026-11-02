@@ -1,19 +1,17 @@
 // 穿云 1.4.1 - Android: notices that the system killed 穿云 in the background (the VPN service
-// recorded a start but never a stop, and it wasn't a reboot or an app update) and shows the steps
-// for this phone's brand to keep it alive. Also reachable from 设置 › 后台保活.
+// recorded a start but never a stop, and it wasn't a reboot or an app update) and records it
+// (counted, and a line in the disconnect history that 诊断 exports).
+// 1.10.0: no dialog any more (the 后台保活 page and its per-brand steps were removed); the only
+// prompt left is the one-time 「允许后台运行」 hint on the first connection (keep_alive_guide.dart).
 // Part of 穿云 (GPLv3).
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/android_keepalive.dart';
-import 'package:hiddify/features/muse/widget/muse_tokens.dart';
-import 'package:hiddify/features/settings/notifier/battery_optimization/battery_optimizations_notifier.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -42,68 +40,5 @@ Future<bool> museCheckBackgroundKill(WidgetRef ref) async {
     return true;
   } catch (_) {
     return false;
-  }
-}
-
-/// The per-brand steps; [killed] adds the 「刚刚被系统关闭」 line.
-Future<void> showMuseBackgroundGuide(BuildContext context, {bool killed = false}) async {
-  final info = await ChuanyunPlatform.deviceInfo();
-  if (!context.mounted) return;
-  final guide = museOemGuide(info?.manufacturer ?? '', brand: info?.brand ?? '');
-  await showDialog<void>(
-    context: context,
-    builder: (c) => _BackgroundGuideDialog(guide: guide, killed: killed),
-  );
-}
-
-class _BackgroundGuideDialog extends ConsumerWidget {
-  const _BackgroundGuideDialog({required this.guide, required this.killed});
-
-  final MuseOemGuide guide;
-  final bool killed;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final ignored = ref.watch(batteryOptimizationNotifierProvider).valueOrNull ?? false;
-    final mt = MuseTheme.of(context);
-    return AlertDialog(
-      key: const ValueKey('background_guide'),
-      title: Text(killed ? '穿云在后台被系统关闭了' : '后台保活'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${guide.brand} 手机请这样设置：', style: MuseType.body(context).copyWith(color: mt.text2)),
-            const SizedBox(height: MuseSpace.s8),
-            for (var i = 0; i < guide.steps.length; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: MuseSpace.s4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(width: MuseSpace.s24, child: Text('${i + 1}.', style: MuseType.body(context))),
-                    Expanded(child: Text(guide.steps[i], style: MuseType.body(context))),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-      actions: [
-        if (!ignored)
-          TextButton(
-            key: const ValueKey('background_guide_battery'),
-            onPressed: () => museAllowBackground(ref),
-            child: const Text('允许后台运行'),
-          ),
-        TextButton(
-          key: const ValueKey('background_guide_settings'),
-          onPressed: () => museOpenAutostart(ref),
-          child: const Text('打开设置'),
-        ),
-        FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('好的')),
-      ],
-    );
   }
 }

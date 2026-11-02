@@ -157,12 +157,11 @@ void main() {
   });
 
   group('keep-alive guide', () {
-    test('shown once, only on Android, only when something is missing', () {
-      expect(museShouldShowKeepAliveGuide(isAndroid: true, alreadyShown: false, batteryIgnored: false, autostartVisited: false), isTrue);
-      expect(museShouldShowKeepAliveGuide(isAndroid: true, alreadyShown: true, batteryIgnored: false, autostartVisited: false), isFalse);
-      expect(museShouldShowKeepAliveGuide(isAndroid: false, alreadyShown: false, batteryIgnored: false, autostartVisited: false), isFalse);
-      expect(museShouldShowKeepAliveGuide(isAndroid: true, alreadyShown: false, batteryIgnored: true, autostartVisited: true), isFalse);
-      expect(museShouldShowKeepAliveGuide(isAndroid: true, alreadyShown: false, batteryIgnored: true, autostartVisited: false), isTrue);
+    test('shown once, only on Android, only when battery optimisation is still on (1.10.0)', () {
+      expect(museShouldShowKeepAliveGuide(isAndroid: true, alreadyShown: false, batteryIgnored: false), isTrue);
+      expect(museShouldShowKeepAliveGuide(isAndroid: true, alreadyShown: true, batteryIgnored: false), isFalse);
+      expect(museShouldShowKeepAliveGuide(isAndroid: false, alreadyShown: false, batteryIgnored: false), isFalse);
+      expect(museShouldShowKeepAliveGuide(isAndroid: true, alreadyShown: false, batteryIgnored: true), isFalse);
     });
   });
 

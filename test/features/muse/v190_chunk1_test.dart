@@ -1,48 +1,20 @@
 // 穿云 1.9.0 (batch 2, chunk 1): glossary / privacy text, stats CSV, weekly snapshot, update size,
-// clipboard clearing, 帮助与隐私 page.
+// clipboard clearing. 1.10.0: the 帮助与隐私 page (glossary / privacy text) was removed; its clipboard
+// switch lives on 设置 › 外观 and search sends the old names there.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/help_content.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/logic/stats_tools.dart';
 import 'package:hiddify/features/muse/logic/sync_core.dart';
-import 'package:hiddify/features/muse/settings/help_page.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  group('#234 glossary', () {
-    test('every card has a word and a meaning, words are unique', () {
-      expect(museGlossary.length, greaterThanOrEqualTo(10));
-      expect(museGlossary.map((e) => e.term).toSet().length, museGlossary.length);
-      for (final t in museGlossary) {
-        expect(t.term, isNotEmpty);
-        expect(t.meaning.length, greaterThan(10));
-      }
-    });
-    test('the app words are all explained (one word everywhere)', () {
-      final terms = museGlossary.map((e) => e.term).join(' ');
-      for (final w in ['节点', '订阅', '规则模式', '全局模式', '分流', 'TUN', '系统代理']) {
-        expect(terms, contains(w));
-      }
-    });
-    test('search by word, meaning and other names', () {
-      expect(museGlossarySearch('').length, museGlossary.length);
-      expect(museGlossarySearch('tun').single.term, 'TUN 模式');
-      expect(museGlossarySearch('虚拟网卡').map((e) => e.term), contains('TUN 模式'));
-      expect(museGlossarySearch('机场').single.term, '订阅');
-      expect(museGlossarySearch('zzzz'), isEmpty);
-    });
-    test('no upstream project names in the help text', () {
-      final all = [for (final t in museGlossary) '${t.term}${t.meaning}', for (final p in musePrivacyStored) '${p.$1}${p.$2}', ...musePrivacyNever].join();
-      for (final n in ['Hiddify', 'sing-box', 'Clash', 'Xray', 'Mihomo']) {
-        expect(all.toLowerCase(), isNot(contains(n.toLowerCase())));
-      }
-    });
-  });
-
   group('#179 CSV', () {
     test('header, order and totals', () {
       const log = MuseTrafficLog({'2026-10-02': (5, 7), '2026-10-01': (1, 2)});
@@ -91,56 +63,42 @@ void main() {
     expect(museFileSizeText(3 * 1024 * 1024 * 1024), '3.00 GB');
   });
 
-  test('1.9.0 settings are searchable', () {
+  test('1.9.0 settings are searchable (1.10.0: 帮助与隐私 is gone, the clipboard switch is on 外观)', () {
     final titles = museSettingEntries.map((e) => e.title).toList();
-    for (final t in ['帮助与隐私', '导入后清空剪贴板', '每周本地快照', '导出 CSV']) {
+    for (final t in ['导入后清空剪贴板', '每周本地快照', '导出 CSV']) {
       expect(titles, contains(t));
     }
-    expect(MuseSettingPage.help.path, contains('帮助'));
+    expect(titles, isNot(contains('帮助与隐私')));
+    expect(MuseSettingPage.values.map((e) => e.name), isNot(contains('help')));
+    expect(museSettingEntries.singleWhere((e) => e.title == '导入后清空剪贴板').page, MuseSettingPage.appearance);
+    // the old words lead to the switch's new place
+    final hits = museSearchSettings('剪贴板', android: true, windows: false);
+    expect(hits.map((e) => e.page), contains(MuseSettingPage.appearance));
   });
 
-  group('help page', () {
-    Future<ProviderContainer> pump(WidgetTester tester, {double width = 360, double scale = 1}) async {
+  group('clipboard switch on 设置 › 外观 (moved from 帮助与隐私)', () {
+    Future<ProviderContainer> pump(WidgetTester tester) async {
       SharedPreferences.setMockInitialValues({});
       final sp = await SharedPreferences.getInstance();
       final container = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) async => sp)]);
       addTearDown(container.dispose);
       await tester.runAsync(() => container.read(sharedPreferencesProvider.future));
-      tester.view.physicalSize = Size(width, 800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
+      await tester.runAsync(() => container.read(translationsProvider.future));
+      await tester.binding.setSurfaceSize(const Size(400, 3000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: MaterialApp(
-            home: MediaQuery(
-              data: MediaQueryData(size: Size(width, 800), textScaler: TextScaler.linear(scale)),
-              child: const MuseHelpPage(),
-            ),
-          ),
+          child: const MaterialApp(home: MuseAppearancePage(android: false, windows: false)),
         ),
       );
       await tester.pump();
       return container;
     }
 
-    testWidgets('shows cards, filters, and survives large text on a narrow screen', (tester) async {
-      await pump(tester, scale: 2);
-      expect(find.byKey(const ValueKey('term_节点')), findsOneWidget);
-      expect(tester.takeException(), isNull);
-      await tester.enterText(find.byKey(const ValueKey('help_search')), 'TUN');
-      await tester.pump();
-      expect(find.byKey(const ValueKey('term_TUN 模式')), findsOneWidget);
-      expect(find.byKey(const ValueKey('term_节点')), findsNothing);
-      await tester.enterText(find.byKey(const ValueKey('help_search')), 'qqqq');
-      await tester.pump();
-      expect(find.byKey(const ValueKey('help_empty')), findsOneWidget);
-    });
-
-    testWidgets('the clipboard switch is off by default and saves', (tester) async {
+    testWidgets('off by default, same preference key, saves', (tester) async {
       final c = await pump(tester);
       final sw = find.byKey(const ValueKey('clear_clipboard_switch'));
-      await tester.dragUntilVisible(sw, find.byType(Scrollable).first, const Offset(0, -300));
       await tester.ensureVisible(sw);
       await tester.pumpAndSettle();
       expect(c.read(MusePrefs.clearClipboardAfterImport), isFalse);
@@ -148,6 +106,8 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump();
       expect(c.read(MusePrefs.clearClipboardAfterImport), isTrue);
+      final sp = await tester.runAsync(() => c.read(sharedPreferencesProvider.future));
+      expect(sp!.getBool('muse_clear_clipboard'), isTrue); // storage key unchanged
     });
   });
 }

@@ -9,7 +9,7 @@ import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
-import 'package:hiddify/features/muse/settings/keep_alive_page.dart';
+import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/settings/resources_page.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
@@ -93,53 +93,85 @@ void main() {
     });
   });
 
-  group('#6 后台保活', () {
-    testWidgets('one page: 允许后台运行, 自启动, 不在最近任务显示, 本机设置步骤', (t) async {
-      final c = await _pump(
-        t,
-        const MuseKeepAlivePage(),
-        prefs: {'muse_kill_count': 2},
-        overrides: [batteryOptimizationNotifierProvider.overrideWith(_FakeBattery.new)],
-      );
-      expect(find.byKey(const ValueKey('keep_alive_battery')), findsOneWidget);
-      expect(find.byKey(const ValueKey('keep_alive_autostart')), findsOneWidget);
-      expect(find.byKey(const ValueKey('settings_background_guide')), findsOneWidget);
-      expect(find.text('去开启'), findsOneWidget);
-      expect(find.text('去设置'), findsOneWidget);
-      expect(c.read(Preferences.excludeFromRecents), isFalse);
+  group('#6 后台保活 (1.10.0: page removed, one battery hint on the first connection)', () {
+    Future<ProviderContainer> host(WidgetTester t, {Map<String, Object> prefs = const {}, bool android = true, bool? ignored = false}) => _pump(
+      t,
+      Consumer(
+        builder: (context, ref, _) => Scaffold(
+          body: TextButton(
+            key: const ValueKey('connected'),
+            onPressed: () => museMaybeShowKeepAliveGuide(context, ref, android: android, batteryIgnored: () async => ignored),
+            child: const Text('connected'),
+          ),
+        ),
+      ),
+      prefs: prefs,
+      overrides: [batteryOptimizationNotifierProvider.overrideWith(_FakeBattery.new)],
+    );
+
+    testWidgets('shown once: the second connection opens nothing', (t) async {
+      final c = await host(t);
+      _FakeBattery.requests = 0;
+      await t.tap(find.byKey(const ValueKey('connected')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('keep_alive_hint')), findsOneWidget);
+      expect(c.read(Preferences.keepAliveGuideShown), isTrue);
+      await t.tap(find.byKey(const ValueKey('keep_alive_hint_later')));
+      await t.pumpAndSettle();
+      expect(_FakeBattery.requests, 0);
+      await t.tap(find.byKey(const ValueKey('connected')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('keep_alive_hint')), findsNothing);
       expect(t.takeException(), isNull);
     });
 
-    test('needs attention while either is missing', () {
-      expect(museKeepAliveNeedsAttention(batteryIgnored: true, autostartVisited: true), isFalse);
-      expect(museKeepAliveNeedsAttention(batteryIgnored: null, autostartVisited: true), isFalse);
-      expect(museKeepAliveNeedsAttention(batteryIgnored: false, autostartVisited: true), isTrue);
-      expect(museKeepAliveNeedsAttention(batteryIgnored: true, autostartVisited: false), isTrue);
+    testWidgets('「去设置」 asks the system once for the battery exemption', (t) async {
+      await host(t);
+      _FakeBattery.requests = 0;
+      await t.tap(find.byKey(const ValueKey('connected')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('keep_alive_hint_go')));
+      await t.pumpAndSettle();
+      expect(_FakeBattery.requests, 1);
     });
 
-    test('no duplicates: guide, kill dialog and 设置 share the actions; privacy keeps one row', () {
-      final privacy = _src('lib/features/muse/settings/privacy_page.dart');
-      for (final s in ["'允许后台运行'", "'自启动'", "'不在最近任务显示'", 'openAutostartSettings', 'requestToIgnore', 'showMuseBackgroundGuide']) {
-        expect(privacy, isNot(contains(s)), reason: s);
+    testWidgets('never when already exempt, already shown (same key as before), or not Android', (t) async {
+      for (final (prefs, android, ignored) in [
+        (const <String, Object>{}, true, true),
+        (const <String, Object>{'keep_alive_guide_shown': true}, true, false),
+        (const <String, Object>{}, false, false),
+      ]) {
+        final c = await host(t, prefs: prefs, android: android, ignored: ignored);
+        await t.tap(find.byKey(const ValueKey('connected')));
+        await t.pumpAndSettle();
+        expect(find.byKey(const ValueKey('keep_alive_hint')), findsNothing, reason: '$prefs $android $ignored');
+        // not marked as shown when it did not open (a later first connection on an un-exempted phone still gets it)
+        if (!prefs.containsKey('keep_alive_guide_shown')) expect(c.read(Preferences.keepAliveGuideShown), isFalse);
+        await t.pumpWidget(const SizedBox.shrink());
       }
-      expect(privacy, contains("ValueKey('settings_keep_alive')"));
+    });
+
+    test('the page, its route, the per-brand dialog and the 自启动 row are gone', () {
+      expect(File('lib/features/muse/settings/keep_alive_page.dart').existsSync(), isFalse);
+      expect(MuseSettingPage.values.map((e) => e.name), isNot(contains('keepAlive')));
       for (final p in ['lib/features/muse/home/keep_alive_guide.dart', 'lib/features/muse/home/background_guard.dart']) {
         final s = _src(p);
+        expect(s, isNot(contains('keep_alive_page')), reason: p);
         expect(s, isNot(contains('openAutostartSettings')), reason: p);
-        expect(s, isNot(contains('requestToIgnore')), reason: p);
-        expect(s, contains('museOpenAutostart(ref)'), reason: p);
+        expect(s, isNot(contains('showMuseBackgroundGuide')), reason: p);
       }
-      // the only callers of the platform actions outside the page itself are gone
-      final page = _src('lib/features/muse/settings/keep_alive_page.dart');
-      expect('openAutostartSettings'.allMatches(page).length, 1);
+      // no background work for the hint: no timers, no periodic checks
+      final guide = _src('lib/features/muse/home/keep_alive_guide.dart');
+      expect(guide, isNot(contains('Timer')));
+      expect(guide, isNot(contains('periodic')));
     });
 
-    test('search: old names land on 后台保活', () {
-      for (final q in ['允许后台运行', '自启动', '最近任务', '后台保活指南', '保活']) {
-        final hits = museSearchSettings(q, android: true, windows: false);
-        expect(hits.first.page, MuseSettingPage.keepAlive, reason: q);
+    test('search: the removed rows lead nowhere dead', () {
+      for (final q in ['后台保活', '自启动', '最近任务', '后台保活指南']) {
+        for (final h in museSearchSettings(q, android: true, windows: false)) {
+          expect(h.page.path, isNot(contains('后台保活')), reason: q);
+        }
       }
-      expect(museSearchSettings('保活', android: false, windows: true), isEmpty);
     });
   });
 
@@ -296,7 +328,6 @@ void main() {
         '自动运行': MuseSettingPage.autoConnect,
         '按需运行': MuseSettingPage.autoConnect,
         '定时连接': MuseSettingPage.autoConnect,
-        '允许后台运行': MuseSettingPage.keepAlive,
       };
       moved.forEach((q, page) {
         final hits = museSearchSettings(q, android: true, windows: true);
@@ -330,6 +361,11 @@ void main() {
 }
 
 class _FakeBattery extends BatteryOptimizationNotifier {
+  static int requests = 0;
+
   @override
   Future<bool> build() async => false;
+
+  @override
+  Future<void> requestToIgnore() async => requests++;
 }

@@ -96,7 +96,6 @@ void main() {
     test('every layer is gated by the one switch', () {
       for (final f in [
         'lib/features/muse/home/node_failover.dart',
-        'lib/features/muse/home/bad_nodes.dart',
         'lib/features/muse/home/core_watchdog.dart',
         'lib/features/muse/desktop/connection_keeper.dart',
       ]) {
