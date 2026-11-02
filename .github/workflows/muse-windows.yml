@@ -302,6 +302,9 @@ jobs:
           (cd out && for f in Chuanyun-Windows-x64-Setup.exe Chuanyun-Windows-x64.zip; do sha256sum "$f" > "$f.sha256"; done)
           files="out/Chuanyun-Windows-x64-Setup.exe out/Chuanyun-Windows-x64.zip out/Chuanyun-Windows-x64-Setup.exe.sha256 out/Chuanyun-Windows-x64.zip.sha256"
           pre=""
+          # 1.10.0: formal releases start as a draft (published by hand after both tag runs and the
+          # asset check); gh release view / upload also find a draft by its tag
+          pre="--draft"
           case "$TAG" in *-*) pre="--prerelease";; esac
           # 1.10.0: the release body = this version's in-app changelog (the 「发现新版本」 dialog shows it)
           notes=""

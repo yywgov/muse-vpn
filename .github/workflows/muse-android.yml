@@ -294,3 +294,6 @@ jobs:
             out/Chuanyun-Android-x86_64.apk
             out/Chuanyun-Android-x86_64.apk.sha256
           prerelease: ${{ contains(github.ref, '-') }}
+          # 1.10.0: formal releases start as a draft; they are published (and become Latest) by hand
+          # once both the Android and Windows tag runs are green and the assets are checked
+          draft: ${{ !contains(github.ref, '-') }}

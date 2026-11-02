@@ -75,4 +75,15 @@ void main() {
       expect(RegExp(r'CODEGEN_FLUTTER_VERSION').allMatches(yml).length, 2, reason: file); // env + codegen job
     }
   });
+
+  test('正式版 tag 的 Release 先建为草稿（两边 tag CI 全绿、资产核对后再手动公开），-win 测试 tag 仍为预发布', () {
+    final android = File('.github/workflows/muse-android.yml').readAsStringSync();
+    expect(android, contains("draft: \${{ !contains(github.ref, '-') }}"));
+    expect(android, contains("prerelease: \${{ contains(github.ref, '-') }}"));
+    final windows = File('.github/workflows/muse-windows.yml').readAsStringSync();
+    expect(windows, contains('pre="--draft"'));
+    expect(windows, contains('case "\$TAG" in *-*) pre="--prerelease";; esac'));
+    expect(windows.indexOf('pre="--draft"'), lessThan(windows.indexOf('pre="--prerelease"')));
+    expect(windows, contains('gh release create "\$TAG" \$files \$pre'));
+  });
 }
