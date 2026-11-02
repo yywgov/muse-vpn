@@ -79,6 +79,9 @@ jobs:
           echo "tags=$tags version=$ver"
           [ -n "$tags" ] && [ -n "$ver" ] || { echo "::error::could not read the build tags"; exit 1; }
           mkdir -p "$GITHUB_WORKSPACE/out"
+          # 1.10.0: module downloads retried (a proxy.golang.org stream reset failed all three
+          # architectures once); the build itself then runs from the module cache
+          for i in 1 2 3; do go mod download && break; echo "::warning::go mod download attempt $i failed"; sleep 15; done
           go build -buildmode=c-shared -trimpath -tags "$tags" \
             -ldflags "-s -w -buildid= -X github.com/metacubex/mihomo/constant.Version=$ver" \
             -o "$GITHUB_WORKSPACE/out/muse-compat.dll" ./bridge

@@ -60,6 +60,15 @@ void main() {
     }
   });
 
+  test('兼容内核 module downloads are retried before the build', () {
+    for (final file in ['muse-android.yml', 'muse-windows.yml']) {
+      final yml = File('.github/workflows/$file').readAsStringSync();
+      final retry = yml.indexOf('for i in 1 2 3; do go mod download && break;');
+      expect(retry, greaterThan(0), reason: file);
+      expect(retry, lessThan(yml.indexOf('go build -buildmode=c-shared')), reason: file);
+    }
+  });
+
   test('the codegen toolchain is only used for generation', () {
     for (final file in workflows.keys) {
       final yml = File('.github/workflows/$file').readAsStringSync();
