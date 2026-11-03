@@ -153,7 +153,7 @@ class MuseDeveloperPage extends HookConsumerWidget {
                 key: const ValueKey('dev_turn_off'),
                 leading: const Icon(Icons.visibility_off_outlined),
                 title: '隐藏开发者选项',
-                subtitle: '在「关于」连点版本号 7 次可再次打开',
+                subtitle: '在「关于」连点图标 7 次可再次打开',
                 onTap: () async {
                   await ref.read(MusePrefs.devMode.notifier).update(false);
                   if (context.mounted) Navigator.of(context).maybePop();

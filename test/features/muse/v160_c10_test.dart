@@ -387,16 +387,40 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
     });
 
-    testWidgets('1.10.0: tapping the version line checks for updates (no 检查更新 row)', (tester) async {
+    testWidgets('1.10.1: 「点击检测更新」 is shown and checks for updates; the version line below is not tappable', (tester) async {
       _CountingUpdater.checks = 0;
       await _pump(tester, const AboutPage(), extra: [museUpdaterProvider.overrideWith(_CountingUpdater.new)]);
+      expect(find.text('点击检测更新'), findsOneWidget);
       expect(find.text('检查更新'), findsNothing);
       expect(find.text('更新内容'), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('about_version')));
+      final version = find.text('1.6.0（160） · 内核 ${museCoreShort()}');
+      expect(version, findsOneWidget);
+      // the version sits right below the update line, as small text
+      expect(tester.getTopLeft(version).dy, greaterThan(tester.getTopLeft(find.text('点击检测更新')).dy));
+      expect(
+        tester.widget<Text>(version).style!.fontSize!,
+        lessThan(tester.widget<Text>(find.text('点击检测更新')).style!.fontSize!),
+      );
+      await tester.tap(version);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(_CountingUpdater.checks, 0, reason: 'the version line does not check');
+      await tester.tap(find.text('点击检测更新'));
       await tester.pump(const Duration(milliseconds: 100));
       expect(_CountingUpdater.checks, 1);
       expect(find.byKey(const ValueKey('about_icon')), findsOneWidget);
       await tester.pump(const Duration(seconds: 5));
+    });
+
+    test('1.10.1: the update line says 点击检测更新 when idle, progress while busy', () {
+      expect(museAboutCheckUpdateLabel, '点击检测更新');
+      expect(museAboutUpdateStatus(const MuseUpdateIdle()), isNull);
+      expect(museAboutUpdateStatus(const MuseUpdateChecking()), '正在检查更新…');
+      expect(museAboutUpdateStatus(const MuseUpdateDownloading(0.42)), '正在下载 42%');
+    });
+
+    test('1.10.1: 设置搜索「检查更新」 still opens 关于', () {
+      final hits = museSearchSettings('检查更新', android: true, windows: false);
+      expect(hits.first.page, MuseSettingPage.about);
     });
 
     test('tap counter: 7 in a row, a pause starts over', () {

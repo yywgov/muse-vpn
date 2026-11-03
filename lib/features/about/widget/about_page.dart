@@ -7,6 +7,9 @@
 // in the dialog; 「已是最新版本」 otherwise) and the line itself shows 正在检查 / 下载进度. One small
 // link at the bottom opens 开源许可与致谢 (license, source, the GPL credits). Tapping the icon 7
 // times turns 开发者选项 on (#127).
+// 1.10.1: the tappable line now says 「点击检测更新」 (primary colour) while idle, 正在检查 / 下载进度
+// while busy; the version line 「1.10.1（194）· 内核 muse.20」 sits right below it as plain grey
+// caption text and is not tappable.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -26,8 +29,11 @@ import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// 1.10.0: what the version line on 关于 says while an update is checked / downloaded (null = the
-/// version itself).
+/// 1.10.1: what the update line on 关于 says while idle.
+const museAboutCheckUpdateLabel = '点击检测更新';
+
+/// 1.10.0: what the update line on 关于 says while an update is checked / downloaded (1.10.1: null =
+/// idle, the line then says [museAboutCheckUpdateLabel]).
 String? museAboutUpdateStatus(MuseUpdateState state) => switch (state) {
   MuseUpdateChecking() => '正在检查更新…',
   MuseUpdateDownloading(:final progress) => progress == null ? '正在下载…' : '正在下载 ${(progress * 100).toStringAsFixed(0)}%',
@@ -110,7 +116,7 @@ class AboutPage extends HookConsumerWidget {
       if (!ok) return;
       try {
         final opened = await updater.downloadAndInstall(release);
-        if (!opened && !PlatformUtils.isWindows) toast.showInfoToast('请允许穿云「安装未知应用」，然后再点一次版本号');
+        if (!opened && !PlatformUtils.isWindows) toast.showInfoToast('请允许穿云「安装未知应用」，然后再点一次「点击检测更新」');
       } on MuseSignatureChanged catch (e) {
         // 1.2.4: earlier builds were signed with a different key each time; from now on the key
         // stays the same. This one switch needs the old version removed first.
@@ -156,22 +162,31 @@ class AboutPage extends HookConsumerWidget {
                       Text(Constants.appName, style: MuseType.title(context)),
                       const Gap(MuseSpace.s4),
                       Semantics(
-                        button: true,
+                        button: idle,
                         label: idle ? '检查更新' : null,
                         child: InkWell(
-                          key: const ValueKey('about_version'),
+                          key: const ValueKey('about_check_update'),
                           borderRadius: MuseRadius.smallAll,
                           onTap: idle ? checkUpdate : null,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s4),
                             child: Text(
-                              status ?? museAboutVersionLine(version: appInfo.version, build: appInfo.buildNumber),
-                              key: const ValueKey('about_version_text'),
+                              status ?? museAboutCheckUpdateLabel,
+                              key: const ValueKey('about_check_update_text'),
                               textAlign: TextAlign.center,
-                              style: MuseType.caption(context).copyWith(fontFeatures: MuseType.tabular),
+                              style: MuseType.body(context).copyWith(
+                                color: idle ? museBrandOf(context) : mt.text2,
+                                fontFeatures: MuseType.tabular,
+                              ),
                             ),
                           ),
                         ),
+                      ),
+                      Text(
+                        museAboutVersionLine(version: appInfo.version, build: appInfo.buildNumber),
+                        key: const ValueKey('about_version_text'),
+                        textAlign: TextAlign.center,
+                        style: MuseType.caption(context).copyWith(color: mt.text2, fontFeatures: MuseType.tabular),
                       ),
                     ],
                   ),

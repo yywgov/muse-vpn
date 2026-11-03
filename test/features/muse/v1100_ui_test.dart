@@ -118,9 +118,10 @@ void main() {
       expect(museAboutVersionLine(version: '1.10.0', build: '193', release: '5.0.0-muse.20'), '1.10.0（193） · 内核 muse.20');
       expect(museAboutVersionLine(version: '1.10.0', build: '', release: '5.0.0-muse.20'), '1.10.0 · 内核 muse.20');
     });
-    test('no list cards: icon, name, version line (tap = 检查更新), one 开源许可与致谢 link', () {
+    test('no list cards: icon, name, 点击检测更新 + version line below, one 开源许可与致谢 link', () {
       final s = _src('lib/features/about/widget/about_page.dart');
-      expect(s, contains("ValueKey('about_version')"));
+      expect(s, contains("ValueKey('about_check_update')"));
+      expect(s, contains("ValueKey('about_version_text')"));
       expect(s, contains("ValueKey('about_open_source')"));
       expect(s, contains('onTap: idle ? checkUpdate : null'));
       for (final gone in ['MuseSection(', 'MuseTile(', "'更新内容'", "'致谢'", "'内核版本'"]) {
