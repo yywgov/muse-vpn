@@ -331,19 +331,23 @@ class MuseNodeList extends HookConsumerWidget {
       }
     }
 
-    // 1.10.0: the 节点 page opens at the node in use (once per visit; the row is highlighted)
-    final autoScrolled = useRef(false);
-    final hasSelection = group != null && group.selected.isNotEmpty;
+    // 1.10.0: the 节点 page opens at the node in use (the row is highlighted).
+    // 1.10.2: every time the page comes into view (the tab stays alive in the shell, so this follows
+    // TickerMode, no polling) and only when the node in use changed since the last time, e.g. after
+    // picking another node on 首页; a node picked on this page does not make the list jump.
+    final visible = TickerMode.valuesOf(context).enabled;
+    final selectedTag = group?.selected ?? '';
+    final scrolledFor = useRef<String?>(null);
     useEffect(() {
-      if (embedded || autoScrolled.value || !hasSelection) return null;
-      autoScrolled.value = true;
+      if (embedded || !visible || selectedTag.isEmpty || scrolledFor.value == selectedTag) return null;
+      scrolledFor.value = selectedTag;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!context.mounted || !scroll.hasClients) return;
         final found = await museScrollToKey(scroll, selectedKey);
-        if (!found && scroll.hasClients) scroll.jumpTo(scroll.position.minScrollExtent);
+        if (!found && context.mounted && scroll.hasClients) scroll.jumpTo(scroll.position.minScrollExtent);
       });
       return null;
-    }, [hasSelection]);
+    }, [visible, selectedTag.isEmpty]);
 
     final toolbar = Padding(
       padding: EdgeInsets.fromLTRB(margin + MuseSpace.s4, 0, margin - MuseSpace.s8, MuseSpace.s4),
@@ -431,10 +435,14 @@ class MuseNodeList extends HookConsumerWidget {
       ),
     );
 
-    final children = <Widget>[toolbar];
-    if (searching.value && nodeTotal > 6) {
-      children.add(
-        Padding(
+    // 1.10.2: on the 节点 page the toolbar (搜索 / 测速 / ⋯) and the search field stay above the list
+    // instead of scrolling with it: the page opens scrolled to the node in use, which used to push
+    // 测速 and ⋯ out of sight. The sheet and the side column keep them in the list.
+    final showSearch = searching.value && nodeTotal > 6;
+    final children = <Widget>[if (embedded) toolbar];
+    Widget? searchField;
+    if (showSearch) {
+      searchField = Padding(
           padding: EdgeInsets.fromLTRB(margin, 0, margin, MuseSpace.s8),
           child: TextField(
             key: const ValueKey('node_search_field'),
@@ -452,8 +460,8 @@ class MuseNodeList extends HookConsumerWidget {
               contentPadding: const EdgeInsets.symmetric(vertical: MuseSpace.s12),
             ),
           ),
-        ),
-      );
+        );
+      if (embedded) children.add(searchField);
     }
 
     if (proxies.isLoading && group == null) {
@@ -788,7 +796,14 @@ class MuseNodeList extends HookConsumerWidget {
       notificationPredicate: (n) => hasProfile && n.depth == 0 && !selecting.value,
       child: list,
     );
-    if (!selecting.value || group == null) return refresh;
+    final framed = Column(
+      children: [
+        toolbar,
+        ?searchField,
+        Expanded(child: refresh),
+      ],
+    );
+    if (!selecting.value || group == null) return framed;
     final sel = picked.value;
     final allNodes = [for (final e in group.items) if (!e.isGroup) e.tag];
     void toast(String t) {
@@ -814,7 +829,7 @@ class MuseNodeList extends HookConsumerWidget {
 
     return Column(
       children: [
-        Expanded(child: refresh),
+        Expanded(child: framed),
         Material(
           color: mt.card,
           child: SafeArea(

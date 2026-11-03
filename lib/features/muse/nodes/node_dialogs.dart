@@ -319,16 +319,20 @@ Future<bool> museScrollToKey(ScrollController scroll, GlobalKey key, {int maxSte
   if (!scroll.hasClients) return false;
   Future<bool> reveal() async {
     final ctx = key.currentContext;
-    if (ctx == null || !ctx.mounted) return false;
+    if (ctx == null || !ctx.mounted || !scroll.hasClients) return false;
     await Scrollable.ensureVisible(ctx, alignment: 0.3, duration: MuseMotion.common);
     return true;
   }
 
+  // 1.10.2: every step waits for a frame; the list may be gone by then (the page was left), so the
+  // controller is checked again each time instead of throwing 「not attached to any scroll views」
   if (await reveal()) return true;
+  if (!scroll.hasClients) return false;
   scroll.jumpTo(scroll.position.minScrollExtent);
   await WidgetsBinding.instance.endOfFrame;
   for (var i = 0; i < maxSteps; i++) {
     if (await reveal()) return true;
+    if (!scroll.hasClients) return false;
     final p = scroll.position;
     if (p.pixels >= p.maxScrollExtent) break;
     scroll.jumpTo(math.min(p.pixels + p.viewportDimension * 0.8, p.maxScrollExtent));

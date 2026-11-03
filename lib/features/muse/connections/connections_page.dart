@@ -86,11 +86,14 @@ class MuseConnectionsPage extends HookConsumerWidget {
                   },
           ),
       ],
-      body: Column(
-        children: [
-          ?header,
-          Padding(
-            padding: EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), MuseSpace.s8),
+      // 1.10.2: on a short screen (a phone held sideways) the 活动 tabs, the summary, 进行中 / 请求
+      // and the search field did not fit above the list (overflowed by a few pixels); there they now
+      // scroll together with the list. Taller screens keep them fixed above it as before.
+      body: LayoutBuilder(
+        builder: (context, box) {
+          final pad = MuseSpace.page(context);
+          final top = Padding(
+            padding: EdgeInsets.fromLTRB(pad, 0, pad, MuseSpace.s8),
             child: Column(
               children: [
                 _Summary(state: state, ended: history.length),
@@ -113,25 +116,60 @@ class MuseConnectionsPage extends HookConsumerWidget {
                 ),
               ],
             ),
-          ),
-          Expanded(
-            child: state.error != null && tab.value == 0
-                ? _Empty(icon: Icons.cloud_off_outlined, text: state.error == '未连接' ? '连接后可查看实时连接' : '暂不可用（${state.error}）')
-                : list.isEmpty
-                ? _Empty(icon: Icons.swap_vert_outlined, text: state.loading && tab.value == 0 ? '正在读取…' : (query.value.isEmpty ? '暂无连接' : '没有匹配的连接'))
-                : ListView.builder(
-                    key: const ValueKey('conn_list'),
-                    itemExtent: museConnRowHeight,
-                    padding: EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), museScrollEndGap(context, MuseSize.fabClearance)),
-                    itemCount: list.length,
-                    itemBuilder: (_, i) => MuseConnRow(conn: list[i], ended: tab.value == 1, wide: MediaQuery.sizeOf(context).width > MuseBreak.laptop),
+          );
+          final empty = state.error != null && tab.value == 0
+              ? _Empty(icon: Icons.cloud_off_outlined, text: state.error == '未连接' ? '连接后可查看实时连接' : '暂不可用（${state.error}）')
+              : list.isEmpty
+              ? _Empty(icon: Icons.swap_vert_outlined, text: state.loading && tab.value == 0 ? '正在读取…' : (query.value.isEmpty ? '暂无连接' : '没有匹配的连接'))
+              : null;
+          final listPad = EdgeInsets.fromLTRB(pad, 0, pad, museScrollEndGap(context, MuseSize.fabClearance));
+          final wide = MediaQuery.sizeOf(context).width > MuseBreak.laptop;
+          if (museConnCompactHeight(box.maxHeight)) {
+            return CustomScrollView(
+              key: const ValueKey('conn_list'),
+              slivers: [
+                if (header case final h?) SliverToBoxAdapter(child: h),
+                SliverToBoxAdapter(child: top),
+                if (empty != null)
+                  SliverFillRemaining(hasScrollBody: false, child: empty)
+                else
+                  SliverPadding(
+                    padding: listPad,
+                    sliver: SliverFixedExtentList(
+                      itemExtent: museConnRowHeight,
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => MuseConnRow(conn: list[i], ended: tab.value == 1, wide: wide),
+                        childCount: list.length,
+                      ),
+                    ),
                   ),
-          ),
-        ],
+              ],
+            );
+          }
+          return Column(
+            children: [
+              ?header,
+              top,
+              Expanded(
+                child: empty ??
+                    ListView.builder(
+                      key: const ValueKey('conn_list'),
+                      itemExtent: museConnRowHeight,
+                      padding: listPad,
+                      itemCount: list.length,
+                      itemBuilder: (_, i) => MuseConnRow(conn: list[i], ended: tab.value == 1, wide: wide),
+                    ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
+
+/// 1.10.2: below this height (a phone held sideways) the 连接 page scrolls its header with the list.
+bool museConnCompactHeight(double height) => height < 400;
 
 class _Summary extends StatelessWidget {
   const _Summary({required this.state, required this.ended});

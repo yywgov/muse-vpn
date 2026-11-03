@@ -124,6 +124,8 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('自动运行', MuseSettingPage.autoConnect, keywords: ['打开即连接', '自动连接', '启动时连接'], androidOnly: true),
   MuseSettingEntry('自动连接', MuseSettingPage.autoConnect, keywords: ['自动运行', '按需运行', '定时连接', '定时断开']),
   MuseSettingEntry('通知栏断开按钮', MuseSettingPage.appearance, keywords: ['通知', '断开', '停止按钮'], androidOnly: true),
+  // 1.10.2: 在最近任务中隐藏 (back, on 设置 › 外观)
+  MuseSettingEntry('在最近任务中隐藏', MuseSettingPage.appearance, keywords: ['最近任务', '多任务', '后台列表', '隐藏', '不在最近任务显示'], androidOnly: true),
   MuseSettingEntry('隐藏桌面图标 / 通知', MuseSettingPage.appearance, keywords: ['隐私', '隐藏', '隐私与后台'], androidOnly: true),
   MuseSettingEntry('检查更新', MuseSettingPage.about, keywords: ['版本', '更新内容']),
   // 1.6.0 C10

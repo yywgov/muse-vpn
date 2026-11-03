@@ -87,17 +87,22 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
     if (connected) unawaited(ref.read(museExitProvider.notifier).ensure().catchError((_) {}));
     // 网络: a domestic site, straight out (not through the proxy); its Date header checks the clock
     final direct = await _get('http://www.baidu.com/', direct: true);
+    // 1.10.2: 诊断 is also a tab of 活动 now; leaving it mid-run (another tab, back) ends the run
+    // here instead of touching ref after the view is gone (a StateError)
+    if (!mounted) return;
     _add(museDiagNetwork(directOk: direct != null));
     // 1.4.1 时间: a clock off by minutes breaks TLS / VMess
     if (direct != null) _add(museDiagClock(museClockSkew(direct.date, DateTime.now())));
     // 1.4.1 Windows: a system proxy left pointing at a dead local port (穿云 closed abnormally)
     if (Platform.isWindows && !connected) {
       final stale = await WindowsProxyGuard.checkStale(connected: false);
+      if (!mounted) return;
       if (stale.port != null || stale.stale) _add(museDiagStaleProxy(stale: stale.stale, port: stale.port));
     }
     // DNS
     final domestic = await _resolves('www.baidu.com');
     final foreign = await _resolves('www.google.com');
+    if (!mounted) return;
     _add(museDiagDns(domesticOk: domestic, foreignOk: foreign));
     // 节点
     final group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
@@ -107,6 +112,7 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
         await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest(sel.tag);
         await Future<void>.delayed(const Duration(seconds: 4));
       } catch (_) {}
+      if (!mounted) return;
     }
     final now = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
     final cur = now?.items.where((e) => e.tag == now.selected).firstOrNull;
@@ -121,11 +127,13 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
     final tun = !Platform.isAndroid && ref.read(ConfigOptions.serviceMode) == ServiceMode.tun;
     bool? ours;
     if (connected && Platform.isWindows && !tun) ours = await WindowsProxyGuard.pointsAtUsNow();
+    if (!mounted) return;
     _add(museDiagRouting(connected: connected, android: Platform.isAndroid, tun: tun, systemProxyOurs: ours));
     // 外网 (generate_204)
     var internet = false;
     if (connected) {
       await ref.read(museReachProvider.notifier).check();
+      if (!mounted) return;
       internet = ref.read(museReachProvider) == MuseReach.ok;
     }
     _add(museDiagInternet(connected: connected, ok: internet));

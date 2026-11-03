@@ -126,8 +126,9 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
 
     override fun onResume() {
         super.onResume()
-        // 穿云 1.10.0: 「不在最近任务显示」 was removed with the 后台保活 page; the saved value is kept but
-        // no longer applied, so 穿云 always shows in recents
+        // 穿云: 「在最近任务中隐藏」 (1.10.2: applied again from the saved value, as in 1.9.1; the
+        // switch is on 设置 › 外观 now, same storage key exclude_from_recents)
+        if (Settings.excludeFromRecents) ChuanyunHandler.applyExcludeFromRecents(this, true)
     }
 
     override fun onDestroy() {
