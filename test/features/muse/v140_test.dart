@@ -10,12 +10,13 @@ import 'package:hiddify/features/muse/logic/latency_cache.dart';
 void main() {
   group('测速', () {
     test('cap grows with the node count, bounded', () {
-      expect(museTestCap(nodes: 1), const Duration(seconds: 12));
-      // 50 CF nodes, 16 workers, 5 s: 4 rounds of ~9 s
-      expect(museTestCap(nodes: 50), const Duration(seconds: 39));
-      expect(museTestCap(nodes: 500), const Duration(seconds: 90));
-      expect(museTestCap(nodes: 50, workers: 32, timeoutSec: 3), const Duration(seconds: 17));
-      expect(museTestCap(nodes: 0, workers: 0), const Duration(seconds: 12));
+      // 1.10.3: 8 workers, 8 s, plus one round of re-tests (3 s + 8 s + 1 s)
+      expect(museTestCap(nodes: 1), const Duration(seconds: 27));
+      // 50 CF nodes, 8 workers, 8 s: 7 rounds of ~12 s + re-tests
+      expect(museTestCap(nodes: 50), const Duration(seconds: 99));
+      expect(museTestCap(nodes: 500), const Duration(seconds: 120));
+      expect(museTestCap(nodes: 50, workers: 32, timeoutSec: 3), const Duration(seconds: 24));
+      expect(museTestCap(nodes: 0, workers: 0), const Duration(seconds: 27));
     });
 
     final since = DateTime(2026, 10, 22, 10);

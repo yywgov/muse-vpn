@@ -250,9 +250,10 @@ class MuseNodeList extends HookConsumerWidget {
 
     // every node answered (or timed out) since 测速 started: end the test
     if (testing && group != null) {
-      final started = testStarted.subtract(const Duration(seconds: 1));
       final nodes = group.items.where((e) => !e.isGroup);
-      final done = nodes.isNotEmpty && nodes.every((e) => e.hasUrlTestTime() && e.urlTestTime.toDateTime().isAfter(started));
+      // 1.10.3: a node at 0 is being re-tested once by the core (not answered yet)
+      final done = nodes.isNotEmpty &&
+          nodes.every((e) => museAnsweredTest(delay: e.urlTestDelay, testedAt: e.hasUrlTestTime() ? e.urlTestTime.toDateTime() : null, testStarted: testStarted));
       final minShown = DateTime.now().difference(testStarted) > const Duration(milliseconds: 800);
       if (done && minShown) {
         Future.microtask(() {
@@ -265,7 +266,7 @@ class MuseNodeList extends HookConsumerWidget {
     final progress = testing && running && group != null
         ? museTestProgress([
             for (final e in group.items)
-              if (!e.isGroup) e.hasUrlTestTime() ? e.urlTestTime.toDateTime() : null,
+              if (!e.isGroup) e.hasUrlTestTime() && e.urlTestDelay != 0 ? e.urlTestTime.toDateTime() : null,
           ], testStarted)
         : null;
     bool matches(OutboundInfo e) {

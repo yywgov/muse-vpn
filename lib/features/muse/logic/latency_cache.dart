@@ -10,22 +10,38 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
-/// Defaults for 设置 › 高级 › 测速.
-const museTestWorkersDefault = 16;
-const museTestWorkersChoices = [8, 16, 32];
-const museTestTimeoutDefault = 5; // seconds per probe
-const museTestTimeoutChoices = [3, 5, 8];
+/// Defaults for 设置 › 开发者选项 › 测速.
+/// 1.10.3: 8 at once and 8 s per probe (were 16 and 5 s). Each test opens a warm-up probe and then
+/// three probes at once, so 16 parallel tests meant dozens of new connections at the same moment;
+/// home broadband with session limits / QoS (China Mobile) dropped part of them and working nodes
+/// showed 超时, and 5 s left no room for one lost packet on a slow route. A value the user picked
+/// in 开发者选项 is kept.
+const museTestWorkersDefault = 8;
+const museTestWorkersChoices = [4, 8, 16];
+const museTestTimeoutDefault = 8; // seconds per probe
+const museTestTimeoutChoices = [5, 8, 10];
+
+/// 1.10.3: seconds after the batch before a node without a result that failed is tested once more
+/// (the core's re-test, one probe with the full timeout).
+const museRetestDelaySec = 3;
 
 /// The longest a 测速 of [nodes] nodes can take with [workers] parallel tests and a probe
 /// timeout of [timeoutSec]: a dead node holds a worker about timeout + 3 s (warm-up, then short
-/// samples). Clamped to 8–90 s.
+/// samples), and 1.10.3 adds one round of re-tests (delay + timeout) for nodes that failed.
+/// Clamped to 10–120 s.
 Duration museTestCap({required int nodes, int workers = museTestWorkersDefault, int timeoutSec = museTestTimeoutDefault}) {
   final w = workers <= 0 ? museTestWorkersDefault : workers;
   final rounds = (math.max(nodes, 1) / w).ceil();
   final perNode = timeoutSec + 3 + 1;
-  final secs = (rounds * perNode + 3).clamp(8, 90);
+  final retest = museRetestDelaySec + timeoutSec + 1;
+  final secs = (rounds * perNode + retest + 3).clamp(10, 120);
   return Duration(seconds: secs);
 }
+
+/// 1.10.3: whether a node has its result for the 测速 that started at [testStarted]. A result of
+/// 0 (the core re-tests the node once before calling it 超时) is not a result yet.
+bool museAnsweredTest({required int delay, DateTime? testedAt, required DateTime testStarted}) =>
+    delay != 0 && testedAt != null && !testedAt.isBefore(testStarted.subtract(const Duration(seconds: 1)));
 
 enum MuseDelayKind { live, cached, pending, timeout, none }
 
@@ -68,7 +84,8 @@ MuseDelayView museDelayView({
   final fromBefore = since != null && testedAt != null && testedAt.isBefore(since.subtract(const Duration(seconds: 2)));
   final answeredThisTest =
       testStarted != null && testedAt != null && !testedAt.isBefore(testStarted.subtract(const Duration(seconds: 1)));
-  if (testStarted != null && !answeredThisTest) {
+  // 1.10.3: delay 0 during a 测速 = the core is re-testing the node once before calling it 超时
+  if (testStarted != null && (!answeredThisTest || delay == 0)) {
     return const MuseDelayView(MuseDelayKind.pending, 0);
   }
   if (delay != 0 && !fromBefore) {
