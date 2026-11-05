@@ -7,7 +7,10 @@
 import 'dart:async';
 import 'dart:io';
 
-enum MuseSvcState { unknown, checking, ok, limited, failed }
+// 1.10.4: [timeout] = no answer within [museServiceTimeout] (was folded into failed). Every service
+// of a check ends in ok / limited / timeout / failed: the whole check is capped at
+// [museServiceTotalCap], and what has not answered by then is a timeout.
+enum MuseSvcState { unknown, checking, ok, limited, failed, timeout }
 
 class MuseService {
   const MuseService(this.key, this.name, this.url);
@@ -37,6 +40,10 @@ const museServiceConcurrency = 4;
 const museServiceTimeout = Duration(seconds: 5);
 const museServiceCacheFor = Duration(minutes: 10);
 
+/// 1.10.4: the longest a whole check can take (13 services, 4 at a time, 5 s each is 20 s; the
+/// rest is headroom for a slow proxy hand-off). Anything still open then is reported as 超时.
+const museServiceTotalCap = Duration(seconds: 30);
+
 /// HTTP status → state: 2xx/3xx answered; 403/451 = the service refuses this region; anything else
 /// or no answer = not reachable.
 MuseSvcState museServiceVerdict(int? status) {
@@ -49,33 +56,63 @@ MuseSvcState museServiceVerdict(int? status) {
 
 typedef MuseServiceProbe = Future<int?> Function(MuseService service);
 
+/// 1.10.4: a probe that gave no answer in time (as opposed to an answer saying no).
+class MuseServiceTimeout implements Exception {
+  const MuseServiceTimeout();
+}
+
 /// Runs [probe] for every service with at most [concurrency] at once and [timeout] each; calls
-/// [onResult] as each finishes. Returns the full result map.
+/// [onResult] as each finishes (with the time it took when it answered). Returns the full result
+/// map, which always holds every service: a probe that throws is failed, one that runs past
+/// [timeout] is timeout, and when [totalCap] is reached the services not done yet are timeout
+/// (1.10.4: before, one probe that never settled kept the card at 检测中 for good).
 Future<Map<String, MuseSvcState>> museProbeServices(
   MuseServiceProbe probe, {
   List<MuseService> services = museServices,
   int concurrency = museServiceConcurrency,
   Duration timeout = museServiceTimeout,
-  void Function(String key, MuseSvcState state)? onResult,
+  Duration totalCap = museServiceTotalCap,
+  void Function(String key, MuseSvcState state, int? ms)? onResult,
 }) async {
   final out = <String, MuseSvcState>{};
+  if (services.isEmpty) return out;
   var next = 0;
+  var closed = false;
+  void report(String key, MuseSvcState v, int? ms) {
+    if (closed || out.containsKey(key)) return;
+    out[key] = v;
+    onResult?.call(key, v, ms);
+  }
+
   Future<void> worker() async {
-    while (next < services.length) {
+    while (!closed && next < services.length) {
       final s = services[next++];
-      int? status;
+      final watch = Stopwatch()..start();
+      MuseSvcState v;
       try {
-        status = await probe(s).timeout(timeout);
+        final status = await Future<int?>.sync(() => probe(s)).timeout(timeout);
+        v = museServiceVerdict(status);
+      } on TimeoutException {
+        v = MuseSvcState.timeout;
+      } on MuseServiceTimeout {
+        v = MuseSvcState.timeout;
       } catch (_) {
-        status = null;
+        v = MuseSvcState.failed;
       }
-      final v = museServiceVerdict(status);
-      out[s.key] = v;
-      onResult?.call(s.key, v);
+      report(s.key, v, v == MuseSvcState.ok || v == MuseSvcState.limited ? watch.elapsedMilliseconds : null);
     }
   }
 
-  await Future.wait([for (var i = 0; i < concurrency.clamp(1, services.length); i++) worker()]);
+  final all = Future.wait([for (var i = 0; i < concurrency.clamp(1, services.length); i++) worker()]);
+  try {
+    await all.timeout(totalCap);
+  } on TimeoutException {
+    // the cap: whatever has not answered is a timeout
+  }
+  for (final s in services) {
+    report(s.key, MuseSvcState.timeout, null);
+  }
+  closed = true;
   return out;
 }
 
@@ -85,17 +122,20 @@ class MuseServiceCache {
 
   final Duration maxAge;
   Map<String, MuseSvcState> results = const {};
+  Map<String, int> ms = const {}; // 1.10.4: how long each answer took
   DateTime? at;
 
   bool fresh(DateTime now) => at != null && now.difference(at!) < maxAge && results.isNotEmpty;
 
-  void store(Map<String, MuseSvcState> r, DateTime now) {
+  void store(Map<String, MuseSvcState> r, DateTime now, {Map<String, int> ms = const {}}) {
     results = Map.unmodifiable(r);
+    this.ms = Map.unmodifiable(ms);
     at = now;
   }
 
   void clear() {
     results = const {};
+    ms = const {};
     at = null;
   }
 }
@@ -114,11 +154,21 @@ MuseServiceProbe museHttpServiceProbe(int port) => (service) async {
       viaProxy = true;
     } catch (_) {}
     if (viaProxy) client.findProxy = (_) => 'PROXY 127.0.0.1:$port';
-    final req = await client.getUrl(Uri.parse(service.url));
+    // 1.10.4: the request itself is bounded too, so the client is closed (force) as soon as the
+    // service is given up on, not whenever the socket finally fails
+    final req = await client.getUrl(Uri.parse(service.url)).timeout(museServiceTimeout);
     req.followRedirects = false;
-    final res = await req.close();
+    final res = await req.close().timeout(museServiceTimeout);
     unawaited(res.drain<void>().catchError((_) {}));
     return res.statusCode;
+  } on TimeoutException {
+    throw const MuseServiceTimeout();
+  } on SocketException catch (e) {
+    if (e.osError == null && e.message.toLowerCase().contains('timed out')) throw const MuseServiceTimeout();
+    return null;
+  } on HttpException catch (e) {
+    if (e.message.toLowerCase().contains('timed out')) throw const MuseServiceTimeout();
+    return null;
   } catch (_) {
     return null;
   } finally {

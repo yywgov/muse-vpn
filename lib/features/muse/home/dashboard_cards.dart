@@ -8,61 +8,91 @@ part of 'muse_home_page.dart';
 // ---------------------------------------------------------------- 服务状态
 
 class MuseServicesState {
-  const MuseServicesState({this.results = const {}, this.checking = false, this.at});
+  const MuseServicesState({this.results = const {}, this.ms = const {}, this.checking = false, this.at});
 
   final Map<String, MuseSvcState> results;
+
+  /// 1.10.4: answer time per service (ms), shown next to 可用
+  final Map<String, int> ms;
   final bool checking;
   final DateTime? at;
 
   int get okCount => results.values.where((v) => v == MuseSvcState.ok).length;
+
+  /// 1.10.4: nothing to show and nothing running (a new connection / never checked): the card
+  /// starts a check when it is on screen, instead of showing 检测中 with nothing behind it.
+  bool get idle => !checking && results.isEmpty;
 }
 
 class MuseServicesNotifier extends StateNotifier<MuseServicesState> {
-  MuseServicesNotifier(this._probe, {DateTime Function()? now})
+  MuseServicesNotifier(this._probe, {DateTime Function()? now, this.totalCap = museServiceTotalCap})
     : _now = now ?? DateTime.now,
       super(const MuseServicesState());
 
   final MuseServiceProbe Function() _probe;
   final DateTime Function() _now;
+  final Duration totalCap;
   final cache = MuseServiceCache();
   int _run = 0;
 
-  /// Probes unless the cache is fresh ([force] = the user tapped 刷新).
+  /// Probes unless the cache is fresh ([force] = the user tapped the card or 刷新). Always ends
+  /// with every service in a final state and [MuseServicesState.checking] false (1.10.4).
   Future<void> check({bool force = false}) async {
     if (state.checking) return;
     if (!force && cache.fresh(_now())) {
-      state = MuseServicesState(results: cache.results, at: cache.at);
+      state = MuseServicesState(results: cache.results, ms: cache.ms, at: cache.at);
       return;
     }
     final run = ++_run;
     state = MuseServicesState(results: const {}, checking: true, at: state.at);
     final partial = <String, MuseSvcState>{};
-    final results = await museProbeServices(
-      _probe(),
-      onResult: (k, v) {
-        if (!mounted || run != _run) return;
-        partial[k] = v;
-        state = MuseServicesState(results: Map.of(partial), checking: true, at: state.at);
-      },
-    );
+    final ms = <String, int>{};
+    Map<String, MuseSvcState> results;
+    try {
+      results = await museProbeServices(
+        _probe(),
+        totalCap: totalCap,
+        onResult: (k, v, t) {
+          partial[k] = v;
+          if (t != null) ms[k] = t;
+          if (!mounted || run != _run) return;
+          state = MuseServicesState(results: Map.of(partial), ms: Map.of(ms), checking: true, at: state.at);
+        },
+      );
+    } catch (_) {
+      // 1.10.4: never leave the card at 检测中 — what did not answer failed
+      results = {for (final s in museServices) s.key: partial[s.key] ?? MuseSvcState.failed};
+    }
     if (!mounted || run != _run) return;
-    cache.store(results, _now());
-    state = MuseServicesState(results: results, at: cache.at);
+    cache.store(results, _now(), ms: ms);
+    state = MuseServicesState(results: results, ms: Map.of(ms), at: cache.at);
   }
 
+  /// A new connection: what answered before says nothing now. The card (when on screen) checks
+  /// again because the state is [MuseServicesState.idle].
   void reset() {
     _run++;
     cache.clear();
     state = const MuseServicesState();
   }
+
+  /// 1.10.4: another node — keep showing the last results (they stay final) but the next check
+  /// (tap, or the card coming back) probes again. Before, every switch of 自动最快 / 负载均衡 (or the
+  /// node list reloading) wiped the results while the card stayed on screen, and nothing started a
+  /// new check: 「检测中」 with every service at 「—」 for as long as the app stayed open.
+  void stale() {
+    cache.clear();
+  }
 }
 
 final museServicesProvider = StateNotifierProvider<MuseServicesNotifier, MuseServicesState>((ref) {
   final n = MuseServicesNotifier(() => museHttpServiceProbe(ref.read(ConfigOptions.mixedPort)));
-  // a new node / a new connection: what answered before says nothing now
-  ref.listen<bool>(museRunningProvider, (_, running) => n.reset());
+  ref.listen<bool>(museRunningProvider, (prev, running) {
+    if (prev != running) n.reset();
+  });
   ref.listen<String?>(proxiesOverviewNotifierProvider.select((g) => g.valueOrNull?.selected), (prev, next) {
-    if (prev != null && prev != next) n.reset();
+    // 1.10.4: the list reloading (null in between) is not a node change
+    if (prev != null && next != null && prev != next) n.stale();
   });
   return n;
 });
@@ -71,9 +101,21 @@ String museServiceStateText(MuseSvcState s) => switch (s) {
   MuseSvcState.ok => '可用',
   MuseSvcState.limited => '受限',
   MuseSvcState.failed => '不可用',
+  MuseSvcState.timeout => '超时',
   MuseSvcState.checking => '检测中',
   MuseSvcState.unknown => '—',
 };
+
+/// 1.10.4: one service as the card / sheet shows it: 可用 with its answer time, else the state.
+String museServiceLabel(MuseSvcState s, int? ms) =>
+    s == MuseSvcState.ok && ms != null ? '${museServiceStateText(s)} $ms ms' : museServiceStateText(s);
+
+/// 1.10.4: the card's big value — 检测中 only while a check runs.
+String museServicesValue({required bool running, required MuseServicesState s, required int total}) {
+  if (!running) return '—';
+  if (s.results.isEmpty) return s.checking ? '检测中' : '点按检测';
+  return '${s.okCount}/$total';
+}
 
 class _ServicesTile extends HookConsumerWidget {
   const _ServicesTile({super.key});
@@ -82,20 +124,15 @@ class _ServicesTile extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final running = ref.watch(museRunningProvider);
     final s = ref.watch(museServicesProvider);
-    // checks once the card is on screen and connected (cached 10 minutes)
+    // checks once the card is on screen and connected (cached 10 minutes); 1.10.4: also when the
+    // results were cleared while the card stayed on screen (no timer: it reacts to that change)
+    final idle = s.idle;
     useEffect(() {
-      if (running) Future.microtask(() => ref.read(museServicesProvider.notifier).check());
+      if (running && idle) Future.microtask(() => ref.read(museServicesProvider.notifier).check());
       return null;
-    }, [running]);
+    }, [running, idle]);
     final total = museServices.length;
-    final String value;
-    if (!running) {
-      value = '—';
-    } else if (s.results.isEmpty) {
-      value = '检测中';
-    } else {
-      value = '${s.okCount}/$total';
-    }
+    final value = museServicesValue(running: running, s: s, total: total);
     final mt = MuseTheme.of(context);
     return _Tile(
       title: '服务状态',
@@ -114,16 +151,20 @@ class _ServicesTile extends HookConsumerWidget {
               ? '未连接'
               : [
                   for (final sv in museServices.take(4))
-                    '${sv.name} ${museServiceStateText(s.results[sv.key] ?? MuseSvcState.unknown)}',
+                    '${sv.name} ${museServiceLabel(s.results[sv.key] ?? (s.checking ? MuseSvcState.checking : MuseSvcState.unknown), s.ms[sv.key])}',
                 ].join(' · '),
           style: MuseType.caption(context),
         ),
       ),
-      onTap: () => showMuseSnapSheet<void>(
-        context,
-        title: '服务状态',
-        builder: (_, c) => _ServicesSheet(controller: c),
-      ),
+      // 1.10.4: a tap checks again (unless a check is running) and shows the details
+      onTap: () {
+        if (running && !s.checking) ref.read(museServicesProvider.notifier).check(force: true);
+        showMuseSnapSheet<void>(
+          context,
+          title: '服务状态',
+          builder: (_, c) => _ServicesSheet(controller: c),
+        );
+      },
     );
   }
 }
@@ -173,7 +214,7 @@ class _ServicesSheet extends ConsumerWidget {
               final color = switch (st) {
                 MuseSvcState.ok => Theme.of(context).colorScheme.success,
                 MuseSvcState.limited => Theme.of(context).colorScheme.warning,
-                MuseSvcState.failed => Theme.of(context).colorScheme.error,
+                MuseSvcState.failed || MuseSvcState.timeout => Theme.of(context).colorScheme.error,
                 _ => Theme.of(context).colorScheme.idle,
               };
               return MuseCard(
@@ -183,7 +224,7 @@ class _ServicesSheet extends ConsumerWidget {
                     Expanded(
                       child: Text(sv.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.body(context)),
                     ),
-                    Text(museServiceStateText(st), style: MuseType.caption(context).copyWith(color: color)),
+                    Text(museServiceLabel(st, s.ms[sv.key]), style: MuseType.caption(context).copyWith(color: color)),
                   ],
                 ),
               );

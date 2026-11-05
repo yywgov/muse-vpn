@@ -98,8 +98,9 @@ void main() {
 
   group('发布 1.10.3', () {
     test('version, notes in plain words, CHANGELOG', () {
-      expect(_src('pubspec.yaml'), contains('version: 1.10.3+196'));
-      expect(museChangelog.keys.first, '1.10.3');
+      // 1.10.4 came after (v1104_test)
+      expect(museChangelog.keys, contains('1.10.3'));
+      expect(museChangelog.keys.toList().indexOf('1.10.3'), lessThan(museChangelog.keys.toList().indexOf('1.10.2')));
       final notes = museChangelog['1.10.3']!;
       expect(notes.join(), contains('超时'));
       expect(notes.join(), contains('自动再测一次'));
@@ -110,11 +111,11 @@ void main() {
       expect(md.indexOf('### 1.10.3'), lessThan(md.indexOf('### 1.10.2')));
     });
 
-    test('both cores from muse.21 (standard core release + 兼容内核 source at the same commit)', () {
+    test('both cores from the same core commit (1.10.4: muse.22, a descendant of muse.21)', () {
       final props = _src('dependencies.properties');
-      expect(props, contains('muse.core.version=5.0.0-muse.21'));
-      expect(museCoreRelease, '5.0.0-muse.21');
-      expect(props, contains('muse.compat.ref=0b29e71e991143cd1b0db0a075a863d2688a6182'));
+      expect(props, contains('muse.core.version=5.0.0-muse.22'));
+      expect(museCoreRelease, '5.0.0-muse.22');
+      expect(props, contains('muse.compat.ref=a076442fb844c3ded4fd1cd00c1e688bdc7ac74e'));
     });
   });
 }

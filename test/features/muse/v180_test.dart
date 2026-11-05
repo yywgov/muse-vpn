@@ -434,9 +434,10 @@ void main() {
       expect(museChangelog.keys, contains('1.8.0'));
       expect(museChangelog['1.8.0'], hasLength(3));
       final props = File('dependencies.properties').readAsStringSync();
-      // 1.10.0: standard core 5.0.0-muse.20 (Go 1.26.10); 1.10.3: muse.21 (测速 on congested lines)
+      // 1.10.0: standard core 5.0.0-muse.20 (Go 1.26.10); 1.10.3: muse.21 (测速 on congested lines);
+      // 1.10.4: muse.22 (测速 faster and more accurate)
       expect(RegExp(r'muse\.core\.version=(\S+)').firstMatch(props)?.group(1), museCoreRelease);
-      expect(museCoreRelease, '5.0.0-muse.21');
+      expect(museCoreRelease, '5.0.0-muse.22');
       expect(props, matches(RegExp(r'muse\.compat\.ref=[0-9a-f]{40}')));
       final md = File('CHANGELOG.md').readAsStringSync();
       expect(md.indexOf('### 1.8.0'), lessThan(md.indexOf('### 1.7.1')));

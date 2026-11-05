@@ -167,12 +167,12 @@ void main() {
       expect(r['netflix'], MuseSvcState.limited);
       expect(r['google'], MuseSvcState.ok);
     });
-    test('a slow service times out as failed, the rest still finish', () async {
+    test('a slow service times out (1.10.4: shown as 超时), the rest still finish', () async {
       final r = await museProbeServices(
         (s) => s.key == 'claude' ? Completer<int?>().future : Future.value(200),
         timeout: const Duration(milliseconds: 30),
       );
-      expect(r['claude'], MuseSvcState.failed);
+      expect(r['claude'], MuseSvcState.timeout);
       expect(r.values.where((v) => v == MuseSvcState.ok).length, 12);
     });
     test('cache: fresh for 10 minutes', () {
