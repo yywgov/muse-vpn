@@ -67,6 +67,18 @@ abstract final class MusePrefs {
   /// 1.6.0 C3: hosts blocked from 连接 › 屏蔽此域名 (JSON list), one 拦截 rule
   static final blockedHosts = PreferencesNotifier.create<String, String>("muse_blocked_hosts", "[]");
 
+  /// 1.12.0: 从连接加的规则（直连 / 走代理），JSON 列表；走指定节点的存在 [nodeRules]
+  static final quickRules = PreferencesNotifier.create<String, String>("muse_quick_rules", "[]");
+
+  /// 1.12.0: 订阅更新后对新增节点测一次速（仅前台或已连接时），默认开
+  static final testNewNodes = PreferencesNotifier.create<bool, bool>("muse_test_new_nodes", true);
+
+  /// 1.12.0: 自动最快只在这个地区里选（地区代码，如 HK；空 = 全部）
+  static final autoRegion = PreferencesNotifier.create<String, String>("muse_auto_region", "");
+
+  /// 1.12.0: 出口 IP 详情缓存（按 IP，1 天）
+  static final exitDetailCache = PreferencesNotifier.create<String, String>("muse_exit_detail_cache", "");
+
   /// 1.6.0 C3 (G72): switching node closes the connections still on the old one
   static final autoCloseConnections = PreferencesNotifier.create<bool, bool>("muse_auto_close_connections", true);
 

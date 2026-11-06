@@ -4,6 +4,12 @@
 // the connection state.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/logic/rules_tools.dart';
+import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:hiddify/features/muse/nodes/node_list.dart';
+import 'package:hiddify/features/muse/home/home_data.dart';
+import 'package:hiddify/features/muse/data/quick_rules_provider.dart';
+import 'package:hiddify/features/muse/logic/quick_rules.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -305,6 +311,11 @@ Future<void> showMuseConnDetail(BuildContext context, WidgetRef ref, MuseConn c,
                 if (ctx.mounted) Navigator.pop(ctx);
               },
             ),
+          // 1.12.0: 一键加规则 — 直连 / 走代理 / 走指定节点，可选仅本次
+          if (c.host.isNotEmpty) ...[
+            const SizedBox(height: MuseSpace.s8),
+            MuseConnRuleButtons(host: c.host, onDone: () => Navigator.pop(ctx)),
+          ],
           const SizedBox(height: MuseSpace.s8),
           Row(
             children: [
@@ -378,4 +389,115 @@ Future<void> museBlockHost(WidgetRef ref, String host) async {
     '已屏蔽 ${museBlockTarget(host)}',
     action: (label: '撤销', onPressed: () => notifier.update(museBlockedHostsToRaw(before))),
   );
+}
+
+
+/// 1.12.0: 连接详情里的「直连 / 走代理 / 走指定节点」+「仅本次」。
+class MuseConnRuleButtons extends ConsumerStatefulWidget {
+  const MuseConnRuleButtons({super.key, required this.host, required this.onDone});
+
+  final String host;
+  final VoidCallback onDone;
+
+  @override
+  ConsumerState<MuseConnRuleButtons> createState() => _MuseConnRuleButtonsState();
+}
+
+class _MuseConnRuleButtonsState extends ConsumerState<MuseConnRuleButtons> {
+  bool once = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final target = museBlockTarget(widget.host);
+    Widget button(String key, IconData icon, String label, Future<void> Function() run) => Expanded(
+      child: OutlinedButton.icon(
+        key: ValueKey(key),
+        icon: Icon(icon, size: MuseIconSize.small),
+        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        onPressed: () async {
+          await run();
+          widget.onDone();
+        },
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('让 $target 以后：', style: MuseType.caption(context)),
+        const SizedBox(height: MuseSpace.s4),
+        Row(
+          children: [
+            button('conn_rule_direct', Icons.alt_route_outlined, '直连', () => museAddQuickRule(ref, target, MuseQuickWay.direct, once: once)),
+            const SizedBox(width: MuseSpace.s8),
+            button('conn_rule_proxy', Icons.vpn_lock_outlined, '走代理', () => museAddQuickRule(ref, target, MuseQuickWay.proxy, once: once)),
+            const SizedBox(width: MuseSpace.s8),
+            button('conn_rule_node', Icons.dns_outlined, '指定节点', () => museAddHostToNode(context, ref, target, once: once)),
+          ],
+        ),
+        CheckboxListTile(
+          key: const ValueKey('conn_rule_once'),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: once,
+          onChanged: (v) => setState(() => once = v ?? false),
+          title: const Text('仅本次（断开连接后失效）'),
+        ),
+      ],
+    );
+  }
+}
+
+/// 1.12.0: [host] 直连 / 走代理 (saved, or 仅本次 in memory); the toast can undo it.
+Future<void> museAddQuickRule(WidgetRef ref, String host, MuseQuickWay way, {bool once = false}) async {
+  final toast = ref.read(inAppNotificationControllerProvider);
+  if (once) {
+    final c = ref.read(museTempQuickRulesProvider.notifier);
+    final before = c.state;
+    c.state = museSetQuickRule(before, host, way);
+    toast.showSuccessToast('本次连接内 $host ${way.title}', action: (label: '撤销', onPressed: () => c.state = before));
+    return;
+  }
+  final n = ref.read(MusePrefs.quickRules.notifier);
+  final raw = ref.read(MusePrefs.quickRules);
+  await n.update(museQuickRulesToRaw(museSetQuickRule(museParseQuickRules(raw), host, way)));
+  toast.showSuccessToast('已设置 $host ${way.title}，可在 规则 › 分流 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
+}
+
+/// 1.12.0: [host] 走指定节点 — pick one of the subscription's nodes.
+Future<void> museAddHostToNode(BuildContext context, WidgetRef ref, String host, {bool once = false}) async {
+  final group = ref.read(museNodeGroupProvider).valueOrNull;
+  final nodes = [for (final e in group?.items ?? const <OutboundInfo>[]) if (!e.isGroup) e];
+  final toast = ref.read(inAppNotificationControllerProvider);
+  if (nodes.isEmpty) {
+    toast.showInfoToast('连接后才能选择节点');
+    return;
+  }
+  final node = await showMuseSnapSheet<String>(
+    context,
+    title: '$host 走哪个节点',
+    builder: (ctx, controller) => ListView(
+      controller: controller,
+      children: [
+        for (final e in nodes)
+          ListTile(
+            key: ValueKey('conn_rule_pick_${e.tag}'),
+            title: Text(museNodeName(e), maxLines: 1, overflow: TextOverflow.ellipsis),
+            onTap: () => Navigator.pop(ctx, e.tag),
+          ),
+      ],
+    ),
+  );
+  if (node == null) return;
+  if (once) {
+    final c = ref.read(museTempNodeRulesProvider.notifier);
+    final before = c.state;
+    c.state = museAddHostToNodeRule(before, node, host);
+    toast.showSuccessToast('本次连接内 $host 走所选节点', action: (label: '撤销', onPressed: () => c.state = before));
+    return;
+  }
+  final n = ref.read(MusePrefs.nodeRules.notifier);
+  final raw = ref.read(MusePrefs.nodeRules);
+  await n.update(museNodeRulesToRaw(museAddHostToNodeRule(museParseNodeRules(raw), node, host)));
+  toast.showSuccessToast('已设置 $host 走所选节点，可在 规则 › 分流 › 指定节点 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
 }

@@ -163,6 +163,8 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
                         call.argument<String>("node") ?: "",
                         call.argument<Int>("delay") ?: 0,
                     )
+                    // 穿云 1.12.0: the quick-settings tile shows the same 「节点 · 延迟」
+                    if (android.os.Build.VERSION.SDK_INT >= 24) com.hiddify.hiddify.bg.TileService.refresh(context)
                     result.success(true)
                 }
 

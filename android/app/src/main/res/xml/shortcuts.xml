@@ -10,4 +10,40 @@
             android:targetClass="com.hiddify.hiddify.ShortcutActivity"
             android:targetPackage="com.chuanyun.app" />
     </shortcut>
+    <!-- 穿云 1.12.0: long-press the icon (opens 穿云 with chuanyun://mode) -->
+    <shortcut
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="mode"
+        android:shortcutLongLabel="@string/shortcut_mode"
+        android:shortcutShortLabel="@string/shortcut_mode">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="chuanyun://mode"
+            android:targetClass="com.hiddify.hiddify.MainActivity"
+            android:targetPackage="com.chuanyun.app" />
+    </shortcut>
+    <!-- 穿云 1.12.0: long-press the icon (opens 穿云 with chuanyun://scan) -->
+    <shortcut
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="scan"
+        android:shortcutLongLabel="@string/shortcut_scan"
+        android:shortcutShortLabel="@string/shortcut_scan">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="chuanyun://scan"
+            android:targetClass="com.hiddify.hiddify.MainActivity"
+            android:targetPackage="com.chuanyun.app" />
+    </shortcut>
+    <!-- 穿云 1.12.0: long-press the icon (opens 穿云 with chuanyun://speedtest) -->
+    <shortcut
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="speedtest"
+        android:shortcutLongLabel="@string/shortcut_test"
+        android:shortcutShortLabel="@string/shortcut_test">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="chuanyun://speedtest"
+            android:targetClass="com.hiddify.hiddify.MainActivity"
+            android:targetPackage="com.chuanyun.app" />
+    </shortcut>
 </shortcuts>

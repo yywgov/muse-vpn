@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/http_client/dio_http_client.dart';
@@ -15,6 +16,8 @@ DioHttpClient httpClient(Ref ref) {
     debug: kDebugMode,
   );
 
-  ref.listen(ConfigOptions.mixedPort, (_, next) => client.setProxyPort(next), fireImmediately: true);
+  ref.listen(ConfigOptions.mixedPort, (_, next) => client.setProxyPort(ref.read(museMixedPortOverrideProvider) ?? next), fireImmediately: true);
+  // 穿云 1.12.0: this connection uses another port (the saved one was taken)
+  ref.listen<int?>(museMixedPortOverrideProvider, (_, next) => client.setProxyPort(next ?? ref.read(ConfigOptions.mixedPort)));
   return client;
 }

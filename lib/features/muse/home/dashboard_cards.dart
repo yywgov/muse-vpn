@@ -86,7 +86,7 @@ class MuseServicesNotifier extends StateNotifier<MuseServicesState> {
 }
 
 final museServicesProvider = StateNotifierProvider<MuseServicesNotifier, MuseServicesState>((ref) {
-  final n = MuseServicesNotifier(() => museHttpServiceProbe(ref.read(ConfigOptions.mixedPort)));
+  final n = MuseServicesNotifier(() => museHttpServiceProbe(museEffectiveMixedPort(ref.read)));
   ref.listen<bool>(museRunningProvider, (prev, running) {
     if (prev != running) n.reset();
   });

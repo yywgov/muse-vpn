@@ -8,6 +8,7 @@ import 'dart:ffi' show Abi;
 import 'dart:io';
 
 
+import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:crypto/crypto.dart';
 
 import 'package:dio/dio.dart';
@@ -261,7 +262,7 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
   /// The local mixed port when 穿云 is connected and listening, else null.
   Future<int?> _proxyPort() async {
     try {
-      final port = ref.read(ConfigOptions.mixedPort);
+      final port = museEffectiveMixedPort(ref.read);
       final s = await Socket.connect(InternetAddress.loopbackIPv4, port, timeout: const Duration(milliseconds: 500));
       s.destroy();
       return port;

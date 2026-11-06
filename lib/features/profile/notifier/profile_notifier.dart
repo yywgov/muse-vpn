@@ -1,5 +1,6 @@
 import 'package:hiddify/features/muse/logic/compat_profile.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
+import 'package:hiddify/features/muse/home/new_node_test.dart';
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -177,6 +178,16 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
         final diff = museSubDiff(museProfileNodeNames(before), museProfileNodeNames(after));
         if (before.isNotEmpty && diff.changed) {
           ref.read(inAppNotificationControllerProvider).showInfoToast('${profile.name}：${diff.summary}');
+        }
+      } catch (_) {}
+    }
+    // 穿云 1.12.0: new nodes of the active subscription get one test (new_node_test.dart)
+    if (!state.hasError) {
+      try {
+        final active = await ref.read(activeProfileProvider.future);
+        if (active != null && active.id == profile.id && before.isNotEmpty) {
+          final after = await _profilesRepo.getRawConfig(profile.id).getOrElse((_) => '').run();
+          museNoteNewNodes(ref, museSubDiff(museProfileNodeNames(before), museProfileNodeNames(after)).added);
         }
       } catch (_) {}
     }

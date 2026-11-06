@@ -35,6 +35,7 @@ class MuseRoutingPage extends HookConsumerWidget {
     final choice = museParsePresetChoice(ref.watch(MusePrefs.rulePresets));
     final hosts = museParseHosts(ref.watch(MusePrefs.hosts));
     final nodeRules = museParseNodeRules(ref.watch(MusePrefs.nodeRules));
+    final quickRules = museParseQuickRules(ref.watch(MusePrefs.quickRules));
     final remoteSets = museParseRemoteRuleSets(ref.watch(MusePrefs.remoteRuleSets));
     final adLevel = MuseAdBlockLevel.fromKey(ref.watch(Preferences.museAdBlockLevel));
 
@@ -89,6 +90,16 @@ class MuseRoutingPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseNodeRulesPage()),
               ),
+              // 1.12.0: 在「活动 › 连接」里加的 直连 / 走代理
+              if (quickRules.isNotEmpty)
+                MuseTile(
+                  key: const ValueKey('routing_quick_rules'),
+                  leading: const Icon(Icons.bolt_outlined),
+                  title: '来自连接的规则',
+                  trailing: Text('${quickRules.length} 条'),
+                  chevron: true,
+                  onTap: () => showMuseQuickRulesSheet(context),
+                ),
               MuseTile(
                 key: const ValueKey('routing_remote_sets'),
                 leading: const Icon(Icons.cloud_download_outlined),
@@ -467,3 +478,36 @@ String museRuleDisplayName(String name) {
     _ => name,
   };
 }
+
+
+/// 1.12.0: 来自连接的规则 — 每个网站一行，可删除。
+Future<void> showMuseQuickRulesSheet(BuildContext context) => showMuseSnapSheet<void>(
+  context,
+  title: '来自连接的规则',
+  builder: (ctx, controller) => Consumer(
+    builder: (ctx, ref, _) {
+      final rules = museParseQuickRules(ref.watch(MusePrefs.quickRules));
+      return ListView(
+        controller: controller,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s8),
+            child: Text('在「活动 › 连接」详情里设置，优先于其他自定义规则（含子域名）。', style: MuseType.caption(ctx)),
+          ),
+          if (rules.isEmpty) const ListTile(title: Text('没有规则')),
+          for (final r in rules)
+            ListTile(
+              key: ValueKey('quick_rule_${r.host}'),
+              title: Text(r.host, maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(r.way.title),
+              trailing: IconButton(
+                tooltip: '删除',
+                icon: const Icon(Icons.delete_outline),
+                onPressed: () => ref.read(MusePrefs.quickRules.notifier).update(museQuickRulesToRaw(museRemoveQuickRule(rules, r.host))),
+              ),
+            ),
+        ],
+      );
+    },
+  ),
+);

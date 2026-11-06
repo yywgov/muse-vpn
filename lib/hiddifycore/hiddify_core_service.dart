@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:hiddify/features/muse/logic/core_extras.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fpdart/fpdart.dart';
@@ -226,7 +227,7 @@ class HiddifyCoreService with InfraLogger {
       statusController.add(currentState = const CoreStatus.starting());
       loggy.debug("starting");
       // 穿云 Windows: remember the user's own proxy settings before sing-box replaces them
-      if (PlatformUtils.isWindows) await WindowsProxyGuard.saveBeforeConnect(ref.read(ConfigOptions.mixedPort));
+      if (PlatformUtils.isWindows) await WindowsProxyGuard.saveBeforeConnect(museEffectiveMixedPort(ref.read));
       final background = await core.setupBackground(
         path,
         name,
@@ -296,6 +297,17 @@ class HiddifyCoreService with InfraLogger {
 
         // throw DioException(requestOptions: RequestOptions(), error: e);
         return left(const ConnectionFailure.unexpected("failed to start background core"));
+      }
+      // 穿云 1.12.0 (Windows 系统代理): 本机、局域网和 .local 不走代理（列表在 网络 › 高级）
+      if (PlatformUtils.isWindows && ref.read(ConfigOptions.serviceMode) == ServiceMode.systemProxy) {
+        final bypass = museProxyBypassString(ref.read(MusePrefs.proxyBypass));
+        unawaited(() async {
+          // the inbound sets the system proxy while starting; at most 3 tries, 2 s apart
+          for (var i = 0; i < 3; i++) {
+            if (await WindowsProxyGuard.applyBypass(bypass)) return;
+            await Future<void>.delayed(const Duration(seconds: 2));
+          }
+        }());
       }
 
       // if (res.messageType != MessageType.EMPTY) return left(res);

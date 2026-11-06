@@ -23,8 +23,10 @@ Future<void> showMuseNodeDetails(
   } else if (ConnectionConst.isValidDelay(delay)) {
     delayText = '$delay ms';
   } else {
-    delayText = '超时';
+    delayText = MuseFailReason.parse(proxy.urlTestError).title;
   }
+  // 1.12.0: why it failed, with one thing to try
+  final fail = delay != 0 && !ConnectionConst.isValidDelay(delay) ? MuseFailReason.parse(proxy.urlTestError) : null;
   // 1.4.0: address, landing IP, health from the recent 测速 results
   final metas = MuseNodeMetas.parse(ref.read(MusePrefs.nodeMeta));
   final meta = metas.of(proxy.tag);
@@ -50,7 +52,7 @@ Future<void> showMuseNodeDetails(
   final relay = proxy.isGroup ? null : museRelayInfo(name, nameRegion: region, exitCode: exitCode);
   // 1.5.0 #24: 下载测速 for the node (or group) in use
   final inUse = running && ref.read(museNodeGroupProvider).valueOrNull?.selected == proxy.tag;
-  final mixedPort = ref.read(ConfigOptions.mixedPort);
+  final mixedPort = museEffectiveMixedPort(ref.read);
   if (!context.mounted) return;
   final rows = <(String, String)>[
     (
@@ -69,6 +71,7 @@ Future<void> showMuseNodeDetails(
     if (region != null)
       ('地区', '${museCountryFlag(region) ?? ''} ${museCountryLabel(region)}${meta.region.isNotEmpty ? '（手动）' : ''}'.trim()),
     ('延迟', delayText),
+    if (fail != null) ('建议', fail.advice),
     if (testedAt != null && delay != 0) ('测速时间', museUpdatedAgo(testedAt, now: DateTime.now()).replaceAll('更新', '')),
     if (!proxy.isGroup && proxy.host.isNotEmpty) ('地址', '${proxy.host}${proxy.port > 0 ? ':${proxy.port}' : ''}'),
     ...?detail?.rows,

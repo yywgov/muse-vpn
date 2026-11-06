@@ -639,6 +639,7 @@ class OutboundInfo extends $pb.GeneratedMessage {
     $fixnum.Int64? upload,
     $fixnum.Int64? download,
     $core.String? detour,
+    $core.String? urlTestError,
   }) {
     final result = create();
     if (tag != null) result.tag = tag;
@@ -659,6 +660,7 @@ class OutboundInfo extends $pb.GeneratedMessage {
     if (upload != null) result.upload = upload;
     if (download != null) result.download = download;
     if (detour != null) result.detour = detour;
+    if (urlTestError != null) result.urlTestError = urlTestError;
     return result;
   }
 
@@ -693,6 +695,7 @@ class OutboundInfo extends $pb.GeneratedMessage {
     ..aInt64(15, _omitFieldNames ? '' : 'upload')
     ..aInt64(16, _omitFieldNames ? '' : 'download')
     ..aOS(17, _omitFieldNames ? '' : 'detour')
+    ..aOS(18, _omitFieldNames ? '' : 'urlTestError')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -872,6 +875,16 @@ class OutboundInfo extends $pb.GeneratedMessage {
   $core.bool hasDetour() => $_has(16);
   @$pb.TagNumber(17)
   void clearDetour() => $_clearField(17);
+
+  /// 穿云 1.12.0: why the last delay test failed (refused / dns / handshake / timeout)
+  @$pb.TagNumber(18)
+  $core.String get urlTestError => $_getSZ(17);
+  @$pb.TagNumber(18)
+  set urlTestError($core.String value) => $_setString(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasUrlTestError() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearUrlTestError() => $_clearField(18);
 }
 
 class IpInfo extends $pb.GeneratedMessage {

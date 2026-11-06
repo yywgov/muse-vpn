@@ -8,6 +8,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
+import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -42,6 +43,7 @@ import 'package:hiddify/features/muse/logic/service_probe.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
+import 'package:hiddify/features/muse/home/exit_detail_sheet.dart';
 import 'package:hiddify/features/muse/settings/service_mode_switch.dart';
 import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
@@ -1220,7 +1222,8 @@ class _ExitTile extends ConsumerWidget {
       title: '出口 IP',
       value: value,
       bottom: Align(alignment: Alignment.bottomLeft, child: bottom),
-      onTap: () => showMuseDiagnoseSheet(context),
+      // 1.12.0: 点开看出口详情（运营商 / ASN / IP 类型），诊断在详情里
+      onTap: () => showMuseExitDetailSheet(context),
     );
   }
 }

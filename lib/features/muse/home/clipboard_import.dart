@@ -1,6 +1,6 @@
-// 穿云 1.1 - 剪贴板里有订阅链接时提示导入（1.3.0：「添加」上的小圆点 + 添加面板第一行）。
-// Only checked when the app opens or comes back to the front, never offered twice for the same
-// link, and never for a link that is already one of the user's subscriptions.
+// 穿云 1.1 - 剪贴板里有订阅链接时提示导入（1.3.0：添加面板第一行）。
+// 1.12.0: 回到前台只问系统「剪贴板里有没有文字」（不读内容，Android 不弹「已粘贴」提示）；
+// 打开「添加」面板时才读取并识别。同一链接不重复提示，已是订阅的链接不提示。
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
@@ -52,25 +52,23 @@ String? museSubscriptionLinkFromClipboard(String? text) {
 /// The subscription url a clipboard link imports (the inner url for import schemes).
 String museSubscriptionUrlOf(String link) => LinkParser.parse(link)?.url ?? link;
 
-/// 1.3.0: checks the clipboard when the app opens or comes back to the front; a new subscription
-/// link puts a dot on 添加 and becomes the first row of the 添加 sheet (no 首页 banner any more).
+/// 1.12.0: whether the clipboard holds text, as seen when the app last came to the front.
+/// Only [Clipboard.hasStrings] is asked (it does not read the content, so Android shows no
+/// 「已从剪贴板粘贴」 notice); the text itself is read when the user opens 添加.
+final museClipboardHasTextProvider = StateProvider<bool>((ref) => false);
+
+/// 1.12.0 (was 1.3.0): on open / back in front only asks whether there is text at all. The
+/// clipboard is read only when the 添加 sheet opens ([museReadClipboardOffer]).
 void useMuseClipboardWatcher(WidgetRef ref) {
   final context = useContext();
   Future<void> check() async {
-    // a short wait: on Android the clipboard can only be read once the window has focus
+    // a short wait: on Android the clipboard can only be asked once the window has focus
     await Future<void>.delayed(const Duration(milliseconds: 400));
     if (!context.mounted) return;
     try {
-      // hasStrings does not read the content, so no "pasted from clipboard" toast for nothing
-      if (!await Clipboard.hasStrings()) return;
-      final data = await Clipboard.getData(Clipboard.kTextPlain);
-      final link = museSubscriptionLinkFromClipboard(data?.text);
-      if (link == null || !context.mounted) return;
-      if (ref.read(Preferences.clipboardLastOffered) == link) return;
-      final url = museSubscriptionUrlOf(link);
-      final profiles = ref.read(profilesNotifierProvider).valueOrNull ?? const <ProfileEntity>[];
-      if (profiles.any((p) => p is RemoteProfileEntity && p.url == url)) return;
-      ref.read(museClipboardOfferProvider.notifier).state = link;
+      final has = await Clipboard.hasStrings();
+      if (!context.mounted) return;
+      ref.read(museClipboardHasTextProvider.notifier).state = has;
     } catch (_) {
       // clipboard unavailable: nothing to offer
     }
@@ -85,12 +83,50 @@ void useMuseClipboardWatcher(WidgetRef ref) {
   });
 }
 
+/// The link to offer for clipboard [text] (pure, for tests): null when it is not a subscription
+/// link, was offered before, or is already one of the subscriptions.
+String? museClipboardOfferFor(String? text, {required String? lastOffered, required Iterable<String> subscriptionUrls}) {
+  final link = museSubscriptionLinkFromClipboard(text);
+  if (link == null || link == lastOffered) return null;
+  final url = museSubscriptionUrlOf(link);
+  if (subscriptionUrls.contains(url)) return null;
+  return link;
+}
+
+/// 1.12.0: the 添加 sheet opened — the user asked to add something, so the clipboard is read
+/// now (only when it holds text) and a subscription link becomes the sheet's first row.
+Future<void> museReadClipboardOffer(WidgetRef ref, {Future<String?> Function()? read}) async {
+  try {
+    final String? text;
+    if (read != null) {
+      text = await read();
+    } else {
+      if (!await Clipboard.hasStrings()) return;
+      text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    }
+    final profiles = ref.read(profilesNotifierProvider).valueOrNull ?? const <ProfileEntity>[];
+    final link = museClipboardOfferFor(
+      text,
+      lastOffered: ref.read(Preferences.clipboardLastOffered),
+      subscriptionUrls: [for (final p in profiles) if (p is RemoteProfileEntity) p.url],
+    );
+    ref.read(museClipboardOfferProvider.notifier).state = link;
+  } catch (_) {
+    // clipboard unavailable: nothing to offer
+  }
+}
+
 /// First row of the 添加 sheet while a clipboard link is on offer: 「导入剪贴板里的订阅 · host」.
-class MuseClipboardOfferTile extends ConsumerWidget {
+class MuseClipboardOfferTile extends HookConsumerWidget {
   const MuseClipboardOfferTile({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 1.12.0: read the clipboard once, when the sheet opens (the user's own action)
+    useEffect(() {
+      Future.microtask(() => museReadClipboardOffer(ref));
+      return null;
+    }, const []);
     final link = ref.watch(museClipboardOfferProvider);
     if (link == null) return const SizedBox.shrink();
     final mt = MuseTheme.of(context);

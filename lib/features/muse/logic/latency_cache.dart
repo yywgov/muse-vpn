@@ -9,6 +9,7 @@
 
 import 'dart:convert';
 import 'dart:math' as math;
+import 'package:hiddify/features/muse/logic/fail_reason.dart';
 
 /// Defaults for 设置 › 开发者选项 › 测速.
 /// 1.10.3: 8 at once and 8 s per probe (were 16 and 5 s). Each test opens a warm-up probe and then
@@ -46,26 +47,29 @@ bool museAnsweredTest({required int delay, DateTime? testedAt, required DateTime
 enum MuseDelayKind { live, cached, pending, timeout, none }
 
 class MuseDelayView {
-  const MuseDelayView(this.kind, this.delay);
+  const MuseDelayView(this.kind, this.delay, {this.reason = MuseFailReason.timeout});
 
   final MuseDelayKind kind;
   final int delay;
 
+  /// 1.12.0: why the test failed (only for [MuseDelayKind.timeout])
+  final MuseFailReason reason;
+
   String get text => switch (kind) {
     MuseDelayKind.live || MuseDelayKind.cached => '$delay ms',
     MuseDelayKind.pending => '测速中',
-    MuseDelayKind.timeout => '超时',
+    MuseDelayKind.timeout => reason.word,
     MuseDelayKind.none => '—',
   };
 
   @override
-  bool operator ==(Object other) => other is MuseDelayView && other.kind == kind && other.delay == delay;
+  bool operator ==(Object other) => other is MuseDelayView && other.kind == kind && other.delay == delay && other.reason == reason;
 
   @override
-  int get hashCode => Object.hash(kind, delay);
+  int get hashCode => Object.hash(kind, delay, reason);
 
   @override
-  String toString() => 'MuseDelayView($kind, $delay)';
+  String toString() => 'MuseDelayView($kind, $delay, $reason)';
 }
 
 bool museIsValidDelayMs(int d) => d > 0 && d < 65000;
@@ -80,6 +84,7 @@ MuseDelayView museDelayView({
   DateTime? since,
   DateTime? testStarted,
   int? cached,
+  String reason = '',
 }) {
   final fromBefore = since != null && testedAt != null && testedAt.isBefore(since.subtract(const Duration(seconds: 2)));
   final answeredThisTest =
@@ -89,7 +94,7 @@ MuseDelayView museDelayView({
     return const MuseDelayView(MuseDelayKind.pending, 0);
   }
   if (delay != 0 && !fromBefore) {
-    return museIsValidDelayMs(delay) ? MuseDelayView(MuseDelayKind.live, delay) : const MuseDelayView(MuseDelayKind.timeout, 0);
+    return museIsValidDelayMs(delay) ? MuseDelayView(MuseDelayKind.live, delay) : MuseDelayView(MuseDelayKind.timeout, 0, reason: MuseFailReason.parse(reason));
   }
   if (cached != null && museIsValidDelayMs(cached)) return MuseDelayView(MuseDelayKind.cached, cached);
   if (delay != 0 && museIsValidDelayMs(delay)) return MuseDelayView(MuseDelayKind.cached, delay);

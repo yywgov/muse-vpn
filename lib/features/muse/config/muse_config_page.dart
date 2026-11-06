@@ -51,6 +51,11 @@ class MuseConfigPage extends HookConsumerWidget {
             tooltip: '更多',
             icon: const Icon(Icons.more_horiz_outlined),
             onSelected: (v) async {
+              // 1.12.0: 更新后测新节点
+              if (v == 'test_new_nodes') {
+                await ref.read(MusePrefs.testNewNodes.notifier).update(!ref.read(MusePrefs.testNewNodes));
+                return;
+              }
               if (v != 'auto_update') return;
               final hours = ref.read(Preferences.museAutoUpdateHours);
               final picked = await musePick<int>(
@@ -66,6 +71,12 @@ class MuseConfigPage extends HookConsumerWidget {
                 key: const ValueKey('auto_update_hours'),
                 value: 'auto_update',
                 child: Text('订阅自动更新：${museAutoUpdateLabel(ref.read(Preferences.museAutoUpdateHours))}'),
+              ),
+              CheckedPopupMenuItem<String>(
+                key: const ValueKey('test_new_nodes'),
+                value: 'test_new_nodes',
+                checked: ref.read(MusePrefs.testNewNodes),
+                child: const Text('更新后测速新增节点'),
               ),
             ],
           ),

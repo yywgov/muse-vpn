@@ -12,6 +12,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:hiddify/features/muse/nodes/auto_region_chip.dart';
+import 'package:hiddify/features/muse/home/auto_fastest.dart' show museAutoFastestTag;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -782,6 +784,15 @@ class MuseNodeList extends HookConsumerWidget {
             ),
           ),
         );
+        // 1.12.0: 自动最快 can be limited to one region (shown only while 自动最快 is in use)
+        if (group.selected == museAutoFastestTag) {
+          children.add(
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: margin),
+              child: MuseAutoRegionRow(regions: [for (final e in nodes) regionOf(e)]),
+            ),
+          );
+        }
       } else if (groups.isNotEmpty && modes.isEmpty) {
         children.add(section(null, groups, asList: true));
       }

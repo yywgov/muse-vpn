@@ -21,6 +21,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
@@ -191,7 +192,7 @@ class MuseConnectionKeeper with InfraLogger {
   /// network's problem (node failover handles the node).
   Future<bool> _proxyPathHealthy() async {
     final options = ref.read(ConfigOptions.singboxConfigOptions);
-    final port = ref.read(ConfigOptions.mixedPort);
+    final port = museEffectiveMixedPort(ref.read);
     for (var i = 0; i < 2; i++) {
       if (i > 0) await Future<void>.delayed(const Duration(seconds: 3));
       if (await museHttpProbe(viaPort: port)) return true;
@@ -313,7 +314,7 @@ class MuseConnectionKeeper with InfraLogger {
         await service.resyncStatus();
         final options = ref.read(ConfigOptions.singboxConfigOptions);
         if (!options.setSystemProxy) return true;
-        return museSocksGreeting(ref.read(ConfigOptions.mixedPort));
+        return museSocksGreeting(museEffectiveMixedPort(ref.read));
       }
       if (s is CoreStopped) return false;
       await Future<void>.delayed(const Duration(milliseconds: 500));

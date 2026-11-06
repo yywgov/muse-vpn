@@ -2,6 +2,8 @@ import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
+import 'package:hiddify/features/muse/logic/quick_rules.dart';
+import 'package:hiddify/features/muse/data/quick_rules_provider.dart';
 import 'package:dartx/dartx.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
@@ -584,7 +586,7 @@ abstract class ConfigOptions {
           RouteRule(
                 // 1.5.0: 局域网 always first and on; Fake-IP exclusions right after it
                 // 1.6.0 C3: 屏蔽此域名 (连接) right after 局域网
-                rules: museApplyBlockedHosts(museApplyBlockQuic(museApplyFakeIpExclusions(
+                rules: museApplyBlockedHosts(museApplyQuickRules(museApplyBlockQuic(museApplyFakeIpExclusions(
                   musePinLanRule(
                     museApplyAdBlockLevel(
                   // 1.4.0: 分流 presets sit between the user's rules and the built-in ones
@@ -602,7 +604,10 @@ abstract class ConfigOptions {
                     ),
                   ),
                   fakeIp: fakeIp,
-                ), block: ref.watch(MusePrefs.blockQuic)), museParseBlockedHosts(ref.watch(MusePrefs.blockedHosts))),
+                ), block: ref.watch(MusePrefs.blockQuic)),
+                  // 1.12.0: 从连接加的规则（已保存的 + 仅本次）
+                  [...museParseQuickRules(ref.watch(MusePrefs.quickRules)), ...ref.watch(museTempQuickRulesProvider)],
+                ), museParseBlockedHosts(ref.watch(MusePrefs.blockedHosts))),
               ).toProto3Json()!
               as Map<String, dynamic>,
     );

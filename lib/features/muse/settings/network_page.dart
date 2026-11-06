@@ -117,6 +117,17 @@ class MuseNetworkPage extends HookConsumerWidget {
                 value: ref.watch(ConfigOptions.enableFakeDns),
                 onChanged: (v) => ref.read(ConfigOptions.enableFakeDns.notifier).update(v),
               ),
+              // 1.12.0 (Windows 系统代理): 本机、局域网、.local 不走代理
+              if (windows ?? PlatformUtils.isWindows)
+                MuseTile(
+                  key: const ValueKey('proxy_bypass'),
+                  leading: const Icon(Icons.lan_outlined),
+                  title: '不走代理的地址',
+                  info: '只影响系统代理模式：访问这些地址（路由器、NAS、打印机等）时直接连接。默认包含本机、局域网网段和 .local',
+                  trailing: Text(ref.watch(MusePrefs.proxyBypass).trim().isEmpty ? '默认' : '${museProxyBypassList(ref.watch(MusePrefs.proxyBypass)).length} 项'),
+                  chevron: true,
+                  onTap: () => museEditProxyBypass(context, ref),
+                ),
               MuseSwitchTile(
                 key: const ValueKey('settings_auto_close'),
                 leading: const Icon(Icons.link_off_outlined),
@@ -131,4 +142,37 @@ class MuseNetworkPage extends HookConsumerWidget {
       ),
     );
   }
+}
+
+
+/// 1.12.0: 编辑「不走代理的地址」：每行一个，留空 = 默认列表。下次连接时生效。
+Future<void> museEditProxyBypass(BuildContext context, WidgetRef ref) async {
+  final raw = ref.read(MusePrefs.proxyBypass);
+  final controller = TextEditingController(text: museProxyBypassList(raw).join('\n'));
+  final result = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('不走代理的地址'),
+      content: SizedBox(
+        width: 360,
+        child: TextField(
+          key: const ValueKey('proxy_bypass_field'),
+          controller: controller,
+          minLines: 6,
+          maxLines: 12,
+          decoration: const InputDecoration(helperText: '每行一个，支持 * 通配；下次连接时生效'),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, ''), child: const Text('恢复默认')),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('保存')),
+      ],
+    ),
+  );
+  controller.dispose();
+  if (result == null) return;
+  final list = museProxyBypassList(result);
+  final isDefault = result.trim().isEmpty || (list.length == museDefaultProxyBypass.length && list.every(museDefaultProxyBypass.contains));
+  await ref.read(MusePrefs.proxyBypass.notifier).update(isDefault ? '' : list.join('\n'));
 }

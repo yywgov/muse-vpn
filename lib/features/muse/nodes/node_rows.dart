@@ -270,6 +270,7 @@ class MuseNodeRow extends StatelessWidget {
       since: since,
       testStarted: proxy.isGroup ? null : testStarted,
       cached: cachedDelay,
+      reason: proxy.urlTestError,
     );
     final delayText = view.text;
     final Color delayColor = switch (view.kind) {
@@ -562,6 +563,7 @@ class MuseNodeCard extends StatelessWidget {
       since: since,
       testStarted: testStarted,
       cached: cachedDelay,
+      reason: proxy.urlTestError,
     );
     final delayColor = switch (view.kind) {
       MuseDelayKind.live => MuseColors.delay(context, view.delay),

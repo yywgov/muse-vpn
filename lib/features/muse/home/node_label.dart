@@ -86,6 +86,16 @@ final _byKeyword = <(RegExp, String)>[
   (RegExp(r'中国|中國|大陆|回国|China', caseSensitive: false), 'CN'),
 ];
 
+/// 1.12.0: the name pattern (its source, case-insensitive) that marks a node of region [code], or
+/// null when the region has none.
+String? museRegionKeywordPattern(String code) {
+  final c = code.toUpperCase() == 'UK' ? 'GB' : code.toUpperCase();
+  for (final (pattern, k) in _byKeyword) {
+    if (k == c) return pattern.pattern;
+  }
+  return null;
+}
+
 /// Strategy names the core reports for a load balancer (shown instead of a node).
 const _balanceStrategies = <String, String>{
   'round-robin': '轮询',

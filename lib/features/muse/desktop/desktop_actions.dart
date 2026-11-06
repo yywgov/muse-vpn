@@ -3,6 +3,7 @@
 // place that changes the connection.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:flutter/services.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
@@ -40,7 +41,7 @@ MuseRouteMode museOtherRouteMode(MuseRouteMode m) =>
     m == MuseRouteMode.rule ? MuseRouteMode.global : MuseRouteMode.rule;
 
 /// The terminal command for [kind] on this computer's proxy port.
-String museProxyEnvFor(MuseRead read, MuseShellKind kind) => museProxyEnvCommand(kind, read(ConfigOptions.mixedPort));
+String museProxyEnvFor(MuseRead read, MuseShellKind kind) => museProxyEnvCommand(kind, museEffectiveMixedPort(read));
 
 Future<void> museRunDesktopAction(
   Ref ref,

@@ -21,6 +21,27 @@ import kotlinx.coroutines.withContext
 @RequiresApi(24)
 class TileService : TileService(), ServiceConnection.Callback {
 
+    companion object {
+        // 穿云 1.12.0: the node / delay 穿云 last sent for the home-screen widget (same store)
+        private const val WIDGET_PREFS = "chuanyun_widget"
+
+        /** The tile's second line: 「节点 · 延迟」 when connected, else 未连接 (pure, unit-testable). */
+        fun subtitle(on: Boolean, node: String, delay: Int): String = when {
+            !on -> "未连接"
+            node.isBlank() -> "已连接"
+            delay in 1..64999 -> "$node · $delay ms"
+            else -> node
+        }
+
+        /** 穿云 says the node or delay changed: ask the system to refresh the tile (event, no polling). */
+        fun refresh(context: android.content.Context) {
+            try {
+                requestListeningState(context, android.content.ComponentName(context, com.hiddify.hiddify.bg.TileService::class.java))
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     private val connection = ServiceConnection(this, this)
 
     // 穿云 1.2: the tile always reads 穿云 and stays tappable while the service starts or stops
@@ -33,6 +54,15 @@ class TileService : TileService(), ServiceConnection.Callback {
                     Status.Started, Status.Starting -> Tile.STATE_ACTIVE
                     else -> Tile.STATE_INACTIVE
                 }
+            // 穿云 1.12.0: 「节点 · 延迟」 under the name (Android 10+)
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                val prefs = getSharedPreferences(WIDGET_PREFS, android.content.Context.MODE_PRIVATE)
+                subtitle = subtitle(
+                    status == Status.Started,
+                    prefs.getString("node", "") ?: "",
+                    prefs.getInt("delay", 0),
+                )
+            }
             updateTile()
         }
     }

@@ -129,6 +129,25 @@ abstract final class WindowsProxyGuard {
     }
   }
 
+  /// 穿云 1.12.0: puts the 不走代理的地址 list on the system proxy while it points at us (sing-box sets
+  /// only the server and leaves this list alone, so it survives hot reloads; disconnecting puts the
+  /// user's own settings back as before). False = not done (not ours / no guard / failed).
+  static Future<bool> applyBypass(String bypass) async {
+    if (!available || bypass.trim().isEmpty) return false;
+    try {
+      final st = await _run('status');
+      if (st.code != 0) return false; // not pointing at us
+      final parsed = museParseGuardProxy(st.out);
+      if (parsed == null || parsed.bypass == bypass) return parsed != null;
+      final r = await _run('apply', [parsed.flags, parsed.server, bypass]);
+      _logger.info('system proxy bypass set (${r.code})');
+      return r.code == 0;
+    } catch (e) {
+      _logger.warning('system proxy bypass failed: $e');
+      return false;
+    }
+  }
+
   /// 1.4.1: the system proxy as the registry has it (null = not Windows / unreadable).
   static Future<MuseProxySetting?> readSetting() async {
     if (!PlatformUtils.isWindows) return null;
@@ -240,3 +259,38 @@ MuseSystemProxy museParseGuardStatus(String out) {
   // PROXY_TYPE_PROXY 0x2, PROXY_TYPE_AUTO_PROXY_URL 0x4
   return flags & 0x6 == 0 ? MuseSystemProxy.direct : MuseSystemProxy.other;
 }
+
+
+/// 穿云 1.12.0: flags / server / bypass from a guard status line (null = unreadable).
+({String flags, String server, String bypass})? museParseGuardProxy(String out) {
+  final line = out.trim();
+  final flags = RegExp(r'\bflags=(0x[0-9a-fA-F]+|\d+)').firstMatch(line)?.group(1);
+  final server = RegExp(r'\bserver=(\S*)').firstMatch(line)?.group(1);
+  if (flags == null || server == null || server.isEmpty) return null;
+  final bypass = RegExp(r'\bbypass=(\S*)').firstMatch(line)?.group(1) ?? '';
+  return (flags: flags, server: server, bypass: bypass);
+}
+
+/// 穿云 1.12.0: 默认不走代理的地址：本机、局域网网段和 .local 设备。
+const museDefaultProxyBypass = [
+  'localhost',
+  '127.*',
+  '10.*',
+  '172.16.*', '172.17.*', '172.18.*', '172.19.*', '172.20.*', '172.21.*', '172.22.*', '172.23.*',
+  '172.24.*', '172.25.*', '172.26.*', '172.27.*', '172.28.*', '172.29.*', '172.30.*', '172.31.*',
+  '192.168.*',
+  '*.local',
+  '<local>',
+];
+
+/// The saved list (one entry per line / separated by ; or ,) or the default when empty.
+List<String> museProxyBypassList(String raw) {
+  final items = [
+    for (final e in raw.split(RegExp(r'[\n;,，；\s]+')))
+      if (e.trim().isNotEmpty) e.trim(),
+  ];
+  return items.isEmpty ? museDefaultProxyBypass : items.toSet().toList();
+}
+
+/// The WinINet bypass string for [raw].
+String museProxyBypassString(String raw) => museProxyBypassList(raw).join(';');

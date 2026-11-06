@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -68,7 +69,7 @@ class MuseReachNotifier extends StateNotifier<MuseReach> {
 }
 
 final museReachProvider = StateNotifierProvider<MuseReachNotifier, MuseReach>((ref) {
-  final notifier = MuseReachNotifier(() => ref.read(ConfigOptions.mixedPort));
+  final notifier = MuseReachNotifier(() => museEffectiveMixedPort(ref.read));
   Timer? pending;
   void schedule(Duration after) {
     pending?.cancel();

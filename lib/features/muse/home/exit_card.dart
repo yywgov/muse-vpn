@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
@@ -277,7 +278,7 @@ Future<String> museLocalNetwork() async {
 
 final museExitProvider = StateNotifierProvider<MuseExitNotifier, MuseExitResult?>((ref) {
   final notifier = MuseExitNotifier(
-    () => ref.read(ConfigOptions.mixedPort),
+    () => museEffectiveMixedPort(ref.read),
     keyBase: () => museExitKey(
       profileId: ref.read(activeProfileProvider).valueOrNull?.id ?? '',
       node: ref.read(proxiesOverviewNotifierProvider).valueOrNull?.selected ?? '',

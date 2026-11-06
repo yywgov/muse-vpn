@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/utils/platform_utils.dart';
+import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/model/directories.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
@@ -116,7 +119,7 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
   @override
   TaskEither<ConnectionFailure, Unit> connect(ProfileEntity activeProfile, bool disableMemoryLimit) => setup().flatMap(
     // 穿云 1.5.0: check the config first; a sure failure names the setting instead of starting the core
-    (_) => precheck(activeProfile).flatMap((_) => applyConfigOption(activeProfile)).flatMap((_) => prepareProfile(activeProfile)).flatMap(
+    (_) => pickMixedPort().flatMap((_) => precheck(activeProfile)).flatMap((_) => applyConfigOption(activeProfile)).flatMap((_) => prepareProfile(activeProfile)).flatMap(
       (_) => runPath(activeProfile).flatMap((path) => singbox.start(path, activeProfile.name, disableMemoryLimit)),
       // .mapLeft(UnexpectedConnectionFailure.new),
     ),
@@ -192,6 +195,31 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
     }
   });
 
+  /// 穿云 1.12.0 (Windows): the saved local proxy port taken by another program → this connection
+  /// uses a free one (port_override.dart) and says so once; elsewhere nothing changes.
+  @visibleForTesting
+  TaskEither<ConnectionFailure, Unit> pickMixedPort() => TaskEither(() async {
+    final override = ref.read(museMixedPortOverrideProvider.notifier);
+    if (!PlatformUtils.isWindows) {
+      override.state = null;
+      return right(unit);
+    }
+    try {
+      final saved = ref.read(ConfigOptions.mixedPort);
+      final (port, moved) = await musePickMixedPort(saved, avoid: {ref.read(ConfigOptions.clashApiPort)});
+      override.state = moved ? port : null;
+      if (moved) {
+        loggy.warning('mixed port $saved is taken, using $port for this connection');
+        try {
+          ref.read(inAppNotificationControllerProvider).showInfoToast(musePortMovedText(saved, port));
+        } catch (_) {}
+      }
+    } catch (_) {
+      override.state = null;
+    }
+    return right(unit);
+  });
+
   /// 穿云 1.5.0: [museConfigPrecheck] on the options the core is about to get.
   @visibleForTesting
   TaskEither<ConnectionFailure, Unit> precheck(ProfileEntity prof) => TaskEither(() async {
@@ -234,7 +262,11 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
               // 1.9.0 #15: the subscription's override rules go to the core only (both cores read this list)
               final o = overrideFor(prof.id);
               final rr = museApplyOverrideRules(options.routeRule, o);
-              await singbox.changeOptions(identical(rr, options.routeRule) ? options : options.copyWith(routeRule: rr)).run();
+              var sent = identical(rr, options.routeRule) ? options : options.copyWith(routeRule: rr);
+              // 1.12.0: the saved port was taken — this connection runs on another one
+              final port = ref.read(museMixedPortOverrideProvider);
+              if (port != null) sent = sent.copyWith(mixedPort: port);
+              await singbox.changeOptions(sent).run();
               return unit;
             }, (err, st) => err is ConnectionFailure ? err : ConnectionFailure.unexpected(err, st)),
           );
