@@ -586,8 +586,8 @@ void main() {
       expect(kt, contains('QuickActionActivity.ACTION_TOGGLE'));
       expect(kt, isNot(contains('AlarmManager')));
       expect(kt, isNot(contains('Handler(')));
-      expect(_src('android/app/src/main/kotlin/com/hiddify/hiddify/bg/BoxService.kt'), contains('ChuanyunWidget.onStatus(service, it)'));
-      expect(_src('android/app/src/main/kotlin/com/hiddify/hiddify/bg/CompatService.kt'), contains('ChuanyunWidget.onStatus(service, it)'));
+      expect(_src('android/app/src/main/kotlin/com/hiddify/hiddify/bg/BoxService.kt'), contains('ChuanyunWidget.onStatus(it)'));
+      expect(_src('android/app/src/main/kotlin/com/hiddify/hiddify/bg/CompatService.kt'), contains('ChuanyunWidget.onStatus(it)'));
       expect(_src('android/app/src/main/kotlin/com/hiddify/hiddify/ChuanyunHandler.kt'), contains('"widget_update"'));
       expect(_src('lib/features/muse/home/widget_sync.dart'), isNot(contains('Timer')));
     });
@@ -707,7 +707,7 @@ void main() {
 
   // ------------------------------------------------------------------ 版本
   test('版本 1.11.0 与更新说明', () {
-    expect(_src('pubspec.yaml'), contains('version: 1.11.0+'));
+    expect(_src('pubspec.yaml'), contains('version: 1.11.'));
     final notes = museChangelog['1.11.0']!.join('\n');
     for (final w in ['节点', '小组件', '自动切换', '导出配置', '高级', '更多']) {
       expect(notes, contains(w), reason: w);
@@ -716,8 +716,8 @@ void main() {
     final md = _src('CHANGELOG.md');
     expect(md.indexOf('### 1.11.0'), lessThan(md.indexOf('### 1.10.4')));
     expect(md.indexOf('### 1.10.4'), lessThan(md.indexOf('### 1.10.3')));
-    expect(museChangelog.keys.first, '1.11.0');
-    expect(museChangelog.keys.toList()[1], '1.10.4');
+    final keys = museChangelog.keys.toList();
+    expect(keys.indexOf('1.11.0') + 1, keys.indexOf('1.10.4'));
   });
 
   // APK 瘦身: the standard core without tor / openvpn / openconnect is a new core release, built from

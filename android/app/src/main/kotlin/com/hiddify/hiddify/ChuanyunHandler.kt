@@ -160,7 +160,6 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
                 // 穿云 1.11.0: the node in use / its delay for the home-screen widget (sent on a change only)
                 "widget_update" -> {
                     com.hiddify.hiddify.bg.ChuanyunWidget.onNode(
-                        context,
                         call.argument<String>("node") ?: "",
                         call.argument<Int>("delay") ?: 0,
                     )

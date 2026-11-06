@@ -4,6 +4,11 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.11.1 - 2026-11-06
+
+- 修复 1.11.0 启动闪退（Android 一打开就退出）：根因是桌面小组件跟随连接状态的代码——BoxService / CompatService 在所属 Service 的字段初始化时构造（此时 Service 还没有 base context），1.11.0 在构造函数里 `status.observeForever { ChuanyunWidget.onStatus(service, it) }`，LiveData 注册后立即回调当前状态，`service.getSharedPreferences` 落到 base 为 null 的 ContextWrapper 上抛 NullPointerException；MainActivity 每次启动都 bindService(BIND_AUTO_CREATE) 创建 VPNService（主进程），于是每次打开即崩。修复：小组件只用应用 Context（Application.attachBaseContext 时已就绪，早于任何组件创建），onStatus / onNode 不再接收 Service / Activity 的 Context，且整体 try/catch(Throwable)，小组件出任何问题都不会拖垮服务或应用。功能不回退：内核仍为 5.0.0-muse.23，小组件、隐藏图标恢复等 1.11.0 改动全部保留
+- 测试：v1111_test（服务构造期不得把 Service 交给小组件、小组件入口全部兜底且只用应用 Context、所有在 Service 字段初始化时构造的对象的 init 块不得调用 Context 方法）
+
 ### 1.11.0 - 2026-11-06
 
 - 节点页 A 双列卡片：顶部「手动选择 / 自动最快 xx / 负载均衡」分段（取代原来的两行组卡），节点为双列小卡（国旗 + 地区小字、节点名粗体、协议小标签、右下延迟数字按快慢着色 + 小号 ms），选中卡主色浅底 + 主色描边 + 右上勾；正在被自动最快 / 负载均衡使用的节点只描边；标题下一行「订阅名 · N 个节点」，右侧搜索 + 测速胶囊按钮；宽窗口自动多列；「⋯ › 布局」去掉（节点页固定为卡片，首页选节点面板与 Windows 侧栏仍为列表）

@@ -14,6 +14,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
+import com.hiddify.hiddify.Application
 import com.hiddify.hiddify.MainActivity
 import com.hiddify.hiddify.QuickActionActivity
 import com.hiddify.hiddify.R
@@ -47,20 +48,45 @@ class ChuanyunWidget : AppWidgetProvider() {
             return ChuanyunWidgetView(title, detail, on)
         }
 
-        /** Service status changed (main or :compat process). */
-        fun onStatus(context: Context, status: Status) {
-            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            if (prefs.getString(KEY_STATUS, null) == status.name) return
-            prefs.edit().putString(KEY_STATUS, status.name).apply()
-            redraw(context)
+        /**
+         * Service status changed (main or :compat process).
+         *
+         * 穿云 1.11.1 (1.11.0 启动闪退): BoxService / CompatService are built in their Service's field
+         * initialiser, before the Service has a base context, and LiveData.observeForever calls this
+         * at once with the current status. 1.11.0 read the preferences through that Service
+         * (getSharedPreferences on a ContextWrapper whose base is still null → NullPointerException),
+         * and since MainActivity binds the service on every start, the app died on launch. Now it
+         * always uses the application context (attached before any component is created) and a
+         * widget problem can never take the service or the app down.
+         */
+        fun onStatus(status: Status) {
+            try {
+                val context = appContext() ?: return
+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                if (prefs.getString(KEY_STATUS, null) == status.name) return
+                prefs.edit().putString(KEY_STATUS, status.name).apply()
+                redraw(context)
+            } catch (_: Throwable) {
+            }
         }
 
         /** 穿云 says the node in use or its delay changed. */
-        fun onNode(context: Context, node: String, delay: Int) {
-            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            if (prefs.getString(KEY_NODE, "") == node && prefs.getInt(KEY_DELAY, 0) == delay) return
-            prefs.edit().putString(KEY_NODE, node).putInt(KEY_DELAY, delay).apply()
-            redraw(context)
+        fun onNode(node: String, delay: Int) {
+            try {
+                val context = appContext() ?: return
+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                if (prefs.getString(KEY_NODE, "") == node && prefs.getInt(KEY_DELAY, 0) == delay) return
+                prefs.edit().putString(KEY_NODE, node).putInt(KEY_DELAY, delay).apply()
+                redraw(context)
+            } catch (_: Throwable) {
+            }
+        }
+
+        /** The application context (never a Service / Activity that may not be attached yet). */
+        private fun appContext(): Context? = try {
+            Application.application.applicationContext
+        } catch (_: Throwable) {
+            null
         }
 
         private fun redraw(context: Context) {
@@ -69,7 +95,7 @@ class ChuanyunWidget : AppWidgetProvider() {
                 val ids = manager.getAppWidgetIds(ComponentName(context, ChuanyunWidget::class.java))
                 if (ids.isEmpty()) return
                 manager.updateAppWidget(ids, build(context))
-            } catch (_: Exception) {
+            } catch (_: Throwable) {
             }
         }
 
@@ -104,7 +130,7 @@ class ChuanyunWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         try {
             manager.updateAppWidget(ids, build(context))
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
         }
     }
 }
