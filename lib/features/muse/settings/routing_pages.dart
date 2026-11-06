@@ -502,7 +502,7 @@ Future<void> showMuseQuickRulesSheet(BuildContext context) => showMuseSnapSheet<
               subtitle: Text(r.way.title),
               trailing: IconButton(
                 tooltip: '删除',
-                icon: const Icon(Icons.delete_outline),
+                icon: const Icon(Icons.delete_outlined),
                 onPressed: () => ref.read(MusePrefs.quickRules.notifier).update(museQuickRulesToRaw(museRemoveQuickRule(rules, r.host))),
               ),
             ),

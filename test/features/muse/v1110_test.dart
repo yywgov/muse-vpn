@@ -707,7 +707,7 @@ void main() {
 
   // ------------------------------------------------------------------ 版本
   test('版本 1.11.0 与更新说明', () {
-    expect(_src('pubspec.yaml'), contains('version: 1.11.'));
+    expect(RegExp(r'version: 1\.(1[1-9])\.').hasMatch(_src('pubspec.yaml')), isTrue); // 1.11.0 or later
     final notes = museChangelog['1.11.0']!.join('\n');
     for (final w in ['节点', '小组件', '自动切换', '导出配置', '高级', '更多']) {
       expect(notes, contains(w), reason: w);

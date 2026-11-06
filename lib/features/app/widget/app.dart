@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/data/quick_rules_provider.dart';
 import 'package:hiddify/features/muse/home/new_node_test.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart' show museRestoreLauncherIconProvider;
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
@@ -99,6 +100,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     ref.listen(museAutoFastestProvider, (_, _) {});
     // 1.12.0: 订阅更新后对新增节点测一次速（已连接且在前台时）
     ref.listen(museNewNodeTestProvider, (_, _) {});
+    ref.listen(museTempRulesResetProvider, (_, _) {});
     ref.listen(museCoreWatchdogProvider, (_, _) {});
     ref.listen(museConnectionKeeperProvider, (_, _) {});
     // 1.4.0: 测速 settings for the core, delay cache

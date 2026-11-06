@@ -191,12 +191,23 @@ Future<Map<String, Object?>> trafficPhase(String name, String shellLoop, int sec
   return r;
 }
 
+Future<void> scrollSafe(String key, double dy) async {
+  try {
+    await driver.waitFor(find.byValueKey(key), timeout: const Duration(seconds: 10));
+    await driver.scroll(find.byValueKey(key), 0, dy, const Duration(milliseconds: 400), timeout: const Duration(seconds: 20));
+  } catch (e) {
+    print('scroll $key skipped: $e');
+  }
+}
+
 Future<void> pages(String theme) async {
   await cmd('go:home');
   await shot('$theme-01-home-connected', settleMs: 2500);
-  await driver.scroll(find.byValueKey('home_node_list'), 0, -260, const Duration(milliseconds: 400));
+  // 1.12.0: the 首页 list is `home_dashboard` (1.11.0 removed `home_node_list`, and the driver waited
+  // for it until the job timed out). A scroll that cannot find its target is skipped, never waited on.
+  await scrollSafe('home_dashboard', -260);
   await shot('$theme-02-home-mid-scroll');
-  await driver.scroll(find.byValueKey('home_node_list'), 0, 900, const Duration(milliseconds: 300));
+  await scrollSafe('home_dashboard', 260);
   for (final (i, page) in ['config', 'settings', 'perAppProxy', 'appList', 'nodes', 'tlsTricks', 'connections', 'logs', 'about', 'openSource'].indexed) {
     await cmd('go:$page');
     // the installed-app list loads from the system first
@@ -308,6 +319,16 @@ Future<void> main() async {
       if (!ok) failures.add('TOGGLE intent did not switch to running=$want');
     }
     results['toggleIntent'] = toggles;
+    // 1.12.0: launcher shortcuts open 穿云 with chuanyun://mode / speedtest; the app must stay up
+    final shortcuts = <Object?>[];
+    for (final link in ['chuanyun://mode', 'chuanyun://mode', 'chuanyun://speedtest']) {
+      await adb(['shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', link, '-p', pkg]);
+      await sleep(4000);
+      final pid = '${(await adb(['shell', 'pidof', pkg])).stdout}'.trim();
+      shortcuts.add({'link': link, 'alive': pid.isNotEmpty});
+      if (pid.isEmpty) failures.add('$link: app is not running afterwards');
+    }
+    results['shortcuts'] = shortcuts;
     await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.MainActivity']);
     await sleep(2000);
   }

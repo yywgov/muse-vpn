@@ -302,7 +302,7 @@ void main() {
       expect(find.text('🇯🇵 东京 02'), findsOneWidget);
       expect(find.text('192.168.1.23'), findsOneWidget);
       expect(find.text('64.0 MB'), findsOneWidget);
-      expect(find.text('13/13'), findsOneWidget);
+      expect(find.text('点按检测'), findsOneWidget, reason: '1.12.0: 服务状态 checks only when tapped');
       final a = tester.getSize(find.byKey(const ValueKey('tile_speed')));
       expect(a.width, lessThan(390 / 2));
       expect(tester.takeException(), isNull);

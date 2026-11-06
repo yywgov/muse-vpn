@@ -26,5 +26,11 @@ rc=${PIPESTATUS[0]}
 adb logcat -d > out/e2e/logcat.txt 2>&1
 python3 tool/emulator/check_status_bar.py out/e2e "${density:-420}" | tee out/e2e/status_bar_check.txt
 rc2=${PIPESTATUS[0]}
-echo "drive=$rc status_bar=$rc2"
-if [ "$rc" != 0 ] || [ "$rc2" != 0 ]; then exit 1; fi
+# 1.12.0: any crash of 穿云 (main or core process) fails the run
+rc3=0
+if grep -A2 "FATAL EXCEPTION" out/e2e/logcat.txt | grep "Process: com.chuanyun.app" | tee out/e2e/fatal.txt | grep -q .; then
+  grep -A30 "FATAL EXCEPTION" out/e2e/logcat.txt | head -80
+  rc3=1
+fi
+echo "drive=$rc status_bar=$rc2 fatal=$rc3"
+if [ "$rc" != 0 ] || [ "$rc2" != 0 ] || [ "$rc3" != 0 ]; then exit 1; fi
