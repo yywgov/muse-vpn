@@ -126,9 +126,8 @@ void main() {
   });
 
   test('版本 1.11.1 与更新说明', () {
-    expect(_read('pubspec.yaml'), contains('version: 1.11.1+199'));
-    expect(museChangelog.keys.first, '1.11.1');
-    expect(museChangelog.keys.toList()[1], '1.11.0');
+    // 1.12.0 came after
+    expect(museChangelog.keys.toList().indexOf('1.11.1') + 1, museChangelog.keys.toList().indexOf('1.11.0'));
     expect(museChangelog['1.11.1']!.join('\n'), contains('修复 1.11.0 启动闪退'));
     final md = _read('CHANGELOG.md');
     expect(md.indexOf('### 1.11.1'), lessThan(md.indexOf('### 1.11.0')));

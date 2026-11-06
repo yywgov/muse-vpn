@@ -37,7 +37,7 @@ class TileService : TileService(), ServiceConnection.Callback {
         fun refresh(context: android.content.Context) {
             try {
                 requestListeningState(context, android.content.ComponentName(context, com.hiddify.hiddify.bg.TileService::class.java))
-            } catch (_: Exception) {
+            } catch (_: Throwable) {
             }
         }
     }
@@ -55,13 +55,17 @@ class TileService : TileService(), ServiceConnection.Callback {
                     else -> Tile.STATE_INACTIVE
                 }
             // 穿云 1.12.0: 「节点 · 延迟」 under the name (Android 10+)
+            // (read through the application context; never fatal - the tile works without it)
             if (android.os.Build.VERSION.SDK_INT >= 29) {
-                val prefs = getSharedPreferences(WIDGET_PREFS, android.content.Context.MODE_PRIVATE)
-                subtitle = subtitle(
-                    status == Status.Started,
-                    prefs.getString("node", "") ?: "",
-                    prefs.getInt("delay", 0),
-                )
+                try {
+                    val prefs = applicationContext.getSharedPreferences(WIDGET_PREFS, android.content.Context.MODE_PRIVATE)
+                    subtitle = Companion.subtitle(
+                        status == Status.Started,
+                        prefs.getString("node", "") ?: "",
+                        prefs.getInt("delay", 0),
+                    )
+                } catch (_: Throwable) {
+                }
             }
             updateTile()
         }
