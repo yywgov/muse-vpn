@@ -2,12 +2,12 @@
 // home page are gone; 通知栏断开按钮, 隐藏通知 and 隐藏桌面图标 sit on 设置 › 外观 › 通知与图标
 // (MuseAndroidAppearanceSection); 1.10.2: 在最近任务中隐藏 is back there too. 自动运行 / 按需运行 are on 设置 › 自动连接 since 1.9.0 #5; the
 // 后台保活 page was removed in 1.10.0 (only the one-time hint on the first connection stays).
+// 1.11.0: 隐藏桌面图标 is gone; an icon hidden by an older version is shown again once
+// ([museRestoreLauncherIconProvider]), since there is no switch left to bring it back.
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
@@ -16,10 +16,22 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// 设置 › 自动连接 (Android): what other apps can send to connect / disconnect.
 const museAndroidAutomationNote = '其他应用（如自动化工具）可发送 com.chuanyun.app.action.START / STOP / TOGGLE 来连接、断开或切换。';
 
+/// 1.11.0: once per install, a launcher icon hidden by an older version is shown again.
+final museRestoreLauncherIconProvider = Provider<void>((ref) {
+  if (ref.read(MusePrefs.launcherIconRestored)) return;
+  // after start-up (never on the cold start path)
+  Future<void>.delayed(const Duration(seconds: 5), () async {
+    try {
+      if (await ChuanyunPlatform.isLauncherIconHidden()) await ChuanyunPlatform.setLauncherIconHidden(false);
+      await ref.read(MusePrefs.launcherIconRestored.notifier).update(true);
+    } catch (_) {}
+  });
+});
+
 /// 1.10.2: the 外观 switch that keeps 穿云 out of the recent-apps screen.
 const museExcludeRecentsTitle = '在最近任务中隐藏';
 
-class MuseAndroidAppearanceSection extends HookConsumerWidget {
+class MuseAndroidAppearanceSection extends ConsumerWidget {
   const MuseAndroidAppearanceSection({super.key});
 
   @override
@@ -27,32 +39,6 @@ class MuseAndroidAppearanceSection extends HookConsumerWidget {
     final stopButton = ref.watch(MusePrefs.notifyStopButton);
     final hideNotification = ref.watch(Preferences.hideNotification);
     final excludeRecents = ref.watch(Preferences.excludeFromRecents);
-    final iconHidden = useState<bool?>(null);
-    useEffect(() {
-      ChuanyunPlatform.isLauncherIconHidden().then((value) {
-        if (context.mounted) iconHidden.value = value;
-      });
-      return null;
-    }, const []);
-
-    Future<void> toggleIcon(bool hide) async {
-      if (hide) {
-        final ok = await ref
-            .read(dialogNotifierProvider.notifier)
-            .showConfirmation(
-              title: '隐藏桌面图标？',
-              message:
-                  '隐藏后桌面上不再显示穿云。重新打开的方法：\n\n'
-                  '1. 下拉通知栏，长按「穿云开关」快捷开关（需先在快捷开关编辑里添加），即可打开穿云；\n'
-                  '2. 系统设置 > 应用 > 穿云 也能找到它。\n\n'
-                  '部分系统（Android 10 及以上）可能仍会显示一个跳转到应用信息的图标，这是系统行为。',
-              positiveBtnTxt: '隐藏',
-            );
-        if (!ok) return;
-      }
-      if (await ChuanyunPlatform.setLauncherIconHidden(hide)) iconHidden.value = hide;
-    }
-
     return MuseSection(
       key: const ValueKey('appearance_android'),
       header: '通知与图标',
@@ -83,13 +69,6 @@ class MuseAndroidAppearanceSection extends HookConsumerWidget {
             await ref.read(Preferences.excludeFromRecents.notifier).update(value);
             await ChuanyunPlatform.setExcludeFromRecents(value);
           },
-        ),
-        MuseSwitchTile(
-          key: const ValueKey('settings_hide_icon'),
-          leading: const Icon(Icons.visibility_off_outlined),
-          title: '隐藏桌面图标',
-          value: iconHidden.value ?? false,
-          onChanged: iconHidden.value == null ? null : toggleIcon,
         ),
       ],
     );

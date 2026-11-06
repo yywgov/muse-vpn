@@ -59,10 +59,11 @@ void main() {
       expect(f.active, isFalse);
     });
 
-    test('no auto group, no switch', () {
+    // 1.11.0: without 自动最快 the fastest working node stands in
+    test('no auto group: the fastest working node', () {
       final f = MuseFailoverTracker();
       f.update(selected: 'A', items: items(65535, 1), autoTag: null);
-      expect(f.update(selected: 'A', items: items(65535, 2), autoTag: null), isNull);
+      expect(f.update(selected: 'A', items: items(65535, 2), autoTag: null), 'B');
     });
   });
 

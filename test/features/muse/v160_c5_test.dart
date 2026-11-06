@@ -110,32 +110,24 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('列表 layout (default): no cards', (tester) async {
+    // 1.11.0 (A): the 节点 page is always two-column cards; 「⋯ › 布局」 is gone
+    testWidgets('双列卡片 (1.11.0): two nodes per row', (tester) async {
       await _pump(tester, group: _group(20));
-      expect(find.byKey(const ValueKey('node_card')), findsNothing);
-      final y0 = tester.getTopLeft(find.byKey(const ValueKey('节点 0'))).dy;
-      expect(tester.getTopLeft(find.byKey(const ValueKey('节点 1'))).dy, greaterThan(y0));
+      expect(find.byKey(const ValueKey('node_card')), findsWidgets);
+      final p0 = tester.getTopLeft(find.byKey(const ValueKey('节点 0')));
+      final p1 = tester.getTopLeft(find.byKey(const ValueKey('节点 1')));
+      final p2 = tester.getTopLeft(find.byKey(const ValueKey('节点 2')));
+      expect(p1.dy, p0.dy);
+      expect(p1.dx, greaterThan(p0.dx));
+      expect(p2.dy, greaterThan(p0.dy));
     });
 
-    testWidgets('样式 menu switches layout and density (saved)', (tester) async {
-      final c = await _pump(tester, group: _group(20));
-      final h0 = tester.getSize(find.byKey(const ValueKey('节点 0'))).height;
+    testWidgets('⋯ menu has no 布局 entry (1.11.0)', (tester) async {
+      await _pump(tester, group: _group(20));
       await tester.tap(find.byKey(const ValueKey('node_more_button')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('node_more_layout')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('node_density_compact')));
-      await tester.pumpAndSettle();
-      expect(c.read(MusePrefs.nodeDensity), 'compact');
-      expect(tester.getSize(find.byKey(const ValueKey('节点 0'))).height, lessThan(h0));
-      await tester.tap(find.byKey(const ValueKey('node_more_button')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('node_more_layout')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('node_layout_grid')));
-      await tester.pumpAndSettle();
-      expect(c.read(MusePrefs.nodeLayout), 'grid');
-      expect(find.byKey(const ValueKey('node_card')), findsWidgets);
+      expect(find.byKey(const ValueKey('node_more_sort')), findsOneWidget);
+      expect(find.byKey(const ValueKey('node_more_layout')), findsNothing);
     });
 
     testWidgets('1.10.0 the 节点 page opens at the node in use, far down a 1000-node list', (tester) async {

@@ -7,6 +7,7 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:hiddify/features/muse/data/bundled_compat_rule_sets.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:path/path.dart' as p;
 
@@ -46,4 +47,20 @@ Future<int> museInstallBundledRuleSets(String baseDir, {AssetBundle? bundle}) as
     }
   } catch (_) {}
   return copied;
+}
+
+/// 1.11.0 冷启动: the preference holding the app build whose bundled lists are already installed.
+const museRuleSetsStampKey = 'muse_rule_sets_installed';
+
+/// 1.11.0: true when the lists of this [stamp] (app version + build) are in place, so start-up can
+/// skip reading ~1.6 MB of assets just to compare sizes (it used to read every list on every start).
+bool museBundledRuleSetsCurrent({required String? saved, required String stamp, required String baseDir, String? workingDir}) {
+  if (saved != stamp || stamp.isEmpty) return false;
+  try {
+    final dir = p.join(baseDir, 'rule-sets');
+    return museBundledRuleSets.every((n) => File(p.join(dir, '$n.srs')).existsSync()) &&
+        (workingDir == null || museCompatBundledRuleSets.every((n) => File(museCompatRuleSetPath(workingDir, n)).existsSync()));
+  } catch (_) {
+    return false;
+  }
 }

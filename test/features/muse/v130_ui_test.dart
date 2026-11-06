@@ -228,9 +228,11 @@ void main() {
       await _pump(tester, page: const MuseNodesPage(), brightness: b, size: phone, tab: 1);
       expect(tester.takeException(), isNull);
       expect(find.byKey(const ValueKey('home_node_list')), findsOneWidget);
-      expect(find.byKey(const ValueKey('node_selected_bar')), findsOneWidget);
-      expect(find.text('86 ms'), findsWidgets);
-      expect(find.text('超时'), findsOneWidget);
+      // 1.11.0 (A): two-column cards; the node in use has a filled, outlined card with a tick
+      expect(find.byKey(const ValueKey('node_card_selected')), findsOneWidget);
+      expect(find.byKey(const ValueKey('node_card_tick')), findsOneWidget);
+      expect(find.text('86 ms', findRichText: true), findsWidgets);
+      expect(find.text('超时', findRichText: true), findsOneWidget);
       await _shot(tester, 'phone-$label-nodes');
       await _done(tester);
     });

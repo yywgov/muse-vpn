@@ -127,7 +127,7 @@ void main() {
   group('1.7.1 migration', () {
     test('saved 标准 (the old default) → 忠实; other styles untouched', () {
       final p = <String, Object?>{'muse_prefs_version': 2, 'muse_color_style': 'tonalSpot'};
-      expect(musePrefsMigrate(p), 3);
+      expect(musePrefsMigrate(p), musePrefsVersionCurrent); // 1.11.0: later steps run too
       expect(p['muse_color_style'], 'fidelity');
       for (final k in ['vibrant', 'expressive', 'vivid', 'tinted', 'soft', 'monochrome']) {
         final q = <String, Object?>{'muse_prefs_version': 2, 'muse_color_style': k};
@@ -136,7 +136,7 @@ void main() {
       }
       // already migrated: a 标准 picked later on purpose is kept
       final r = <String, Object?>{'muse_prefs_version': 3, 'muse_color_style': 'tonalSpot'};
-      expect(musePrefsMigrate(r), 3);
+      expect(musePrefsMigrate(r), musePrefsVersionCurrent);
       expect(r['muse_color_style'], 'tonalSpot');
     });
 
@@ -161,10 +161,10 @@ void main() {
     test('the store migration writes back once (1.6.x device → version 3)', () async {
       SharedPreferences.setMockInitialValues({'muse_prefs_version': 2, 'muse_color_style': 'tonalSpot', 'muse_accent': 'yuebai'});
       final sp = await SharedPreferences.getInstance();
-      expect(await musePrefsMigrateStore(sp), 3);
+      expect(await musePrefsMigrateStore(sp), musePrefsVersionCurrent);
       expect(sp.getString('muse_color_style'), 'fidelity');
       expect(sp.getString('muse_accent'), 'songhua');
-      expect(sp.getInt('muse_prefs_version'), 3);
+      expect(sp.getInt('muse_prefs_version'), musePrefsVersionCurrent);
     });
   });
 

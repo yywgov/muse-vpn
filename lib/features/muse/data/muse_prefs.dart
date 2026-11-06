@@ -133,7 +133,13 @@ abstract final class MusePrefs {
 
   /// 定时连接 / 断开 ("connectMinute,disconnectMinute", -1 = off)
   static final schedule = PreferencesNotifier.create<String, String>("muse_schedule", "-1,-1");
-  static final qualityAlert = PreferencesNotifier.create<bool, bool>("muse_quality_alert", false);
+  // 1.11.0: 连接质量提醒 removed (its stored muse_quality_alert is ignored)
+
+  /// 1.11.0 节点失效自动切换 (节点 › ⋯ › 节点设置; on by default)
+  static final autoFailover = PreferencesNotifier.create<bool, bool>("muse_auto_failover", true);
+
+  /// 1.11.0: a launcher icon hidden by 隐藏桌面图标 (removed) was shown again
+  static final launcherIconRestored = PreferencesNotifier.create<bool, bool>("muse_launcher_icon_restored", false);
 
   /// Wi‑Fi rules (Windows; experimental). 1.6.0 C8 按需运行 keeps its Wi‑Fi list here as
   /// `{"SSID": "disconnect"}` entries.

@@ -126,22 +126,12 @@ void main() {
       expect(MuseColorStyle.fromKey('bogus'), MuseColorStyle.fidelity);
     });
 
-    testWidgets('外观 shows 配色风格 (1.7.1: 忠实 by default); picking 鲜艳 saves it', (t) async {
+    // 1.11.0: 配色风格 removed from 外观 (fixed to 忠实)
+    testWidgets('外观 has no 配色风格 row (1.11.0)', (t) async {
       final c = await _container(t);
       await t.pumpWidget(_app(c, const MuseAppearancePage()));
       await t.pump(const Duration(milliseconds: 300));
-      final tile = find.byKey(const ValueKey('appearance_color_style'));
-      expect(tile, findsOneWidget);
-      expect(find.descendant(of: tile, matching: find.text('忠实')), findsOneWidget);
-      await t.tap(tile);
-      await t.pumpAndSettle();
-      for (final s in MuseColorStyle.offered) {
-        expect(find.byKey(ValueKey('pick_${s.title}')), findsOneWidget, reason: s.title);
-      }
-      await t.tap(find.byKey(const ValueKey('pick_鲜艳')));
-      await t.pumpAndSettle();
-      expect(c.read(MusePrefs.colorStyle), 'vibrant');
-      expect(find.descendant(of: tile, matching: find.text('鲜艳')), findsOneWidget);
+      expect(find.byKey(const ValueKey('appearance_color_style')), findsNothing);
       expect(t.takeException(), isNull);
     });
 
@@ -155,16 +145,13 @@ void main() {
       expect(t.takeException(), isNull);
     });
 
-    test('设置搜索 finds 配色风格 by its name and by a style', () {
-      for (final q in ['配色风格', '鲜艳', '单色', '表现力']) {
-        final hits = museSearchSettings(q, android: true, windows: false);
-        expect(hits.any((e) => e.title == '配色风格' && e.page == MuseSettingPage.appearance), isTrue, reason: q);
-      }
+    test('设置搜索: 配色风格 is gone (1.11.0)', () {
+      expect(museSettingEntries.where((e) => e.title == '配色风格'), isEmpty);
     });
 
-    test('the style is synced and backed up', () {
+    test('the style is no longer backed up (1.11.0); old backups with it still import', () {
       final src = File('lib/features/muse/data/sync_service.dart').readAsStringSync();
-      expect(src, contains("'muse_color_style'"));
+      expect(src, isNot(contains("'muse_color_style':")));
     });
   });
 

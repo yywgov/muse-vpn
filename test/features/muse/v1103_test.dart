@@ -111,11 +111,11 @@ void main() {
       expect(md.indexOf('### 1.10.3'), lessThan(md.indexOf('### 1.10.2')));
     });
 
-    test('both cores from the same core commit (1.10.4: muse.22, a descendant of muse.21)', () {
+    test('both cores from the same core commit (1.11.0: muse.23, a descendant of muse.22)', () {
       final props = _src('dependencies.properties');
-      expect(props, contains('muse.core.version=5.0.0-muse.22'));
-      expect(museCoreRelease, '5.0.0-muse.22');
-      expect(props, contains('muse.compat.ref=a076442fb844c3ded4fd1cd00c1e688bdc7ac74e'));
+      expect(props, contains('muse.core.version=5.0.0-muse.23'));
+      expect(museCoreRelease, '5.0.0-muse.23');
+      expect(props, contains('muse.compat.ref=66d82b1502a3b735643faf0e8102aa95f217dd34'));
     });
   });
 }

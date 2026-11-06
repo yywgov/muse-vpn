@@ -3,6 +3,7 @@
     <string name="app_name">穿云</string>
     <string name="stop">断开</string>
     <string name="quick_toggle">穿云开关</string>
+    <string name="widget_description">一键连接或断开，显示当前节点与延迟</string>
     <string name="status_starting">正在连接…</string>
     <string name="status_started">已连接</string>
     <string name="notification_channel_name">连接状态</string>

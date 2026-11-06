@@ -41,6 +41,11 @@ class CompatService(
     private val status = MutableLiveData(Status.Stopped)
     private val binder = ServiceBinder(status)
     private val notification = ServiceNotification(status, service)
+
+    // 穿云 1.11.0: the home-screen widget follows the connection (only on a change, no polling)
+    init {
+        status.observeForever { ChuanyunWidget.onStatus(service, it) }
+    }
     private var tun: ParcelFileDescriptor? = null
     private var coreSetUp = false
     private var receiverRegistered = false

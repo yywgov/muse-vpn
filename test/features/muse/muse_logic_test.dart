@@ -125,11 +125,11 @@ void main() {
       now: now,
     ).map((a) => a.key.split(':')[1]).toList();
 
-    // 1.2.8: 80 % used, then used up — each its own threshold
-    test('traffic: 80 % used, then used up', () {
+    // 1.2.8: 80 % used, then used up — each its own threshold; 1.11.0: no 80 % reminder any more
+    test('traffic: 10 % left, then used up', () {
       expect(kinds(used: 79 * gb), isEmpty);
-      expect(kinds(used: 80 * gb), ['traffic80']);
-      expect(kinds(used: 89 * gb), ['traffic80']);
+      expect(kinds(used: 80 * gb), isEmpty);
+      expect(kinds(used: 89 * gb), isEmpty);
       // 1.4.1: again at 10 % left
       expect(kinds(used: 90 * gb), ['traffic90']);
       expect(kinds(used: 99 * gb), ['traffic90']);

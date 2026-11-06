@@ -16,12 +16,13 @@ MuseSettingPage? _first(String q, {bool android = true, bool windows = false}) {
 }
 
 void main() {
+  // 1.11.0: 备份与同步 removed (导出 / 导入配置 on 关于) — seven rows
   group('#7 设置首页 8 项', () {
-    test('Android: 外观, 自动连接, 分应用代理, 网络, 活动, 备份与同步, 内核与资源, 关于', () {
-      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '自动连接', '分应用代理', '网络', '活动', '备份与同步', '内核与资源', '关于']);
+    test('Android: 外观, 自动连接, 分应用代理, 网络, 活动, 内核与资源, 关于', () {
+      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '自动连接', '分应用代理', '网络', '活动', '内核与资源', '关于']);
     });
     test('Windows has no 分应用代理; 开发者选项 only once turned on', () {
-      expect(museSettingsHomeRows(android: false, developer: false), hasLength(7));
+      expect(museSettingsHomeRows(android: false, developer: false), hasLength(6));
       expect(museSettingsHomeRows(android: false, developer: false), isNot(contains('分应用代理')));
       expect(museSettingsHomeRows(android: true, developer: true).last, '开发者选项');
     });
@@ -30,7 +31,8 @@ void main() {
       for (final k in ['settings_help', 'settings_nodes', 'settings_routing', 'settings_stats', 'settings_keep_alive', 'settings_privacy', 'settings_advanced']) {
         expect(page, isNot(contains("ValueKey('$k')")), reason: k);
       }
-      for (final k in ['settings_auto_connect', 'settings_network', 'settings_activity', 'settings_sync', 'settings_resources', 'settings_about']) {
+      expect(page, isNot(contains("ValueKey('settings_sync')")));
+      for (final k in ['settings_auto_connect', 'settings_network', 'settings_activity', 'settings_resources', 'settings_about']) {
         expect(page, contains("ValueKey('$k')"), reason: k);
       }
     });
@@ -41,7 +43,8 @@ void main() {
         '订阅自动更新': MuseSettingPage.subscriptions,
         '节点名美化': MuseSettingPage.nodes,
         '负载均衡策略': MuseSettingPage.advanced,
-        'TLS 分片': MuseSettingPage.advanced,
+        // 1.11.0: TLS 分片 stays on 网络 (not folded into 高级)
+        'TLS 分片': MuseSettingPage.network,
         '统计': MuseSettingPage.stats,
         '诊断': MuseSettingPage.diagnose,
         '通知栏断开按钮': MuseSettingPage.appearance,
@@ -51,14 +54,13 @@ void main() {
       };
       moved.forEach((q, page) => expect(_first(q), page, reason: q));
       expect(_first('运行模式', android: false, windows: true), MuseSettingPage.network);
-      expect(_first('窗口置顶', android: false, windows: true), MuseSettingPage.appearance);
+      expect(_first('窗口置顶', android: false, windows: true), MuseSettingPage.windowAdvanced);
       expect(MuseSettingPage.stats.path, '设置 › 活动 › 统计');
       expect(MuseSettingPage.advanced.path, '设置 › 网络 › 高级');
       expect(MuseSettingPage.nodes.path, startsWith('节点 ›'));
     });
     test('统计 / 诊断 open as tabs of 活动', () {
       expect(museActivityTabKeyForSetting('统计'), 'stats');
-      expect(museActivityTabKeyForSetting('导出 CSV'), 'stats');
       expect(museActivityTabKeyForSetting('诊断'), 'diagnose');
       expect(museActivityTabKeyForSetting('连接'), 'connections');
     });

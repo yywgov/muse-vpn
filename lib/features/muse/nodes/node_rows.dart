@@ -24,7 +24,22 @@ class _NodeRowMemo {
 
 /// One card of node rows with an optional caption above.
 class _NodeSection extends StatelessWidget {
-  const _NodeSection({super.key, this.header, required this.margin, required this.children, this.collapsed, this.onHeaderTap});
+  const _NodeSection({
+    super.key,
+    this.header,
+    required this.margin,
+    required this.children,
+    this.collapsed,
+    this.onHeaderTap,
+    this.asList = false,
+    this.selfDecorated = false,
+  });
+
+  /// 1.11.0: always one column of rows (groups that do not fit the mode bar)
+  final bool asList;
+
+  /// 1.11.0 (A): each child draws its own card (selected fill / outline), no card box around it
+  final bool selfDecorated;
 
   final String? header;
   final double margin;
@@ -59,6 +74,7 @@ class _NodeSection extends StatelessWidget {
   /// 1.5.0 #22: the same section as a sliver whose rows are built only when scrolled into view.
   Widget buildSliver(BuildContext context, {int columns = 1, double extent = 0}) {
     final mt = MuseTheme.of(context);
+    final cols = asList ? 1 : columns;
     final last = children.length - 1;
     // 1.6.0 C11: when the order changes (a new delay under 按延迟), a row keeps its element and moves
     // instead of every row after it being rebuilt in its new slot
@@ -70,7 +86,7 @@ class _NodeSection extends StatelessWidget {
       final k = children[i].key;
       return k == null || !unique ? child : KeyedSubtree(key: _NodeSlotKey(k), child: child);
     }
-    if (columns > 1 && children.isNotEmpty) {
+    if ((cols > 1 || selfDecorated) && children.isNotEmpty) {
       return SliverPadding(
         key: key,
         padding: EdgeInsets.fromLTRB(margin, MuseSpace.s8, margin, 0),
@@ -79,14 +95,16 @@ class _NodeSection extends StatelessWidget {
             if (header != null) SliverToBoxAdapter(child: _header(context)),
             SliverGrid.builder(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
+                crossAxisCount: cols,
                 mainAxisExtent: extent,
                 crossAxisSpacing: MuseSpace.s8,
                 mainAxisSpacing: MuseSpace.s8,
               ),
               itemCount: children.length,
               findChildIndexCallback: findSlot,
-              itemBuilder: (context, i) => slot(
+              itemBuilder: (context, i) => selfDecorated
+                  ? slot(i, children[i])
+                  : slot(
                 i,
                 DecoratedBox(
                   key: const ValueKey('node_card'),
@@ -470,6 +488,308 @@ class MuseFlagBox extends StatelessWidget {
               size: MuseIconSize.small,
               color: onBrand ? mt.onHero : (neutral ? mt.text3 : museBrandOf(context)),
             ),
+    );
+  }
+}
+
+// ======================================================================= 1.11.0 节点 A 双列卡片
+
+/// 1.11.0: height of a [MuseNodeCard] at [scale] (padding + region line + name + bottom row; the
+/// text parts grow with the system font size).
+double museNodeCardExtentA(double Function(double) scale) => MuseSpace.s12 * 2 + MuseSpace.s4 * 2 + scale(16 + 20 + 18);
+
+/// 1.11.0: columns of cards for a list [width] wide (two on a phone; one only when very narrow).
+int museNodeColumnsA(double width, {double textScale = 1}) {
+  final min = MuseSize.nodeCardMinWidth * textScale.clamp(1.0, 1.6);
+  final n = ((width + MuseSpace.s8) / (min + MuseSpace.s8)).floor();
+  return n.clamp(1, 6);
+}
+
+/// 1.11.0: a delay split for the card: the number (coloured) and its unit, or a word (测速中 / 超时 / —).
+({String number, String unit}) museDelayParts(MuseDelayView view) => switch (view.kind) {
+  MuseDelayKind.live || MuseDelayKind.cached => (number: '${view.delay}', unit: 'ms'),
+  _ => (number: view.text, unit: ''),
+};
+
+/// 1.11.0 (A): one node as a card — flag + region (small), the name (bold), the protocol as a
+/// small tag and the delay bottom right (number coloured by speed, small grey 「ms」). Selected =
+/// tonal accent fill + accent outline + a round tick top right. [inUse] = the node a group (自动最快 /
+/// 负载均衡) is using right now: outline only.
+class MuseNodeCard extends StatelessWidget {
+  const MuseNodeCard({
+    super.key,
+    required this.proxy,
+    required this.since,
+    required this.selected,
+    required this.onTap,
+    this.onLongPress,
+    this.testStarted,
+    this.cachedDelay,
+    this.dimmed = false,
+    this.favorite = false,
+    this.inUse = false,
+    this.displayName,
+    this.note = '',
+    this.checked,
+    this.region,
+  });
+
+  final OutboundInfo proxy;
+  final DateTime? since;
+  final DateTime? testStarted;
+  final int? cachedDelay;
+  final bool selected;
+  final bool inUse;
+  final bool dimmed;
+  final bool favorite;
+  final String? displayName;
+  final String note;
+  final String? region;
+
+  /// 多选: null = not selecting, else whether this card is picked
+  final bool? checked;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    MuseNodeRow.debugBuilds++;
+    final mt = MuseTheme.of(context);
+    final brand = museBrandOf(context);
+    final view = museDelayView(
+      delay: proxy.urlTestDelay,
+      testedAt: proxy.hasUrlTestTime() ? proxy.urlTestTime.toDateTime() : null,
+      since: since,
+      testStarted: testStarted,
+      cached: cachedDelay,
+    );
+    final delayColor = switch (view.kind) {
+      MuseDelayKind.live => MuseColors.delay(context, view.delay),
+      MuseDelayKind.timeout => MusePalette.red,
+      _ => mt.text2,
+    };
+    final parts = museDelayParts(view);
+    final name = displayName ?? museNodeName(proxy);
+    final invalid = museIsInvalidNodeType(proxy.type);
+    final type = proxy.type.toLowerCase();
+    final protocol = invalid || type == 'direct' || type == 'block' ? '' : museProtocolShort(proxy.type);
+    final own = region ?? '';
+    final code = own.isNotEmpty ? own : museRegionCode(name) ?? museRegionCode(museNodeName(proxy));
+    final flag = own.isNotEmpty ? museCountryFlag(own) : (museFlagEmoji(name) ?? museFlagEmoji(museNodeName(proxy)));
+    final regionText = invalid ? museInvalidNodeSubtitle(proxy.type) : (note.isNotEmpty ? note : (code == null ? '' : museCountryLabel(code)));
+    final highlighted = selected || (checked ?? false);
+
+    final Widget corner = checked != null
+        ? Icon(
+            checked! ? Icons.check_circle_outlined : Icons.radio_button_unchecked_outlined,
+            key: ValueKey('node_check_${proxy.tag}'),
+            size: MuseSize.nodeCardCheck,
+            color: checked! ? brand : mt.text3,
+          )
+        : selected
+        ? Container(
+            key: const ValueKey('node_card_tick'),
+            width: MuseSize.nodeCardCheck,
+            height: MuseSize.nodeCardCheck,
+            decoration: BoxDecoration(color: brand, shape: BoxShape.circle),
+            child: Icon(Icons.check_outlined, size: MuseIconSize.tiny, color: museOnColor(brand)),
+          )
+        : favorite
+        ? const Icon(Icons.star_rounded, size: MuseIconSize.tiny, color: MusePalette.star, key: ValueKey('node_star'))
+        : const SizedBox.shrink();
+
+    final card = Material(
+      key: ValueKey(highlighted ? 'node_card_selected' : 'node_card'),
+      color: highlighted ? mt.selected : mt.card,
+      shape: RoundedSuperellipseBorder(
+        borderRadius: MuseRadius.cardAll,
+        side: highlighted || inUse ? BorderSide(color: brand, width: MuseSize.nodeCardBorder) : BorderSide.none,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s12, vertical: MuseSpace.s12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  if (flag != null) ...[
+                    Text(flag, style: const TextStyle(fontSize: MuseIconSize.flag, height: 1)),
+                    const SizedBox(width: MuseSpace.s8),
+                  ],
+                  Expanded(
+                    child: Text(regionText, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
+                  ),
+                  corner,
+                ],
+              ),
+              Text(
+                flag == null ? name : museStripFlags(name),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: MuseTextLevel.subheadline.style(context, color: mt.text1, weight: highlighted ? FontWeight.w700 : FontWeight.w600),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (protocol.isNotEmpty)
+                    Flexible(
+                      child: Container(
+                        key: const ValueKey('node_protocol_tag'),
+                        padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s4),
+                        decoration: BoxDecoration(color: highlighted ? brand.withValues(alpha: 0.16) : mt.inner, borderRadius: MuseRadius.smallAll),
+                        child: Text(
+                          protocol,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          style: MuseTextLevel.caption2.style(context, color: highlighted ? brand : mt.text2),
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  const SizedBox(width: MuseSpace.s4),
+                  AnimatedSwitcher(
+                    duration: museMotion(context),
+                    transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                    child: Text.rich(
+                      key: ValueKey(view.text),
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: parts.number,
+                            style: MuseTextLevel.subheadline.style(context, color: delayColor, weight: parts.unit.isEmpty ? FontWeight.w500 : FontWeight.w700),
+                          ),
+                          if (parts.unit.isNotEmpty)
+                            TextSpan(text: ' ${parts.unit}', style: MuseTextLevel.caption2.style(context, color: mt.text2)),
+                        ],
+                      ),
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return Semantics(
+      selected: selected,
+      label: '${museStripFlags(name)} ${view.text}',
+      child: dimmed ? Opacity(opacity: 0.55, child: card) : card,
+    );
+  }
+}
+
+/// 1.11.0 (A): one mode of the 节点 page's top bar — 手动选择, or a group of the main selector.
+class MuseNodeMode {
+  const MuseNodeMode({required this.key, required this.label, this.groupTag});
+
+  /// 'manual' or the group's tag
+  final String key;
+  final String label;
+
+  /// null = 手动选择
+  final String? groupTag;
+}
+
+/// 1.11.0: the modes for the bar: 手动选择 first, then each group of [groups] (自动最快 with its
+/// delay, 负载均衡, …). Empty when there is no group to choose (the bar is hidden then).
+List<MuseNodeMode> museNodeModes(List<OutboundInfo> groups, {required int Function(OutboundInfo) delayOf}) {
+  if (groups.isEmpty) return const [];
+  return [
+    const MuseNodeMode(key: 'manual', label: '手动选择'),
+    for (final g in groups)
+      MuseNodeMode(
+        key: g.tag,
+        groupTag: g.tag,
+        label: switch (museGroupIconKind(type: g.type, name: museNodeName(g).split(' → ').first.trim(), selectedDisplay: g.groupSelectedTagDisplay)) {
+          MuseGroupIcon.autoFastest => delayOf(g) > 0 ? '自动最快 ${delayOf(g)}' : '自动最快',
+          MuseGroupIcon.loadBalance => '负载均衡',
+          _ => museGroupName(museNodeName(g).split(' → ').first.trim()),
+        },
+      ),
+  ];
+}
+
+/// 1.11.0: which mode the main group is in ([selected] = its pick).
+String museNodeModeOf(List<MuseNodeMode> modes, String selected) =>
+    modes.where((m) => m.groupTag != null && m.groupTag == selected).firstOrNull?.key ?? 'manual';
+
+/// 1.11.0: the node 「手动选择」 switches to from a group: the most recent node still in the list,
+/// else the fastest one that passed its test, else the first node; null when there is none.
+String? museManualPick({required List<String> recent, required List<OutboundInfo> nodes, required int Function(OutboundInfo) delayOf}) {
+  final present = {for (final n in nodes) n.tag};
+  for (final r in recent) {
+    if (present.contains(r)) return r;
+  }
+  final tested = [for (final n in nodes) if (museIsValidDelayMs(delayOf(n))) n]..sort((a, b) => delayOf(a).compareTo(delayOf(b)));
+  return tested.firstOrNull?.tag ?? nodes.firstOrNull?.tag;
+}
+
+/// 1.11.0 (A): 手动选择 / 自动最快 184 / 负载均衡 — the selected mode is a filled accent pill.
+class MuseNodeModeBar extends StatelessWidget {
+  const MuseNodeModeBar({super.key, required this.modes, required this.selected, required this.onChanged});
+
+  final List<MuseNodeMode> modes;
+  final String selected;
+  final ValueChanged<MuseNodeMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final mt = MuseTheme.of(context);
+    final brand = museBrandOf(context);
+    return SizedBox(
+      key: const ValueKey('node_mode_bar'),
+      height: MediaQuery.textScalerOf(context).scale(MuseSize.nodeModeBar),
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: mt.card, borderRadius: MuseRadius.fullAll),
+        child: Padding(
+          padding: const EdgeInsets.all(MuseSpace.s4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < modes.length; i++)
+                Expanded(
+                  child: Semantics(
+                    button: true,
+                    selected: modes[i].key == selected,
+                    child: InkWell(
+                      key: ValueKey('node_mode_$i'),
+                      borderRadius: MuseRadius.fullAll,
+                      onTap: () => onChanged(modes[i]),
+                      child: AnimatedContainer(
+                        duration: museMotion(context),
+                        curve: MuseMotion.curve,
+                        decoration: BoxDecoration(color: modes[i].key == selected ? brand : MusePalette.transparent, borderRadius: MuseRadius.fullAll),
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s4),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            modes[i].label,
+                            maxLines: 1,
+                            style: MuseType.body(context).copyWith(
+                              fontWeight: modes[i].key == selected ? FontWeight.w600 : FontWeight.w500,
+                              color: modes[i].key == selected ? museOnColor(brand) : mt.text2,
+                              fontFeatures: MuseType.tabular,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

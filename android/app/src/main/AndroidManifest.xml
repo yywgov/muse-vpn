@@ -199,6 +199,18 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="proxy" />
         </service>
+        <!-- 穿云 1.11.0: home-screen widget (connect / disconnect, node · delay); event driven -->
+        <receiver
+            android:name=".bg.ChuanyunWidget"
+            android:exported="false"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/chuanyun_widget_info" />
+        </receiver>
         <receiver
             android:name=".bg.BootReceiver"
             android:enabled="true"

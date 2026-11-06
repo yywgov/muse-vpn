@@ -91,6 +91,6 @@ void main() {
     final ref = RegExp(r'^muse\.compat\.ref=([0-9a-f]{40})$', multiLine: true)
         .firstMatch(File('dependencies.properties').readAsStringSync())
         ?.group(1);
-    expect(ref, 'a076442fb844c3ded4fd1cd00c1e688bdc7ac74e');
+    expect(ref, '66d82b1502a3b735643faf0e8102aa95f217dd34'); // 1.11.0: muse.23 (muse.22 + slimmer standard core)
   });
 }

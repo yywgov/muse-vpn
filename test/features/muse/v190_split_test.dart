@@ -47,8 +47,12 @@ void main() {
 
   test('every page class is defined exactly once across the parts', () {
     final src = museLibrarySource('$settings/more_settings.dart');
-    for (final c in ['MuseAppearancePage', 'MuseNodeSettingsPage', 'MuseDeveloperPage', 'MuseRoutingPage', 'MuseNetworkPage', 'MuseSyncPage', 'MuseStatsPage', 'MuseWebdavPage']) {
+    for (final c in ['MuseAppearancePage', 'MuseNodeSettingsPage', 'MuseDeveloperPage', 'MuseRoutingPage', 'MuseNetworkPage', 'MuseStatsPage']) {
       expect(RegExp('class $c ').allMatches(src).length, 1, reason: c);
+    }
+    // 1.11.0: 备份与同步 / WebDAV pages removed
+    for (final c in ['MuseSyncPage', 'MuseWebdavPage']) {
+      expect(RegExp('class $c ').allMatches(src), isEmpty, reason: c);
     }
   });
 }

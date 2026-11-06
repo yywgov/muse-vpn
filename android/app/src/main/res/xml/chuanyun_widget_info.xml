@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 穿云 1.11.0 home-screen widget. updatePeriodMillis 0: redrawn only when the connection or the
+     node changes, never on a timer. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/chuanyun_widget"
+    android:minWidth="180dp"
+    android:minHeight="40dp"
+    android:previewLayout="@layout/chuanyun_widget"
+    android:resizeMode="horizontal"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

@@ -3,6 +3,8 @@
 
 part of 'more_settings.dart';
 
+// 1.11.0: 导出 CSV removed.
+
 // ======================================================================= 统计
 
 class MuseStatsPage extends HookConsumerWidget {
@@ -72,24 +74,6 @@ class MuseStatsPage extends HookConsumerWidget {
             header: '本月报告',
             dividerIndent: MuseSpace.s16,
             children: [for (final line in report) MuseTile(title: line)],
-          ),
-          // 1.9.0 #179
-          MuseSection(
-            children: [
-              MuseTile(
-                key: const ValueKey('stats_export_csv'),
-                leading: const Icon(Icons.table_chart_outlined),
-                title: '导出 CSV',
-                subtitle: log.days.isEmpty ? '还没有流量记录' : '每天的上传 / 下载字节数，可用表格软件打开',
-                chevron: log.days.isNotEmpty,
-                onTap: log.days.isEmpty
-                    ? null
-                    : () async {
-                        final ok = await museSaveTextFile(context, 'chuanyun-traffic.csv', museTrafficCsv(log));
-                        if (context.mounted) _toast(ref, ok ? '已导出' : '没有导出');
-                      },
-              ),
-            ],
           ),
         ],
       );

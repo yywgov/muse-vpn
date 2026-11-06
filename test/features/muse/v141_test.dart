@@ -5,16 +5,12 @@
 // 诊断向导, Android 后台被杀检测 + 机型指引, 订阅 10 % 提醒 / 更新差异, 命令行参数 / 控制链接.
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/muse/data/bundled_rule_sets.dart';
-import 'package:hiddify/features/muse/data/lan_sync_service.dart';
-import 'package:hiddify/features/muse/data/sync_service.dart';
 import 'package:hiddify/features/muse/logic/android_keepalive.dart';
 import 'package:hiddify/features/muse/logic/core_extras.dart';
 import 'package:hiddify/features/muse/logic/diagnosis.dart';
-import 'package:hiddify/features/muse/logic/lan_sync.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:hiddify/features/muse/logic/stats_tools.dart';
@@ -22,48 +18,6 @@ import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/logic/sync_core.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
-
-/// An in-memory device for the LAN exchange (only what the LAN code uses).
-class _FakeSync implements MuseSyncService {
-  _FakeSync(this.values);
-
-  Map<String, Object?> values;
-  MuseSnapshot last = MuseSnapshot.empty;
-  int applied = 0;
-
-  @override
-  MuseSnapshot lastSynced() => last;
-
-  @override
-  Future<MuseSnapshot> stampedLocal({Set<String> remoteKeys = const {}, int? now}) async => museStampLocal(
-    current: values,
-    lastSynced: last,
-    now: now ?? DateTime.now().millisecondsSinceEpoch,
-    remoteKeys: remoteKeys,
-  );
-
-  @override
-  Future<MuseSyncResult> applyMerged(MuseSnapshot merged) async {
-    final changes = museSyncChanges(values, merged);
-    final next = {...values};
-    changes.forEach((k, v) {
-      if (k.startsWith('sub:')) {
-        if (v != null) next[k] = v; // never deleted
-      } else if (v == null) {
-        next.remove(k);
-      } else {
-        next[k] = v;
-      }
-    });
-    values = next;
-    last = merged;
-    applied++;
-    return MuseSyncResult(changed: changes.length);
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError('${invocation.memberName}');
-}
 
 void main() {
   group('bug sweep', () {
@@ -129,172 +83,7 @@ void main() {
     });
   });
 
-  group('局域网同步', () {
-    test('keys: 160 bits, unambiguous alphabet, typed forms accepted', () {
-      final k = museNewLanKey(Random(1));
-      expect(k.length, 32);
-      expect(RegExp(r'^[A-HJ-NP-Z2-9]+$').hasMatch(k), isTrue);
-      expect(museNormalizeKey(museGroupKey(k).toLowerCase()), k);
-      expect(museNormalizeKey(' ${museGroupKey(k)} '), k);
-      expect(museNormalizeKey('short'), isNull);
-      expect(museNormalizeKey('${k.substring(0, 31)}0'), isNull); // 0 is not in the alphabet
-      expect(museNewLanKey(), isNot(museNewLanKey()));
-    });
-
-    test('pairing: QR link and typed code round trip, LAN only', () {
-      final now = DateTime(2026, 10, 22, 20);
-      final p = MuseLanPairing(
-        host: '192.168.1.5',
-        port: 43125,
-        key: museNewLanKey(Random(2)),
-        expiresAt: now.add(museLanPairingTtl).millisecondsSinceEpoch,
-        device: 'Windows · DESKTOP-1',
-      );
-      final back = museParseLanPairing(p.toUri())!;
-      expect((back.host, back.port, back.key, back.device), (p.host, p.port, p.key, p.device));
-      expect(back.expiresAt ~/ 1000, p.expiresAt ~/ 1000);
-      expect(back.expired(now), isFalse);
-      expect(back.expired(now.add(const Duration(minutes: 4))), isTrue);
-      final typed = museParseLanPairing(p.manualCode, now: now)!;
-      expect((typed.host, typed.port, typed.key), (p.host, p.port, p.key));
-      // public or loopback addresses are refused
-      expect(museParseLanPairing(p.toUri().replaceFirst('192.168.1.5', '8.8.8.8')), isNull);
-      expect(museParseLanPairing('127.0.0.1:43125 ${museGroupKey(p.key)}'), isNull);
-      expect(museParseLanPairing('https://example.com'), isNull);
-      expect(museParseLanPairing(''), isNull);
-    });
-
-    test('private addresses and the interface to listen on', () {
-      for (final ip in ['10.0.0.2', '172.16.4.245', '172.31.255.1', '192.168.50.9', '169.254.3.3']) {
-        expect(museIsLanAddress(ip), isTrue, reason: ip);
-      }
-      for (final ip in ['172.32.0.1', '8.8.8.8', '100.64.0.1', '127.0.0.1', '0.0.0.0', '1.2.3', 'x']) {
-        expect(museIsLanAddress(ip), isFalse, reason: ip);
-      }
-      expect(
-        musePickLanAddress([('vEthernet (WSL)', '172.20.0.1'), ('Wintun 穿云', '172.19.0.1'), ('WLAN', '192.168.1.8'), ('lo', '127.0.0.1')]),
-        '192.168.1.8',
-      );
-      expect(musePickLanAddress([('vEthernet (WSL)', '172.20.0.1'), ('Ethernet', '10.1.2.3')]), '10.1.2.3');
-      expect(musePickLanAddress([('lo', '127.0.0.1'), ('ppp0', '100.70.1.1')]), isNull);
-    });
-
-    test('messages: sealed with the key, refused with another key, session or type', () {
-      final key = museNewLanKey(Random(3));
-      final now = DateTime.now();
-      final m = MuseLanMessage(
-        type: 'push',
-        session: museLanSession(key),
-        at: now.millisecondsSinceEpoch,
-        device: 'A',
-        snapshot: MuseSnapshot({'muse_accent': const MuseSyncEntry('green', 5)}),
-      );
-      final sealed = museLanSeal(m, key);
-      expect(sealed.contains('green'), isFalse);
-      expect(museLanOpen(sealed, key, expectType: 'push', now: now).snapshot.values['muse_accent'], 'green');
-      expect(() => museLanOpen(sealed, museNewLanKey(Random(4)), expectType: 'push', now: now), throwsA(isA<MuseLanException>()));
-      expect(() => museLanOpen(sealed, key, expectType: 'merged', now: now), throwsA(isA<MuseLanException>()));
-      expect(
-        () => museLanOpen(sealed, key, expectType: 'push', now: now.add(const Duration(minutes: 10))),
-        throwsA(isA<MuseLanException>()),
-      );
-      final other = museLanSeal(
-        MuseLanMessage(type: 'push', session: 'someone-else', at: now.millisecondsSinceEpoch, device: 'B', snapshot: MuseSnapshot.empty),
-        key,
-      );
-      expect(() => museLanOpen(other, key, expectType: 'push', now: now), throwsA(isA<MuseLanException>()));
-    });
-
-    test('merge: a joining device that never synced yields on shared keys', () {
-      final host = MuseSnapshot({'muse_accent': const MuseSyncEntry('purple', 100), 'sub:https://h/s': const MuseSyncEntry('H', 100)});
-      final client = MuseLanMessage(
-        type: 'push',
-        session: 's',
-        at: 0,
-        device: 'phone',
-        firstSync: true,
-        snapshot: MuseSnapshot({'muse_accent': const MuseSyncEntry('blue', 9999), 'sub:https://p/s': const MuseSyncEntry('P', 9999)}),
-      );
-      final merged = museLanMerge(host, client);
-      expect(merged.values, {'muse_accent': 'purple', 'sub:https://h/s': 'H', 'sub:https://p/s': 'P'});
-      // not a first sync: the newer change wins
-      final again = museLanMerge(host, MuseLanMessage(type: 'push', session: 's', at: 0, device: 'p', snapshot: client.snapshot));
-      expect(again.values['muse_accent'], 'blue');
-    });
-
-    test('a real exchange over the LAN: both devices end with the merged state', () async {
-      final ip = await MuseLanHost.lanAddress();
-      if (ip == null) {
-        markTestSkipped('no LAN address here');
-        return;
-      }
-      final hostSync = _FakeSync({'muse_accent': 'purple', 'sub:https://h/s': 'Home'})
-        ..last = MuseSnapshot({'muse_accent': const MuseSyncEntry('blue', 1)});
-      final phoneSync = _FakeSync({'muse_hosts': '1.2.3.4 nas.lan', 'sub:https://p/s': 'Phone'});
-      String? asked;
-      final host = MuseLanHost(
-        hostSync,
-        confirm: (device) async {
-          asked = device;
-          return true;
-        },
-      );
-      await host.start(address: ip);
-      if (host.state == MuseLanHostState.failed && host.message.startsWith('无法开始监听')) {
-        markTestSkipped('cannot listen here: ${host.message}');
-        return;
-      }
-      expect(host.state, MuseLanHostState.waiting, reason: host.message);
-      expect(host.listening, isTrue);
-      final pairing = museParseLanPairing(host.pairing!.toUri())!;
-
-      // a wrong key is refused and does not use up the pairing
-      final wrong = MuseLanPairing(host: pairing.host, port: pairing.port, key: museNewLanKey(), expiresAt: pairing.expiresAt);
-      await expectLater(museLanSyncWith(phoneSync, wrong), throwsA(isA<MuseLanException>()));
-      expect(host.state, MuseLanHostState.waiting, reason: host.message);
-
-      final result = await museLanSyncWith(phoneSync, pairing);
-      expect(asked, isNotNull);
-      expect(result.changed, greaterThan(0));
-      expect(phoneSync.values, hostSync.values);
-      expect(phoneSync.values, {
-        'muse_accent': 'purple',
-        'muse_hosts': '1.2.3.4 nas.lan',
-        'sub:https://h/s': 'Home',
-        'sub:https://p/s': 'Phone',
-      });
-      expect(host.state, MuseLanHostState.done);
-      // one pairing = one sync: the listener is gone
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      expect(host.listening, isFalse);
-      await expectLater(museLanSyncWith(phoneSync, pairing), throwsA(isA<MuseLanException>()));
-    });
-
-    test('the host refuses when its user says no, and expires', () async {
-      final ip = await MuseLanHost.lanAddress();
-      if (ip == null) {
-        markTestSkipped('no LAN address here');
-        return;
-      }
-      final hostSync = _FakeSync({'muse_accent': 'purple'});
-      final host = MuseLanHost(hostSync, confirm: (_) async => false);
-      await host.start(address: ip);
-      if (host.state == MuseLanHostState.failed && host.message.startsWith('无法开始监听')) {
-        markTestSkipped('cannot listen here: ${host.message}');
-        return;
-      }
-      final p = museParseLanPairing(host.pairing!.toUri())!;
-      await expectLater(museLanSyncWith(_FakeSync({}), p), throwsA(isA<MuseLanException>()));
-      expect(hostSync.applied, 0);
-
-      final short = MuseLanHost(hostSync, confirm: (_) async => true);
-      await short.start(address: ip, ttl: const Duration(milliseconds: 300));
-      await Future<void>.delayed(const Duration(milliseconds: 600));
-      expect(short.state, MuseLanHostState.expired);
-      expect(short.listening, isFalse);
-    });
-  });
-
+  // 1.11.0: 局域网同步 removed (its tests went with it).
   group('分流预设 1.4.1', () {
     test('the new services are there, all off by default, each in a section', () {
       final keys = museRulePresets.map((p) => p.key).toSet();

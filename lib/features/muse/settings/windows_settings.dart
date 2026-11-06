@@ -79,17 +79,38 @@ class MuseWindowsSilentStartTile extends ConsumerWidget {
 
 /// 穿云标题栏 / 窗口置顶 / 快捷键 / 关闭窗口时 (设置 › 外观 › 窗口).
 class MuseWindowsWindowSection extends ConsumerWidget {
-  const MuseWindowsWindowSection({super.key});
+  const MuseWindowsWindowSection({super.key, this.advancedOpen = false});
+
+  /// 1.11.0: 「高级」 (穿云标题栏 / 快捷键 / 窗口置顶) unfolded
+  final bool advancedOpen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final closing = ref.watch(Preferences.actionAtClose);
     final hotkeyCount = ref.watch(MusePrefs.hotkeysOn) ? museParseHotkeys(ref.watch(MusePrefs.hotkeys)).length : 0;
-    return MuseSection(
+    return Column(
       key: const ValueKey('appearance_windows'),
-      header: '窗口',
       children: [
+        MuseSection(header: '窗口', children: [
+        MuseTile(
+          key: const ValueKey('settings_close_action'),
+          leading: const Icon(Icons.close_outlined),
+          title: '关闭窗口时',
+          trailing: Text(closing.present(t)),
+          chevron: true,
+          onTap: () async {
+            final selected = await ref.read(dialogNotifierProvider.notifier).showActionAtClosing(selected: closing);
+            if (selected != null) await ref.read(Preferences.actionAtClose.notifier).update(selected);
+          },
+        ),
+        ]),
+        // 1.11.0: 穿云标题栏 / 快捷键 / 窗口置顶 fold into 「高级」 (same preferences)
+        MuseFoldSection(
+          foldKey: const ValueKey('window_advanced_fold'),
+          summary: '穿云标题栏、全局快捷键、窗口置顶',
+          initiallyOpen: advancedOpen,
+          children: [
         // 1.6.0 C8: 穿云's own title bar (off = the Windows one) and 窗口置顶
         MuseSwitchTile(
           key: const ValueKey('settings_custom_title_bar'),
@@ -114,16 +135,7 @@ class MuseWindowsWindowSection extends ConsumerWidget {
           chevron: true,
           onTap: () => musePushPage(context, const MuseHotkeysPage()),
         ),
-        MuseTile(
-          key: const ValueKey('settings_close_action'),
-          leading: const Icon(Icons.close_outlined),
-          title: '关闭窗口时',
-          trailing: Text(closing.present(t)),
-          chevron: true,
-          onTap: () async {
-            final selected = await ref.read(dialogNotifierProvider.notifier).showActionAtClosing(selected: closing);
-            if (selected != null) await ref.read(Preferences.actionAtClose.notifier).update(selected);
-          },
+          ],
         ),
       ],
     );

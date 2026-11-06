@@ -280,6 +280,15 @@ void main() {
         expect(find.byKey(const ValueKey('settings_network')), findsOneWidget);
         await _done(tester);
         await _pump(tester, page: const MuseNetworkPage(), brightness: b, size: s.$1, desktop: s.$3, tab: 3);
+        // 1.11.0: IPv6 / Fake-IP are in the folded 「高级」 of 网络; open it first
+        expect(find.byKey(const ValueKey('fake_ip')), findsNothing);
+        await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('network_advanced_fold')),
+          200,
+          scrollable: find.descendant(of: find.byType(MuseNetworkPage), matching: find.byType(Scrollable)).first,
+        );
+        await tester.tap(find.byKey(const ValueKey('network_advanced_fold')));
+        await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
           find.byKey(const ValueKey('fake_ip')),
           200,
@@ -313,7 +322,8 @@ void main() {
           extra: [museNodeTestStartedProvider.overrideWith((ref) => started)],
         );
         expect(tester.takeException(), isNull);
-        final built = find.byType(MuseNodeRow).evaluate().length;
+        // 1.11.0 (A): nodes are two-column cards
+        final built = find.byType(MuseNodeRow).evaluate().length + find.byType(MuseNodeCard).evaluate().length;
         expect(built, greaterThan(3));
         expect(built, lessThan(120), reason: 'only the rows on screen (plus the cache) are built');
         expect(find.text('已测 250 / 1000'), findsOneWidget);

@@ -176,7 +176,12 @@ void _mockClipboard(WidgetTester tester) {
   addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
 }
 
-double _y(WidgetTester tester, String key) => tester.getTopLeft(find.byKey(ValueKey(key))).dy;
+/// Reading order on the page: 1.11.0 (A) lays nodes out in two columns, so a node is "before"
+/// another when it is on an earlier row, or on the same row further left.
+double _y(WidgetTester tester, String key) {
+  final p = tester.getTopLeft(find.byKey(ValueKey(key)));
+  return p.dy * 10000 + p.dx;
+}
 
 void main() {
   group('logic', () {
@@ -414,12 +419,12 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.textContaining('不可用'), findsNothing);
       expect(find.byKey(const ValueKey('clear_unavailable')), findsNothing);
-      expect(find.text('超时'), findsNWidgets(2));
+      expect(find.text('超时', findRichText: true), findsNWidgets(2));
       // still in the list (nothing folded away), below every node that did not time out
-      final hk = tester.getTopLeft(find.byKey(const ValueKey('🇭🇰 香港 01'))).dy;
-      final sg = tester.getTopLeft(find.byKey(const ValueKey('🇸🇬 新加坡 03'))).dy;
+      final hk = _y(tester, '🇭🇰 香港 01');
+      final sg = _y(tester, '🇸🇬 新加坡 03');
       for (final ok in ['沪日 IPLC 01', '🇺🇸 洛杉矶 01', 'dupD']) {
-        final y = tester.getTopLeft(find.byKey(ValueKey(ok))).dy;
+        final y = _y(tester, ok);
         expect(y, lessThan(hk), reason: ok);
         expect(y, lessThan(sg), reason: ok);
       }

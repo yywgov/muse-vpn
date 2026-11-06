@@ -5,14 +5,16 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 
 /// The page a setting lives on. 1.10.0: the 设置 home page has 8 rows (外观, 自动连接, 分应用代理,
 /// 网络, 活动, 备份与同步, 内核与资源, 关于); rows that moved elsewhere keep their old names here so
-/// search still finds them, with the path of their new place.
+/// search still finds them, with the path of their new place. 1.11.0: removed settings (配色风格, 文字缩放,
+/// 隐藏桌面图标, 局域网同步, WebDAV 同步, 每周本地快照, 连接质量提醒, 导出 CSV) are gone from search too.
 enum MuseSettingPage {
   advanced('设置 › 网络 › 高级'),
   appearance('设置 › 外观'),
   nodes('节点 › ⋯ › 节点设置'),
   routing('订阅 › 规则 › 分流'),
   network('设置 › 网络'),
-  sync('设置 › 备份与同步'),
+  // 1.11.0: 备份与同步 is gone; what is left (导出 / 导入配置) is on 关于
+  sync('设置 › 关于 › 导出 / 导入配置'),
   stats('设置 › 活动 › 统计'),
   developer('设置 › 开发者选项'),
   perApp('设置 › 分应用代理'),
@@ -29,7 +31,10 @@ enum MuseSettingPage {
   overrides('订阅 › 规则 › 订阅覆写'),
   // 1.10.0
   subscriptions('订阅 › ⋯'),
-  openSource('设置 › 关于 › 开源许可与致谢');
+  openSource('设置 › 关于 › 开源许可与致谢'),
+  // 1.11.0: rows folded into 「高级」 on their page
+  nodesAdvanced('节点 › ⋯ › 节点设置 › 高级'),
+  windowAdvanced('设置 › 外观 › 窗口 › 高级');
 
   const MuseSettingPage(this.path);
 
@@ -54,11 +59,12 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('深浅色', MuseSettingPage.appearance, keywords: ['深色模式', '浅色模式', '跟随系统', '主题']),
   MuseSettingEntry('纯黑', MuseSettingPage.appearance, keywords: ['黑色', 'OLED', '省电', '深色模式', 'AMOLED']),
   MuseSettingEntry('主题色', MuseSettingPage.appearance, keywords: ['颜色', '强调色', '中国传统色', '传统色', '景泰蓝', '宝蓝', '竹青', '松花', '胭脂', '枣红', '藤黄', '青碧', '丁香', '赭石', '蓝', '绿', '紫', '青', '红', '黄', '灰', '棕']),
-  MuseSettingEntry('配色风格', MuseSettingPage.appearance, keywords: ['忠实', '标准', '鲜艳', '表现力', '柔和', '鲜明', '着色', '单色', '配色', '风格', '色调', 'Material You']),
   MuseSettingEntry('自定义主题色', MuseSettingPage.appearance, keywords: ['十六进制', 'hex', '#', '自定义颜色', '取色']),
-  MuseSettingEntry('文字缩放', MuseSettingPage.appearance, keywords: ['字体大小', '字号', '文字', '放大', '缩小']),
   MuseSettingEntry('隐私模式', MuseSettingPage.appearance, keywords: ['模糊', '截图']),
-  MuseSettingEntry('智能保持连接', MuseSettingPage.autoConnect, keywords: ['断线', '重连', '自动切换', '故障转移']),
+  MuseSettingEntry('智能保持连接', MuseSettingPage.autoConnect, keywords: ['断线', '重连', '重启内核']),
+  // 1.11.0
+  MuseSettingEntry('节点失效自动切换', MuseSettingPage.nodes, keywords: ['自动切换', '故障转移', '失效', '同地区', '换节点']),
+  MuseSettingEntry('隐藏通知', MuseSettingPage.appearance, keywords: ['通知', '隐私'], androidOnly: true),
   MuseSettingEntry('去广告', MuseSettingPage.routing, keywords: ['广告', '拦截', '温和', '强力']),
   MuseSettingEntry('订阅自动更新', MuseSettingPage.subscriptions, keywords: ['更新间隔', '订阅']),
   MuseSettingEntry('分应用代理', MuseSettingPage.perApp, keywords: ['应用', 'App', '绕过'], androidOnly: true),
@@ -66,9 +72,9 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('节点', MuseSettingPage.nodes, keywords: ['节点设置', '订阅 UA', '测速记录']),
   MuseSettingEntry('节点名美化', MuseSettingPage.nodes, keywords: ['国旗', '名称']),
   MuseSettingEntry('隐藏重复节点', MuseSettingPage.nodes, keywords: ['重复']),
-  MuseSettingEntry('重复判断', MuseSettingPage.nodes, keywords: ['去重', '地址', '端口', '完整参数']),
+  MuseSettingEntry('重复判断', MuseSettingPage.nodesAdvanced, keywords: ['去重', '地址', '端口', '完整参数']),
   MuseSettingEntry('只显示 / 排除', MuseSettingPage.nodes, keywords: ['过滤', '筛选', '正则']),
-  MuseSettingEntry('订阅 UA', MuseSettingPage.nodes, keywords: ['User-Agent', '格式', '客户端']),
+  MuseSettingEntry('订阅 UA', MuseSettingPage.nodesAdvanced, keywords: ['User-Agent', '格式', '客户端']),
   MuseSettingEntry('订阅更新方式', MuseSettingPage.nodes, keywords: ['走代理', '直连', '订阅下载']),
   MuseSettingEntry('清除测速记录', MuseSettingPage.nodes, keywords: ['延迟', '缓存']),
   MuseSettingEntry('订阅覆写', MuseSettingPage.overrides, keywords: ['覆写', '覆写脚本', '追加节点', '代理组', '自定义规则', 'override']),
@@ -81,21 +87,18 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('导入 / 导出 / 粘贴规则', MuseSettingPage.routing, keywords: ['Clash', 'Surge', '规则']),
   MuseSettingEntry('远程 DNS', MuseSettingPage.network, keywords: ['DNS', '解析']),
   MuseSettingEntry('每天定时连接 / 断开', MuseSettingPage.autoConnect, keywords: ['定时', '计划', '网络']),
-  MuseSettingEntry('连接质量提醒', MuseSettingPage.network, keywords: ['延迟', '提醒', '通知']),
-  MuseSettingEntry('局域网同步', MuseSettingPage.sync, keywords: ['配对码', '扫码', '多设备', '同步与备份']),
-  MuseSettingEntry('WebDAV 同步', MuseSettingPage.sync, keywords: ['坚果云', '云同步', '立即同步', '同步与备份']),
-  MuseSettingEntry('导出 / 恢复备份', MuseSettingPage.sync, keywords: ['备份', '恢复', '自动备份', '脱敏', '导出脱敏备份', '加密', '同步与备份']),
+  MuseSettingEntry('导出 / 导入配置', MuseSettingPage.sync, keywords: ['导出配置', '导入配置', '备份', '恢复', '导出 / 恢复备份', '脱敏', '导出脱敏备份', '加密', '同步与备份']),
   // 1.9.0 #8/#10: the page itself; 同步与备份 is its old name
-  MuseSettingEntry('备份与同步', MuseSettingPage.sync, keywords: ['同步与备份', '同步', '备份', 'WebDAV', '局域网']),
+  MuseSettingEntry('备份与同步', MuseSettingPage.sync, keywords: ['同步与备份', '同步', '备份']),
   MuseSettingEntry('统计', MuseSettingPage.stats, keywords: ['流量', '用量']),
   MuseSettingEntry('流量统计', MuseSettingPage.stats, keywords: ['图表', '月报', '用量']),
   // 1.10.0: 「高级」 is a group of 设置 › 网络
-  MuseSettingEntry('高级', MuseSettingPage.advanced, keywords: ['负载均衡', 'TLS 分片', 'IPv6', 'Fake-IP', 'QUIC']),
+  MuseSettingEntry('高级', MuseSettingPage.advanced, keywords: ['负载均衡', 'IPv6', 'Fake-IP', '关闭旧连接']),
   MuseSettingEntry('负载均衡策略', MuseSettingPage.advanced, keywords: ['负载均衡']),
-  MuseSettingEntry('TLS 分片', MuseSettingPage.advanced, keywords: ['分片', '混淆']),
+  MuseSettingEntry('TLS 分片', MuseSettingPage.network, keywords: ['分片', '混淆']),
   MuseSettingEntry('IPv6', MuseSettingPage.advanced, keywords: ['v6']),
   MuseSettingEntry('Fake-IP', MuseSettingPage.advanced, keywords: ['虚拟地址', 'TUN']),
-  MuseSettingEntry('屏蔽 QUIC', MuseSettingPage.advanced, keywords: ['UDP', 'YouTube', 'HTTP/3']),
+  MuseSettingEntry('屏蔽 QUIC', MuseSettingPage.network, keywords: ['UDP', 'YouTube', 'HTTP/3']),
   // 1.8.0: 连接 / 日志 / DNS are the tabs of 活动
   MuseSettingEntry('活动', MuseSettingPage.activity, keywords: ['连接', '日志', 'DNS', '统计', '诊断']),
   MuseSettingEntry('连接', MuseSettingPage.activity, keywords: ['连接列表', '实时连接', '连接信息', '请求', '屏蔽']),
@@ -105,10 +108,8 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('测速并发数 / 超时', MuseSettingPage.developer, keywords: ['测速', '并发', '超时']),
   // 1.9.0
   MuseSettingEntry('导入后清空剪贴板', MuseSettingPage.appearance, keywords: ['剪贴板', '订阅链接', '密钥', '隐私']),
-  MuseSettingEntry('每周本地快照', MuseSettingPage.sync, keywords: ['快照', '自动备份', '每周']),
   MuseSettingEntry('导出为 sing-box 格式', MuseSettingPage.routing, keywords: ['规则', '导出']),
   MuseSettingEntry('恢复推荐 DNS', MuseSettingPage.network, keywords: ['默认', 'DNS', '还原']),
-  MuseSettingEntry('导出 CSV', MuseSettingPage.stats, keywords: ['流量', '表格', 'Excel']),
   MuseSettingEntry('诊断', MuseSettingPage.diagnose, keywords: ['日志', '连不上', '排查', '反馈', '崩溃']),
   MuseSettingEntry('运行模式', MuseSettingPage.network, keywords: ['TUN', '系统代理', '虚拟网卡'], windowsOnly: true),
   MuseSettingEntry('开机自启', MuseSettingPage.autoConnect, keywords: ['启动', '开机'], windowsOnly: true),
@@ -116,17 +117,16 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('关闭窗口时', MuseSettingPage.appearance, keywords: ['托盘', '最小化', '退出', '窗口'], windowsOnly: true),
   // 1.6.0 C8
   MuseSettingEntry('开机自启时静默', MuseSettingPage.autoConnect, keywords: ['开机', '托盘', '不弹窗口'], windowsOnly: true),
-  MuseSettingEntry('穿云标题栏', MuseSettingPage.appearance, keywords: ['标题栏', '系统标题栏', '窗口边框', '窗口'], windowsOnly: true),
-  MuseSettingEntry('窗口置顶', MuseSettingPage.appearance, keywords: ['置顶', '最前面', '总在最前', '窗口'], windowsOnly: true),
+  MuseSettingEntry('穿云标题栏', MuseSettingPage.windowAdvanced, keywords: ['标题栏', '系统标题栏', '窗口边框', '窗口'], windowsOnly: true),
+  MuseSettingEntry('窗口置顶', MuseSettingPage.windowAdvanced, keywords: ['置顶', '最前面', '总在最前', '窗口'], windowsOnly: true),
   MuseSettingEntry('按需运行', MuseSettingPage.autoConnect, keywords: ['Wi-Fi', 'WiFi', '无线', '暂停', '家里', '公司']),
-  MuseSettingEntry('快捷键', MuseSettingPage.appearance, keywords: ['全局快捷键', '热键', '键盘'], windowsOnly: true),
+  MuseSettingEntry('快捷键', MuseSettingPage.windowAdvanced, keywords: ['全局快捷键', '热键', '键盘'], windowsOnly: true),
   // 1.6.0 C9 (Android 通用)
-  MuseSettingEntry('自动运行', MuseSettingPage.autoConnect, keywords: ['打开即连接', '自动连接', '启动时连接'], androidOnly: true),
-  MuseSettingEntry('自动连接', MuseSettingPage.autoConnect, keywords: ['自动运行', '按需运行', '定时连接', '定时断开']),
+  MuseSettingEntry('打开即连接', MuseSettingPage.autoConnect, keywords: ['自动运行', '自动连接', '启动时连接'], androidOnly: true),
+  MuseSettingEntry('自动连接', MuseSettingPage.autoConnect, keywords: ['打开即连接', '自动运行', '开机自启', '更多', '按需运行', '定时连接', '定时断开']),
   MuseSettingEntry('通知栏断开按钮', MuseSettingPage.appearance, keywords: ['通知', '断开', '停止按钮'], androidOnly: true),
   // 1.10.2: 在最近任务中隐藏 (back, on 设置 › 外观)
   MuseSettingEntry('在最近任务中隐藏', MuseSettingPage.appearance, keywords: ['最近任务', '多任务', '后台列表', '隐藏', '不在最近任务显示'], androidOnly: true),
-  MuseSettingEntry('隐藏桌面图标 / 通知', MuseSettingPage.appearance, keywords: ['隐私', '隐藏', '隐私与后台'], androidOnly: true),
   MuseSettingEntry('检查更新', MuseSettingPage.about, keywords: ['版本', '更新内容']),
   // 1.6.0 C10
   // 1.7.0 M3
@@ -170,7 +170,7 @@ String museActivityTabKeyForSetting(String title) => switch (title) {
   '日志' => 'logs',
   'DNS 查询' => 'dns',
   // 1.10.0: 统计 and 诊断 are tabs of 活动
-  '统计' || '流量统计' || '导出 CSV' => 'stats',
+  '统计' || '流量统计' => 'stats',
   '诊断' => 'diagnose',
   _ => 'connections',
 };

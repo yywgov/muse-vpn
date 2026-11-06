@@ -42,7 +42,14 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:hiddify/features/muse/data/crash_recorder.dart';
 
+/// 1.11.0 冷启动: jobs deferred until the first frame is on screen.
+final museAfterFirstFrame = <Future<void> Function()>[];
+
+/// 1.11.0: time since lazyBootstrap started (the log line 「first frame at」 reads it).
+final museColdStart = Stopwatch();
+
 Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async {
+  museColdStart.start();
   if (!kIsWeb) {
     FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   }
@@ -82,6 +89,14 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
       child: const App(),
     ),
   );
+  // 1.11.0 冷启动: work the first frame does not need runs right after it
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    for (final job in museAfterFirstFrame) {
+      unawaited(job());
+    }
+    museAfterFirstFrame.clear();
+    Logger.bootstrap.info("first frame at [${museColdStart.elapsedMilliseconds}ms]");
+  });
 
   if (!kIsWeb) {
     FlutterNativeSplash.remove();
@@ -190,11 +205,18 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
     Logger.bootstrap.info(appInfo.format());
   }
 
+  // 1.11.0 冷启动: the bundled lists are copied once per app build (a stamp in the preferences)
+  // instead of every list being read from the APK on every start to compare sizes
   await _safeInit("bundled rule-sets", () async {
     final dirs = container.read(appDirectoriesProvider).requireValue;
-    await museInstallBundledRuleSets(dirs.baseDir.absolute.path);
+    final prefs = container.read(sharedPreferencesProvider).requireValue;
+    final stamp = appInfo == null ? '' : '${appInfo.version}+${appInfo.buildNumber}';
+    final base = dirs.baseDir.absolute.path;
+    if (museBundledRuleSetsCurrent(saved: prefs.getString(museRuleSetsStampKey), stamp: stamp, baseDir: base, workingDir: dirs.workingDir.absolute.path)) return;
+    await museInstallBundledRuleSets(base);
     // 1.9.0 #14: 兼容内核's default lists too (first connect needs no download)
     await museInstallBundledCompatRuleSets(dirs.workingDir.absolute.path);
+    if (stamp.isNotEmpty) await prefs.setString(museRuleSetsStampKey, stamp);
   }, timeout: 5000);
   await _safeInit("profile repository", () => container.read(profileRepositoryProvider.future));
 
@@ -221,10 +243,10 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
     }
 
     if (PlatformUtils.isAndroid) {
-      await _safeInit("android display mode", () async {
-        await FlutterDisplayMode.setHighRefreshRate();
-        await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      });
+      // 1.11.0 冷启动: edge-to-edge before the first frame (the layout depends on it); the refresh
+      // rate is asked for after it (a platform call the first frame does not need)
+      await _safeInit("android edge-to-edge", () => SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+      museAfterFirstFrame.add(() => _safeInit("android display mode", FlutterDisplayMode.setHighRefreshRate));
     }
   }
 }

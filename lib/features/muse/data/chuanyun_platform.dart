@@ -20,6 +20,10 @@ abstract final class ChuanyunPlatform {
     }
   }
 
+  /// 1.11.0: the node in use and its delay (0 = unknown) for the home-screen widget.
+  static Future<void> updateWidget({required String node, required int delay}) =>
+      _call<bool>('widget_update', {'node': node, 'delay': delay});
+
   static Future<bool> isLauncherIconHidden() async => await _call<bool>('is_launcher_icon_hidden') ?? false;
 
   static Future<bool> setLauncherIconHidden(bool hidden) async =>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 穿云 1.11.0 home-screen widget -->
+    <color name="widget_background">#F21C1C1E</color>
+    <color name="widget_text">#F0F0F5</color>
+    <color name="widget_text_secondary">#9A9AA2</color>
+</resources>

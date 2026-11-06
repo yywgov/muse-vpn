@@ -147,6 +147,18 @@ abstract final class MuseSize {
   /// 1.6.0 C5: 节点 list layout keeps a readable column
   static const nodeListMax = 720.0;
 
+  /// 1.11.0 节点 A 双列卡片: narrowest card (two columns on a phone, more on a wide window)
+  static const nodeCardMinWidth = 156.0;
+
+  /// 1.11.0: the selected card's accent outline
+  static const nodeCardBorder = 1.5;
+
+  /// 1.11.0: the round tick on the selected card
+  static const nodeCardCheck = 18.0;
+
+  /// 1.11.0: 手动选择 / 自动最快 / 负载均衡 bar on the 节点 page
+  static const nodeModeBar = 40.0;
+
   /// 1.5.3: a node row shows its protocol tag only while it takes at most this share of the name column
   static const protocolTagShare = 0.4;
 

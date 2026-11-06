@@ -5,8 +5,14 @@ part of 'more_settings.dart';
 
 // ======================================================================= 节点
 
+/// 1.11.0
+const museAutoFailoverTitle = '节点失效自动切换';
+
 class MuseNodeSettingsPage extends HookConsumerWidget {
-  const MuseNodeSettingsPage({super.key});
+  const MuseNodeSettingsPage({super.key, this.advancedOpen = false});
+
+  /// 1.11.0: open with 「高级」 (订阅 UA / 重复判断) unfolded
+  final bool advancedOpen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,6 +38,19 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
       title: '节点',
       body: MuseGroupedBody(
         children: [
+          // 1.11.0 节点失效自动切换 (on by default; event driven: acts on test results, never polls)
+          MuseSection(
+            children: [
+              MuseSwitchTile(
+                key: const ValueKey('node_auto_failover'),
+                leading: const Icon(Icons.swap_horiz_outlined),
+                title: museAutoFailoverTitle,
+                info: '当前节点连续两次测速失败时，自动换到同地区最快的可用节点并提示；该节点恢复后换回',
+                value: ref.watch(MusePrefs.autoFailover),
+                onChanged: (v) => ref.read(MusePrefs.autoFailover.notifier).update(v),
+              ),
+            ],
+          ),
           MuseSection(
             children: [
               MuseSwitchTile(
@@ -47,34 +66,6 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
                 title: '隐藏重复节点',
                 value: ref.watch(MusePrefs.hideDuplicates),
                 onChanged: (v) => ref.read(MusePrefs.hideDuplicates.notifier).update(v),
-              ),
-              // 1.6.0 #31: what counts as a duplicate
-              MuseTile(
-                key: const ValueKey('node_dedup_mode'),
-                leading: const Icon(Icons.rule_outlined),
-                title: '重复判断',
-                subtitle: ref.watch(MusePrefs.hideDuplicates) ? null : '开启「隐藏重复节点」后生效',
-                trailing: Text(museDedupModes[ref.watch(MusePrefs.dedupMode)] ?? museDedupModes['protocol']!, overflow: TextOverflow.ellipsis),
-                chevron: true,
-                onTap: () async {
-                  final cur = ref.read(MusePrefs.dedupMode);
-                  final v = await showDialog<String>(
-                    context: context,
-                    builder: (c) => SimpleDialog(
-                      key: const ValueKey('node_dedup_dialog'),
-                      title: const Text('重复判断'),
-                      children: [
-                        for (final e in museDedupModes.entries)
-                          SimpleDialogOption(
-                            key: ValueKey('node_dedup_${e.key}'),
-                            onPressed: () => Navigator.of(c).pop(e.key),
-                            child: Text('${e.value}${cur == e.key ? '（当前）' : ''}'),
-                          ),
-                      ],
-                    ),
-                  );
-                  if (v != null) await ref.read(MusePrefs.dedupMode.notifier).update(v);
-                },
               ),
               MuseTile(
                 key: const ValueKey('node_include'),
@@ -105,7 +96,29 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
           // 1.4.1: the user agent subscriptions are downloaded with (the server picks the format by it)
           MuseSection(
             header: '订阅',
-            footer: '「自动」适合大多数订阅；节点不全或格式不对时可换一个再更新',
+            children: [
+              // 1.5.0 #41
+              MuseTile(
+                key: const ValueKey('node_sub_fetch'),
+                leading: const Icon(Icons.alt_route_outlined),
+                title: '订阅更新方式',
+                info: '自动：已连接时先走代理，失败再直连；未连接时总是直连',
+                trailing: Text(fetch.title),
+                chevron: true,
+                onTap: () async {
+                  final picked = await musePick<MuseSubFetch>(context, '订阅更新方式', [for (final f in MuseSubFetch.values) (f, f.title)], fetch);
+                  if (picked != null) await ref.read(MusePrefs.subFetch.notifier).update(picked.key);
+                },
+              ),
+            ],
+          ),
+          // 1.11.0: 订阅 UA and 重复判断 fold into 「高级」 (same preferences)
+          MuseFoldSection(
+            key: const ValueKey('node_advanced'),
+            foldKey: const ValueKey('node_advanced_fold'),
+            summary: '订阅 UA、重复判断',
+            footer: '订阅 UA「自动」适合大多数订阅；节点不全或格式不对时可换一个再更新',
+            initiallyOpen: advancedOpen,
             children: [
               MuseTile(
                 key: const ValueKey('node_sub_ua'),
@@ -118,17 +131,32 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
                   if (picked != null) await ref.read(MusePrefs.subUserAgent.notifier).update(picked);
                 },
               ),
-              // 1.5.0 #41
+              // 1.6.0 #31: what counts as a duplicate
               MuseTile(
-                key: const ValueKey('node_sub_fetch'),
-                leading: const Icon(Icons.alt_route_outlined),
-                title: '订阅更新方式',
-                info: '自动：已连接时先走代理，失败再直连；未连接时总是直连',
-                trailing: Text(fetch.title),
+                key: const ValueKey('node_dedup_mode'),
+                leading: const Icon(Icons.rule_outlined),
+                title: '重复判断',
+                subtitle: ref.watch(MusePrefs.hideDuplicates) ? null : '开启「隐藏重复节点」后生效',
+                trailing: Text(museDedupModes[ref.watch(MusePrefs.dedupMode)] ?? museDedupModes['protocol']!, overflow: TextOverflow.ellipsis),
                 chevron: true,
                 onTap: () async {
-                  final picked = await musePick<MuseSubFetch>(context, '订阅更新方式', [for (final f in MuseSubFetch.values) (f, f.title)], fetch);
-                  if (picked != null) await ref.read(MusePrefs.subFetch.notifier).update(picked.key);
+                  final cur = ref.read(MusePrefs.dedupMode);
+                  final v = await showDialog<String>(
+                    context: context,
+                    builder: (c) => SimpleDialog(
+                      key: const ValueKey('node_dedup_dialog'),
+                      title: const Text('重复判断'),
+                      children: [
+                        for (final e in museDedupModes.entries)
+                          SimpleDialogOption(
+                            key: ValueKey('node_dedup_${e.key}'),
+                            onPressed: () => Navigator.of(c).pop(e.key),
+                            child: Text('${e.value}${cur == e.key ? '（当前）' : ''}'),
+                          ),
+                      ],
+                    ),
+                  );
+                  if (v != null) await ref.read(MusePrefs.dedupMode.notifier).update(v);
                 },
               ),
             ],

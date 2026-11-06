@@ -275,8 +275,6 @@ final _pages = <(String, int, Widget, _Opts)>[
   ('网络', 3, const MuseNetworkPage(windows: false), const _Opts()),
   ('网络 Windows', 3, const MuseNetworkPage(windows: true), const _Opts()),
   ('节点设置', 3, const MuseNodeSettingsPage(), const _Opts()),
-  ('备份与同步', 3, const MuseSyncPage(), const _Opts()),
-  ('WebDAV', 3, const MuseWebdavPage(), const _Opts()),
   ('内核与资源', 3, const MuseResourcesPage(), const _Opts()),
   ('开发者选项', 3, const MuseDeveloperPage(), const _Opts(prefs: {'muse_dev_mode': true})),
   ('关于', 3, const AboutPage(), const _Opts()),
@@ -334,9 +332,11 @@ void main() {
     testWidgets('every entry opens what it says, nothing throws', (t) async {
       await _pump(t, phone, Brightness.light, 1, const MuseNodesPage(), const _Opts(prefs: {'muse_node_tags': ''}));
       await openMore(t);
-      for (final k in ['sort', 'layout', 'select', 'settings']) {
+      for (final k in ['sort', 'select', 'settings']) {
         expect(find.byKey(ValueKey('node_more_$k')), findsOneWidget, reason: k);
       }
+      // 1.11.0 (A): one layout (双列卡片), no 布局 entry
+      expect(find.byKey(const ValueKey('node_more_layout')), findsNothing);
       // 排序
       await t.tap(find.byKey(const ValueKey('node_more_sort')));
       await t.pumpAndSettle();
@@ -344,13 +344,6 @@ void main() {
       await t.pumpAndSettle();
       final sp = await t.runAsync(SharedPreferences.getInstance);
       expect(sp!.getString('muse_node_sort'), 'original');
-      // 布局
-      await openMore(t);
-      await t.tap(find.byKey(const ValueKey('node_more_layout')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('node_layout_grid')));
-      await t.pumpAndSettle();
-      expect(sp.getString('muse_node_layout'), 'grid');
       // 筛选 (several protocols)
       await openMore(t);
       await t.tap(find.byKey(const ValueKey('node_more_filter')));

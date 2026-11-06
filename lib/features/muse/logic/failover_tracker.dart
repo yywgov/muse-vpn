@@ -1,12 +1,17 @@
 // 穿云 1.2 - 节点失效自动切换 (pure logic, unit-tested).
 // A node the user picked by hand that fails [failThreshold] fresh url tests in a row is swapped
-// for 自动最快; once it passes [recoverThreshold] fresh tests in a row the user's pick comes back.
+// for a stand-in; once it passes [recoverThreshold] fresh tests in a row the user's pick comes back.
+// 1.11.0: the stand-in is the fastest working node of the same region (by flag / region code),
+// else 自动最快, else the fastest working node of the group ([museFailoverTarget]).
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 class MuseNodeSample {
-  const MuseNodeSample({required this.tag, required this.delay, required this.testedAt, this.isGroup = false});
+  const MuseNodeSample({required this.tag, required this.delay, required this.testedAt, this.isGroup = false, this.region});
 
   final String tag;
+
+  /// 1.11.0: ISO region code ('us', 'jp', …; null = unknown)
+  final String? region;
 
   /// url test delay in ms; 0 = not tested yet, >= [MuseFailoverTracker.maxDelay] = timed out
   final int delay;
@@ -23,8 +28,11 @@ class MuseFailoverTracker {
   final int failThreshold;
   final int recoverThreshold;
 
-  /// the node the user picked, while 自动最快 stands in for it
+  /// the node the user picked, while [standIn] stands in for it
   String? failedFrom;
+
+  /// 1.11.0: what was switched to (a node of the same region, 自动最快 or the fastest node)
+  String? standIn;
   int _fails = 0;
   int _oks = 0;
   final Map<String, int> _seen = {};
@@ -46,7 +54,7 @@ class MuseFailoverTracker {
     final from = failedFrom;
     if (from == null) {
       final current = find(selected);
-      if (current == null || current.isGroup || autoTag == null) {
+      if (current == null || current.isGroup) {
         _fails = 0;
         return null;
       }
@@ -54,10 +62,13 @@ class MuseFailoverTracker {
         _fails = isValid(current.delay) ? 0 : _fails + 1;
       }
       if (_fails >= failThreshold) {
+        final target = museFailoverTarget(failed: current, items: items, autoTag: autoTag);
+        if (target == null) return null; // nothing works either: stay (the count keeps going)
         _fails = 0;
         _oks = 0;
         failedFrom = selected;
-        return autoTag;
+        standIn = target;
+        return target;
       }
       return null;
     }
@@ -68,7 +79,7 @@ class MuseFailoverTracker {
       if (s != null && isValid(s.delay)) _clear();
       return null;
     }
-    if (selected != autoTag) {
+    if (selected != standIn) {
       // the user chose something else meanwhile
       _clear();
       return null;
@@ -90,6 +101,7 @@ class MuseFailoverTracker {
 
   void _clear() {
     failedFrom = null;
+    standIn = null;
     _fails = 0;
     _oks = 0;
   }
@@ -98,6 +110,22 @@ class MuseFailoverTracker {
     _clear();
     _seen.clear();
   }
+}
+
+/// 1.11.0: where a failing [failed] node is switched to: the fastest node of its region that
+/// passed its last test, else [autoTag] (自动最快), else the fastest working node; null = none.
+String? museFailoverTarget({required MuseNodeSample failed, required List<MuseNodeSample> items, required String? autoTag}) {
+  final working = [
+    for (final e in items)
+      if (!e.isGroup && e.tag != failed.tag && MuseFailoverTracker.isValid(e.delay)) e,
+  ]..sort((a, b) => a.delay.compareTo(b.delay));
+  final region = failed.region;
+  if (region != null && region.isNotEmpty) {
+    final same = working.where((e) => e.region == region).firstOrNull;
+    if (same != null) return same.tag;
+  }
+  if (autoTag != null) return autoTag;
+  return working.firstOrNull?.tag;
 }
 
 /// 穿云 1.2 - core watchdog (pure logic): [failThreshold] failed health pings in a row while

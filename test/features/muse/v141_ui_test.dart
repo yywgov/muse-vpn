@@ -13,7 +13,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
-import 'package:hiddify/features/muse/data/lan_sync_service.dart';
 import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
@@ -225,8 +224,6 @@ void main() {
       },
     ),
     'remote-sets': (const MuseRemoteRuleSetsPage(), 3, {'muse_remote_rule_sets': '[{"url":"https://example.com/rules/geosite-custom.srs","outbound":"direct"}]'}),
-    'sync': (const MuseSyncPage(), 3, {'muse_sync_last_at': DateTime.now().subtract(const Duration(hours: 3)).millisecondsSinceEpoch}),
-    'webdav': (const MuseWebdavPage(), 3, {'muse_webdav_user': 'me@example.com'}),
     'network': (const MuseNetworkPage(), 3, {'muse_schedule': '480,1410', 'muse_quality_alert': true}),
     'node-settings': (const MuseNodeSettingsPage(), 3, {'muse_sub_user_agent': 'clash'}),
   };
@@ -242,7 +239,7 @@ void main() {
       });
     }
     for (final s in [(narrow, 'narrow'), (wide, 'wide')]) {
-      for (final key in ['presets', 'sync', 'node-rules']) {
+      for (final key in ['presets', 'node-rules']) {
         testWidgets('Windows ${s.$2} $label: $key', (tester) async {
           final p = pages[key]!;
           await _pump(tester, page: p.$1, brightness: b, size: s.$1, desktop: true, tab: p.$2, initialPrefs: p.$3);
@@ -274,32 +271,16 @@ void main() {
     await _done(tester);
   });
 
-  // 1.9.0 #8: 备份与同步 — 备份 first, then WebDAV, then 局域网
-  testWidgets('sync: 备份 → WebDAV → 局域网, not branded', (tester) async {
-    await _pump(tester, page: const MuseSyncPage(), brightness: Brightness.light, size: phone, tab: 3);
-    expect(find.byKey(const ValueKey('lan_host'), skipOffstage: false), findsOneWidget);
-    expect(find.byKey(const ValueKey('lan_type'), skipOffstage: false), findsOneWidget);
-    expect(find.byKey(const ValueKey('sync_webdav'), skipOffstage: false), findsOneWidget);
-    expect(find.textContaining('坚果云', skipOffstage: false), findsNothing);
-    final dy = (Key k) => tester.getTopLeft(find.byKey(k, skipOffstage: false)).dy;
-    expect(dy(const ValueKey('sync_webdav')), lessThan(dy(const ValueKey('lan_host'))));
-    await _done(tester);
-  });
-
-  testWidgets('pairing sheet shows the QR code and the typed code, stops when closed', (tester) async {
-    final ip = await tester.runAsync(MuseLanHost.lanAddress);
-    if (ip == null) {
-      markTestSkipped('no LAN address');
-      return;
-    }
-    await _pump(tester, page: Scaffold(body: MuseLanHostSheet(address: ip)), brightness: Brightness.light, size: phone, tab: 3);
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
-    await tester.pump();
-    expect(tester.takeException(), isNull);
-    expect(find.byKey(const ValueKey('lan_qr')), findsOneWidget);
-    expect(find.textContaining(ip), findsOneWidget);
-    await _shot(tester, 'phone-light-lan-pairing');
-    await _done(tester);
+  // 1.11.0: 备份与同步 page (WebDAV, 局域网同步) removed; only 关于 › 导出 / 导入配置 remains.
+  test('sync: no WebDAV / 局域网 page, backup is 关于 › 导出 / 导入配置', () {
+    final sync = File('lib/features/muse/settings/sync_pages.dart').readAsStringSync();
+    expect(sync, isNot(contains('class MuseSyncPage')));
+    expect(sync, isNot(contains('class MuseWebdavPage')));
+    expect(sync, isNot(contains('MuseLanHost')));
+    expect(File('lib/features/muse/data/lan_sync_service.dart').existsSync(), isFalse);
+    final about = File('lib/features/about/widget/about_page.dart').readAsStringSync();
+    expect(about, contains("ValueKey('about_export_config')"));
+    expect(about, contains("ValueKey('about_import_config')"));
   });
 
   testWidgets('节点 多选: pick rows, the action bar counts them', (tester) async {

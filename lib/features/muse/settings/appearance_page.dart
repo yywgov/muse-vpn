@@ -1,4 +1,5 @@
-// 穿云 - 设置 › 外观 (深浅色、主题色、配色风格、文字缩放、隐私模式; 1.10.0: 导入后清空剪贴板, Android 通知与图标,
+// 穿云 - 设置 › 外观 (深浅色、主题色、隐私模式; 1.11.0: 配色风格 (fixed to 忠实) and 文字缩放 (follows the
+// system font size) are gone; 1.10.0: 导入后清空剪贴板, Android 通知与图标,
 // Windows 窗口). Split out of more_settings.dart in 1.9.0 (same library, behaviour unchanged).
 // Part of 穿云 (GPLv3).
 
@@ -7,7 +8,10 @@ part of 'more_settings.dart';
 // ======================================================================= 外观
 
 class MuseAppearancePage extends HookConsumerWidget {
-  const MuseAppearancePage({super.key, this.android, this.windows});
+  const MuseAppearancePage({super.key, this.android, this.windows, this.windowAdvancedOpen = false});
+
+  /// 1.11.0: Windows 窗口 › 高级 unfolded (a search result inside it)
+  final bool windowAdvancedOpen;
 
   /// Platform overrides for tests; null = the running platform.
   final bool? android;
@@ -18,11 +22,6 @@ class MuseAppearancePage extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final themeMode = ref.watch(themePreferencesProvider);
     final shownTheme = themeMode == AppThemeMode.black ? AppThemeMode.dark : themeMode;
-    final scaleOn = ref.watch(MusePrefs.textScaleOn);
-    final scalePct = museClampTextScalePct(ref.watch(MusePrefs.textScalePct));
-    // 1.6.0 C7: the slider moves locally and is saved when released (the whole app rebuilds on save)
-    final dragPct = useState<int?>(null);
-    final shownPct = dragPct.value ?? scalePct;
     return MuseScaffold(
       title: '外观',
       body: MuseGroupedBody(
@@ -64,67 +63,6 @@ class MuseAppearancePage extends HookConsumerWidget {
             header: '主题色',
             children: [
               const MuseAccentPicker(),
-              // 1.6.1 配色风格: how the colour scheme is derived from 主题色
-              MuseTile(
-                key: const ValueKey('appearance_color_style'),
-                leading: const Icon(Icons.palette_outlined),
-                title: '配色风格',
-                trailing: Text(MuseColorStyle.fromKey(ref.watch(MusePrefs.colorStyle)).title),
-                chevron: true,
-                onTap: () async {
-                  final current = MuseColorStyle.fromKey(ref.read(MusePrefs.colorStyle));
-                  final picked = await musePick<MuseColorStyle>(
-                    context,
-                    '配色风格',
-                    [for (final s in MuseColorStyle.offered) (s, s.title)],
-                    current,
-                  );
-                  if (picked == null || picked == current) return;
-                  await ref.read(MusePrefs.colorStyle.notifier).update(picked.key);
-                },
-              ),
-            ],
-          ),
-          MuseSection(
-            children: [
-              MuseSwitchTile(
-                key: const ValueKey('appearance_text_scale'),
-                leading: const Icon(Icons.format_size_outlined),
-                title: '文字缩放',
-                info: '独立于系统字号，只改穿云里的文字大小',
-                value: scaleOn,
-                onChanged: (v) => ref.read(MusePrefs.textScaleOn.notifier).update(v),
-              ),
-              if (scaleOn)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s4),
-                  child: Row(
-                    children: [
-                      Text(museTextScaleLabel(museTextScaleMin), style: MuseType.caption(context)),
-                      Expanded(
-                        child: Slider(
-                          key: const ValueKey('appearance_text_scale_slider'),
-                          min: museTextScaleMin.toDouble(),
-                          max: museTextScaleMax.toDouble(),
-                          divisions: (museTextScaleMax - museTextScaleMin) ~/ museTextScaleStep,
-                          value: shownPct.toDouble(),
-                          label: museTextScaleLabel(shownPct),
-                          semanticFormatterCallback: (v) => '文字缩放 ${museTextScaleLabel(v.round())}',
-                          onChanged: (v) => dragPct.value = museClampTextScalePct(v.round()),
-                          onChangeEnd: (v) async {
-                            await ref.read(MusePrefs.textScalePct.notifier).update(museClampTextScalePct(v.round()));
-                            dragPct.value = null;
-                          },
-                        ),
-                      ),
-                      Text(
-                        museTextScaleLabel(shownPct),
-                        key: const ValueKey('appearance_text_scale_value'),
-                        style: MuseType.caption(context),
-                      ),
-                    ],
-                  ),
-                ),
             ],
           ),
           MuseSection(
@@ -151,7 +89,7 @@ class MuseAppearancePage extends HookConsumerWidget {
           ),
           // 1.10.0: the platform rows that used to be groups on the 设置 home page
           if (android ?? PlatformUtils.isAndroid) const MuseAndroidAppearanceSection(),
-          if (windows ?? PlatformUtils.isWindows) const MuseWindowsWindowSection(),
+          if (windows ?? PlatformUtils.isWindows) MuseWindowsWindowSection(advancedOpen: windowAdvancedOpen),
         ],
       ),
     );

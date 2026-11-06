@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/settings/android_settings.dart' show museRestoreLauncherIconProvider;
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
 import 'package:hiddify/features/muse/desktop/on_demand.dart';
 import 'package:hiddify/features/muse/home/auto_run.dart';
@@ -6,6 +7,8 @@ import 'package:hiddify/features/muse/data/core_extras_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/traffic_recorder.dart';
 import 'package:hiddify/features/muse/home/net_watch.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart' show museDefaultColorStyle;
+import 'package:hiddify/features/muse/home/widget_sync.dart';
 import 'package:hiddify/features/muse/desktop/launch_control.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
@@ -81,14 +84,15 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     museApplyPureBlack(themeMode.trueBlack);
     // 1.4.0: accent colour and text size (设置 › 外观); 1.6.0 C7: custom accent, 纯黑, 文字缩放
     museApplyAccent(ref.watch(MusePrefs.accent));
-    museApplyColorStyle(ref.watch(MusePrefs.colorStyle));
-    final textScale = museTextScale(ref.watch(MusePrefs.textScaleOn), ref.watch(MusePrefs.textScalePct));
+    // 1.11.0: 配色风格 is fixed to 忠实 and text follows the system font size (a saved 配色风格 /
+    // 文字缩放 from an older version is ignored, never applied)
+    museApplyColorStyle(museDefaultColorStyle);
     final theme = AppTheme(themeMode, locale.preferredFontFamily);
     final activeBreakpoint = Breakpoint(context).activeBreakpoint;
 
     ref.listen(foregroundProfilesUpdateNotifierProvider, (_, _) {});
     if (PlatformUtils.isAndroid) ref.listen(appBasedRoutingProvider, (_, _) {});
-    // 穿云 1.3.0 智能保持连接 (one switch, logic/keep_alive.dart): node failover, timed-out node
+    // 穿云 1.3.0 智能保持连接 (logic/keep_alive.dart); 1.11.0: node failover has its own switch, timed-out node
     // folding, core watchdog, Windows connection keeper (recovery, system proxy restore, wake)
     ref.listen(museNodeFailoverProvider, (_, _) {});
     ref.listen(museAutoFastestProvider, (_, _) {});
@@ -98,10 +102,9 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     ref.listen(museCoreExtrasProvider, (_, _) {});
     ref.listen(museLatencyCacheWriterProvider, (_, _) {});
     ref.listen(museTrafficRecorderProvider, (_, _) {});
-    // 1.4.1: wake re-check, 定时连接/断开, 连接质量提醒
+    // 1.4.1: wake re-check, 定时连接/断开 (1.11.0: 连接质量提醒 removed)
     ref.listen(museWakeCheckProvider, (_, _) {});
     ref.listen(museScheduleProvider, (_, _) {});
-    ref.listen(museQualityAlertProvider, (_, _) {});
     ref.listen(museLaunchControlProvider, (_, _) {});
     // 穿云 1.3.0: node list kept for picking while disconnected; 网速 sparkline history
     ref.listen(museNodeCacheWriterProvider, (_, _) {});
@@ -121,6 +124,10 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     if (PlatformUtils.isAndroid) {
       ref.listen(museAutoRunProvider, (_, _) {});
       ref.listen(museOnDemandProvider, (_, _) {});
+      // 1.11.0: 隐藏桌面图标 removed — an icon hidden before comes back once
+      ref.listen(museRestoreLauncherIconProvider, (_, _) {});
+      // 1.11.0: home-screen widget (node · delay, sent only on a change)
+      ref.listen(museWidgetSyncProvider, (_, _) {});
     }
 
     // updating ActiveBreakpointNotifier value
@@ -146,16 +153,9 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
               title: Constants.appName,
               builder: (context, routed) {
                 final theme = Theme.of(context);
-                var child = routed ?? const SizedBox();
+                final child = routed ?? const SizedBox();
                 if (kDebugMode && _debugAccessibility) {
                   return AccessibilityTools(checkFontOverflows: true, child: child);
-                }
-                if (textScale != 1.0) {
-                  final mq = MediaQuery.of(context);
-                  child = MediaQuery(
-                    data: mq.copyWith(textScaler: TextScaler.linear(mq.textScaler.scale(1) * textScale)),
-                    child: child,
-                  );
                 }
                 return AnnotatedRegion<SystemUiOverlayStyle>(
                   // 穿云: edge-to-edge, the pages draw behind transparent system bars; icons follow

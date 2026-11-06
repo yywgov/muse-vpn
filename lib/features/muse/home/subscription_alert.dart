@@ -2,6 +2,8 @@
 // 1.2.8: at 80 % of the traffic used, again when it is used up, and 3 days or less before it
 // expires; each threshold once per billing period (a renewal gives a new expiry date, so the next
 // period alerts again). Android and Windows.
+// 1.11.0: only when it matters — 10 % or less left (and once more when used up), or 3 days or less
+// before it expires; the 80 % reminder is gone. Each once per billing period, as before.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -34,10 +36,8 @@ List<MuseSubscriptionAlert> museSubscriptionAlerts({
     if (remaining <= 0) {
       alerts.add((key: '$profileId:traffic100:$period', text: '流量已用完'));
     } else if (used >= total * 0.90) {
-      // 1.4.1: once more when only 10 % is left
+      // 1.4.1: once more when only 10 % is left; 1.11.0: the first reminder (80 % is no longer one)
       alerts.add((key: '$profileId:traffic90:$period', text: '流量只剩 ${(remaining * 100 / total).ceil()}%（${_size(remaining)}）'));
-    } else if (used >= total * 0.80) {
-      alerts.add((key: '$profileId:traffic80:$period', text: '流量已用 ${(used * 100 / total).floor()}%，剩余 ${_size(remaining)}'));
     }
   }
   final validExpiry = expire.year > 1971 && expire.year < 2100;

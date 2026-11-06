@@ -1,5 +1,5 @@
-// 穿云 1.4.0 - 同步 and 本地备份 / 恢复. 1.4.1: 局域网同步 first (data/lan_sync_service.dart);
-// WebDAV (any server) is the secondary option.
+// 穿云 1.4.0 - 同步 and 本地备份 / 恢复. 1.11.0: WebDAV 同步, 局域网同步, 自动备份 and 每周本地快照 were
+// removed; this is the backup file behind 关于 › 导出 / 导入配置 (same format as before).
 // What is synced: the settings in [museSyncedPrefs] and the subscription links (`sub:<url>` →
 // name). Subscriptions are only ever added by a sync, never deleted. The file on the server is
 // always encrypted (AES-GCM, logic/sync_core.dart) with the sync password (or the app password).
@@ -8,32 +8,26 @@
 // Part of 穿云 (GPLv3).
 
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
-import 'package:dio/dio.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/logic/help_content.dart';
 import 'package:hiddify/features/muse/logic/restore_plan.dart';
 import 'package:hiddify/features/muse/logic/sync_core.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 
-/// Settings that go into 同步 / 备份, with the provider to refresh after a change.
+/// Settings that go into 备份 (导出 / 导入配置), with the provider to refresh after a change.
+/// 1.11.0: 配色风格 and 文字缩放 (muse_color_style, muse_text_size, muse_text_scale_on / _pct) are no
+/// longer settings: an older backup that has them still imports, and those entries are skipped.
 final museSyncedPrefs = <String, ProviderOrFamily>{
   'muse_accent': MusePrefs.accent,
-  'muse_color_style': MusePrefs.colorStyle,
   'muse_dock_style': MusePrefs.dockStyle,
   'muse_blocked_hosts': MusePrefs.blockedHosts,
   'muse_tab_animation': MusePrefs.tabAnimation,
-  'muse_text_size': MusePrefs.textSize,
-  'muse_text_scale_on': MusePrefs.textScaleOn,
-  'muse_text_scale_pct': MusePrefs.textScalePct,
   'muse_custom_accents': MusePrefs.customAccents,
   'muse_privacy_mask': MusePrefs.privacyMask,
   'muse_node_meta': MusePrefs.nodeMeta,
@@ -68,8 +62,6 @@ final museSyncedPrefs = <String, ProviderOrFamily>{
   'muse_sub_overrides': MusePrefs.subOverrides,
 };
 
-const museSyncFileName = 'chuanyun-sync.json';
-const museSyncFolder = 'chuanyun';
 
 class MuseSyncException implements Exception {
   const MuseSyncException(this.message);
@@ -165,45 +157,6 @@ class MuseSyncService {
     return MuseSyncResult(changed: changed, subsAdded: added);
   }
 
-  /// The last merged state this device knows (shared by LAN and WebDAV sync).
-  MuseSnapshot lastSynced() {
-    try {
-      final raw = ref.read(MusePrefs.syncLast);
-      if (raw.isNotEmpty) return MuseSnapshot.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-    } catch (_) {}
-    return MuseSnapshot.empty;
-  }
-
-  /// This device's values stamped against [lastSynced] ([remoteKeys]: what the other side has,
-  /// for a first sync).
-  Future<MuseSnapshot> stampedLocal({Set<String> remoteKeys = const {}, int? now}) async => museStampLocal(
-    current: await localValues(),
-    lastSynced: lastSynced(),
-    now: now ?? DateTime.now().millisecondsSinceEpoch,
-    device: deviceId,
-    remoteKeys: remoteKeys,
-  );
-
-  /// Applies [merged] here and remembers it as the last synced state.
-  Future<MuseSyncResult> applyMerged(MuseSnapshot merged) async {
-    final result = await apply(museSyncChanges(await localValues(), merged));
-    await ref.read(MusePrefs.syncLast.notifier).update(jsonEncode(merged.toJson()));
-    await ref.read(MusePrefs.syncLastAt.notifier).update(DateTime.now().millisecondsSinceEpoch);
-    return result;
-  }
-
-  /// A readable name for this device (shown to the other side when pairing).
-  static String get deviceName {
-    String host;
-    try {
-      host = Platform.localHostname;
-    } catch (_) {
-      host = '';
-    }
-    final kind = Platform.isAndroid ? 'Android' : (Platform.isWindows ? 'Windows' : Platform.operatingSystem);
-    return host.isEmpty || host == 'localhost' ? kind : '$kind · $host';
-  }
-
   String get deviceId => _deviceId;
 
   String get _deviceId {
@@ -214,92 +167,6 @@ class MuseSyncService {
       ref.read(MusePrefs.deviceId.notifier).update(id);
     }
     return id;
-  }
-
-  String get _password {
-    final own = ref.read(MusePrefs.syncPassphrase);
-    return own.isNotEmpty ? own : ref.read(MusePrefs.webdavPassword);
-  }
-
-  Dio _dio() {
-    final user = ref.read(MusePrefs.webdavUser).trim();
-    final pass = ref.read(MusePrefs.webdavPassword);
-    if (user.isEmpty || pass.isEmpty) throw const MuseSyncException('请先填写账号和应用密码');
-    return Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 30),
-        sendTimeout: const Duration(seconds: 30),
-        headers: {'Authorization': 'Basic ${base64.encode(utf8.encode('$user:$pass'))}'},
-        validateStatus: (_) => true,
-        responseType: ResponseType.plain,
-      ),
-    );
-  }
-
-  String _base() {
-    var url = ref.read(MusePrefs.webdavUrl).trim();
-    if (url.isEmpty) throw const MuseSyncException('请先填写服务器地址');
-    if (!url.endsWith('/')) url = '$url/';
-    final u = Uri.tryParse(url);
-    if (u == null || u.scheme != 'https' || u.host.isEmpty) throw const MuseSyncException('服务器地址需以 https:// 开头');
-    return url;
-  }
-
-  static String _httpError(int? code) => switch (code) {
-    401 => '账号或应用密码不对',
-    403 => '没有权限（部分服务需使用「应用密码」）',
-    404 => '服务器上没有这个目录',
-    507 => '服务器空间已满',
-    _ => '服务器返回 $code',
-  };
-
-  /// Download → merge (last change per field wins) → apply here → upload.
-  Future<MuseSyncResult> syncNow() async {
-    final dio = _dio();
-    try {
-      final base = _base();
-      final password = _password;
-      final folder = '$base$museSyncFolder/';
-      final fileUrl = '$folder$museSyncFileName';
-
-      // remote
-      MuseSnapshot remote = const MuseSnapshot({});
-      final Response<String> got;
-      try {
-        got = await dio.get<String>(fileUrl);
-      } on DioException catch (e) {
-        throw MuseSyncException('连接服务器失败：${e.message ?? e.type.name}');
-      }
-      if (got.statusCode == 200 && (got.data ?? '').isNotEmpty) {
-        try {
-          remote = MuseSnapshot.fromJson(jsonDecode(await museDecryptAsync(got.data!, password)) as Map<String, dynamic>);
-        } on MuseCryptoException catch (e) {
-          throw MuseSyncException('解密同步文件失败：$e（两台设备的同步密码需相同）');
-        } catch (_) {
-          throw const MuseSyncException('同步文件已损坏');
-        }
-      } else if (got.statusCode != 404) {
-        throw MuseSyncException(_httpError(got.statusCode));
-      }
-
-      // local, stamped against what was synced last time
-      final local = await stampedLocal(remoteKeys: remote.entries.keys.toSet());
-      final merged = museMergeSnapshots(local, remote);
-      final body = await museEncryptAsync(jsonEncode(merged.toJson()), password);
-
-      // upload first, then apply: a failed upload leaves this device unchanged
-      try {
-        await dio.request<String>(folder, options: Options(method: 'MKCOL'));
-        final put = await dio.put<String>(fileUrl, data: body, options: Options(contentType: 'application/json'));
-        if (put.statusCode == null || put.statusCode! >= 300) throw MuseSyncException(_httpError(put.statusCode));
-      } on DioException catch (e) {
-        throw MuseSyncException('上传失败：${e.message ?? e.type.name}');
-      }
-      return await applyMerged(merged);
-    } finally {
-      dio.close(force: true);
-    }
   }
 
   /// A backup file's text. [password] empty = plain JSON; [redact] drops subscription links.
@@ -346,12 +213,10 @@ class MuseSyncService {
     strategy: strategy,
   );
 
-  /// 1.6.0 C10: carries out [plan], after saving the current state as an automatic backup.
+  /// 1.6.0 C10: carries out [plan] (1.11.0: no automatic backup first — 自动备份 was removed).
   /// Subscriptions are only added (the plan never holds a removal).
   Future<MuseSyncResult> applyRestore(MuseRestorePlan plan) async {
     if (plan.isEmpty) return const MuseSyncResult();
-    // 1.5.0 #197: what is there now is kept first, so a wrong file can be undone
-    await autoBackup('restore');
     return apply(plan.changes);
   }
 
@@ -360,59 +225,6 @@ class MuseSyncService {
   Future<MuseSyncResult> importBackup(String text, {String password = ''}) async {
     final snap = await readBackup(text, password: password);
     return applyRestore(await planRestore(snap));
-  }
-
-  /// 1.5.0 #197 / #206: the current settings and subscriptions saved as an automatic backup
-  /// (newest 5 kept). Null when it could not be written; never throws.
-  /// 1.9.0 #200: takes the weekly snapshot when it is due (switch on, none in the last 7 days).
-  /// Never throws; true when one was taken.
-  Future<bool> weeklySnapshotIfDue({DateTime? now}) async {
-    try {
-      if (!ref.read(MusePrefs.weeklySnapshot)) return false;
-      final files = await museListAutoBackups();
-      final times = [
-        for (final f in files)
-          if (museParseAutoBackupName(f.uri.pathSegments.last) case final m? when m.reason == 'weekly') m.at,
-      ];
-      final t = now ?? DateTime.now();
-      if (!museWeeklySnapshotDue(times, t)) return false;
-      return await autoBackup('weekly') != null;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<File?> autoBackup(String reason) async {
-    try {
-      final dir = await museAutoBackupDir();
-      if (!dir.existsSync()) dir.createSync(recursive: true);
-      final file = File('${dir.path}${Platform.pathSeparator}${museAutoBackupName(reason, DateTime.now())}');
-      await file.writeAsString(await exportBackup());
-      final names = [for (final f in dir.listSync().whereType<File>()) f.uri.pathSegments.last];
-      for (final old in museAutoBackupsToPrune(names)) {
-        try {
-          File('${dir.path}${Platform.pathSeparator}$old').deleteSync();
-        } catch (_) {}
-      }
-      return file;
-    } catch (_) {
-      return null;
-    }
-  }
-}
-
-Future<Directory> museAutoBackupDir() async => Directory('${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}backups');
-
-/// The automatic backups, newest first.
-Future<List<File>> museListAutoBackups() async {
-  try {
-    final dir = await museAutoBackupDir();
-    if (!dir.existsSync()) return const [];
-    final files = [for (final f in dir.listSync().whereType<File>()) if (museParseAutoBackupName(f.uri.pathSegments.last) != null) f];
-    files.sort((a, b) => museParseAutoBackupName(b.uri.pathSegments.last)!.at.compareTo(museParseAutoBackupName(a.uri.pathSegments.last)!.at));
-    return files;
-  } catch (_) {
-    return const [];
   }
 }
 

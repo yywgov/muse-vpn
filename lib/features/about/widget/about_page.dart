@@ -10,6 +10,8 @@
 // 1.10.1: the tappable line now says 「点击检测更新」 (primary colour) while idle, 正在检查 / 下载进度
 // while busy; the version line 「1.10.1（194）· 内核 muse.20」 sits right below it as plain grey
 // caption text and is not tappable.
+// 1.11.0: 设置 › 备份与同步 is gone; 导出配置 / 导入配置 are two small links at the bottom, next to
+// 开源许可与致谢 (same backup file as before; old backups still import).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -23,6 +25,7 @@ import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/help_content.dart' show museFileSizeText;
 import 'package:hiddify/features/muse/logic/resources.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart' show museExportConfig, museImportConfig, museExportConfigTitle, museImportConfigTitle;
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/gen/assets.gen.dart';
@@ -195,11 +198,21 @@ class AboutPage extends HookConsumerWidget {
             ),
             Padding(
               padding: const EdgeInsets.only(bottom: MuseSpace.s16),
-              child: TextButton(
-                key: const ValueKey('about_open_source'),
-                style: TextButton.styleFrom(foregroundColor: mt.text2, visualDensity: VisualDensity.compact),
-                onPressed: () => context.goNamed('openSource'),
-                child: Text('开源许可与致谢', style: MuseType.caption(context).copyWith(color: mt.text2)),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                children: [
+                  for (final (key, label, onTap) in [
+                    (const ValueKey('about_export_config'), museExportConfigTitle, () => museExportConfig(context, ref)),
+                    (const ValueKey('about_import_config'), museImportConfigTitle, () => museImportConfig(context, ref)),
+                    (const ValueKey('about_open_source'), '开源许可与致谢', () => context.goNamed('openSource')),
+                  ])
+                    TextButton(
+                      key: key,
+                      style: TextButton.styleFrom(foregroundColor: mt.text2, visualDensity: VisualDensity.compact),
+                      onPressed: onTap,
+                      child: Text(label, style: MuseType.caption(context).copyWith(color: mt.text2)),
+                    ),
+                ],
               ),
             ),
           ],

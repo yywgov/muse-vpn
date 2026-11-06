@@ -1,6 +1,8 @@
 // 穿云 - 设置 › 网络. Split out of more_settings.dart in 1.9.0 (same library, behaviour unchanged).
 // 1.10.0: the 设置 home page's collapsed 「高级」 (负载均衡策略 / TLS 分片 / IPv6 / Fake-IP / 屏蔽 QUIC /
 // 切换节点时关闭旧连接) is the 「高级」 group here, and Windows 运行模式 sits on top. Same preferences.
+// 1.11.0: 连接质量提醒 removed; TLS 分片 and 屏蔽 QUIC stay in view, 负载均衡策略 / IPv6 / Fake-IP /
+// 切换节点时关闭旧连接 fold into 「高级」.
 // Part of 穿云 (GPLv3).
 
 part of 'more_settings.dart';
@@ -8,7 +10,10 @@ part of 'more_settings.dart';
 // ======================================================================= 网络
 
 class MuseNetworkPage extends HookConsumerWidget {
-  const MuseNetworkPage({super.key, this.windows});
+  const MuseNetworkPage({super.key, this.windows, this.advancedOpen = false});
+
+  /// 1.11.0: open with 「高级」 unfolded (a search result inside it)
+  final bool advancedOpen;
 
   /// Platform override for tests; null = the running platform.
   final bool? windows;
@@ -48,22 +53,32 @@ class MuseNetworkPage extends HookConsumerWidget {
                 ),
             ],
           ),
-          // 1.9.0 #5: 定时连接 / 断开 moved to 设置 › 自动连接
           MuseSection(
             children: [
+              MuseTile(
+                key: const ValueKey('network_tls_tricks'),
+                leading: const Icon(Icons.call_split_outlined),
+                title: 'TLS 分片',
+                chevron: true,
+                onTap: () => context.goNamed('tlsTricks'),
+              ),
+              // 1.5.0 #9
               MuseSwitchTile(
-                key: const ValueKey('network_quality_alert'),
-                leading: const Icon(Icons.network_check_outlined),
-                title: '连接质量提醒',
-                info: '当前节点延迟持续偏高或超时时通知（每分钟测一次）',
-                value: ref.watch(MusePrefs.qualityAlert),
-                onChanged: (v) => ref.read(MusePrefs.qualityAlert.notifier).update(v),
+                key: const ValueKey('block_quic'),
+                leading: const Icon(Icons.block_outlined),
+                title: '屏蔽 QUIC',
+                info: '节点 UDP 不稳时打开：YouTube 等网站改走 TCP，播放更稳',
+                value: ref.watch(MusePrefs.blockQuic),
+                onChanged: (v) => ref.read(MusePrefs.blockQuic.notifier).update(v),
               ),
             ],
           ),
-          MuseSection(
+          // 1.11.0: rarely changed options fold into 「高级」 (same preferences)
+          MuseFoldSection(
             key: const ValueKey('network_advanced'),
-            header: '高级',
+            foldKey: const ValueKey('network_advanced_fold'),
+            summary: '负载均衡策略、IPv6、Fake-IP、切换节点时关闭旧连接',
+            initiallyOpen: advancedOpen,
             children: [
               MuseTile(
                 key: const ValueKey('balancer_strategy'),
@@ -80,13 +95,6 @@ class MuseNetworkPage extends HookConsumerWidget {
                   );
                   if (picked != null) await ref.read(ConfigOptions.balancerStrategy.notifier).update(picked);
                 },
-              ),
-              MuseTile(
-                key: const ValueKey('network_tls_tricks'),
-                leading: const Icon(Icons.call_split_outlined),
-                title: 'TLS 分片',
-                chevron: true,
-                onTap: () => context.goNamed('tlsTricks'),
               ),
               // 1.5.0: network options that can break a working setup, all off by default
               MuseTile(
@@ -108,15 +116,6 @@ class MuseNetworkPage extends HookConsumerWidget {
                 info: '仅 TUN 模式生效：域名先拿到虚拟地址，打开网页更快；局域网、对时和联网检测仍用真实地址。个别 App 或游戏异常时请关闭',
                 value: ref.watch(ConfigOptions.enableFakeDns),
                 onChanged: (v) => ref.read(ConfigOptions.enableFakeDns.notifier).update(v),
-              ),
-              // 1.5.0 #9
-              MuseSwitchTile(
-                key: const ValueKey('block_quic'),
-                leading: const Icon(Icons.block_outlined),
-                title: '屏蔽 QUIC',
-                info: '节点 UDP 不稳时打开：YouTube 等网站改走 TCP，播放更稳',
-                value: ref.watch(MusePrefs.blockQuic),
-                onChanged: (v) => ref.read(MusePrefs.blockQuic.notifier).update(v),
               ),
               MuseSwitchTile(
                 key: const ValueKey('settings_auto_close'),

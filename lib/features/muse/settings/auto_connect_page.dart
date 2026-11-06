@@ -2,9 +2,12 @@
 // 自动运行 (Android), 按需运行, 每天定时连接 / 断开, 开机自启 and 开机自启时静默 (Windows).
 // The rows moved here from 设置 › 通用 / 电脑 / 网络; preferences and behaviour are unchanged.
 // 1.10.0: 智能保持连接 (from the 设置 home page) and Windows 静默启动 are here too.
+// 1.11.0: only 打开即连接 (Android) and 开机自启 (+ 开机自启时静默, Windows) are shown; 智能保持连接,
+// 按需运行, 每天定时连接 / 断开 and Windows 静默启动 fold into 「更多」 on the same page. Same preferences.
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
@@ -21,7 +24,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// One-line summary for the 设置 row: which automatic ways are on.
 String museAutoConnectSummary({required bool autoRun, required bool onDemand, required MuseSchedule schedule, required bool autoStart}) {
   final on = [
-    if (autoRun) '自动运行',
+    if (autoRun) '打开即连接',
     if (onDemand) '按需',
     if (schedule.connectAt >= 0 || schedule.disconnectAt >= 0) '定时',
     if (autoStart) '开机自启',
@@ -29,8 +32,14 @@ String museAutoConnectSummary({required bool autoRun, required bool onDemand, re
   return on.isEmpty ? '关' : on.join('、');
 }
 
-class MuseAutoConnectPage extends ConsumerWidget {
-  const MuseAutoConnectPage({super.key, this.android, this.windows});
+/// 1.11.0: the 自动连接 rows behind 「更多」.
+const museAutoConnectMoreRows = ['智能保持连接', '按需运行', '每天定时连接', '每天定时断开', '静默启动'];
+
+class MuseAutoConnectPage extends HookConsumerWidget {
+  const MuseAutoConnectPage({super.key, this.android, this.windows, this.initiallyMore = false});
+
+  /// 1.11.0: open with 「更多」 unfolded (a search result for one of its rows)
+  final bool initiallyMore;
 
   /// Platform overrides for tests; null = the running platform.
   final bool? android;
@@ -42,6 +51,7 @@ class MuseAutoConnectPage extends ConsumerWidget {
     final isWindows = windows ?? PlatformUtils.isWindows;
     final onDemandOn = ref.watch(MusePrefs.onDemand) && museOnDemandSsids(ref.watch(MusePrefs.wifiRules)).isNotEmpty;
     final schedule = MuseSchedule.parse(ref.watch(MusePrefs.schedule));
+    final more = useState(initiallyMore);
 
     Future<void> pickTime(bool connect) async {
       final cur = connect ? schedule.connectAt : schedule.disconnectAt;
@@ -62,71 +72,87 @@ class MuseAutoConnectPage extends ConsumerWidget {
       title: '自动连接',
       body: MuseGroupedBody(
         children: [
-          // 1.10.0: 智能保持连接 moved here (1.3.0: one switch for reconnect → switch node → restart core)
-          MuseSection(
-            children: [
-              MuseSwitchTile(
-                key: const ValueKey('keep_alive'),
-                leading: const Icon(Icons.autorenew_outlined),
-                title: '智能保持连接',
-                info: '断线后自动重连；当前节点失效时自动换到可用节点，必要时重启内核',
-                value: ref.watch(Preferences.museKeepAlive),
-                onChanged: (v) => ref.read(Preferences.museKeepAlive.notifier).update(v),
-              ),
-            ],
-          ),
-          MuseSection(
-            footer: isAndroid ? museAndroidAutomationNote : null,
-            children: [
-              if (isAndroid)
+          if (isAndroid)
+            MuseSection(
+              footer: museAndroidAutomationNote,
+              children: [
                 MuseSwitchTile(
                   key: const ValueKey('settings_auto_run'),
                   leading: const Icon(Icons.play_circle_outlined),
-                  title: '自动运行',
+                  title: '打开即连接',
                   subtitle: '打开穿云时自动连接',
                   value: ref.watch(MusePrefs.autoRun),
                   onChanged: (v) => ref.read(MusePrefs.autoRun.notifier).update(v),
                 ),
-              MuseTile(
-                key: const ValueKey('settings_on_demand'),
-                leading: const Icon(Icons.wifi_outlined),
-                title: '按需运行',
-                trailing: Text(onDemandOn ? '开' : '关'),
-                chevron: true,
-                onTap: () => musePushPage(context, const MuseOnDemandPage()),
-              ),
-            ],
-          ),
+              ],
+            ),
+          if (isWindows) const _WindowsStartSection(),
           MuseSection(
-            header: '定时',
-            footer: '穿云需在运行（可在后台）；时间到时只执行一次，手动操作随时优先',
             children: [
               MuseTile(
-                key: const ValueKey('network_schedule_connect'),
-                leading: const Icon(Icons.alarm_on_outlined),
-                title: '每天定时连接',
-                trailing: Text(museMinuteLabel(schedule.connectAt)),
-                chevron: true,
-                onTap: () => pickTime(true),
-              ),
-              MuseTile(
-                key: const ValueKey('network_schedule_disconnect'),
-                leading: const Icon(Icons.alarm_off_outlined),
-                title: '每天定时断开',
-                trailing: Text(museMinuteLabel(schedule.disconnectAt)),
-                chevron: true,
-                onTap: () => pickTime(false),
+                key: const ValueKey('auto_connect_more'),
+                leading: const Icon(Icons.tune_outlined),
+                title: '更多',
+                subtitle: more.value ? null : '智能保持连接、按需运行、定时连接 / 断开${isWindows ? '、静默启动' : ''}',
+                trailing: Icon(more.value ? Icons.expand_less_outlined : Icons.expand_more_outlined),
+                onTap: () => more.value = !more.value,
               ),
             ],
           ),
-          if (isWindows) const _WindowsStartSection(),
+          if (more.value) ...[
+            // 1.10.0: 智能保持连接 moved here (1.3.0: one switch for reconnect → restart core)
+            MuseSection(
+              children: [
+                MuseSwitchTile(
+                  key: const ValueKey('keep_alive'),
+                  leading: const Icon(Icons.autorenew_outlined),
+                  title: '智能保持连接',
+                  info: '断线后自动重连，必要时重启内核（节点失效时换节点在「节点设置」里单独开关）',
+                  value: ref.watch(Preferences.museKeepAlive),
+                  onChanged: (v) => ref.read(Preferences.museKeepAlive.notifier).update(v),
+                ),
+                MuseTile(
+                  key: const ValueKey('settings_on_demand'),
+                  leading: const Icon(Icons.wifi_outlined),
+                  title: '按需运行',
+                  trailing: Text(onDemandOn ? '开' : '关'),
+                  chevron: true,
+                  onTap: () => musePushPage(context, const MuseOnDemandPage()),
+                ),
+                if (isWindows) const MuseWindowsSilentStartTile(),
+              ],
+            ),
+            MuseSection(
+              header: '定时',
+              footer: '穿云需在运行（可在后台）；时间到时只执行一次，手动操作随时优先',
+              children: [
+                MuseTile(
+                  key: const ValueKey('network_schedule_connect'),
+                  leading: const Icon(Icons.alarm_on_outlined),
+                  title: '每天定时连接',
+                  trailing: Text(museMinuteLabel(schedule.connectAt)),
+                  chevron: true,
+                  onTap: () => pickTime(true),
+                ),
+                MuseTile(
+                  key: const ValueKey('network_schedule_disconnect'),
+                  leading: const Icon(Icons.alarm_off_outlined),
+                  title: '每天定时断开',
+                  trailing: Text(museMinuteLabel(schedule.disconnectAt)),
+                  chevron: true,
+                  onTap: () => pickTime(false),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-/// 静默启动 + 开机自启 + 开机自启时静默 (Windows only; the auto-start notifier is never built elsewhere).
+/// 开机自启 + 开机自启时静默 (Windows only; the auto-start notifier is never built elsewhere).
+/// 1.11.0: 静默启动 moved into 「更多」.
 class _WindowsStartSection extends ConsumerWidget {
   const _WindowsStartSection();
 
@@ -134,9 +160,7 @@ class _WindowsStartSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final autoStart = ref.watch(autoStartNotifierProvider).valueOrNull ?? false;
     return MuseSection(
-      header: '启动',
       children: [
-        const MuseWindowsSilentStartTile(),
         MuseSwitchTile(
           key: const ValueKey('settings_autostart'),
           leading: const Icon(Icons.power_settings_new_outlined),

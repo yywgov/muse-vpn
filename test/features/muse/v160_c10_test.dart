@@ -259,10 +259,12 @@ void main() {
       expect(tester.widget<FilledButton>(find.byKey(const ValueKey('restore_ok'))).onPressed, isNull);
     });
 
-    testWidgets('同步与备份: 从备份恢复 says it previews first', (tester) async {
-      await _pump(tester, const MuseSyncPage());
-      expect(find.text('先预览，可选 仅订阅 / 仅设置、合并 / 覆盖'), findsOneWidget);
-      expect(tester.takeException(), isNull);
+    // 1.11.0: 备份与同步 page removed; 关于 › 导入配置 still previews before restoring.
+    test('导入配置 previews first (恢复范围 / 恢复策略)', () {
+      final src = File('lib/features/muse/settings/sync_pages.dart').readAsStringSync();
+      final body = src.substring(src.indexOf('Future<void> museRestoreConfigText'));
+      expect(body.indexOf('showMuseRestorePreview'), greaterThan(0));
+      expect(body.indexOf('showMuseRestorePreview'), lessThan(body.indexOf('applyRestore')));
     });
   });
 

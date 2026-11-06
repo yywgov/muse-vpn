@@ -8,7 +8,7 @@ import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const musePrefsVersionKey = 'muse_prefs_version';
-const musePrefsVersionCurrent = 3;
+const musePrefsVersionCurrent = 4;
 
 typedef MusePrefsStep = void Function(Map<String, Object?> prefs);
 
@@ -18,7 +18,18 @@ typedef MusePrefsStep = void Function(Map<String, Object?> prefs);
 /// 文字缩放 is never overwritten).
 /// 2→3 (1.7.1): 配色风格 标准 (the old default, never picked on purpose) becomes 忠实; the four
 /// replaced 主题色 move to the nearest new colour (苤蓝→宝蓝, 月白→松花, 苍蝇灰→胭脂, 朱瑾→枣红).
-final Map<int, MusePrefsStep> musePrefsSteps = {1: museMigrate1to2, 2: museMigrate2to3};
+/// 3→4 (1.11.0): the 内网 IP card on 首页 is hidden (also for a saved layout that showed it). The
+/// removed settings (配色风格, 文字缩放, 连接质量提醒, 每周本地快照, WebDAV / 局域网同步) are not
+/// touched: their stored values stay where they are and are simply never read again.
+final Map<int, MusePrefsStep> musePrefsSteps = {1: museMigrate1to2, 2: museMigrate2to3, 3: museMigrate3to4};
+
+void museMigrate3to4(Map<String, Object?> prefs) {
+  final hidden = prefs['muse_home_tiles_hidden'];
+  // nothing saved = the default list, which already hides it
+  if (hidden is! String) return;
+  final keys = hidden.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  if (!keys.contains('lanip')) prefs['muse_home_tiles_hidden'] = [...keys, 'lanip'].join(',');
+}
 
 /// 1.7.1: replaced 1.6.2 主题色 keys → their 1.7.1 successor.
 const museAccentRenames171 = <String, String>{

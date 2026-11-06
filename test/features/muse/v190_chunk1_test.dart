@@ -65,8 +65,10 @@ void main() {
 
   test('1.9.0 settings are searchable (1.10.0: 帮助与隐私 is gone, the clipboard switch is on 外观)', () {
     final titles = museSettingEntries.map((e) => e.title).toList();
-    for (final t in ['导入后清空剪贴板', '每周本地快照', '导出 CSV']) {
-      expect(titles, contains(t));
+    expect(titles, contains('导入后清空剪贴板'));
+    // 1.11.0: 每周本地快照 and 统计导出 CSV removed
+    for (final t in ['每周本地快照', '导出 CSV']) {
+      expect(titles, isNot(contains(t)));
     }
     expect(titles, isNot(contains('帮助与隐私')));
     expect(MuseSettingPage.values.map((e) => e.name), isNot(contains('help')));

@@ -403,3 +403,48 @@ class MuseInfoTitle extends HookWidget {
     );
   }
 }
+
+/// 1.11.0: a group whose rows stay folded behind one 「高级」 (or [title]) row until it is tapped.
+/// Folded by default; [initiallyOpen] for a search result that points inside it.
+class MuseFoldSection extends HookWidget {
+  const MuseFoldSection({
+    super.key,
+    required this.foldKey,
+    required this.children,
+    this.title = '高级',
+    this.summary,
+    this.header,
+    this.footer,
+    this.initiallyOpen = false,
+  });
+
+  final Key foldKey;
+  final String title;
+
+  /// shown under [title] while folded (what is inside)
+  final String? summary;
+  final String? header;
+  final String? footer;
+  final bool initiallyOpen;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final open = useState(initiallyOpen);
+    return MuseSection(
+      header: header,
+      footer: open.value ? footer : null,
+      children: [
+        MuseTile(
+          key: foldKey,
+          leading: const Icon(Icons.tune_outlined),
+          title: title,
+          subtitle: open.value ? null : summary,
+          trailing: Icon(open.value ? Icons.expand_less_outlined : Icons.expand_more_outlined),
+          onTap: () => open.value = !open.value,
+        ),
+        if (open.value) ...children,
+      ],
+    );
+  }
+}

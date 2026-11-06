@@ -157,6 +157,16 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
             when (call.method) {
                 "is_launcher_icon_hidden" -> result.success(isLauncherHidden(context))
 
+                // 穿云 1.11.0: the node in use / its delay for the home-screen widget (sent on a change only)
+                "widget_update" -> {
+                    com.hiddify.hiddify.bg.ChuanyunWidget.onNode(
+                        context,
+                        call.argument<String>("node") ?: "",
+                        call.argument<Int>("delay") ?: 0,
+                    )
+                    result.success(true)
+                }
+
                 "set_launcher_icon_hidden" -> {
                     val hidden = call.argument<Boolean>("hidden") ?: false
                     context.packageManager.setComponentEnabledSetting(

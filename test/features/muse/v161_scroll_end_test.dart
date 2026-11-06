@@ -150,8 +150,6 @@ final _pages = <(String, int, Widget, Map<String, Object>, Future<void> Function
   ('远程规则集', 3, const MuseRemoteRuleSetsPage(), {}, null),
   ('规则测试', 3, const MuseRuleTesterPage(), {}, null),
   ('网络', 3, const MuseNetworkPage(), {}, null),
-  ('同步与备份', 3, const MuseSyncPage(), {}, null),
-  ('WebDAV', 3, const MuseWebdavPage(), {}, null),
   ('统计', 3, const MuseStatsPage(), {}, null),
   ('开发者选项', 3, const MuseDeveloperPage(), {'muse_dev_mode': true}, null),
   ('按需运行', 3, const MuseOnDemandPage(), {}, null),

@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/muse/logic/diagnosis.dart';
-import 'package:hiddify/features/muse/logic/lan_sync.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/settings_search.dart';
 import 'package:hiddify/features/system_tray/notifier/system_tray_notifier.dart';
@@ -26,7 +25,8 @@ void main() {
     test('platform-only settings stay on their platform', () {
       expect(museSearchSettings('分应用', android: false, windows: true), isEmpty);
       expect(museSearchSettings('分应用', android: true, windows: false), isNotEmpty);
-      expect(museSearchSettings('开机自启', android: true, windows: false), isEmpty);
+      // 1.11.0: on Android 开机自启 only finds the 自动连接 page (a keyword), never the Windows row
+      expect(museSearchSettings('开机自启', android: true, windows: false).map((e) => e.title), isNot(contains('开机自启')));
       expect(museSearchSettings('开机自启', android: false, windows: true), isNotEmpty);
     });
     test('every page is reachable and titles are unique', () {
@@ -53,11 +53,11 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('settings_search_field')), 'quic');
     await tester.pump();
     expect(find.text('屏蔽 QUIC'), findsOneWidget);
-    expect(find.text('设置 › 网络 › 高级'), findsWidgets); // 1.10.0: 高级 is a group of 网络
+    expect(find.text('设置 › 网络'), findsWidgets); // 1.11.0: 屏蔽 QUIC is on 网络 itself
     await tester.tap(find.byKey(const ValueKey('settings_hit_0')));
     await tester.pumpAndSettle();
     expect(picked?.title, '屏蔽 QUIC');
-    expect(picked?.page, MuseSettingPage.advanced);
+    expect(picked?.page, MuseSettingPage.network);
   });
 
   testWidgets('#101 no result says so', (tester) async {
@@ -87,13 +87,5 @@ void main() {
       expect(uri.toString().length, lessThan(2000));
     });
   });
-
-  group('#195 LAN sync hints', () {
-    test('name the usual causes', () {
-      expect(museLanUnreachableHint, contains('同一个 Wi‑Fi'));
-      expect(museLanUnreachableHint, contains('AP 隔离'));
-      expect(museLanUnreachableHint, contains('防火墙'));
-      expect(museLanNoAnswerHint, startsWith('对方没有回应'));
-    });
-  });
+  // 1.11.0: 局域网同步 removed, its hints with it.
 }

@@ -21,7 +21,6 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/activity/activity_page.dart';
 import 'package:hiddify/features/muse/data/changelog.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/data/sync_service.dart' show museSyncServiceProvider;
 import 'package:hiddify/features/muse/home/background_guard.dart';
 import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
@@ -35,6 +34,7 @@ import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/muse/logic/connect_flow.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
+import 'package:hiddify/features/muse/logic/stats_tools.dart' show MuseTrafficLog, museDayKey;
 import 'package:hiddify/features/muse/logic/home_tiles.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
@@ -99,14 +99,6 @@ class MuseHomePage extends HookConsumerWidget {
 
     // 1.3.0: a subscription link on the clipboard puts a dot on 添加 (no banner)
     useMuseClipboardWatcher(ref);
-    // 1.9.0 #200: the weekly snapshot (when switched on), a little after start so it never delays the first frame
-    useEffect(() {
-      final timer = Timer(const Duration(seconds: 20), () {
-        unawaited(ref.read(museSyncServiceProvider).weeklySnapshotIfDue());
-      });
-      return timer.cancel;
-    }, const []);
-
     return MuseScaffold(
       large: true,
       title: Constants.appName,
@@ -661,31 +653,66 @@ class _HeroNodeRow extends ConsumerWidget {
     }
     final delay = item == null ? 0 : museFreshDelay(item, since);
     final showDelay = delay > 0 && ConnectionConst.isValidDelay(delay);
+    // 1.11.0: the same look as a card on 节点 (A): region small above the bold name, the protocol
+    // as a small tag, the delay as a coloured number with a small 「ms」
+    final regionCode = item == null || item.isGroup ? null : museRegionCode(museNodeName(item));
+    final protocol = item == null || item.isGroup ? '' : museNodeProtocolShort(item);
+    final caption = item == null
+        ? ''
+        : item.isGroup
+        ? '自动选择'
+        : [if (regionCode != null) museCountryLabel(regionCode), if (protocol.isNotEmpty) protocol].join(' · ');
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
         key: const ValueKey('home_current_node'),
         onTap: () => showMuseNodePicker(context),
-        child: SizedBox(
-          height: MuseSize.heroRow,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: MuseSize.heroRow),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
+            padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s8),
             child: Row(
               children: [
                 MuseFlagBox(flag: flag, icon: icon, onBrand: onBrand),
                 const SizedBox(width: MuseSpace.s12),
                 Expanded(
-                  child: Text(
-                    text,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: MuseType.body(context).copyWith(color: fg, fontWeight: FontWeight.w600),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (caption.isNotEmpty)
+                        Text(
+                          caption,
+                          key: const ValueKey('home_node_caption'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: MuseType.caption(context).copyWith(color: fg2),
+                        ),
+                      Text(
+                        text,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: MuseType.body(context).copyWith(color: fg, fontWeight: FontWeight.w700),
+                      ),
+                    ],
                   ),
                 ),
                 if (showDelay)
-                  Text(
-                    '$delay ms',
-                    style: MuseType.body(context).copyWith(color: fg2, fontFeatures: MuseType.tabular),
+                  Text.rich(
+                    key: const ValueKey('home_node_delay'),
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '$delay',
+                          style: MuseType.body(context).copyWith(
+                            color: onBrand ? fg : MuseColors.delay(context, delay),
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: MuseType.tabular,
+                          ),
+                        ),
+                        TextSpan(text: ' ms', style: MuseType.caption(context).copyWith(color: fg2)),
+                      ],
+                    ),
                   ),
                 Icon(Icons.chevron_right_outlined, size: MuseIconSize.small, color: fg2),
               ],
@@ -904,6 +931,17 @@ class _Tile extends ConsumerWidget {
   }
 }
 
+/// 1.11.0: the 网速 tile is idle (shows 今日流量 instead) while disconnected, or connected with the
+/// last few samples all under 1 KB/s (a short pause in traffic does not flip it back and forth).
+bool museSpeedIdle({required bool running, required List<int> history}) {
+  if (!running) return true;
+  if (history.length < 3) return false;
+  return history.skip(history.length - 3).every((v) => v < 1024);
+}
+
+/// 1.11.0: today's ↑ / ↓ bytes from the traffic log.
+(int, int) museTodayTraffic(String rawLog, DateTime now) => MuseTrafficLog.parse(rawLog).days[museDayKey(now)] ?? (0, 0);
+
 class _SpeedTile extends ConsumerWidget {
   const _SpeedTile({super.key});
 
@@ -911,6 +949,18 @@ class _SpeedTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(museStatsProvider);
     final history = ref.watch(museSpeedHistoryProvider);
+    if (museSpeedIdle(running: ref.watch(museRunningProvider), history: history)) {
+      final (up, down) = museTodayTraffic(ref.watch(MusePrefs.trafficLog), DateTime.now());
+      return _Tile(
+        title: '今日流量',
+        value: museBytes(up + down),
+        bottom: Align(
+          alignment: Alignment.bottomLeft,
+          child: Text('↑ ${museBytes(up)}   ↓ ${museBytes(down)}', key: const ValueKey('tile_speed_today'), maxLines: 1, style: MuseType.caption(context)),
+        ),
+        onTap: () => _showSessionSheet(context),
+      );
+    }
     return _Tile(
       title: '网速',
       titleTrailing: Text('↑ ${museSpeedText(stats.uplink.toInt())}', style: MuseType.caption(context)),

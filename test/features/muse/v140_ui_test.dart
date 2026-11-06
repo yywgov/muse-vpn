@@ -230,7 +230,6 @@ void main() {
     'settings': (const SettingsPage(), 3),
     'stats': (const MuseStatsPage(), 3),
     'routing': (const MuseRoutingPage(), 3),
-    'sync': (const MuseSyncPage(), 3),
     'appearance': (const MuseAppearancePage(), 3),
     'node-settings': (const MuseNodeSettingsPage(), 3),
     'network': (const MuseNetworkPage(), 3),
@@ -261,10 +260,11 @@ void main() {
 
   testWidgets('settings has the 1.10.0 rows (节点 / 分流 / 统计 moved off the home page)', (tester) async {
     await _pump(tester, page: const SettingsPage(), brightness: Brightness.light, size: phone, tab: 3);
-    for (final k in ['theme_mode', 'settings_auto_connect', 'settings_network', 'settings_activity', 'settings_sync', 'settings_resources', 'settings_about']) {
+    for (final k in ['theme_mode', 'settings_auto_connect', 'settings_network', 'settings_activity', 'settings_resources', 'settings_about']) {
       expect(find.byKey(ValueKey(k)), findsOneWidget, reason: k);
     }
-    for (final k in ['settings_nodes', 'settings_routing', 'settings_stats', 'settings_help']) {
+    // 1.11.0: 备份与同步 removed (导出 / 导入配置 on 关于)
+    for (final k in ['settings_nodes', 'settings_routing', 'settings_stats', 'settings_help', 'settings_sync']) {
       expect(find.byKey(ValueKey(k)), findsNothing, reason: k);
     }
     await _done(tester);

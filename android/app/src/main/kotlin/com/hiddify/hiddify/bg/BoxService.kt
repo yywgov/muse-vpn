@@ -122,6 +122,11 @@ class BoxService(
     private val status = MutableLiveData(Status.Stopped)
     private val binder = ServiceBinder(status)
     private val notification = ServiceNotification(status, service)
+
+    // 穿云 1.11.0: the home-screen widget follows the connection (only on a change, no polling)
+    init {
+        status.observeForever { ChuanyunWidget.onStatus(service, it) }
+    }
 //    private var boxService: BoxService? = null
     private var commandServer: CommandServer? = null
     private var receiverRegistered = false

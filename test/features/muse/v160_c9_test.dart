@@ -464,7 +464,7 @@ void main() {
     });
 
     test('search entries', () {
-      for (final title in ['自动运行', '通知栏断开按钮']) {
+      for (final title in ['打开即连接', '通知栏断开按钮']) { // 1.11.0: 自动运行 → 打开即连接
         expect(museSettingEntries.where((x) => x.title == title).single.androidOnly, isTrue, reason: title);
       }
       final onDemand = museSettingEntries.where((x) => x.title == '按需运行').single;

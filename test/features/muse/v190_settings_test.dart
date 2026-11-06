@@ -43,6 +43,10 @@ void main() {
     testWidgets('Android: 自动运行 switch, 按需运行 row, 定时 rows; no Windows rows', (t) async {
       final c = await _pump(t, const MuseAutoConnectPage(android: true, windows: false), prefs: {'muse_schedule': '480,-1'});
       expect(find.text('自动连接'), findsOneWidget);
+      // 1.11.0: 按需运行 / 定时 are behind 「更多」
+      expect(find.byKey(const ValueKey('settings_on_demand')), findsNothing);
+      await t.tap(find.byKey(const ValueKey('auto_connect_more')));
+      await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('settings_on_demand')), findsOneWidget);
       expect(find.text('08:00'), findsOneWidget);
       expect(find.byKey(const ValueKey('network_schedule_disconnect')), findsOneWidget);
@@ -57,6 +61,8 @@ void main() {
     testWidgets('neither platform: no 自动运行 (Android-only)', (t) async {
       await _pump(t, const MuseAutoConnectPage(android: false, windows: false));
       expect(find.byKey(const ValueKey('settings_auto_run')), findsNothing);
+      await t.tap(find.byKey(const ValueKey('auto_connect_more')));
+      await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('settings_on_demand')), findsOneWidget);
     });
 
@@ -80,7 +86,7 @@ void main() {
       expect(museAutoConnectSummary(autoRun: false, onDemand: false, schedule: off, autoStart: false), '关');
       expect(
         museAutoConnectSummary(autoRun: true, onDemand: true, schedule: const MuseSchedule(connectAt: 60), autoStart: true),
-        '自动运行、按需、定时、开机自启',
+        '打开即连接、按需、定时、开机自启',
       );
       expect(museAutoConnectSummary(autoRun: false, onDemand: false, schedule: const MuseSchedule(disconnectAt: 60), autoStart: false), '定时');
     });
@@ -214,8 +220,9 @@ void main() {
     });
 
     test('one button on the page, file name follows the choice', () {
+      // 1.11.0: the one button is 关于 › 导出配置
       final page = _src('lib/features/muse/settings/sync_pages.dart');
-      expect(page, contains("ValueKey('backup_export')"));
+      expect(_src('lib/features/about/widget/about_page.dart'), contains("ValueKey('about_export_config')"));
       expect(page, isNot(contains('backup_export_redacted')));
       expect(page, isNot(contains("'导出脱敏备份'")));
       expect(museBackupFileName(redact: true), 'chuanyun-backup-redacted.json');
@@ -224,23 +231,14 @@ void main() {
   });
 
   group('#8 备份与同步 / 内核与资源', () {
-    testWidgets('备份与同步: 备份 → WebDAV → 局域网 on one page', (t) async {
-      await _pump(t, const MuseSyncPage(), prefs: {'muse_webdav_user': 'u'});
-      expect(find.text('备份与同步'), findsOneWidget);
-      double y(String k) => t.getTopLeft(find.byKey(ValueKey(k), skipOffstage: false)).dy;
-      for (final k in ['backup_export', 'backup_import', 'backup_auto', 'sync_webdav', 'backup_sync_webdav_now', 'lan_host']) {
-        await t.scrollUntilVisible(find.byKey(ValueKey(k)), 200);
-        expect(find.byKey(ValueKey(k)), findsOneWidget, reason: k);
-      }
-      expect(y('backup_auto') < y('sync_webdav'), isTrue);
-      expect(y('sync_webdav') < y('lan_host'), isTrue);
-      expect(t.takeException(), isNull);
-    });
-
-    testWidgets('立即同步 only once WebDAV is set', (t) async {
-      await _pump(t, const MuseSyncPage());
-      await t.scrollUntilVisible(find.byKey(const ValueKey('sync_webdav')), 200);
-      expect(find.byKey(const ValueKey('backup_sync_webdav_now')), findsNothing);
+    // 1.11.0: 备份与同步 page (WebDAV, 局域网, 自动备份) removed; 导出 / 导入配置 lives on 关于.
+    test('备份: 导出 / 导入配置 on 关于, no 备份与同步 page', () {
+      final about = File('lib/features/about/widget/about_page.dart').readAsStringSync();
+      expect(about, contains("ValueKey('about_export_config')"));
+      expect(about, contains("ValueKey('about_import_config')"));
+      final sync = File('lib/features/muse/settings/sync_pages.dart').readAsStringSync();
+      expect(sync, isNot(contains('class MuseSyncPage')));
+      expect(sync, isNot(contains('class MuseWebdavPage')));
     });
 
     testWidgets('内核与资源: 内核 + 内核版本 + Geo 数据库 + 规则集', (t) async {
@@ -268,9 +266,10 @@ void main() {
       final s = _src('lib/features/settings/overview/settings_page.dart');
       expect(s, isNot(contains('const MuseCoreKindSection()')));
       expect(s, contains("title: '内核与资源'"));
-      expect(s, contains("title: '备份与同步'"));
+      // 1.11.0: no 备份与同步 row; 导出 / 导入配置 are on 关于
+      expect(s, isNot(contains("title: '备份与同步'")));
       expect(s, isNot(contains("title: '同步与备份'")));
-      expect(MuseSettingPage.sync.path, '设置 › 备份与同步');
+      expect(MuseSettingPage.sync.path, '设置 › 关于 › 导出 / 导入配置');
       expect(MuseSettingPage.resources.path, '设置 › 内核与资源');
     });
   });
@@ -350,12 +349,11 @@ void main() {
 
     test('old entry points open the new pages', () {
       final s = _src('lib/features/settings/overview/settings_page.dart');
-      expect(s, contains('case MuseSettingPage.sync:\n          musePushPage(context, const MuseSyncPage());'));
+      expect(s, contains('case MuseSettingPage.about || MuseSettingPage.sync:'));
       expect(s, contains('case MuseSettingPage.resources:\n          musePushPage(context, const MuseResourcesPage());'));
       // the 资源 row (same key) now opens 内核与资源
       expect(s, contains("key: const ValueKey('settings_resources')"));
       expect(_src('lib/features/muse/activity/dns_view.dart'), contains('设置 › 内核与资源'));
-      expect(_src('lib/features/muse/settings/sync_pages.dart'), contains('设置 › 备份与同步 › 扫码或输入配对码'));
     });
   });
 }

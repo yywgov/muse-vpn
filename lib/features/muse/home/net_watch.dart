@@ -9,18 +9,15 @@
 
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/data/notify.dart';
 import 'package:hiddify/features/muse/desktop/connection_keeper.dart';
 import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/muse/logic/keep_alive.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
-import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -92,25 +89,4 @@ final museScheduleProvider = Provider<void>((ref) {
   ref.onDispose(timer.cancel);
 });
 
-final museQualityAlertProvider = Provider<void>((ref) {
-  if (!ref.watch(MusePrefs.qualityAlert) || !ref.watch(serviceRunningProvider)) return;
-  final watch = MuseQualityWatch();
-  final timer = Timer.periodic(const Duration(minutes: 1), (_) async {
-    if (PlatformUtils.isAndroid && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
-    try {
-      final group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
-      final sel = group?.items.where((e) => e.tag == group.selected).firstOrNull;
-      if (group == null || sel == null) return;
-      await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest(sel.isGroup ? group.tag : sel.tag);
-      await Future<void>.delayed(const Duration(seconds: 8));
-      final now = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
-      final cur = now?.items.where((e) => e.tag == now.selected).firstOrNull;
-      if (cur == null) return;
-      if (watch.add(cur.urlTestDelay)) {
-        final name = cur.tagDisplay.isNotEmpty ? cur.tagDisplay : cur.tag;
-        await museNotify(id: museQualityAlertId, title: '连接质量变差', text: '「$name」延迟高或经常超时，可以换个节点');
-      }
-    } catch (_) {}
-  });
-  ref.onDispose(timer.cancel);
-});
+// 1.11.0: 连接质量提醒 (a url test every minute) was removed.

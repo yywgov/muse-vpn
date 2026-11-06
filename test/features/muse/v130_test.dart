@@ -94,8 +94,11 @@ void main() {
       expect(museKeepAliveLogLine(MuseKeepAliveStep.restartCore, '内核无响应'), '智能保持连接 · 重启内核：内核无响应');
     });
     test('every layer is gated by the one switch', () {
+      // 1.11.0: 换节点 (node_failover) has its own switch 节点失效自动切换 (MusePrefs.autoFailover, on by default)
+      final failover = File('lib/features/muse/home/node_failover.dart').readAsStringSync();
+      expect(failover, contains('MusePrefs.autoFailover'));
+      expect(failover, isNot(contains('Preferences.museKeepAlive')));
       for (final f in [
-        'lib/features/muse/home/node_failover.dart',
         'lib/features/muse/home/core_watchdog.dart',
         'lib/features/muse/desktop/connection_keeper.dart',
       ]) {

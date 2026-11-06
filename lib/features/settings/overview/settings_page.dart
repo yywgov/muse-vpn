@@ -7,6 +7,7 @@
 // 智能保持连接 → 自动连接; 高级 → 网络 › 高级; 统计 / 诊断 → 活动 tabs; 去广告 → 规则 › 分流;
 // 订阅自动更新 → 订阅 › ⋯; 节点 → 节点 › ⋯ › 节点设置; Android 通用 / 隐私与后台 → 外观;
 // Windows 电脑 → 网络 (运行模式), 自动连接 (静默启动), 外观 (窗口). 帮助与隐私 and 后台保活 are gone.
+// 1.11.0: 备份与同步 is gone (导出 / 导入配置 on 关于); seven rows.
 // Old names still find their new place through search (logic/settings_index.dart); every
 // preference keeps its storage key.
 
@@ -33,14 +34,14 @@ import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// 1.10.0: the rows of the 设置 home page, in order (pure, for tests).
+/// 1.10.0: the rows of the 设置 home page, in order (pure, for tests). 1.11.0: 备份与同步 is gone
+/// (导出 / 导入配置 are on 关于).
 List<String> museSettingsHomeRows({required bool android, required bool developer}) => [
   '外观',
   '自动连接',
   if (android) '分应用代理',
   '网络',
   '活动',
-  '备份与同步',
   '内核与资源',
   '关于',
   if (developer) '开发者选项',
@@ -69,21 +70,25 @@ class SettingsPage extends HookConsumerWidget {
     void openEntry(MuseSettingEntry e) {
       switch (e.page) {
         case MuseSettingPage.autoConnect:
-          musePushPage(context, const MuseAutoConnectPage());
-        case MuseSettingPage.advanced || MuseSettingPage.network:
+          musePushPage(context, MuseAutoConnectPage(initiallyMore: museAutoConnectMoreRows.any(e.title.startsWith)));
+        case MuseSettingPage.advanced:
+          musePushPage(context, const MuseNetworkPage(advancedOpen: true));
+        case MuseSettingPage.network:
           musePushPage(context, const MuseNetworkPage());
         case MuseSettingPage.appearance:
           musePushPage(context, const MuseAppearancePage());
+        case MuseSettingPage.windowAdvanced:
+          musePushPage(context, const MuseAppearancePage(windowAdvancedOpen: true));
         case MuseSettingPage.nodes:
           musePushPage(context, const MuseNodeSettingsPage());
+        case MuseSettingPage.nodesAdvanced:
+          musePushPage(context, const MuseNodeSettingsPage(advancedOpen: true));
         case MuseSettingPage.routing:
           museOpenRules(context);
         case MuseSettingPage.overrides:
           museOpenRules(context, tab: MuseRulesTab.overrides);
         case MuseSettingPage.subscriptions:
           context.goNamed('config');
-        case MuseSettingPage.sync:
-          musePushPage(context, const MuseSyncPage());
         case MuseSettingPage.stats:
           context.go(museActivityLocation(MuseActivityTab.stats));
         case MuseSettingPage.diagnose:
@@ -96,7 +101,7 @@ class SettingsPage extends HookConsumerWidget {
           musePushPage(context, const MuseThemePreviewPage());
         case MuseSettingPage.perApp:
           context.goNamed('perAppProxy');
-        case MuseSettingPage.about:
+        case MuseSettingPage.about || MuseSettingPage.sync:
           context.goNamed('about');
         case MuseSettingPage.openSource:
           context.goNamed('openSource');
@@ -163,13 +168,6 @@ class SettingsPage extends HookConsumerWidget {
                 title: '活动',
                 chevron: true,
                 onTap: () => context.go(museActivityLocation(MuseActivityTab.connections)),
-              ),
-              MuseTile(
-                key: const ValueKey('settings_sync'),
-                leading: const Icon(Icons.cloud_sync_outlined),
-                title: '备份与同步',
-                chevron: true,
-                onTap: () => musePushPage(context, const MuseSyncPage()),
               ),
               // 1.6.0 C10; 1.9.0 #8: 内核 (Windows / Android) + 资源 on one page
               MuseTile(

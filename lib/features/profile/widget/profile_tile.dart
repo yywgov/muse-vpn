@@ -127,19 +127,41 @@ class ProfileTile extends HookConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _title(t, theme),
-              // 穿云 1.2: remaining traffic / time as a thin bar, red when low or expiring — no text
+              // 穿云 1.2: remaining traffic / time as a thin bar, red when low or expiring.
+              // 1.11.0: one bar each for 流量 and 到期, with a small label and what is left
               if (subInfo != null)
-                if (museSubscriptionBar(subInfo) case final bar?) ...[
+                if (museSubscriptionBars(subInfo) case final bars when bars.isNotEmpty) ...[
                   const Gap(6),
-                  LinearProgressIndicator(
+                  Column(
                     key: const ValueKey('subscription_bar'),
-                    value: bar.remaining,
-                    minHeight: 4,
-                    borderRadius: MuseRadius.smallAll,
-                    color: bar.warn ? theme.colorScheme.error : theme.colorScheme.primary,
-                    backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                    children: [
+                      for (final bar in bars)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: MuseSpace.s4),
+                          child: Row(
+                            key: ValueKey('subscription_bar_${bar.kind}'),
+                            children: [
+                              Text(bar.label, style: MuseType.caption(context)),
+                              const SizedBox(width: MuseSpace.s8),
+                              Expanded(
+                                child: LinearProgressIndicator(
+                                  value: bar.remaining,
+                                  minHeight: MuseSpace.s4,
+                                  borderRadius: MuseRadius.smallAll,
+                                  color: bar.warn ? theme.colorScheme.error : theme.colorScheme.primary,
+                                  backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              const SizedBox(width: MuseSpace.s8),
+                              Text(
+                                bar.trailing,
+                                style: MuseType.caption(context).copyWith(color: bar.warn ? theme.colorScheme.error : null),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
-                  const Gap(4),
                 ],
               // 穿云 1.2.5: 「已用 12.3 GB / 100 GB · 剩 23 天 · 3 小时前更新」 (Clash Verge Rev's card)
               if (profile is RemoteProfileEntity)

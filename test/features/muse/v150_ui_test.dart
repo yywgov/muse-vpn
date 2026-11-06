@@ -317,6 +317,10 @@ void main() {
   testWidgets('ⓘ: a section explanation is folded until tapped', (tester) async {
     await _pump(tester, page: const MuseNodeSettingsPage(), brightness: Brightness.light, size: phone, tab: 3);
     expect(find.textContaining('「自动」适合大多数订阅'), findsNothing);
+    // 1.11.0: 订阅 UA is in the folded 「高级」 section; open it first
+    await tester.tap(find.byKey(const ValueKey('node_advanced_fold')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('「自动」适合大多数订阅'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('section_info')).first);
     await tester.pumpAndSettle();
     expect(find.textContaining('「自动」适合大多数订阅'), findsOneWidget);

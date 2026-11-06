@@ -1,6 +1,8 @@
 // 穿云 1.3.0 - the node list: the 节点 tab, the 首页 node picker sheet and the right-hand column on
 // wide Windows windows all use this widget. Search, sort (按延迟 / 订阅顺序 / 按地区), favourites,
 // region headers, long-press detail, single-node test.
+// 1.11.0: the 节点 page is the A 双列卡片 design (docs: 节点页定稿) — a 手动选择 / 自动最快 / 负载均衡 bar
+// above two columns of node cards (more on a wide window); the sheet and the side column keep rows.
 // 1.10.0: no 「不可用」 group — timed-out nodes sort to the end and show 「超时」; no 当前节点 card on
 // the 节点 page (the row is highlighted and the page scrolls to it once); the toolbar is 搜索, 测速 and
 // one ⋯ menu (筛选 / 排序 / 布局 / 多选 / 滚动到当前节点 / 节点设置).
@@ -240,7 +242,9 @@ class MuseNodeList extends HookConsumerWidget {
     final recent = museRecentFromRaw(ref.watch(MusePrefs.recentNodes));
     final profileName = ref.watch(museActiveProfileNameProvider)?.trim() ?? '';
     // 1.6.0 C5: 列表 / 卡片 and 紧凑 / 标准 / 宽松 (the embedded lists stay a plain list)
-    final layout = embedded ? MuseNodeLayout.list : MuseNodeLayout.fromKey(ref.watch(MusePrefs.nodeLayout));
+    // 1.11.0: the 节点 page is always the A 双列卡片 layout; the sheet and the side column stay a list
+    final cardsA = !embedded;
+    final layout = embedded ? MuseNodeLayout.list : MuseNodeLayout.grid;
     final density = MuseNodeDensity.fromKey(ref.watch(MusePrefs.nodeDensity));
     final ownScroll = useScrollController();
     final scroll = controller ?? ownScroll;
@@ -282,7 +286,6 @@ class MuseNodeList extends HookConsumerWidget {
     final moreItems = <(String, String)>[
       if (canFilter) ('filter', '筛选：${nodeFilter.label}'),
       if (nodeTotal > 1) ('sort', '排序：${sortMode.title}'),
-      if (!embedded && nodeTotal > 0) ('layout', '布局：${layout.title} · ${density.title}'),
       if (!embedded && nodeTotal > 1) ('select', '多选'),
       if (group != null && group.selected.isNotEmpty) ('locate', '滚动到当前节点'),
       if (!embedded) ('settings', '节点设置'),
@@ -396,8 +399,9 @@ class MuseNodeList extends HookConsumerWidget {
                   }
                 },
               ),
-            TextButton(
+            FilledButton.tonal(
               key: const ValueKey('node_test_button'),
+              style: FilledButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16)),
               onPressed: group == null || !running ? null : () => testing ? museStopNodeTest(ref) : museRunNodeTest(ref),
               child: testing
                   ? Row(
@@ -590,7 +594,36 @@ class MuseNodeList extends HookConsumerWidget {
       final memo = rowMemo.value;
       if (memo.rows.length > 2 * group.items.length + 16) memo.rows.clear();
 
-      Widget rowWidget(OutboundInfo proxy, {bool dimmed = false}) => MuseNodeRow(
+      // 1.11.0 (A): the node a group (自动最快 / 负载均衡) is using right now
+      final inUseTag = group.items.where((e) => e.isGroup && e.tag == group.selected).firstOrNull?.groupSelectedTag ?? '';
+      Widget rowWidget(OutboundInfo proxy, {bool dimmed = false}) => cardsA && !proxy.isGroup
+          ? MuseNodeCard(
+              key: ValueKey(proxy.tag),
+              proxy: proxy,
+              since: since,
+              testStarted: running ? testStarted : null,
+              cachedDelay: latencyCache.delayOf(proxy.tag),
+              dimmed: dimmed,
+              selected: group.selected == proxy.tag,
+              inUse: inUseTag.isNotEmpty && inUseTag == proxy.tag,
+              favorite: favorites.contains(proxy.tag),
+              displayName: shownName(proxy),
+              region: metas.of(proxy.tag).region,
+              note: metas.of(proxy.tag).note,
+              checked: selecting.value ? picked.value.contains(proxy.tag) : null,
+              onLongPress: selecting.value ? null : () => showMuseNodeDetails(context, ref, proxy, since: since, groupTag: group.tag),
+              onTap: selecting.value
+                  ? () {
+                      final next = {...picked.value};
+                      if (!next.remove(proxy.tag)) next.add(proxy.tag);
+                      picked.value = next;
+                    }
+                  : () async {
+                      await musePickNode(ref, group.tag, proxy.tag);
+                      onPicked?.call();
+                    },
+            )
+          : MuseNodeRow(
         key: ValueKey(proxy.tag),
         padV: density.padV,
         proxy: proxy,
@@ -632,6 +665,7 @@ class MuseNodeList extends HookConsumerWidget {
           // only a group row shows its pick
           proxy.isGroup ? shownPick : null,
           selecting.value && !proxy.isGroup ? picked.value.contains(proxy.tag) : null,
+          cardsA && inUseTag == proxy.tag,
         );
         final hit = memo.rows[proxy.tag];
         if (hit != null && hit.$1 == inputs) return hit.$2;
@@ -655,8 +689,11 @@ class MuseNodeList extends HookConsumerWidget {
         bool dimmed = false,
         bool? isCollapsed,
         VoidCallback? onHeaderTap,
+        bool asList = false,
       }) => _NodeSection(
         key: key,
+        asList: asList,
+        selfDecorated: cardsA && !asList,
         header: header,
         margin: margin,
         collapsed: isCollapsed,
@@ -712,7 +749,42 @@ class MuseNodeList extends HookConsumerWidget {
       }
       final groups = visible.where((e) => e.isGroup).toList();
       final nodes = visible.where((e) => !e.isGroup).toList();
-      if (groups.isNotEmpty) children.add(section(null, groups));
+      // 1.11.0 (A): the groups are the 手动选择 / 自动最快 / 负载均衡 bar above the cards
+      final modes = cardsA && groups.length <= 3
+          ? museNodeModes(groups, delayOf: (g) {
+              final d = museFreshDelay(g, since);
+              return ConnectionConst.isValidDelay(d) ? d : 0;
+            })
+          : const <MuseNodeMode>[];
+      if (modes.isNotEmpty && !selecting.value && !filtering) {
+        children.add(
+          Padding(
+            padding: EdgeInsets.fromLTRB(margin, MuseSpace.s4, margin, MuseSpace.s4),
+            child: MuseNodeModeBar(
+              modes: modes,
+              selected: museNodeModeOf(modes, group.selected),
+              onChanged: (m) async {
+                final String? target;
+                if (m.groupTag != null) {
+                  target = m.groupTag;
+                } else if (museNodeModeOf(modes, group.selected) == 'manual') {
+                  return;
+                } else {
+                  target = museManualPick(
+                    recent: recent,
+                    nodes: nodes,
+                    delayOf: (e) => museFreshDelay(e, since),
+                  );
+                }
+                if (target == null || target == group.selected) return;
+                await musePickNode(ref, group.tag, target);
+              },
+            ),
+          ),
+        );
+      } else if (groups.isNotEmpty && modes.isEmpty) {
+        children.add(section(null, groups, asList: true));
+      }
       if (sortMode == MuseNodeSort.region) {
         final favs = nodes.where((e) => favorites.contains(e.tag)).toList();
         if (favs.isNotEmpty) children.add(section('⭐ 收藏', favs, key: const ValueKey('region_header_favorites')));
@@ -767,10 +839,13 @@ class MuseNodeList extends HookConsumerWidget {
     final scaler = MediaQuery.textScalerOf(context);
     final list = LayoutBuilder(
       builder: (context, box) {
-        final columns = layout == MuseNodeLayout.grid
-            ? museNodeColumns(box.maxWidth - margin * 2, density, textScale: scaler.scale(MuseType.numberSize) / MuseType.numberSize)
+        final textScale = scaler.scale(MuseType.numberSize) / MuseType.numberSize;
+        final columns = cardsA
+            ? museNodeColumnsA(box.maxWidth - margin * 2, textScale: textScale)
+            : layout == MuseNodeLayout.grid
+            ? museNodeColumns(box.maxWidth - margin * 2, density, textScale: textScale)
             : 1;
-        final extent = museNodeCardExtent(density, scaler.scale);
+        final extent = cardsA ? museNodeCardExtentA(scaler.scale) : museNodeCardExtent(density, scaler.scale);
         return CustomScrollView(
           key: listKey,
           controller: scroll,

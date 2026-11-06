@@ -181,26 +181,19 @@ void main() {
       expect(sp.getInt('muse_text_scale_pct'), 110);
     });
     test('synced and wired into the app', () {
-      expect(museSyncedPrefs.keys, containsAll(['muse_text_scale_on', 'muse_text_scale_pct', 'muse_custom_accents', 'muse_accent']));
-      expect(museSyncedPrefKeys, containsAll(['muse_text_scale_on', 'muse_text_scale_pct', 'muse_custom_accents']));
+      // 1.11.0: 文字缩放 removed (follows the system font size); old backups with it still import
+      expect(museSyncedPrefs.keys, containsAll(['muse_custom_accents', 'muse_accent']));
+      expect(museSyncedPrefs.keys, isNot(contains('muse_text_scale_on')));
       final app = File('lib/features/app/widget/app.dart').readAsStringSync();
-      expect(app, contains('museTextScale(ref.watch(MusePrefs.textScaleOn), ref.watch(MusePrefs.textScalePct))'));
+      expect(app, isNot(contains('MusePrefs.textScaleOn')));
       expect(app, contains('museApplyPureBlack(themeMode.trueBlack)'));
       expect(app, isNot(contains('MusePrefs.textSize')));
     });
-    testWidgets('switch reveals the slider; release saves', (tester) async {
-      final c = await _pump(tester, {});
+    testWidgets('1.11.0: no 文字缩放 row on 外观', (tester) async {
+      await _pump(tester, {});
+      expect(find.byKey(const ValueKey('appearance_text_scale')), findsNothing);
       expect(find.byKey(const ValueKey('appearance_text_scale_slider')), findsNothing);
       expect(find.text('字体大小'), findsNothing);
-      await tester.tap(find.descendant(of: find.byKey(const ValueKey('appearance_text_scale')), matching: find.byType(Switch)));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(c.read(MusePrefs.textScaleOn), isTrue);
-      final slider = find.byKey(const ValueKey('appearance_text_scale_slider'));
-      expect(slider, findsOneWidget);
-      await tester.drag(slider, const Offset(400, 0));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(c.read(MusePrefs.textScalePct), museTextScaleMax);
-      expect(find.text('1.40×'), findsWidgets);
     });
   });
 
@@ -242,8 +235,8 @@ void main() {
       String first(String q, {bool windows = false}) => museSearchSettings(q, android: !windows, windows: windows).first.title;
       expect(first('纯黑'), '纯黑');
       expect(first('OLED'), '纯黑');
-      expect(first('文字缩放'), '文字缩放');
-      expect(first('字体大小'), '文字缩放');
+      // 1.11.0: 文字缩放 removed
+      expect(museSettingEntries.where((e) => e.title == '文字缩放'), isEmpty);
       expect(first('hex'), '自定义主题色');
       expect(first('静默', windows: true), '静默启动');
       expect(museSearchSettings('静默', android: true, windows: false), isEmpty);
