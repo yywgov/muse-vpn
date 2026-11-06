@@ -10,7 +10,12 @@ import 'dart:io';
 // 1.10.4: [timeout] = no answer within [museServiceTimeout] (was folded into failed). Every service
 // of a check ends in ok / limited / timeout / failed: the whole check is capped at
 // [museServiceTotalCap], and what has not answered by then is a timeout.
-enum MuseSvcState { unknown, checking, ok, limited, failed, timeout }
+// 1.12.0: [originals] = 仅自制剧 (only the service's own shows), [unsupported] = 不支持 (not offered
+// in the region the service sees).
+enum MuseSvcState { unknown, checking, ok, limited, failed, timeout, originals, unsupported }
+
+/// 1.12.0: a full check of one service (state + the region it sees), used instead of [MuseServiceProbe].
+typedef MuseServiceCheck = Future<({MuseSvcState state, String? region})> Function(MuseService service);
 
 class MuseService {
   const MuseService(this.key, this.name, this.url);
@@ -73,6 +78,8 @@ Future<Map<String, MuseSvcState>> museProbeServices(
   Duration timeout = museServiceTimeout,
   Duration totalCap = museServiceTotalCap,
   void Function(String key, MuseSvcState state, int? ms)? onResult,
+  MuseServiceCheck? check,
+  void Function(String key, String region)? onRegion,
 }) async {
   final out = <String, MuseSvcState>{};
   if (services.isEmpty) return out;
@@ -90,8 +97,15 @@ Future<Map<String, MuseSvcState>> museProbeServices(
       final watch = Stopwatch()..start();
       MuseSvcState v;
       try {
-        final status = await Future<int?>.sync(() => probe(s)).timeout(timeout);
-        v = museServiceVerdict(status);
+        if (check != null) {
+          final r = await Future.sync(() => check(s)).timeout(timeout);
+          v = r.state;
+          final region = r.region;
+          if (region != null && !closed) onRegion?.call(s.key, region);
+        } else {
+          final status = await Future<int?>.sync(() => probe(s)).timeout(timeout);
+          v = museServiceVerdict(status);
+        }
       } on TimeoutException {
         v = MuseSvcState.timeout;
       } on MuseServiceTimeout {
@@ -99,7 +113,7 @@ Future<Map<String, MuseSvcState>> museProbeServices(
       } catch (_) {
         v = MuseSvcState.failed;
       }
-      report(s.key, v, v == MuseSvcState.ok || v == MuseSvcState.limited ? watch.elapsedMilliseconds : null);
+      report(s.key, v, v == MuseSvcState.ok || v == MuseSvcState.limited || v == MuseSvcState.originals ? watch.elapsedMilliseconds : null);
     }
   }
 
@@ -123,19 +137,22 @@ class MuseServiceCache {
   final Duration maxAge;
   Map<String, MuseSvcState> results = const {};
   Map<String, int> ms = const {}; // 1.10.4: how long each answer took
+  Map<String, String> regions = const {}; // 1.12.0: region each service sees
   DateTime? at;
 
   bool fresh(DateTime now) => at != null && now.difference(at!) < maxAge && results.isNotEmpty;
 
-  void store(Map<String, MuseSvcState> r, DateTime now, {Map<String, int> ms = const {}}) {
+  void store(Map<String, MuseSvcState> r, DateTime now, {Map<String, int> ms = const {}, Map<String, String> regions = const {}}) {
     results = Map.unmodifiable(r);
     this.ms = Map.unmodifiable(ms);
+    this.regions = Map.unmodifiable(regions);
     at = now;
   }
 
   void clear() {
     results = const {};
     ms = const {};
+    regions = const {};
     at = null;
   }
 }

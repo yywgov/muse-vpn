@@ -9,7 +9,6 @@ import 'dart:io';
 import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 enum MuseReach { unknown, checking, ok, failed }

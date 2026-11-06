@@ -8,9 +8,12 @@ part of 'muse_home_page.dart';
 // ---------------------------------------------------------------- 服务状态
 
 class MuseServicesState {
-  const MuseServicesState({this.results = const {}, this.ms = const {}, this.checking = false, this.at});
+  const MuseServicesState({this.results = const {}, this.ms = const {}, this.regions = const {}, this.checking = false, this.at});
 
   final Map<String, MuseSvcState> results;
+
+  /// 1.12.0: the region each service sees (解锁检测)
+  final Map<String, String> regions;
 
   /// 1.10.4: answer time per service (ms), shown next to 可用
   final Map<String, int> ms;
@@ -19,17 +22,20 @@ class MuseServicesState {
 
   int get okCount => results.values.where((v) => v == MuseSvcState.ok).length;
 
-  /// 1.10.4: nothing to show and nothing running (a new connection / never checked): the card
-  /// starts a check when it is on screen, instead of showing 检测中 with nothing behind it.
+  /// nothing to show and nothing running (a new connection / never checked). 1.12.0: the card
+  /// shows 点按检测 and checks only when tapped.
   bool get idle => !checking && results.isEmpty;
 }
 
 class MuseServicesNotifier extends StateNotifier<MuseServicesState> {
-  MuseServicesNotifier(this._probe, {DateTime Function()? now, this.totalCap = museServiceTotalCap})
+  MuseServicesNotifier(this._probe, {DateTime Function()? now, this.totalCap = museServiceTotalCap, this.checker})
     : _now = now ?? DateTime.now,
       super(const MuseServicesState());
 
   final MuseServiceProbe Function() _probe;
+
+  /// 1.12.0: the region-aware check (解锁检测); null = status only
+  final MuseServiceCheck Function()? checker;
   final DateTime Function() _now;
   final Duration totalCap;
   final cache = MuseServiceCache();
@@ -40,23 +46,28 @@ class MuseServicesNotifier extends StateNotifier<MuseServicesState> {
   Future<void> check({bool force = false}) async {
     if (state.checking) return;
     if (!force && cache.fresh(_now())) {
-      state = MuseServicesState(results: cache.results, ms: cache.ms, at: cache.at);
+      state = MuseServicesState(results: cache.results, ms: cache.ms, regions: cache.regions, at: cache.at);
       return;
     }
     final run = ++_run;
     state = MuseServicesState(results: const {}, checking: true, at: state.at);
     final partial = <String, MuseSvcState>{};
     final ms = <String, int>{};
+    final regions = <String, String>{};
+    final check = checker?.call();
     Map<String, MuseSvcState> results;
     try {
       results = await museProbeServices(
         _probe(),
         totalCap: totalCap,
+        check: check,
+        timeout: check == null ? museServiceTimeout : museUnlockTimeout,
+        onRegion: (k, r) => regions[k] = r,
         onResult: (k, v, t) {
           partial[k] = v;
           if (t != null) ms[k] = t;
           if (!mounted || run != _run) return;
-          state = MuseServicesState(results: Map.of(partial), ms: Map.of(ms), checking: true, at: state.at);
+          state = MuseServicesState(results: Map.of(partial), ms: Map.of(ms), regions: Map.of(regions), checking: true, at: state.at);
         },
       );
     } catch (_) {
@@ -64,8 +75,8 @@ class MuseServicesNotifier extends StateNotifier<MuseServicesState> {
       results = {for (final s in museServices) s.key: partial[s.key] ?? MuseSvcState.failed};
     }
     if (!mounted || run != _run) return;
-    cache.store(results, _now(), ms: ms);
-    state = MuseServicesState(results: results, ms: Map.of(ms), at: cache.at);
+    cache.store(results, _now(), ms: ms, regions: regions);
+    state = MuseServicesState(results: results, ms: Map.of(ms), regions: Map.of(regions), at: cache.at);
   }
 
   /// A new connection: what answered before says nothing now. The card (when on screen) checks
@@ -86,7 +97,10 @@ class MuseServicesNotifier extends StateNotifier<MuseServicesState> {
 }
 
 final museServicesProvider = StateNotifierProvider<MuseServicesNotifier, MuseServicesState>((ref) {
-  final n = MuseServicesNotifier(() => museHttpServiceProbe(museEffectiveMixedPort(ref.read)));
+  final n = MuseServicesNotifier(
+    () => museHttpServiceProbe(museEffectiveMixedPort(ref.read)),
+    checker: () => museUnlockServiceCheck(museHttpFetch(museEffectiveMixedPort(ref.read))),
+  );
   ref.listen<bool>(museRunningProvider, (prev, running) {
     if (prev != running) n.reset();
   });
@@ -104,11 +118,18 @@ String museServiceStateText(MuseSvcState s) => switch (s) {
   MuseSvcState.timeout => '超时',
   MuseSvcState.checking => '检测中',
   MuseSvcState.unknown => '—',
+  MuseSvcState.originals => '仅自制剧',
+  MuseSvcState.unsupported => '不支持',
 };
 
 /// 1.10.4: one service as the card / sheet shows it: 可用 with its answer time, else the state.
-String museServiceLabel(MuseSvcState s, int? ms) =>
-    s == MuseSvcState.ok && ms != null ? '${museServiceStateText(s)} $ms ms' : museServiceStateText(s);
+/// 1.12.0: with the region the service sees (可用·香港 182 ms / 不支持·中国大陆).
+String museServiceLabel(MuseSvcState s, int? ms, {String? region}) {
+  final base = region == null || s == MuseSvcState.checking || s == MuseSvcState.unknown
+      ? museServiceStateText(s)
+      : '${museServiceStateText(s)}·${museRegionName(region)}';
+  return s == MuseSvcState.ok && ms != null ? '$base $ms ms' : base;
+}
 
 /// 1.10.4: the card's big value — 检测中 only while a check runs.
 String museServicesValue({required bool running, required MuseServicesState s, required int total}) {
@@ -124,13 +145,7 @@ class _ServicesTile extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final running = ref.watch(museRunningProvider);
     final s = ref.watch(museServicesProvider);
-    // checks once the card is on screen and connected (cached 10 minutes); 1.10.4: also when the
-    // results were cleared while the card stayed on screen (no timer: it reacts to that change)
-    final idle = s.idle;
-    useEffect(() {
-      if (running && idle) Future.microtask(() => ref.read(museServicesProvider.notifier).check());
-      return null;
-    }, [running, idle]);
+    // 1.12.0: checks only when tapped (解锁检测 sends a few requests per service; no automatic run)
     final total = museServices.length;
     final value = museServicesValue(running: running, s: s, total: total);
     final mt = MuseTheme.of(context);
@@ -151,7 +166,7 @@ class _ServicesTile extends HookConsumerWidget {
               ? '未连接'
               : [
                   for (final sv in museServices.take(4))
-                    '${sv.name} ${museServiceLabel(s.results[sv.key] ?? (s.checking ? MuseSvcState.checking : MuseSvcState.unknown), s.ms[sv.key])}',
+                    '${sv.name} ${museServiceLabel(s.results[sv.key] ?? (s.checking ? MuseSvcState.checking : MuseSvcState.unknown), s.ms[sv.key], region: s.regions[sv.key])}',
                 ].join(' · '),
           style: MuseType.caption(context),
         ),
@@ -187,7 +202,7 @@ class _ServicesSheet extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
             child: Row(
               children: [
-                Expanded(child: Text(running ? '经当前节点访问，每 10 分钟最多检测一次' : '连接后才能检测', style: MuseType.caption(context))),
+                Expanded(child: Text(running ? '经当前节点检测能否打开、所在地区与是否解锁，点「刷新」重新检测' : '连接后才能检测', style: MuseType.caption(context))),
                 TextButton(
                   key: const ValueKey('services_refresh'),
                   onPressed: running && !s.checking
@@ -213,8 +228,8 @@ class _ServicesSheet extends ConsumerWidget {
               final st = s.results[sv.key] ?? (s.checking ? MuseSvcState.checking : MuseSvcState.unknown);
               final color = switch (st) {
                 MuseSvcState.ok => Theme.of(context).colorScheme.success,
-                MuseSvcState.limited => Theme.of(context).colorScheme.warning,
-                MuseSvcState.failed || MuseSvcState.timeout => Theme.of(context).colorScheme.error,
+                MuseSvcState.limited || MuseSvcState.originals => Theme.of(context).colorScheme.warning,
+                MuseSvcState.failed || MuseSvcState.timeout || MuseSvcState.unsupported => Theme.of(context).colorScheme.error,
                 _ => Theme.of(context).colorScheme.idle,
               };
               return MuseCard(
@@ -224,7 +239,14 @@ class _ServicesSheet extends ConsumerWidget {
                     Expanded(
                       child: Text(sv.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.body(context)),
                     ),
-                    Text(museServiceLabel(st, s.ms[sv.key]), style: MuseType.caption(context).copyWith(color: color)),
+                    Flexible(
+                      child: Text(
+                        museServiceLabel(st, s.ms[sv.key], region: s.regions[sv.key]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: MuseType.caption(context).copyWith(color: color),
+                      ),
+                    ),
                   ],
                 ),
               );

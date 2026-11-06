@@ -238,7 +238,7 @@ const museRulePresets = <MuseRulePreset>[
   ),
   MuseRulePreset(
     key: 'cnapps',
-    title: '国内常用 App 直连（微信 / QQ / 淘宝 / 支付宝 / 抖音 / B 站 / 网易云）',
+    title: '国内常用应用直连（微信 / QQ / 淘宝 / 支付宝 / 抖音 / B 站 / 网易云）',
     group: MusePresetGroup.domestic,
     outbound: Outbound.direct,
     geosites: ['tencent', 'alibaba', 'douyin', 'bilibili', 'netease'],

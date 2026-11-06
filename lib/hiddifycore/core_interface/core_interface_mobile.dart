@@ -147,7 +147,7 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
 
     if (!await waitUntilPort(portBack, true, null)) {
       await stopMethodChannel();
-      return const CoreStatus.stopped(alert: CoreAlert.startService, message: "starting background core...");
+      return const CoreStatus.stopped(alert: CoreAlert.startService, message: "后台内核仍在启动，请稍后再试");
     }
     return const CoreStarted();
   }

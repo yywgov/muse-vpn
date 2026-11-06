@@ -240,7 +240,7 @@ class HiddifyCoreService with InfraLogger {
       );
       if (background != const CoreStatus.started()) {
         statusController.add(currentState = const CoreStatus.stopped());
-        return left(background.getCoreAlert() ?? const ConnectionFailure.unexpected("failed to start core"));
+        return left(background.getCoreAlert() ?? const ConnectionFailure.unexpected("内核启动失败"));
       }
       // Armed again on every connect, not only when there are two channels.
       // listenSingle drops a subscription for good when its stream errors, and
@@ -275,7 +275,7 @@ class HiddifyCoreService with InfraLogger {
           final alert = res.message.contains("denied") ? CoreAlert.requestVPNPermission : CoreAlert.startFailed;
           currentState = CoreStatus.stopped(
             alert: alert,
-            message: "failed to start core ${res.messageType} ${res.message}",
+            message: "内核启动失败（${res.messageType}）：${res.message}",
           );
 
           statusController.add(currentState);
@@ -283,7 +283,7 @@ class HiddifyCoreService with InfraLogger {
 
           return left(
             currentState.getCoreAlert() ??
-                ConnectionFailure.unexpected("failed to start core ${res.messageType} ${res.message}"),
+                ConnectionFailure.unexpected("内核启动失败（${res.messageType}）：${res.message}"),
           );
         }
       } on GrpcError catch (e) {

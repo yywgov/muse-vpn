@@ -7,7 +7,6 @@ import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
 import 'package:hiddify/features/muse/widget/muse_sheet.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
-import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// The regions to offer: those of [codes] (one per node, null = unknown), most nodes first.

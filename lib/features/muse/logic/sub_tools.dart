@@ -119,9 +119,15 @@ Set<MuseSubReminder> museSubReminders({
   return out;
 }
 
+/// 穿云 1.12.0: launcher shortcuts `chuanyun://mode` / `scan` / `speedtest`.
+enum MuseQuickAction { mode, scan, speedtest }
+
 /// What a `chuanyun://` link asks for.
 class MuseDeepLink {
-  const MuseDeepLink({this.url, this.name, this.connect = false, this.node, this.disconnect = false});
+  const MuseDeepLink({this.url, this.name, this.connect = false, this.node, this.disconnect = false, this.quick});
+
+  /// 1.12.0: 切换规则/全局, 扫码添加, 测速
+  final MuseQuickAction? quick;
 
   /// a subscription to import
   final String? url;
@@ -152,6 +158,12 @@ MuseDeepLink? museParseDeepLink(String raw) {
       return MuseDeepLink(connect: true, node: q['node']);
     case 'disconnect':
       return const MuseDeepLink(disconnect: true);
+    case 'mode':
+      return const MuseDeepLink(quick: MuseQuickAction.mode);
+    case 'scan':
+      return const MuseDeepLink(quick: MuseQuickAction.scan);
+    case 'speedtest':
+      return const MuseDeepLink(quick: MuseQuickAction.speedtest);
     case 'import':
     case 'install-config':
     case 'install-sub':

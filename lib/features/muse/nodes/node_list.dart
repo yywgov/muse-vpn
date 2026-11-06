@@ -9,6 +9,8 @@
 // Works while disconnected from the cached list (picking then only remembers the node).
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/logic/fail_reason.dart';
+import 'package:hiddify/features/muse/data/port_override.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -42,7 +44,6 @@ import 'package:hiddify/features/muse/settings/more_settings.dart' show MuseNode
 import 'package:hiddify/features/muse/settings/sub_filter_dialog.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';

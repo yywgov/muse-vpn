@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hiddify/features/muse/home/quick_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -86,6 +87,12 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
         if (control != null && (control.connect || control.disconnect)) {
           unawaited(museApplyLaunchControl(ref, MuseCliArgs(connect: control.connect, disconnect: control.disconnect, node: control.node)));
           return '/home';
+        }
+        // 穿云 1.12.0: launcher shortcuts
+        final quick = control?.quick;
+        if (quick != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(museRunQuickAction(ref, quick)));
+          return quick == MuseQuickAction.speedtest ? '/nodes' : '/home';
         }
         if (url != null && Uri.parse(url).host == 'import') {
           // Auto import profile from url

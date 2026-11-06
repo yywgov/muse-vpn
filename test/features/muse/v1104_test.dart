@@ -145,7 +145,7 @@ void main() {
     test('the provider: a reload of the node list (null in between) is not a node change', () {
       final src = _src('lib/features/muse/home/dashboard_cards.dart');
       expect(src, contains('if (prev != null && next != null && prev != next) n.stale();'));
-      expect(src, contains('}, [running, idle]);'));
+      expect(src, isNot(contains('}, [running, idle]);')), reason: '1.12.0: only a tap checks');
       expect(src, contains("if (running && !s.checking) ref.read(museServicesProvider.notifier).check(force: true);"));
       // no timer / polling added for the card
       final card = src.substring(src.indexOf('class _ServicesTile'), src.indexOf('class _ServicesSheet'));
@@ -213,19 +213,23 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
     }
 
-    testWidgets('results cleared while the card is on screen: it checks again and ends with a result', (tester) async {
+    // 1.12.0: the card checks only when tapped (解锁检测); no automatic check when it shows up
+    testWidgets('results cleared while the card is on screen: 点按检测, never 检测中 forever', (tester) async {
       await pump(tester);
       expect(find.byKey(const ValueKey('tile_services')), findsOneWidget);
-      expect(find.text('13/13'), findsOneWidget);
-      expect(probed.length, 13);
-      // the 1.10.3 bug: results wiped while connected and on screen → 「检测中」 forever
-      notifier.reset();
+      expect(probed, isEmpty, reason: '1.12.0: nothing runs until the card is tapped');
+      expect(find.text('点按检测'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('tile_services')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(probed.length, 26, reason: 'the card started a new check by itself');
+      expect(probed.length, 13);
       await tester.pump(const Duration(seconds: 1)); // value cross-fade
       expect(find.text('13/13'), findsOneWidget);
+      notifier.reset();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(probed.length, 13, reason: 'no check by itself');
+      expect(find.text('点按检测'), findsOneWidget);
       expect(find.text('检测中'), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(seconds: 31));
@@ -233,7 +237,14 @@ void main() {
 
     testWidgets('a tap checks again', (tester) async {
       await pump(tester);
+      expect(probed, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('tile_services')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
       expect(probed.length, 13);
+      await tester.pump(const Duration(seconds: 1));
+      Navigator.of(tester.element(find.byKey(const ValueKey('services_sheet')))).pop();
+      await tester.pump(const Duration(seconds: 1));
       await tester.tap(find.byKey(const ValueKey('tile_services')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));

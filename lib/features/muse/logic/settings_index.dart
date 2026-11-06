@@ -133,7 +133,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('内核', MuseSettingPage.resources, keywords: ['切换内核', '标准内核', '兼容内核', '双内核', '引擎', '代理组', '内核与资源']),
   // 1.9.0 #8/#10: 资源 is now 内核与资源 (the old name still finds it)
   MuseSettingEntry('内核与资源', MuseSettingPage.resources, keywords: ['资源', '内核', '规则集', '规则文件', '更新规则', '数据库']),
-  MuseSettingEntry('Geo 数据库', MuseSettingPage.resources, keywords: ['geosite', 'geoip', '数据库', '内置规则集', '检查并修复', '资源']),
+  MuseSettingEntry('地理规则库', MuseSettingPage.resources, keywords: ['geosite', 'geoip', '数据库', '内置规则集', '检查并修复', '资源']),
   MuseSettingEntry('规则集', MuseSettingPage.resources, keywords: ['远程规则集', '规则文件', '更新规则', '资源']),
   MuseSettingEntry('主题预览', MuseSettingPage.themePreview, keywords: ['预览', '主题', '配色', '样式', '单选示例', '开关示例', '开发者选项'], debugOnly: true),
   MuseSettingEntry('内核版本', MuseSettingPage.resources, keywords: ['内核', '版本号', '内核与资源']),

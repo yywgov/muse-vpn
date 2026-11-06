@@ -45,7 +45,7 @@ class GenericListNotifier extends _$GenericListNotifier {
   bool _isValid(dynamic value) {
     if (value == null) return false;
     if (state.contains(value)) {
-      ref.read(inAppNotificationControllerProvider).showErrorToast('Value is exist');
+      ref.read(inAppNotificationControllerProvider).showErrorToast('已存在');
       return false;
     }
     return true;

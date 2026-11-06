@@ -241,7 +241,7 @@ void main() {
       expect(sync, isNot(contains('class MuseWebdavPage')));
     });
 
-    testWidgets('内核与资源: 内核 + 内核版本 + Geo 数据库 + 规则集', (t) async {
+    testWidgets('内核与资源: 内核 + 内核版本 + 地理规则库 + 规则集', (t) async {
       final dir = Directory.systemTemp.createTempSync('v190-res');
       addTearDown(() => dir.deleteSync(recursive: true));
       await _pump(t, MuseResourcesPage(baseDir: dir.path, showCore: true, desktop: false));
@@ -250,7 +250,7 @@ void main() {
       expect(find.text('内核与资源'), findsOneWidget);
       expect(find.byKey(const ValueKey('core_kind')), findsOneWidget);
       expect(find.byKey(const ValueKey('core_kind_version')), findsOneWidget);
-      expect(find.text('Geo 数据库'), findsOneWidget);
+      expect(find.text('地理规则库'), findsOneWidget);
       await t.scrollUntilVisible(find.byKey(const ValueKey('res_remote_manage')), 300);
       expect(find.text('规则集'), findsOneWidget);
       expect(find.textContaining('双内核版本提供'), findsNothing);
@@ -322,7 +322,7 @@ void main() {
         '兼容内核': MuseSettingPage.resources,
         '内核版本': MuseSettingPage.resources,
         'geoip': MuseSettingPage.resources,
-        'Geo 数据库': MuseSettingPage.resources,
+        '地理规则库': MuseSettingPage.resources,
         '内置规则集': MuseSettingPage.resources,
         '自动运行': MuseSettingPage.autoConnect,
         '按需运行': MuseSettingPage.autoConnect,

@@ -4,6 +4,20 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.12.0 - 2026-11-07
+
+- 解锁检测：首页「服务状态」只在点按卡片或「刷新」时检测（不再出现时自动检测，无轮询）；Netflix（授权片 / 自制剧两次判断）、YouTube Premium、Disney+、ChatGPT / Claude（cdn-cgi/trace 地区 + 不支持地区表）、TikTok、Prime Video 显示所在地区与「仅自制剧 / 不支持 / 受限」，其他服务仍只看能否打开；单项 10 秒、整次 30 秒上限，结果缓存 10 分钟
+- 测速失败原因：内核（patch 0014）在测速结果里带出原因（拒绝 / 解析 / 握手 / 超时），节点卡片显示短词，节点详情给建议；测速流程不变
+- 连接一键加规则：「活动 › 连接」详情里设为直连 / 走代理 / 指定节点，可选「仅本次」（断开即失效），规则排在局域网与屏蔽之后、其他规则之前，热重载生效，可撤销；规则页可管理
+- 出口 IP 详情：点开才查（ip-api / ipwho 免费接口回退），运营商、ASN、城市、IP 类型，按 IP 缓存 1 天，提示出口是否变化
+- 自动最快限定地区：默认全部；选地区后内核 urltest 只在匹配的节点里挑，匹配不到时仍用全部
+- 订阅更新后自动测新增节点：仅已连接且前台；后台只记下
+- Android：启动器快捷方式「切换规则/全局」（chuanyun://mode）「扫码添加」（chuanyun://scan）「测速」（chuanyun://speedtest），打开穿云后走与界面按钮相同的代码；快捷开关副标题显示节点 · 延迟
+- 剪贴板：回前台只调用 hasStrings（不读内容），打开「添加」时才读取识别
+- Windows：本地端口被占用时本次自动换空闲端口并提示一次；系统代理绕过列表（默认本机、局域网网段、*.local、<local>）
+- 中文化：「Geo 数据库」→「地理规则库」，内核启动失败等提示改中文；新增文案扫描测试，界面字符串出现非白名单英文即失败
+- 测试：v1120_test；v1104 服务状态卡片测试改为点按才检测
+
 ### 1.11.1 - 2026-11-06
 
 - 修复 1.11.0 启动闪退（Android 一打开就退出）：根因是桌面小组件跟随连接状态的代码——BoxService / CompatService 在所属 Service 的字段初始化时构造（此时 Service 还没有 base context），1.11.0 在构造函数里 `status.observeForever { ChuanyunWidget.onStatus(service, it) }`，LiveData 注册后立即回调当前状态，`service.getSharedPreferences` 落到 base 为 null 的 ContextWrapper 上抛 NullPointerException；MainActivity 每次启动都 bindService(BIND_AUTO_CREATE) 创建 VPNService（主进程），于是每次打开即崩。修复：小组件只用应用 Context（Application.attachBaseContext 时已就绪，早于任何组件创建），onStatus / onNode 不再接收 Service / Activity 的 Context，且整体 try/catch(Throwable)，小组件出任何问题都不会拖垮服务或应用。功能不回退：内核仍为 5.0.0-muse.23，小组件、隐藏图标恢复等 1.11.0 改动全部保留

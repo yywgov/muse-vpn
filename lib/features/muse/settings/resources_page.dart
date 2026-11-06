@@ -85,7 +85,7 @@ class MuseResourcesPage extends HookConsumerWidget {
         children: [
           if (showCore ?? (PlatformUtils.isWindows || PlatformUtils.isAndroid)) MuseCoreKindSection(desktop: desktop),
           MuseSection(
-            header: 'Geo 数据库',
+            header: '地理规则库',
             footer: 'GeoSite（域名）/ GeoIP（IP）规则集，随穿云提供，连接时直接使用，不用等下载；连接后每 $museRuleSetUpdateDays 天在后台自动更新为最新版',
             children: [
               MuseTile(
