@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/logic/sub_headers.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'dart:convert';
@@ -95,7 +96,7 @@ class ProfileParser {
     required String tempFilePath,
     required UserOverride? userOverride,
     CancelToken? cancelToken,
-  }) => _downloadProfile(url, tempFilePath, cancelToken).flatMap(
+  }) => _downloadProfile(url, tempFilePath, cancelToken, profileId: id).flatMap(
     (remoteHeaders) =>
         TaskEither.fromEither(
           populateHeaders(content: File(tempFilePath).readAsStringSync(), remoteHeaders: remoteHeaders),
@@ -121,7 +122,7 @@ class ProfileParser {
     required RemoteProfileEntity rp,
     required String tempFilePath,
     CancelToken? cancelToken,
-  }) => _downloadProfile(rp.url, tempFilePath, cancelToken).flatMap(
+  }) => _downloadProfile(rp.url, tempFilePath, cancelToken, profileId: rp.id).flatMap(
     (remoteHeaders) =>
         TaskEither.fromEither(
           populateHeaders(content: File(tempFilePath).readAsStringSync(), remoteHeaders: remoteHeaders),
@@ -148,8 +149,9 @@ class ProfileParser {
   TaskEither<ProfileFailure, Map<String, dynamic>> _downloadProfile(
     String url,
     String tempFilePath,
-    CancelToken? cancelToken,
-  ) => TaskEither.tryCatch(() async {
+    CancelToken? cancelToken, {
+    String? profileId,
+  }) => TaskEither.tryCatch(() async {
     // if (url.startsWith("http://"))
     //   throw const ProfileFailure.invalidUrl('HTTP is not supported. Please use HTTPS for secure connection.');
 
@@ -159,6 +161,8 @@ class ProfileParser {
           tempFilePath,
           cancelToken: cancelToken,
           // 穿云 1.5.0 #41: 设置 › 节点 › 订阅更新方式
+          // 穿云 1.14.0 R14: 订阅自定义请求头 (never logged)
+          extraHeaders: museSubHeadersFor(_ref.read(MusePrefs.subHeaders), profileId),
           pickMode: (proxyUp) => museSubFetchMode(MuseSubFetch.fromKey(_ref.read(MusePrefs.subFetch)), proxyUp: proxyUp),
           // 穿云 1.4.1: 设置 › 节点 › 订阅 UA ('auto' keeps the app's own)
           userAgent:

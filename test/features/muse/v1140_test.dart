@@ -6,6 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/logic/qr_image_import.dart';
+import 'package:hiddify/features/muse/logic/redact.dart';
+import 'package:hiddify/features/muse/logic/sub_headers.dart';
+import 'package:hiddify/features/muse/settings/sub_headers_dialog.dart';
+import 'package:hiddify/features/muse/data/sync_service.dart';
 import 'package:hiddify/features/muse/logic/sub_guard.dart';
 import 'package:hiddify/features/profile/model/profile_failure.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
@@ -163,6 +167,81 @@ void main() {
       for (final k in ["'node_search_field'", "'node_filter_fav'", 'museFavoritesFirst', 'museToggleRegionFold', 'showMuseFavoriteOrder']) {
         expect(list, contains(k), reason: k);
       }
+    });
+  });
+
+  group('R14 订阅自定义请求头', () {
+    test('editor lines', () {
+      final r = museParseHeaderLines('# 面板令牌\nX-Token: abc123456\n\nX-Device-Id：dev-1\nx-token: newer');
+      expect(r.error, isNull);
+      expect(r.headers, {'X-Device-Id': 'dev-1', 'x-token': 'newer'});
+      expect(museParseHeaderLines('没有冒号').error, contains('第 1 行'));
+      expect(museParseHeaderLines('Host: a.example.com').error, contains('自动设置'));
+      expect(museParseHeaderLines('坏 名: 1').error, contains('不允许的字符'));
+      expect(museHeaderValueError('a\nb'), isNotNull);
+      expect(museHeaderLines({'A': '1', 'B': '2'}), 'A: 1\nB: 2');
+    });
+
+    test('stored by subscription, removed when emptied, broken value reads as none', () {
+      var raw = museEncodeSubHeaders(const {}, 'p1', {'X-Token': 'secret-1'});
+      raw = museEncodeSubHeaders(museParseSubHeaders(raw), 'p2', {'X-Device-Id': 'd'});
+      expect(museSubHeadersFor(raw, 'p1'), {'X-Token': 'secret-1'});
+      expect(museSubHeadersFor(raw, 'p3'), isEmpty);
+      expect(museSubHeadersFor(raw, null), isEmpty);
+      raw = museEncodeSubHeaders(museParseSubHeaders(raw), 'p1', const {});
+      expect(museParseSubHeaders(raw).keys, ['p2']);
+      expect(museParseSubHeaders('not json'), isEmpty);
+      expect(museParseSubHeaders('{"p":{"Host":"x","Ok":"1"}}'), {'p': {'Ok': '1'}});
+    });
+
+    test('masked in summaries and logs; never synced or backed up', () {
+      expect(museMaskHeaderValue('abcdefgh123'), 'ab****');
+      expect(museMaskHeaderValue('abc'), '****');
+      expect(museMaskedHeaderSummary({'X-Token': 'abcdefgh123'}), 'X-Token: ab****');
+      final log = museRedact('GET sub with Authorization: Bearer eyJhbGci.x.y, X-Token: abcdef123 and cookie=sid=42');
+      expect(log, isNot(contains('eyJhbGci')));
+      expect(log, isNot(contains('abcdef123')));
+      expect(log, isNot(contains('sid=42')));
+      expect(museSyncedPrefs.keys, isNot(contains('muse_sub_headers')));
+      expect(_src('lib/features/muse/data/muse_prefs.dart'), contains('"muse_sub_headers"'));
+    });
+
+    test('sent only with that subscription\'s own download', () {
+      final parser = _src('lib/features/profile/data/profile_parser.dart');
+      expect(parser, contains('extraHeaders: museSubHeadersFor(_ref.read(MusePrefs.subHeaders), profileId)'));
+      expect(parser, contains('profileId: rp.id'));
+      expect(parser, contains('profileId: id'));
+      final dio = _src('lib/core/http_client/dio_http_client.dart');
+      expect(dio, contains('Map<String, String> extraHeaders = const {}'));
+      expect(_src('lib/features/profile/widget/profile_tile.dart'), contains('showMuseSubHeadersDialog(context, ref, remote.id)'));
+    });
+
+    testWidgets('dialog checks before saving', (tester) async {
+      Map<String, String>? out;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async => out = await showDialog<Map<String, String>>(
+                context: context,
+                builder: (_) => const MuseSubHeadersDialog(initial: {'X-Token': 'a'}),
+              ),
+              child: const Text('打开'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('打开'));
+      await tester.pumpAndSettle();
+      expect(find.text('X-Token: a'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('sub_headers_field')), 'bad line');
+      await tester.tap(find.byKey(const ValueKey('sub_headers_save')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('第 1 行'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('sub_headers_field')), 'X-Device-Id: 9');
+      await tester.tap(find.byKey(const ValueKey('sub_headers_save')));
+      await tester.pumpAndSettle();
+      expect(out, {'X-Device-Id': '9'});
     });
   });
 }

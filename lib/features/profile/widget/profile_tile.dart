@@ -1,5 +1,6 @@
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/muse/settings/sub_filter_dialog.dart';
+import 'package:hiddify/features/muse/settings/sub_headers_dialog.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:flutter/material.dart';
@@ -393,6 +394,19 @@ class ProfileActionsMenu extends HookConsumerWidget {
             await Clipboard.setData(ClipboardData(text: remote.url));
             try {
               ref.read(inAppNotificationControllerProvider).showSuccessToast('已复制订阅链接');
+            } catch (_) {}
+          },
+        ),
+      // 1.14.0 R14: 订阅自定义请求头 (sent with this subscription's download only)
+      if (profile case final RemoteProfileEntity remote)
+        AdaptiveMenuItem(
+          leadingIcon: const Icon(Icons.vpn_key_outlined),
+          title: '请求头',
+          onTap: () async {
+            final saved = await showMuseSubHeadersDialog(context, ref, remote.id);
+            if (!saved) return;
+            try {
+              ref.read(inAppNotificationControllerProvider).showSuccessToast('已保存请求头，下次更新订阅时生效');
             } catch (_) {}
           },
         ),

@@ -10,6 +10,11 @@ final _rules = <(RegExp, String Function(Match))>[
   ),
   // any other URL (subscription links, panels): keep the scheme only
   (RegExp(r'\bhttps?://[^\s"<>]+', caseSensitive: false), (m) => '${m[0]!.split('://').first}://***'),
+  // 1.14.0 R14: request headers that carry secrets (「Authorization: Bearer …」「X-Token: …」「Cookie: …」)
+  (
+    RegExp(r'''\b((?:proxy-)?authorization|cookie|set-cookie|x-[a-z0-9-]+)(\s*[:=]\s*)("[^"]*"|[^\r\n,;}]+)''', caseSensitive: false),
+    (m) => '${m[1]}${m[2]}***',
+  ),
   // "password": "…" / password=… / "uuid": … / token=…
   (
     RegExp(r'''("?(?:password|passwd|pass|psk|private_key|privatekey|pre_shared_key|uuid|token|secret|auth|auth_str|obfs-password|obfs_password|key)"?\s*[:=]\s*)("[^"]*"|[^\s,;&}]+)''', caseSensitive: false),

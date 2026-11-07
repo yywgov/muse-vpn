@@ -131,6 +131,8 @@ abstract final class MusePrefs {
 
   /// 1.9.0 #15: 订阅覆写 by profile id (sub_override.dart); applied at connect, never written into the subscription
   static final subOverrides = PreferencesNotifier.create<String, String>("muse_sub_overrides", "{}");
+  // 1.14.0 R14: 订阅自定义请求头 by profile id (secrets: not synced or backed up)
+  static final subHeaders = PreferencesNotifier.create<String, String>("muse_sub_headers", "{}");
 
   /// 全局模式 also sends 中国大陆 direct
   static final globalBypassCn = PreferencesNotifier.create<bool, bool>("muse_global_bypass_cn", false);

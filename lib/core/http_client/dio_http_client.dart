@@ -113,6 +113,8 @@ class DioHttpClient with InfraLogger {
     bool proxyOnly = false,
     // 穿云 1.5.0 #41: 'proxy' / 'direct' / 'both' chosen by the caller (null = automatic)
     String? Function(bool proxyUp)? pickMode,
+    // 穿云 1.14.0 R14: the subscription's own headers (a header named like one set here replaces it)
+    Map<String, String> extraHeaders = const {},
   }) async {
     final proxyUp = proxyOnly || pickMode != null ? await isPortOpen("127.0.0.1", port, timeout: const Duration(seconds: 1)) : false;
     final picked = pickMode?.call(proxyUp);
@@ -124,12 +126,16 @@ class DioHttpClient with InfraLogger {
         ? "both"
         : "direct";
     final dio = _dio[mode]!;
-    return dio.download(
-      url,
-      path,
-      cancelToken: cancelToken,
-      options: _options(url, userAgent: userAgent, credentials: credentials),
-    );
+    final options = _options(url, userAgent: userAgent, credentials: credentials);
+    if (extraHeaders.isNotEmpty) {
+      final h = {...?options.headers};
+      for (final e in extraHeaders.entries) {
+        h.removeWhere((k, _) => k.toLowerCase() == e.key.toLowerCase());
+        h[e.key] = e.value;
+      }
+      options.headers = h;
+    }
+    return dio.download(url, path, cancelToken: cancelToken, options: options);
   }
 
   Options _options(String url, {String? userAgent, ({String username, String password})? credentials}) {
