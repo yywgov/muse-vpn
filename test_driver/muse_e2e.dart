@@ -18,7 +18,9 @@ import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_notifier.dart';
+import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
+import 'package:hiddify/hiddifycore/core_interface/core_interface_mobile.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
@@ -146,6 +148,21 @@ Future<String> _handler(String? message) async {
           }
         }
         return jsonEncode({'ms': -1});
+      case 'staleBgCore':
+        // 1.12.1: what a failed widget / quick-tile / boot start left behind before the fix: the
+        // background core (mode 4) set up on 127.0.0.1:17079 while the VPN service is stopped
+        final d = await _c().read(appDirectoriesProvider.future);
+        await CoreInterfaceMobile.methodChannel.invokeMethod('setup', {
+          'baseDir': d.baseDir.path,
+          'workingDir': d.workingDir.path,
+          'tempDir': d.tempDir.path,
+          'grpcPort': CoreInterfaceMobile.portBack,
+          'mode': 4,
+          'debug': false,
+        });
+        return (await isPortOpen('127.0.0.1', CoreInterfaceMobile.portBack)) ? 'open' : 'closed';
+      case 'bgPort':
+        return (await isPortOpen('127.0.0.1', CoreInterfaceMobile.portBack)) ? 'open' : 'closed';
       case 'select':
         final g = _c().read(proxiesOverviewNotifierProvider).valueOrNull;
         if (g == null) return 'no-group';

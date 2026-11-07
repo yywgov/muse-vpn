@@ -227,6 +227,39 @@ Future<void> pages(String theme) async {
   await cmd('go:home');
 }
 
+Future<void> tapHomeConnect() async {
+  await cmd('go:home');
+  await sleep(1500);
+  await driver.tap(find.byValueKey('home_connect_switch'), timeout: const Duration(seconds: 20));
+}
+
+Future<Map<String, Object?>> staleBgCoreThenTapHomeConnect() async {
+  final r = <String, Object?>{};
+  try {
+    final nodes = jsonDecode(await cmd('nodes')) as Map<String, dynamic>;
+    final vless = [for (final n in (nodes['items'] as List? ?? const [])) '${(n as Map)['tag']}'].firstWhere((t) => t.contains('法国 09'), orElse: () => '');
+    if (vless.isNotEmpty) r['selectVless'] = await cmd('select:$vless');
+    await cmd('disconnect');
+    r['disconnected'] = await waitRunning(false, seconds: 30);
+    await sleep(3000);
+    r['bgPortBefore'] = await cmd('staleBgCore');
+    await tapHomeConnect();
+    final ok = await waitRunning(true, seconds: 60);
+    final st = await status();
+    r['connected'] = ok;
+    r['status'] = st;
+    await shot('light-stale-bg-core-home-connected', settleMs: 2500);
+    if (!ok) failures.add('stale-bg-core: home connect failed: $st');
+    if ('${st['error']}'.contains('createService')) failures.add('stale-bg-core: createService error: ${st['error']}');
+    final n2 = jsonDecode(await cmd('nodes')) as Map<String, dynamic>;
+    r['selectedAfter'] = n2['selected'];
+  } catch (e) {
+    r['error'] = '$e';
+    failures.add('stale-bg-core: $e');
+  }
+  return r;
+}
+
 Future<void> main() async {
   out.createSync(recursive: true);
   driver = await FlutterDriver.connect(timeout: const Duration(minutes: 3));
@@ -331,6 +364,11 @@ Future<void> main() async {
     results['shortcuts'] = shortcuts;
     await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.MainActivity']);
     await sleep(2000);
+
+    // 1.12.1 regression「意外失败 / createService - null」: the user's path — VLESS node, rule mode,
+    // tap the home connect button — after a failed widget / quick-tile start left the background
+    // core (17079) open with the service stopped. Before the fix every connect then failed.
+    results['stale-bg-core'] = await staleBgCoreThenTapHomeConnect();
   }
 
   results['pickApps'] = await cmd('pickApps:com.android.chrome,com.google.android.youtube,com.google.android.apps.maps,'
