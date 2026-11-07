@@ -105,6 +105,25 @@ class BoxService(
         @Volatile
         var pendingStopReason: String? = null
 
+        /**
+         * 穿云 1.12.1: closes the background core (mode 4, port 17079) in this process. Safe when it
+         * is not set up (no-op). Never throws.
+         */
+        fun releaseCore() {
+            try {
+                Mobile.close(4L)
+            } catch (e: Throwable) {
+                Log.w(TAG, "release core: ${describeError(e)}")
+            }
+        }
+
+        /** 穿云 1.12.1: an error for the user: type plus message, never a bare 「null」. */
+        fun describeError(e: Throwable): String {
+            val type = e.javaClass.simpleName.ifBlank { e.javaClass.name }
+            val msg = e.message?.takeIf { it.isNotBlank() && it != "null" }
+            return if (msg != null) "$type: $msg" else "$type（内核没有给出原因）"
+        }
+
         fun stop(reason: String? = null) {
             if (reason != null) pendingStopReason = reason
             Application.application.sendBroadcast(
@@ -197,7 +216,7 @@ class BoxService(
 //                Libbox.newService(content,platformInterface)
 
             } catch (e: Exception) {
-                stopAndAlert(Alert.CreateService, e.message)
+                stopAndAlert(Alert.CreateService, describeError(e))
                 return
             }
             status.postValue(Status.Started)
@@ -224,7 +243,7 @@ class BoxService(
             notification.start()
             startWatchdog()
         } catch (e: Exception) {
-            stopAndAlert(Alert.StartService, e.message)
+            stopAndAlert(Alert.StartService, describeError(e))
             return
         }
     }
@@ -427,6 +446,18 @@ class BoxService(
         DisconnectLog.record("启动失败: ${type.name} ${message ?: ""}".trim())
         stopWatchdog()
         Settings.startedByUser = false
+        // 穿云 1.12.1: a start that failed after Mobile.setup (e.g. the core start of a 桌面小组件 /
+        // 快捷开关 / 开机 / 系统重启 connect) left the background gRPC server (17079) open while the
+        // status went back to 已停止. Every later in-app connect then waited for that port to close,
+        // never saw it close (a stopped service ignores the close broadcast) and failed with
+        // 「createService - null」. Release the core here, like the 兼容内核 already does.
+        releaseCore()
+        val pfd = fileDescriptor
+        if (pfd != null) {
+            runCatching { pfd.close() }
+            fileDescriptor = null
+        }
+        runCatching { DefaultNetworkMonitor.stop() }
         withContext(Dispatchers.Main) {
             if (receiverRegistered) {
                 service.unregisterReceiver(receiver)
@@ -438,6 +469,7 @@ class BoxService(
             }
             Settings.connectedSince = 0L
             status.value = Status.Stopped
+            service.stopSelf()
         }
     }
 

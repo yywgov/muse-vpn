@@ -106,7 +106,9 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
   @override
   Future<CoreStatus> setupBackground(String path, String name, {Map<String, Object> extras = const {}}) async {
     // if (!await waitUntilPort(portBack, false, stop)) return const CoreStatus.stopped(alert: CoreAlert.createService);
-    if (!await stop()) return const CoreStatus.stopped(alert: CoreAlert.createService);
+    // 穿云 1.12.1: the background core of an earlier start (widget / quick tile / boot / a failed
+    // start) may still hold 17079. Ask once more to release it before giving up, and say why.
+    if (!await stop() && !await stop()) return const CoreStatus.stopped(alert: CoreAlert.createService, message: bgPortBusyMessage);
     _status.clean();
     await methodChannel.invokeMethod("start", {
       "path": path,
@@ -188,6 +190,9 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
     return await isPortOpen("127.0.0.1", portBack);
   }
 }
+
+/// 穿云 1.12.1: shown when the previous background core never released its port.
+const bgPortBusyMessage = "上一次的后台连接没有退出（端口 17079 仍被占用）。请在系统设置里「强行停止」穿云后再连接";
 
 Future<bool> waitUntilPort(
   int portNumber,

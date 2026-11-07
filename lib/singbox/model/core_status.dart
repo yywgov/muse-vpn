@@ -92,7 +92,7 @@ sealed class CoreStatus with _$CoreStatus {
         CoreAlert.createService ||
         CoreAlert.startService ||
         CoreAlert.alreadyStarted ||
-        CoreAlert.startFailed => ConnectionFailure.unexpected("${alert.name} - $message"),
+        CoreAlert.startFailed => ConnectionFailure.unexpected(describeCoreAlert(alert, message)),
 
         _ => null,
       },
@@ -112,4 +112,20 @@ enum CoreAlert {
   alreadyStarted,
   startFailed,
   unknown,
+}
+
+/// 穿云 1.12.1: what the user reads for a failed start: a Chinese explanation, the alert's name
+/// for support, and the core's reason — never a bare 「null」.
+String describeCoreAlert(CoreAlert alert, String? message) {
+  final label = switch (alert) {
+    CoreAlert.startCommandServer => "启动命令服务失败",
+    CoreAlert.createService => "创建后台服务失败",
+    CoreAlert.startService => "启动内核失败",
+    CoreAlert.alreadyStarted => "内核已在运行",
+    CoreAlert.startFailed => "启动失败",
+    _ => "连接失败",
+  };
+  final m = message?.trim();
+  final reason = (m == null || m.isEmpty || m == "null") ? "内核没有给出原因" : m;
+  return "$label（${alert.name}）：$reason";
 }

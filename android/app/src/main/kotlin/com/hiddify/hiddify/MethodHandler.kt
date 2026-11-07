@@ -154,6 +154,11 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
                             //    return@launch success(true)
                         }
                         BoxService.stop("用户在应用内断开")
+                        // 穿云 1.12.1: no running service hears the close broadcast; a background
+                        // core left by a failed start would keep 17079 open → close it directly
+                        if (mainActivity.serviceStatus.value == Status.Stopped) {
+                            BoxService.releaseCore()
+                        }
                         success(true)
                     }
                 }

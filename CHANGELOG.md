@@ -4,6 +4,11 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.12.1 - 2026-11-07
+
+- 修复 Android「意外失败 / createService - null」连不上：BoxService 在 Mobile.setup 之后启动失败（stopAndAlert）时没有关闭后台内核（mode 4，127.0.0.1:17079），状态却回到已停止并注销了关闭广播接收器；之后应用内连接先 stop() 等 17079 关闭，等不到就报 createService（无消息 → null）。现在 stopAndAlert 关闭后台内核（与兼容内核一致）并 stopSelf；应用内「停止」在服务已停止时直接关闭本进程残留的后台内核；Dart 再请求一次释放后才报错，并给出中文原因
+- 连接失败提示：中文说明 +（alert 名）+ 原因，异常无 message 时显示异常类型，不再显示「null」
+
 ### 1.12.0 - 2026-11-07
 
 - 解锁检测：首页「服务状态」只在点按卡片或「刷新」时检测（不再出现时自动检测，无轮询）；Netflix（授权片 / 自制剧两次判断）、YouTube Premium、Disney+、ChatGPT / Claude（cdn-cgi/trace 地区 + 不支持地区表）、TikTok、Prime Video 显示所在地区与「仅自制剧 / 不支持 / 受限」，其他服务仍只看能否打开；单项 10 秒、整次 30 秒上限，结果缓存 10 分钟
