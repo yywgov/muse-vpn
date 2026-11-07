@@ -1,4 +1,5 @@
 import 'package:hiddify/features/muse/logic/compat_profile.dart';
+import 'package:hiddify/features/muse/logic/sub_guard.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/home/new_node_test.dart';
 import 'dart:async';
@@ -135,7 +136,7 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
 
   ProfileRepository get _profilesRepo => ref.read(profileRepositoryProvider).requireValue;
 
-  Future<void> updateProfile(RemoteProfileEntity profile, {bool isBulk = false}) async {
+  Future<void> updateProfile(RemoteProfileEntity profile, {bool isBulk = false, bool force = false}) async {
     if (state.isLoading) return;
     _resetTimer?.cancel();
     state = const AsyncLoading();
@@ -143,7 +144,7 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
     final before = await _profilesRepo.getRawConfig(profile.id).getOrElse((_) => '').run();
     state = await AsyncValue.guard(() async {
       return await _profilesRepo
-          .upsertRemote(profile.url)
+          .upsertRemote(profile.url, force: force)
           .match(
             (err) {
               loggy.warning("failed to update profile", err);
@@ -191,11 +192,21 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
         }
       } catch (_) {}
     }
-    if (state case AsyncError(:final error) when !isBulk) {
+    // 1.14.0 R15: a steep drop in node count is held back; the user may still take it
+    var retryForced = false;
+    if (state case AsyncError(error: ProfileInvalidConfigFailure(:final message)) when !isBulk && !force && museSubIsDropMessage(message)) {
+      retryForced = await ref
+          .read(dialogNotifierProvider.notifier)
+          .showConfirmation(title: '节点数骤减', message: '$message。\n\n如果确认订阅本来就变少了，可以仍然更新。', positiveBtnTxt: '仍然更新');
+    } else if (state case AsyncError(:final error) when !isBulk) {
       final t = ref.read(translationsProvider).requireValue;
       ref
           .read(dialogNotifierProvider.notifier)
           .showCustomAlertFromErr(t.presentError(error, action: t.pages.profiles.msg.update.failure));
+    }
+    if (retryForced) {
+      state = const AsyncData(null);
+      return updateProfile(profile, force: true);
     }
 
     // Hold the success/failure result for 2s so the leading can flash an icon,

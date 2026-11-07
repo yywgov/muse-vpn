@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dartx/dartx.dart';
+import 'package:hiddify/features/muse/logic/sub_guard.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/data/notify.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -124,12 +125,16 @@ class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifie
 
       var successCount = 0;
       final failedNames = <String>[];
+      String? firstReason;
       // Sequential on purpose: validation and the active-profile reconnect share
       // one native core that is not safe to call concurrently (it can hang).
       for (final profile in toUpdate) {
         await ref.read(updateProfileNotifierProvider(profile.id).notifier).updateProfile(profile, isBulk: true);
-        if (ref.read(updateProfileNotifierProvider(profile.id)).hasError) {
+        final result = ref.read(updateProfileNotifierProvider(profile.id));
+        if (result.hasError) {
           failedNames.add(profile.name);
+          // 1.14.0 R15: say why (the reason already says the old nodes are kept)
+          firstReason ??= museSubFailureReason(result.error);
         } else {
           successCount++;
         }
@@ -142,14 +147,14 @@ class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifie
           notification.showSuccessToast(t.pages.profiles.msg.update.bulkSuccess(count: successCount));
         } else {
           // 1.2.8: a system notification too (the window may be hidden in the tray)
-          unawaited(museNotify(id: 2103, title: '订阅更新失败', text: '${failedNames.join('、')}，已保留原有节点'));
+          unawaited(museNotify(id: 2103, title: '订阅更新失败', text: museSubBulkFailText(failedNames, firstReason)));
           // 1.2.8: say plainly that the old nodes are kept
           notification.showErrorToast(
             '${t.pages.profiles.msg.update.bulkPartial(
               success: successCount,
               failed: failedNames.length,
               names: failedNames.join(", "),
-            )}（已保留原有节点）',
+            )}（${firstReason ?? '已保留原有节点'}）',
           );
         }
       }

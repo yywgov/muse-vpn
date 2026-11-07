@@ -8,6 +8,7 @@ import 'package:hiddify/core/db/db.dart';
 
 import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/features/muse/logic/compat_profile.dart';
+import 'package:hiddify/features/muse/logic/sub_guard.dart';
 import 'package:hiddify/features/profile/data/profile_data_mapper.dart';
 import 'package:hiddify/features/profile/data/profile_data_source.dart';
 import 'package:hiddify/features/profile/data/profile_parser.dart';
@@ -32,7 +33,9 @@ abstract interface class ProfileRepository {
     ProfilesSort sort = ProfilesSort.lastUpdate,
     SortMode sortMode = SortMode.ascending,
   });
-  TaskEither<ProfileFailure, Unit> upsertRemote(String url, {UserOverride? userOverride, CancelToken? cancelToken});
+  /// 1.14.0 R15: an update that brings back nothing usable keeps the saved nodes; [force] lets a
+  /// steep drop in node count through (the user confirmed it).
+  TaskEither<ProfileFailure, Unit> upsertRemote(String url, {UserOverride? userOverride, CancelToken? cancelToken, bool force = false});
   TaskEither<ProfileFailure, Unit> addLocal(String content, {UserOverride? userOverride});
   TaskEither<ProfileFailure, Unit> offlineUpdate(ProfileEntity nProfile, String nContent);
   TaskEither<ProfileFailure, Unit> validateConfig(String path, String tempPath, String? profileOverride, bool debug);
@@ -147,7 +150,7 @@ class ProfileRepositoryImpl with ExceptionHandler, InfraLogger implements Profil
   }
 
   @override
-  TaskEither<ProfileFailure, Unit> upsertRemote(String url, {UserOverride? userOverride, CancelToken? cancelToken}) =>
+  TaskEither<ProfileFailure, Unit> upsertRemote(String url, {UserOverride? userOverride, CancelToken? cancelToken, bool force = false}) =>
       TaskEither.tryCatch(
         () async => await _profileDataSource.getByUrl(url).then((profEntry) => profEntry?.toEntity()),
         ProfileFailure.unexpected,
@@ -163,18 +166,23 @@ class ProfileRepositoryImpl with ExceptionHandler, InfraLogger implements Profil
             return _profileParser
                 .updateRemote(rp: existing, tempFilePath: tempFile.path, cancelToken: cancelToken)
                 .flatMap(
-                  (profEntity) =>
-                      validateConfig(
-                        file.path,
-                        tempFile.path,
-                        ProfileParser.profileOverrideHelper(profile: profEntity),
-                        false,
-                      ).flatMap(
-                        (unit) => TaskEither.tryCatch(() async {
-                          await _profileDataSource.edit(id, profEntity);
-                          return unit;
-                        }, ProfileFailure.unexpected),
-                      ),
+                  (profEntity) => _guardUpdate(file.path, tempFile.path, force: force).flatMap(
+                    (_) =>
+                        _keepOnFailure(
+                          file.path,
+                          validateConfig(
+                            file.path,
+                            tempFile.path,
+                            ProfileParser.profileOverrideHelper(profile: profEntity),
+                            false,
+                          ),
+                        ).flatMap(
+                          (unit) => TaskEither.tryCatch(() async {
+                            await _profileDataSource.edit(id, profEntity);
+                            return unit;
+                          }, ProfileFailure.unexpected),
+                        ),
+                  ),
                 );
           } else {
             // Add
@@ -205,6 +213,22 @@ class ProfileRepositoryImpl with ExceptionHandler, InfraLogger implements Profil
           if (tempFile.existsSync()) tempFile.deleteSync();
         }
       });
+
+  /// 1.14.0 R15: an empty answer, a web page, no nodes or a steep drop never reaches the core.
+  TaskEither<ProfileFailure, Unit> _guardUpdate(String path, String tempPath, {required bool force}) => TaskEither(() async {
+    try {
+      final old = File(path);
+      final oldBody = await old.exists() ? await old.readAsString() : '';
+      final problem = museSubUpdateProblem(oldBody, await File(tempPath).readAsString(), force: force);
+      if (problem != null) {
+        loggy.warning('subscription update held back: $problem');
+        return left(ProfileFailure.invalidConfig(problem));
+      }
+      return right(unit);
+    } catch (e, st) {
+      return left(ProfileFailure.unexpected(e, st));
+    }
+  });
 
   @override
   TaskEither<ProfileFailure, Unit> addLocal(String content, {UserOverride? userOverride}) =>
@@ -277,6 +301,31 @@ class ProfileRepositoryImpl with ExceptionHandler, InfraLogger implements Profil
           if (tempFile.existsSync()) tempFile.deleteSync();
         }
       });
+
+  /// 1.14.0 R15: if saving the update fails part-way, the last good file is put back.
+  TaskEither<ProfileFailure, Unit> _keepOnFailure(String path, TaskEither<ProfileFailure, Unit> save) => TaskEither(() async {
+    final file = File(path);
+    final backup = File('$path.prev');
+    var kept = false;
+    try {
+      if (await file.exists()) {
+        await file.copy(backup.path);
+        kept = true;
+      }
+    } catch (_) {}
+    final r = await save.run();
+    try {
+      if (kept) {
+        if (r.isLeft()) {
+          await backup.copy(path);
+        }
+        await backup.delete();
+      }
+    } catch (e) {
+      loggy.warning('could not put the last good subscription back: $e');
+    }
+    return r;
+  });
 
   @override
   TaskEither<ProfileFailure, Unit> validateConfig(String path, String tempPath, String? profileOverride, bool debug) {
