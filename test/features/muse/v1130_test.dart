@@ -1,6 +1,7 @@
 // 穿云 1.13.0 稳定性: 本地崩溃自检、连不上一键诊断、安全模式、被其他 VPN 顶掉、e2e 启动路径.
 // Part of 穿云 (GPLv3).
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -15,6 +16,8 @@ import 'package:hiddify/features/muse/home/health_banner.dart';
 import 'package:hiddify/features/muse/logic/connect_doctor.dart';
 import 'package:hiddify/features/muse/logic/diagnosis.dart';
 import 'package:hiddify/features/muse/logic/health_tools.dart';
+import 'package:hiddify/hiddifycore/core_interface/core_interface_mobile.dart';
+import 'package:hiddify/hiddifycore/hiddify_core_service.dart' show museStopCallTimeout;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -344,6 +347,109 @@ void main() {
       final drv = _src('test_driver/muse_e2e.dart');
       expect(drv, contains("invokeMethod<bool>('e2e_boot')"));
       expect(drv, contains("invokeMethod<bool>('e2e_widget_update')"));
+    });
+  });
+
+  // e2e #16: two in-app disconnects each froze the app for 120 s. Mobile.close ran on the main
+  // thread (= Flutter's UI thread) and the core needed 120 s to close.
+  group('停止有上限且不占主线程（e2e #16 卡 120 秒）', () {
+    final box = _src('$_kt/bg/BoxService.kt');
+    final stop = _src('$_kt/bg/CoreStop.kt');
+
+    test('no Mobile.close on the main thread anywhere in the service', () {
+      final body = _fnBody(box, 'private fun stopService()');
+      expect(body, contains('CoreStop.closeWithin('));
+      expect(body, isNot(contains('Mobile.close')));
+      // the close comes before the main-thread block that reports 已停止
+      final main = body.indexOf('withContext(Dispatchers.Main)');
+      expect(body.indexOf('CoreStop.closeWithin('), lessThan(main));
+      expect(body.substring(main), contains('status.value = Status.Stopped'));
+      for (final f in ['bg/BoxService.kt', 'bg/CompatService.kt', 'MethodHandler.kt', 'ChuanyunHandler.kt']) {
+        expect(_src('$_kt/$f'), isNot(contains('Mobile.close(')), reason: f);
+      }
+      expect(stop, contains('Mobile.close(4L)'));
+    });
+
+    test('the core closes on its own thread, waited on for at most 10 s, never twice at once', () {
+      expect(stop, contains('const val TIMEOUT_MILLIS = 10_000L'));
+      expect(stop, contains('const val PORT = 17079'));
+      final run = _fnBody(stop, 'fun runWithin(');
+      expect(run, contains('Thread('));
+      expect(run, contains('latch.await(timeoutMillis, TimeUnit.MILLISECONDS)'));
+      expect(run, contains('running.count > 0L'));
+      expect(run, contains('forceReleasePort(PORT)'));
+      expect(run, contains('DisconnectLog.record('));
+      expect(run, contains('catch (e: Throwable)'));
+    });
+
+    test('past the limit 17079 is released: loopback sockets on the port are shut down', () {
+      final f = _fnBody(stop, 'fun forceReleasePort(');
+      expect(f, contains('/proc/self/fd'));
+      expect(f, contains('Os.getsockname('));
+      expect(f, contains('local.port == port'));
+      expect(f, contains('isLoopbackAddress'));
+      expect(f, contains('Os.shutdown(dup.fileDescriptor, OsConstants.SHUT_RDWR)'));
+      expect(f, contains('dup?.close()'));
+    });
+
+    test('a new setup waits for a late close first (its gRPC server would be taken down)', () {
+      final body = _fnBody(box, 'private suspend fun startService()');
+      expect(body.indexOf('CoreStop.awaitIdle()'), greaterThan(0));
+      expect(body.indexOf('CoreStop.awaitIdle()'), lessThan(body.indexOf('Mobile.setup(')));
+      expect(_fnBody(stop, 'fun awaitIdle('), contains('latch.await(maxMillis'));
+    });
+
+    test('every caller of releaseCore is off the main thread', () {
+      expect(_fnBody(box, 'private suspend fun stopAndAlert('), contains('withContext(Dispatchers.IO) { releaseCore() }'));
+      final mh = _src('$_kt/MethodHandler.kt');
+      expect(mh, contains('withContext(Dispatchers.IO) { BoxService.releaseCore() }'));
+      final ch = _src('$_kt/ChuanyunHandler.kt');
+      final at = ch.indexOf('"release_core" ->');
+      expect(ch.substring(at, at + 400), contains('Thread('));
+      expect(ch.substring(at, at + 400), contains('main.post { result.success(true) }'));
+    });
+
+    test('兼容内核 stop is bounded too', () {
+      final c = _fnBody(_src('$_kt/bg/CompatService.kt'), 'private fun releaseCore()');
+      expect(c, contains('CoreStop.runWithin("兼容内核"'));
+      expect(c.indexOf('CoreStop.runWithin'), lessThan(c.indexOf('tun?.close()')));
+    });
+
+    test('Dart waits for the service limit, and its own stop call has a deadline', () {
+      expect(bgStopWait, greaterThan(const Duration(seconds: 10)));
+      expect(bgStopWait, lessThanOrEqualTo(const Duration(seconds: 15)));
+      expect(museStopCallTimeout, const Duration(seconds: 10));
+      final m = _src('lib/hiddifycore/core_interface/core_interface_mobile.dart');
+      expect(_fnBody(m, 'Future<bool> stop() async'), contains('waitUntilPortFor(portBack, false, bgStopWait)'));
+      final svc = _src('lib/hiddifycore/hiddify_core_service.dart');
+      expect(svc, contains('await core.bgClient.stop(Empty(), options: PlatformUtils.isAndroid ? CallOptions(timeout: museStopCallTimeout) : null);'));
+    });
+
+    test('waitUntilPortFor returns as soon as the port closes, and gives up after the limit', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final port = server.port;
+      server.listen((s) => s.destroy());
+      unawaited(Future<void>.delayed(const Duration(milliseconds: 600), server.close));
+      final sw = Stopwatch()..start();
+      expect(await waitUntilPortFor(port, false, const Duration(seconds: 5)), isTrue);
+      expect(sw.elapsed, lessThan(const Duration(seconds: 4)));
+      final open = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      open.listen((s) => s.destroy());
+      sw.reset();
+      expect(await waitUntilPortFor(open.port, false, const Duration(milliseconds: 700)), isFalse);
+      expect(sw.elapsed, greaterThanOrEqualTo(const Duration(milliseconds: 700)));
+      await open.close();
+    });
+
+    test('the emulator run fails on any stop longer than 15 s and keeps the app logs', () async {
+      final sh = _src('tool/emulator/run_e2e.sh');
+      expect(sh, contains('python3 tool/emulator/check_stops.py out/e2e'));
+      expect(sh, contains(r'[ "$rc4" != 0 ]'));
+      expect(sh, contains('run-as com.chuanyun.app'));
+      final py = _src('tool/emulator/check_stops.py');
+      expect(py, contains('LIMIT = 15.0'));
+      final r = await Process.run('python3', ['tool/emulator/check_stops.py', '--self-test']);
+      expect(r.exitCode, 0, reason: '${r.stdout}${r.stderr}');
     });
   });
 }

@@ -321,7 +321,9 @@ class HiddifyCoreService with InfraLogger {
       loggy.debug("stopping");
       var errMsg = "";
       try {
-        await core.bgClient.stop(Empty());
+        // 穿云 1.13.0 (Android): never wait on the core without a limit; the service stops it
+        // within 10 s next (CoreStop), whatever this call does
+        await core.bgClient.stop(Empty(), options: PlatformUtils.isAndroid ? CallOptions(timeout: museStopCallTimeout) : null);
       } on GrpcError catch (e) {
         if (e.code == StatusCode.unknown && !(e.message?.contains("HTTP/2") ?? false)) {
           errMsg = e.message ?? "failed to stop core: $e";
@@ -761,3 +763,6 @@ class HiddifyCoreService with InfraLogger {
     });
   }
 }
+
+/// 穿云 1.13.0: the longest an Android disconnect waits for the core's own stop call.
+const museStopCallTimeout = Duration(seconds: 10);

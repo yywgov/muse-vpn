@@ -110,8 +110,9 @@ class BoxService(
          * is not set up (no-op). Never throws.
          */
         fun releaseCore() {
+            // 穿云 1.13.0: on its own thread, at most 10 s (CoreStop); callers are off the main thread
             try {
-                Mobile.close(4L)
+                CoreStop.closeWithin("释放残留内核")
             } catch (e: Throwable) {
                 Log.w(TAG, "release core: ${describeError(e)}")
             }
@@ -196,6 +197,9 @@ class BoxService(
                 }
             }
 
+            // 穿云 1.13.0: a stop that ran past 10 s is still closing the old core; setting up now
+            // would reuse its gRPC server, which that close then takes down — wait for it first
+            withContext(Dispatchers.IO) { CoreStop.awaitIdle() }
             DefaultNetworkMonitor.start()
             Libbox.setMemoryLimit(!Settings.disableMemoryLimit)
             DisconnectLog.preserveCrashTraces()
@@ -434,8 +438,11 @@ class BoxService(
 //            }
 //            commandServer = null
             Settings.startedByUser = false
+            // 穿云 1.13.0: never on the main thread (it is also Flutter's UI thread: e2e #16 froze the
+            // whole app for 120 s here) and at most 10 s; past that 17079 is released and the late
+            // close finishes in the background
+            CoreStop.closeWithin("断开")
             withContext(Dispatchers.Main) {
-                Mobile.close(4L)
                 Settings.connectedSince = 0L
                 status.value = Status.Stopped
                 service.stopSelf()
@@ -455,7 +462,7 @@ class BoxService(
         // status went back to 已停止. Every later in-app connect then waited for that port to close,
         // never saw it close (a stopped service ignores the close broadcast) and failed with
         // 「createService - null」. Release the core here, like the 兼容内核 already does.
-        releaseCore()
+        withContext(Dispatchers.IO) { releaseCore() }
         val pfd = fileDescriptor
         if (pfd != null) {
             runCatching { pfd.close() }

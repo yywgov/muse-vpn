@@ -177,10 +177,8 @@ class CompatService(
         guard.stop()
         current = null
         if (coreSetUp) {
-            try {
-                CompatCore.nativeStop()
-            } catch (_: Throwable) {
-            }
+            // 穿云 1.13.0: at most 10 s, then the TUN is closed and 已停止 reported anyway (CoreStop)
+            CoreStop.runWithin("兼容内核", "断开") { CompatCore.nativeStop() }
             coreSetUp = false
         }
         try {

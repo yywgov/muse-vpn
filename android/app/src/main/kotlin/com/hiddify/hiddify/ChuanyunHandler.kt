@@ -318,8 +318,12 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
                 "open_vpn_settings" -> result.success(startFirst(listOf(Intent(android.provider.Settings.ACTION_VPN_SETTINGS))))
                 // 连不上诊断「释放内核」: the background core of this process (17079), when no service runs
                 "release_core" -> {
-                    com.hiddify.hiddify.bg.BoxService.releaseCore()
-                    result.success(true)
+                    // 1.13.0: never on the main thread (Flutter's UI thread); at most 10 s
+                    val main = Handler(Looper.getMainLooper())
+                    Thread({
+                        com.hiddify.hiddify.bg.BoxService.releaseCore()
+                        main.post { result.success(true) }
+                    }, "chuanyun-release-core").start()
                 }
                 // debug builds only (the emulator e2e run): the 开机自启 and 小组件更新 paths
                 "e2e_boot" -> {

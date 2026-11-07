@@ -32,5 +32,18 @@ if grep -A2 "FATAL EXCEPTION" out/e2e/logcat.txt | grep "Process: com.chuanyun.a
   grep -A30 "FATAL EXCEPTION" out/e2e/logcat.txt | head -80
   rc3=1
 fi
-echo "drive=$rc status_bar=$rc2 fatal=$rc3"
-if [ "$rc" != 0 ] || [ "$rc2" != 0 ] || [ "$rc3" != 0 ]; then exit 1; fi
+# 1.13.0: every stop of the service must finish within 15 s (e2e #16: two in-app disconnects took
+# 120 s each); also records whether the system ever froze 穿云's process (freezer.txt)
+python3 tool/emulator/check_stops.py out/e2e | tee out/e2e/check_stops.txt
+rc4=${PIPESTATUS[0]}
+# the app's own logs (core box.log / stderr, disconnect log, crash log) for the artifact
+mkdir -p out/e2e/applogs
+for f in $(adb shell run-as com.chuanyun.app find . -name '*.log' -size -8192k 2>/dev/null | tr -d '\r'); do
+  adb exec-out run-as com.chuanyun.app cat "$f" > "out/e2e/applogs/$(echo "$f" | sed 's#^\./##; s#/#_#g')" 2>/dev/null || true
+done
+for f in $(adb shell find /sdcard/Android/data/com.chuanyun.app -name '*.log' -size -8192k 2>/dev/null | tr -d '\r'); do
+  adb pull "$f" "out/e2e/applogs/ext_$(basename "$f")" >/dev/null 2>&1 || true
+done
+ls -la out/e2e/applogs || true
+echo "drive=$rc status_bar=$rc2 fatal=$rc3 stops=$rc4"
+if [ "$rc" != 0 ] || [ "$rc2" != 0 ] || [ "$rc3" != 0 ] || [ "$rc4" != 0 ]; then exit 1; fi

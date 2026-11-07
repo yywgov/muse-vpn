@@ -40,7 +40,9 @@ void main() {
 
     test('releaseCore closes mode 4 and never throws', () {
       final body = _fnBody(_src(box), 'fun releaseCore()');
-      expect(body, contains('Mobile.close(4L)'));
+      // 1.13.0: closed through CoreStop (own thread, at most 10 s), which closes mode 4
+      expect(body, contains('CoreStop.closeWithin('));
+      expect(_fnBody(_src('android/app/src/main/kotlin/com/hiddify/hiddify/bg/CoreStop.kt'), 'fun closeWithin('), contains('Mobile.close(4L)'));
       expect(body, contains('catch (e: Throwable)'));
     });
 

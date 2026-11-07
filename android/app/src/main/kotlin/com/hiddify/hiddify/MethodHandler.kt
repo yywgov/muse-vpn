@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
@@ -157,7 +158,8 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
                         // 穿云 1.12.1: no running service hears the close broadcast; a background
                         // core left by a failed start would keep 17079 open → close it directly
                         if (mainActivity.serviceStatus.value == Status.Stopped) {
-                            BoxService.releaseCore()
+                            // 1.13.0: off the main thread (Flutter's UI thread), at most 10 s
+                            withContext(Dispatchers.IO) { BoxService.releaseCore() }
                         }
                         success(true)
                     }

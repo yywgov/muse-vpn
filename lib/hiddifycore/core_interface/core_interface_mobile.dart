@@ -157,7 +157,9 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
   @override
   Future<bool> stop() async {
     await stopMethodChannel();
-    if (!await waitUntilPort(portBack, false, null)) {
+    // 1.13.0: the service gives the core 10 s to stop, then releases 17079 itself; the old wait
+    // (20 quick tries, about 2 s) gave up long before that
+    if (!await waitUntilPortFor(portBack, false, bgStopWait)) {
       return false;
     }
 
@@ -193,6 +195,20 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
 
 /// 穿云 1.12.1: shown when the previous background core never released its port.
 const bgPortBusyMessage = "上一次的后台连接没有退出（端口 17079 仍被占用）。请在系统设置里「强行停止」穿云后再连接";
+
+/// 1.13.0: how long an in-app stop waits for 17079 to close: the service's 10 s stop limit
+/// (CoreStop.TIMEOUT_MILLIS) plus the port release after it.
+const bgStopWait = Duration(seconds: 12);
+
+/// Waits until [port] is open (or closed) for at most [within]; returns as soon as it is.
+Future<bool> waitUntilPortFor(int port, bool isOpen, Duration within) async {
+  final until = DateTime.now().add(within);
+  while (true) {
+    if (await isPortOpen("127.0.0.1", port) == isOpen) return true;
+    if (!DateTime.now().isBefore(until)) return false;
+    await Future.delayed(const Duration(milliseconds: 200));
+  }
+}
 
 Future<bool> waitUntilPort(
   int portNumber,
