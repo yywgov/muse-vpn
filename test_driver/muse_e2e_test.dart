@@ -289,8 +289,11 @@ Future<Map<String, Object?>> launchPaths() async {
     }
     await shot('light-launch-widget-connected', settleMs: 1500);
     // 快捷开关磁贴
+    // the tile only exists once it is in the panel and the panel has been opened (bound)
     r['addTile'] = '${(await adb(['shell', 'cmd', 'statusbar', 'add-tile', '$pkg/com.hiddify.hiddify.bg.TileService'])).stdout}'.trim();
-    await sleep(1500);
+    await adb(['shell', 'cmd', 'statusbar', 'expand-settings']);
+    await sleep(3000);
+    r['qsTiles'] = '${(await adb(['shell', 'settings', 'get', 'secure', 'sysui_qs_tiles'])).stdout}'.trim();
     for (final on in [false, true]) {
       final c = await adb(['shell', 'cmd', 'statusbar', 'click-tile', '$pkg/com.hiddify.hiddify.bg.TileService']);
       r['clickTile-$on'] = '${c.stdout}${c.stderr}'.trim();
@@ -305,9 +308,26 @@ Future<Map<String, Object?>> launchPaths() async {
     await cmd('wantConnected');
     r['boot'] = await cmd('e2eBoot');
     if (r['boot'] != 'true') failures.add('boot: e2e_boot hook refused: ${r['boot']}');
+    // at boot no screen is open: the service brings the core up by itself (17079 opens) …
+    var bootCore = false;
+    for (var i = 0; i < 60 && !bootCore; i++) {
+      await sleep(1000);
+      bootCore = await cmd('bgPort') == 'open';
+    }
+    r['boot-core'] = bootCore;
+    if (!bootCore) failures.add('boot: the service did not start the core');
+    // … and the user opens 穿云 later, which must show it connected
+    await adb(['shell', 'input', 'keyevent', 'KEYCODE_HOME']);
+    await sleep(3000);
+    await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.MainActivity']);
     await want('boot', true, seconds: 60);
     await shot('light-launch-boot-connected', settleMs: 1500);
-    // 连 → 断 → 再连 with the 首页 button
+    // 连 → 断 → 再连 with the 首页 button (starts from connected)
+    if ((await status())['running'] != true) {
+      await cmd('connect');
+      await waitRunning(true, seconds: 60);
+    }
+    r['home-cycle-start'] = await status();
     await tapHomeConnect();
     await want('home-cycle', false, seconds: 30);
     await tapHomeConnect();
