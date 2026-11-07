@@ -260,6 +260,70 @@ Future<Map<String, Object?>> staleBgCoreThenTapHomeConnect() async {
   return r;
 }
 
+/// 1.13.0 (A2): the ways a phone starts 穿云 without the in-app button — home-screen widget tap
+/// (QuickActionActivity TOGGLE, the widget's own PendingIntent), quick-settings tile, 开机自启 — then
+/// 连 → 断 → 再连 with the 首页 button. Each must reach the wanted state; no crash (checked from logcat
+/// by run_e2e.sh) and no createService error.
+Future<Map<String, Object?>> launchPaths() async {
+  final r = <String, Object?>{};
+  Future<bool> want(String path, bool running, {int seconds = 45}) async {
+    final ok = await waitRunning(running, seconds: seconds);
+    final st = await status();
+    r['$path-${running ? 'on' : 'off'}'] = {'ok': ok, 'status': st};
+    if (!ok) failures.add('$path: did not switch to running=$running: $st');
+    if ('${st['error']}'.contains('createService')) failures.add('$path: createService error: ${st['error']}');
+    await sleep(2500);
+    return ok;
+  }
+
+  try {
+    if ((await status())['running'] != true) {
+      await cmd('connect');
+      await waitRunning(true, seconds: 60);
+    }
+    // 小组件: redraw with the current node (onUpdate / onNode), then the widget's tap twice
+    r['widgetUpdate'] = await cmd('e2eWidget');
+    for (final on in [false, true]) {
+      await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.QuickActionActivity', '-a', 'com.chuanyun.app.action.TOGGLE']);
+      await want('widget', on);
+    }
+    await shot('light-launch-widget-connected', settleMs: 1500);
+    // 快捷开关磁贴
+    r['addTile'] = '${(await adb(['shell', 'cmd', 'statusbar', 'add-tile', '$pkg/com.hiddify.hiddify.bg.TileService'])).stdout}'.trim();
+    await sleep(1500);
+    for (final on in [false, true]) {
+      final c = await adb(['shell', 'cmd', 'statusbar', 'click-tile', '$pkg/com.hiddify.hiddify.bg.TileService']);
+      r['clickTile-$on'] = '${c.stdout}${c.stderr}'.trim();
+      await want('tile', on);
+    }
+    await adb(['shell', 'cmd', 'statusbar', 'collapse']);
+    await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.MainActivity']);
+    await sleep(1500);
+    // 开机自启: stopped (automation STOP), the user still wants the tunnel, then the boot path
+    await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.QuickActionActivity', '-a', 'com.chuanyun.app.action.STOP']);
+    await want('boot-before', false);
+    await cmd('wantConnected');
+    r['boot'] = await cmd('e2eBoot');
+    if (r['boot'] != 'true') failures.add('boot: e2e_boot hook refused: ${r['boot']}');
+    await want('boot', true, seconds: 60);
+    await shot('light-launch-boot-connected', settleMs: 1500);
+    // 连 → 断 → 再连 with the 首页 button
+    await tapHomeConnect();
+    await want('home-cycle', false, seconds: 30);
+    await tapHomeConnect();
+    await want('home-cycle', true, seconds: 60);
+    await shot('light-launch-home-reconnected', settleMs: 2000);
+    // none of this may count as failed starts (安全模式) — every path above connected
+    final h = await cmd('health');
+    r['health'] = h;
+    if (h.contains('"safeMode":true')) failures.add('launch paths: 安全模式 entered: $h');
+  } catch (e) {
+    r['error'] = '$e';
+    failures.add('launch paths: $e');
+  }
+  return r;
+}
+
 Future<void> main() async {
   out.createSync(recursive: true);
   driver = await FlutterDriver.connect(timeout: const Duration(minutes: 3));
@@ -369,6 +433,8 @@ Future<void> main() async {
     // tap the home connect button — after a failed widget / quick-tile start left the background
     // core (17079) open with the service stopped. Before the fix every connect then failed.
     results['stale-bg-core'] = await staleBgCoreThenTapHomeConnect();
+    // 1.13.0: 小组件 / 快捷开关 / 开机自启 and 连 → 断 → 再连
+    results['launch-paths'] = await launchPaths();
   }
 
   results['pickApps'] = await cmd('pickApps:com.android.chrome,com.google.android.youtube,com.google.android.apps.maps,'

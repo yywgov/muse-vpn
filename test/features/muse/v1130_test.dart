@@ -326,5 +326,20 @@ void main() {
         expect(h.substring(at, at + 300), contains('FLAG_DEBUGGABLE'));
       }
     });
+
+    test('the emulator run drives widget, tile, boot and 连→断→再连', () {
+      final host = _src('test_driver/muse_e2e_test.dart');
+      final body = _fnBody(host, 'Future<Map<String, Object?>> launchPaths()');
+      expect(body, contains(r"'$pkg/com.hiddify.hiddify.QuickActionActivity'"));
+      expect(body, contains("'click-tile'"));
+      expect(body, contains("cmd('e2eBoot')"));
+      expect(body, contains("want('home-cycle', false"));
+      expect(body, contains("want('home-cycle', true"));
+      expect(body, contains('createService'));
+      expect(host, contains("results['launch-paths'] = await launchPaths();"));
+      final drv = _src('test_driver/muse_e2e.dart');
+      expect(drv, contains("invokeMethod<bool>('e2e_boot')"));
+      expect(drv, contains("invokeMethod<bool>('e2e_widget_update')"));
+    });
   });
 }

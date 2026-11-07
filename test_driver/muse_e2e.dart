@@ -161,6 +161,17 @@ Future<String> _handler(String? message) async {
           'debug': false,
         });
         return (await isPortOpen('127.0.0.1', CoreInterfaceMobile.portBack)) ? 'open' : 'closed';
+      // 1.13.0: launch paths — 开机自启 (the receiver's own code; a shell may not send BOOT_COMPLETED),
+      // 小组件更新, and what 首页 reads about 安全模式 / 上次异常
+      case 'e2eBoot':
+        return '${await const MethodChannel('com.chuanyun.app/system').invokeMethod<bool>('e2e_boot')}';
+      case 'e2eWidget':
+        return '${await const MethodChannel('com.chuanyun.app/system').invokeMethod<bool>('e2e_widget_update')}';
+      case 'wantConnected':
+        await _c().read(Preferences.startedByUser.notifier).update(true);
+        return 'ok';
+      case 'health':
+        return jsonEncode(await const MethodChannel('com.chuanyun.app/system').invokeMethod<Map<Object?, Object?>>('health_state'));
       case 'bgPort':
         return (await isPortOpen('127.0.0.1', CoreInterfaceMobile.portBack)) ? 'open' : 'closed';
       case 'select':
