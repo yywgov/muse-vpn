@@ -4,6 +4,15 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.13.0 - 2026-11-08
+
+- 本地崩溃自检：Kotlin 各进程（主进程、兼容内核进程）未捕获异常与服务启动失败（标准/兼容内核 stopAndAlert）写入 filesDir/diagnostics/crash.log（128 KB 轮转一份，仅本机）；Dart 未捕获异常照旧进崩溃记录并标记未读；首页「上次异常」显示时间与一句原因，「复制日志」复制服务与界面两份记录（已脱敏），「知道了」关闭
+- 连不上一键诊断（首页连接失败后、活动 › 诊断未连接时）：点「开始诊断」才检查网络（直连百度）、DNS、当前节点服务器 TCP 可达（UDP 协议跳过）、17079 后台内核与本地代理端口占用、其他 VPN（ConnectivityManager TRANSPORT_VPN）；中文结论 + 释放内核 / 打开 VPN 设置 / 切换节点 / 重新检测
+- 安全模式：连续 2 次启动失败（服务与界面 5 秒内重复上报只算一次；内核真正运行才清零）进入；停用桌面小组件更新（只读 Application.onCreate 时缓存的标志，服务构造期不碰 Context）与自定义规则（分流规则、远程规则集、从连接加的规则、屏蔽域名、订阅覆写）；首页「退出安全模式」
+- 被其他 VPN 顶掉（onRevoke，标准/兼容内核）：通知「穿云已被其他 VPN 断开」+ 首页提示，不自动重连（startedByUser 清除）
+- e2e：新增小组件（更新 + 点按 TOGGLE）、快捷开关磁贴（add-tile / click-tile）、开机自启（debug 包 e2e_boot 钩子走 BootReceiver.autoStart）三条启动路径与首页按钮「连→断→再连」
+- 测试：v1130_test；文案白名单加入 VPN
+
 ### 1.12.1 - 2026-11-07
 
 - 修复 Android「意外失败 / createService - null」连不上：BoxService 在 Mobile.setup 之后启动失败（stopAndAlert）时没有关闭后台内核（mode 4，127.0.0.1:17079），状态却回到已停止并注销了关闭广播接收器；之后应用内连接先 stop() 等 17079 关闭，等不到就报 createService（无消息 → null）。现在 stopAndAlert 关闭后台内核（与兼容内核一致）并 stopSelf；应用内「停止」在服务已停止时直接关闭本进程残留的后台内核；Dart 再请求一次释放后才报错，并给出中文原因

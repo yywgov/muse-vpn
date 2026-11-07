@@ -18,6 +18,7 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/features/muse/data/muse_health.dart';
+import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/health_tools.dart';
 import 'package:hiddify/features/muse/logic/redact.dart';
 import 'package:hiddify/features/muse/settings/connect_doctor_sheet.dart';
@@ -30,7 +31,7 @@ class MuseHealthBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final h = ref.watch(museHealthProvider).valueOrNull ?? MuseHealthState.none;
-    final status = ref.watch(connectionNotifierProvider).valueOrNull;
+    final status = ref.watch(museConnectionProvider).valueOrNull;
     final failed = status is Disconnected && status.connectionFailure != null;
     final now = DateTime.now();
     final cards = <Widget>[
@@ -140,7 +141,7 @@ class _Hint extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, color: color, size: 20),
+                Icon(icon, color: color, size: MuseIconSize.small),
                 const SizedBox(width: MuseSpace.s8),
                 Expanded(child: Text(title, style: MuseType.body(context).copyWith(fontWeight: FontWeight.w600))),
               ],

@@ -189,7 +189,7 @@ class _DoctorState extends ConsumerState<MuseConnectDoctorView> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(icon(item.level).$1, color: icon(item.level).$2, size: 20),
+                      Icon(icon(item.level).$1, color: icon(item.level).$2, size: MuseIconSize.small),
                       const SizedBox(width: MuseSpace.s8),
                       SizedBox(width: 72, child: Text(item.title, style: MuseType.body(context).copyWith(color: mt.text2))),
                       Expanded(child: Text(item.text, style: MuseType.body(context))),

@@ -103,8 +103,9 @@ void main() {
 
   group('版本 1.12.1', () {
     test('pubspec and changelog', () {
-      expect(_src('pubspec.yaml'), contains('version: 1.12.1+201'));
-      expect(museChangelog.keys.first, '1.12.1');
+      // 1.13.0: later versions follow; 1.12.1 keeps its entry
+      expect(int.parse(RegExp(r'version: [\d.]+\+(\d+)').firstMatch(_src('pubspec.yaml'))!.group(1)!), greaterThanOrEqualTo(201));
+      expect(museChangelog.keys.take(2), contains('1.12.1'));
       expect(museChangelog['1.12.1']!.join(), contains('createService'));
       expect(_src('CHANGELOG.md'), contains('### 1.12.1'));
     });

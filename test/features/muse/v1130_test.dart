@@ -7,8 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
+import 'package:hiddify/features/muse/data/changelog.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
-import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/data/muse_health.dart';
 import 'package:hiddify/features/muse/home/health_banner.dart';
 import 'package:hiddify/features/muse/logic/connect_doctor.dart';
@@ -46,15 +47,6 @@ class _Health extends MuseHealthNotifier {
   Future<MuseHealthState> build() async => value;
 }
 
-class _Conn extends ConnectionNotifier {
-  _Conn(this.value);
-
-  final ConnectionStatus value;
-
-  @override
-  Stream<ConnectionStatus> build() => Stream.value(value);
-}
-
 Future<void> _pumpBanner(WidgetTester t, MuseHealthState h, ConnectionStatus s) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
@@ -63,7 +55,7 @@ Future<void> _pumpBanner(WidgetTester t, MuseHealthState h, ConnectionStatus s) 
       overrides: [
         sharedPreferencesProvider.overrideWith((ref) async => prefs),
         museHealthProvider.overrideWith(() => _Health(h)),
-        connectionNotifierProvider.overrideWith(() => _Conn(s)),
+        museConnectionProvider.overrideWithValue(AsyncData(s)),
       ],
       child: const MaterialApp(home: Scaffold(body: SingleChildScrollView(child: MuseHealthBanner()))),
     ),
@@ -312,6 +304,18 @@ void main() {
       await _pumpBanner(t, MuseHealthState.none, const ConnectionStatus.disconnected(ConnectionFailure.unexpected('x')));
       expect(find.byKey(const ValueKey('home_connect_failed')), findsOneWidget);
       expect(find.text('一键诊断'), findsOneWidget);
+    });
+  });
+
+  group('版本 1.13.0', () {
+    test('pubspec, changelog, CHANGELOG.md', () {
+      expect(_src('pubspec.yaml'), contains('version: 1.13.0+202'));
+      expect(museChangelog.keys.first, '1.13.0');
+      final lines = museChangelog['1.13.0']!.join();
+      for (final w in ['上次异常', '一键诊断', '安全模式', '其他 VPN']) {
+        expect(lines, contains(w));
+      }
+      expect(_src('CHANGELOG.md'), contains('### 1.13.0'));
     });
   });
 
