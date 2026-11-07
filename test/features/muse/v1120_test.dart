@@ -282,6 +282,8 @@ void main() {
       'Gemini', 'Disney+', 'HBO', 'Prime', 'Video',
       // 1.13.0: VPN has no common Chinese word (连不上诊断「其他 VPN」、「已被其他 VPN 断开」)
       'VPN',
+      // 1.14.0 R21: transport name in 手动添加节点 (no common Chinese word)
+      'WebSocket',
     };
     final ui = RegExp(
       r'''(?:\bText\(|\b(?:title|label|tooltip|hintText|labelText|helperText|subtitle|header|footer|message|hint|semanticsLabel)\s*:|\bshow(?:Success|Error|Info)Toast\(|\bmuseAskText\(\s*context\s*,)\s*(?:const\s+)?(?:Text\(\s*)?(['"])((?:\\.|(?!\1).)*?)\1''',

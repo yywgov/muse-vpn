@@ -6,6 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/logic/qr_image_import.dart';
+import 'package:hiddify/features/muse/logic/node_form.dart';
+import 'package:hiddify/features/muse/logic/sub_override.dart';
+import 'package:hiddify/features/muse/nodes/node_form_dialog.dart';
+import 'dart:convert';
 import 'package:hiddify/features/muse/logic/redact.dart';
 import 'package:hiddify/features/muse/logic/sub_headers.dart';
 import 'package:hiddify/features/muse/settings/sub_headers_dialog.dart';
@@ -242,6 +246,155 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('sub_headers_save')));
       await tester.pumpAndSettle();
       expect(out, {'X-Device-Id': '9'});
+    });
+  });
+
+  group('R21 手动添加 / 编辑节点（本地覆写）', () {
+    const uuid = '1b2c3d4e-0000-1111-2222-333344445555';
+
+    test('form checks and links for the common protocols', () {
+      expect(const MuseNodeForm().error, '请填写名称');
+      expect(const MuseNodeForm(name: 'a', server: 'http://x.com').error, contains('地址格式'));
+      expect(const MuseNodeForm(name: 'a', server: 'x.com', port: '70000').error, contains('端口'));
+      expect(const MuseNodeForm(name: 'a', server: 'x.com', uuid: 'nope').error, contains('UUID'));
+      expect(const MuseNodeForm(name: 'a', server: 'x.com', protocol: MuseFormProtocol.trojan).error, '请填写密码');
+      expect(const MuseNodeForm(name: 'a', server: 'x.com', uuid: uuid, ws: true, path: 'ws').error, contains('/'));
+
+      final vless = const MuseNodeForm(name: '自建 东京', server: 'jp.example.com', uuid: uuid, sni: 'cdn.example.com', ws: true, path: '/ray').toLink()!;
+      expect(vless, startsWith('vless://$uuid@jp.example.com:443?encryption=none&security=tls&sni=cdn.example.com&type=ws&path=%2Fray#'));
+      expect(Uri.decodeComponent(vless.split('#').last), '自建 东京');
+      final trojan = const MuseNodeForm(protocol: MuseFormProtocol.trojan, name: 't', server: '1.2.3.4', port: '8443', password: 'p@ss').toLink()!;
+      expect(trojan, startsWith('trojan://p%40ss@1.2.3.4:8443?security=tls&type=tcp#t'));
+      final hy2 = const MuseNodeForm(protocol: MuseFormProtocol.hysteria2, name: 'h', server: 'h.example.com', password: 'x', insecure: true).toLink()!;
+      expect(hy2, 'hysteria2://x@h.example.com:443?insecure=1#h');
+      final ss = const MuseNodeForm(protocol: MuseFormProtocol.shadowsocks, name: 's', server: 's.example.com', port: '8388', password: 'pw', method: 'aes-256-gcm').toLink()!;
+      final user = ss.substring(5, ss.indexOf('@'));
+      expect(utf8.decode(base64Url.decode(base64Url.normalize(user))), 'aes-256-gcm:pw');
+      final vmess = const MuseNodeForm(protocol: MuseFormProtocol.vmess, name: 'v', server: 'v.example.com', uuid: uuid, tls: false).toLink()!;
+      final j = jsonDecode(utf8.decode(base64.decode(vmess.substring(8)))) as Map;
+      expect([j['add'], j['port'], j['id'], j['net'], j['tls']], ['v.example.com', '443', uuid, 'tcp', '']);
+      expect(museOverrideLinks(vless), [vless], reason: 'a link the 覆写 keeps');
+    });
+
+    final original = <String, dynamic>{
+      'type': 'vless',
+      'tag': '东京 01',
+      'server': 'jp.example.com',
+      'server_port': 443,
+      'uuid': uuid,
+      'tls': {'enabled': true, 'server_name': 'jp.example.com'},
+    };
+
+    test('edit keeps only what changed and lays it over the node', () {
+      final e = MuseNodeEdit.diff(original, server: 'jp.example.com', port: '8443', sni: 'cdn.example.com', uuid: uuid);
+      expect(e.toJson(), {'server_port': 8443, 'sni': 'cdn.example.com'});
+      final applied = e.applyTo(original);
+      expect(applied['server_port'], 8443);
+      expect((applied['tls'] as Map)['server_name'], 'cdn.example.com');
+      expect((original['tls'] as Map)['server_name'], 'jp.example.com', reason: 'the subscription copy is untouched');
+      expect(MuseNodeEdit.diff(original, server: 'jp.example.com', port: '443').isEmpty, isTrue);
+      expect(const MuseNodeEdit(password: 'x').applyTo(original).containsKey('password'), isFalse, reason: 'no field the node lacks');
+      expect(MuseNodeEdit.fromJson({'server_port': '99999', 'server': ' '}).isEmpty, isTrue);
+    });
+
+    test('the patch survives a subscription update and an encode round trip', () {
+      var o = const MuseSubOverride().withEdit('东京 01', const MuseNodeEdit(port: 8443));
+      expect(o.changesBody, isTrue);
+      o = museParseOverrides(museEncodeOverrides({'p1': o}))['p1']!;
+      expect(o.edits['东京 01']!.port, 8443);
+      String sub(List<Map<String, dynamic>> nodes) => jsonEncode({
+        'outbounds': [
+          {'type': 'selector', 'tag': 'select', 'outbounds': [for (final n in nodes) n['tag']]},
+          ...nodes,
+        ],
+      });
+      // before and after an update that renamed nothing but changed another node
+      for (final body in [
+        sub([original]),
+        sub([original, {'type': 'trojan', 'tag': '新加坡 02', 'server': 'sg.example.com', 'server_port': 443, 'password': 'x'}]),
+      ]) {
+        final run = jsonDecode(museOverrideBody(body, o)!) as Map;
+        final tokyo = (run['outbounds'] as List).firstWhere((e) => e['tag'] == '东京 01') as Map;
+        expect(tokyo['server_port'], 8443);
+        expect(tokyo['server'], 'jp.example.com');
+        expect((run['outbounds'] as List).first['type'], 'selector');
+      }
+      // a node gone from the subscription: nothing to patch, the patch is kept
+      final gone = jsonDecode(museOverrideBody(sub([{'type': 'vless', 'tag': '别的', 'server': 'b', 'server_port': 1, 'uuid': uuid}]), o)!) as Map;
+      expect((gone['outbounds'] as List).last['server_port'], 1);
+      expect(o.withEdit('东京 01', const MuseNodeEdit()).edits, isEmpty, reason: '恢复订阅原值');
+      expect(museEncodeOverrides({'p1': const MuseSubOverride().withEdit('x', const MuseNodeEdit(port: 1))}), contains('"edits"'));
+    });
+
+    testWidgets('add dialog: protocol fields, checks, link', (tester) async {
+      String? out;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async => out = await showDialog<String>(context: context, builder: (_) => const MuseNodeFormDialog()),
+              child: const Text('打开'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('打开'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('node_add_uuid')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('node_add_save')));
+      await tester.pumpAndSettle();
+      expect(find.text('请填写名称'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('node_add_name')), '自建');
+      await tester.enterText(find.byKey(const ValueKey('node_add_server')), 'my.example.com');
+      await tester.enterText(find.byKey(const ValueKey('node_add_uuid')), uuid);
+      await tester.tap(find.byKey(const ValueKey('node_add_save')));
+      await tester.pumpAndSettle();
+      expect(out, startsWith('vless://$uuid@my.example.com:443?'));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('edit dialog saves the change only, and can go back to the subscription', (tester) async {
+      MuseNodeEdit? out;
+      Future<void> open(MuseNodeEdit current) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async => out = await showDialog<MuseNodeEdit>(
+                  context: context,
+                  builder: (_) => MuseNodeEditDialog(original: original, current: current),
+                ),
+                child: const Text('打开'),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('打开'));
+        await tester.pumpAndSettle();
+      }
+
+      await open(const MuseNodeEdit());
+      expect(find.byKey(const ValueKey('node_edit_reset')), findsNothing);
+      expect(find.byKey(const ValueKey('node_edit_password')), findsNothing);
+      await tester.enterText(find.byKey(const ValueKey('node_edit_port')), '2053');
+      await tester.tap(find.byKey(const ValueKey('node_edit_save')));
+      await tester.pumpAndSettle();
+      expect(out!.toJson(), {'server_port': 2053});
+      await open(const MuseNodeEdit(port: 2053));
+      expect(find.text('2053'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('node_edit_reset')));
+      await tester.pumpAndSettle();
+      expect(out!.isEmpty, isTrue);
+    });
+
+    test('wired into the node pages', () {
+      final list = _src('lib/features/muse/nodes/node_list.dart');
+      expect(list, contains("('add', '手动添加节点')"));
+      expect(list, contains('showMuseAddNodeDialog(context, ref, id)'));
+      final details = _src('lib/features/muse/nodes/node_details.dart');
+      expect(details, contains("ValueKey('node_edit')"));
+      expect(details, contains('showMuseEditNodeDialog(context, ref, editProfileId, proxy.tag, editOriginal)'));
+      expect(_src('lib/features/muse/config/sub_override_page.dart'), contains("'修改 \${o.edits.length}'"));
     });
   });
 }

@@ -48,6 +48,9 @@ Future<void> showMuseNodeDetails(
   // 1.6.0 #30 / #35: share link (二维码) and the copy formats, named as the row shows the node
   final shownName = metas.displayName(proxy.tag, name, beautify: ref.read(MusePrefs.beautifyNames));
   final shareLink = configRaw.isEmpty ? null : museNodeShareLink(configRaw, proxy.tag, name: shownName);
+  // 1.14.0 R21: a node of the saved subscription (JSON form) can be edited locally
+  final editOriginal = configRaw.isEmpty ? null : museFindOutbound(configRaw, proxy.tag);
+  final editProfileId = ref.read(museActiveProfileIdProvider);
   // 1.6.0 #36: a relay shows where traffic enters and where it leaves
   final relay = proxy.isGroup ? null : museRelayInfo(name, nameRegion: region, exitCode: exitCode);
   // 1.5.0 #24: 下载测速 for the node (or group) in use
@@ -309,6 +312,23 @@ Future<void> showMuseNodeDetails(
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: MuseSpace.s12),
+                // 1.14.0 R21: change address / port / SNI / key as a local patch that survives updates
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('node_edit'),
+                    icon: const Icon(Icons.edit_outlined, size: MuseIconSize.small),
+                    label: Text(editOriginal != null && editProfileId != null && museOverrideHasEdit(ref, editProfileId, proxy.tag) ? '编辑节点（已修改）' : '编辑节点'),
+                    onPressed: editOriginal == null || editProfileId == null
+                        ? null
+                        : () async {
+                            Navigator.of(sheetContext).pop();
+                            final msg = await showMuseEditNodeDialog(context, ref, editProfileId, proxy.tag, editOriginal);
+                            if (msg != null) toast(msg.isEmpty ? '已恢复订阅原值' : msg);
+                          },
+                  ),
                 ),
                 const SizedBox(height: MuseSpace.s12),
               ],

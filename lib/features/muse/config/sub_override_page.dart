@@ -25,11 +25,13 @@ Future<void> museSaveOverride(WidgetRef ref, String id, MuseSubOverride o) async
 
 /// One-line summary for the list (empty = none).
 String museOverrideSummary(MuseSubOverride o) {
-  if (o.rules.isEmpty && o.nodes.isEmpty && o.groups.isEmpty) return '未设置';
+  if (o.rules.isEmpty && o.nodes.isEmpty && o.groups.isEmpty && o.edits.isEmpty) return '未设置';
   final parts = [
     if (o.rules.isNotEmpty) '规则 ${o.rules.length}',
     if (o.nodes.isNotEmpty) '节点 ${o.nodes.length}',
     if (o.groups.isNotEmpty) '代理组 ${o.groups.length}',
+    // 1.14.0 R21
+    if (o.edits.isNotEmpty) '修改 ${o.edits.length}',
   ];
   return '${o.enabled ? '' : '已停用 · '}${parts.join(' · ')}';
 }

@@ -15,6 +15,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:hiddify/features/muse/logic/node_form.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart' show museLanRuleName;
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
@@ -94,7 +95,7 @@ class MuseOverrideGroup {
 }
 
 class MuseSubOverride {
-  const MuseSubOverride({this.enabled = true, this.rules = const [], this.nodes = const [], this.groups = const []});
+  const MuseSubOverride({this.enabled = true, this.rules = const [], this.nodes = const [], this.groups = const [], this.edits = const {}});
 
   final bool enabled;
   final List<MuseOverrideRule> rules;
@@ -103,20 +104,33 @@ class MuseSubOverride {
   final List<String> nodes;
   final List<MuseOverrideGroup> groups;
 
+  /// 1.14.0 R21: local patches of subscription nodes, by node name (编辑节点)
+  final Map<String, MuseNodeEdit> edits;
+
   /// Nothing to apply: the core gets the subscription exactly as before.
-  bool get isEmpty => !enabled || (rules.isEmpty && nodes.isEmpty && groups.isEmpty);
+  bool get isEmpty => !enabled || (rules.isEmpty && nodes.isEmpty && groups.isEmpty && edits.isEmpty);
 
   /// Whether the body needs a runtime copy (rules alone go into the options).
-  bool get changesBody => !isEmpty && (nodes.isNotEmpty || groups.isNotEmpty);
+  bool get changesBody => !isEmpty && (nodes.isNotEmpty || groups.isNotEmpty || edits.isNotEmpty);
 
-  MuseSubOverride copyWith({bool? enabled, List<MuseOverrideRule>? rules, List<String>? nodes, List<MuseOverrideGroup>? groups}) =>
-      MuseSubOverride(enabled: enabled ?? this.enabled, rules: rules ?? this.rules, nodes: nodes ?? this.nodes, groups: groups ?? this.groups);
+  MuseSubOverride copyWith({bool? enabled, List<MuseOverrideRule>? rules, List<String>? nodes, List<MuseOverrideGroup>? groups, Map<String, MuseNodeEdit>? edits}) =>
+      MuseSubOverride(
+        enabled: enabled ?? this.enabled,
+        rules: rules ?? this.rules,
+        nodes: nodes ?? this.nodes,
+        groups: groups ?? this.groups,
+        edits: edits ?? this.edits,
+      );
+
+  /// [tag]'s patch replaced ([e] empty = removed).
+  MuseSubOverride withEdit(String tag, MuseNodeEdit e) => copyWith(edits: {...edits}..remove(tag)..addAll({if (!e.isEmpty) tag: e}));
 
   Map<String, Object?> toJson() => {
     'enabled': enabled,
     'rules': [for (final r in rules) r.toJson()],
     'nodes': nodes,
     'groups': [for (final g in groups) g.toJson()],
+    if (edits.isNotEmpty) 'edits': {for (final e in edits.entries) e.key: e.value.toJson()},
   };
 
   static MuseSubOverride fromJson(Object? j) {
@@ -126,6 +140,11 @@ class MuseSubOverride {
       rules: [for (final r in (j['rules'] is List ? j['rules'] as List : const [])) ?MuseOverrideRule.fromJson(r)],
       nodes: museOverrideLinks(j['nodes'] is List ? (j['nodes'] as List).join('\n') : (j['nodes'] ?? '').toString()),
       groups: [for (final g in (j['groups'] is List ? j['groups'] as List : const [])) ?MuseOverrideGroup.fromJson(g)],
+      edits: {
+        if (j['edits'] is Map)
+          for (final e in (j['edits'] as Map).entries)
+            if (!MuseNodeEdit.fromJson(e.value).isEmpty) '${e.key}': MuseNodeEdit.fromJson(e.value),
+      },
     );
   }
 }
@@ -150,7 +169,8 @@ Map<String, MuseSubOverride> museParseOverrides(String raw) {
 /// Encodes [all], leaving out empty entries of profiles that have none.
 String museEncodeOverrides(Map<String, MuseSubOverride> all) => jsonEncode({
   for (final e in all.entries)
-    if (e.value.enabled == false || e.value.rules.isNotEmpty || e.value.nodes.isNotEmpty || e.value.groups.isNotEmpty) e.key: e.value.toJson(),
+    if (e.value.enabled == false || e.value.rules.isNotEmpty || e.value.nodes.isNotEmpty || e.value.groups.isNotEmpty || e.value.edits.isNotEmpty)
+      e.key: e.value.toJson(),
 });
 
 /// The app's rule list (proto3 JSON) with [o]'s rules right after 局域网. Returns [routeRule]
@@ -244,6 +264,15 @@ String? _jsonBody(String body, MuseSubOverride o, List<Map<String, dynamic>> ext
     copy['tag'] = tag;
     tags.add(tag);
     outbounds.add(copy);
+  }
+  // 1.14.0 R21: local patches over the nodes they name (a node gone from the subscription has none)
+  if (o.edits.isNotEmpty) {
+    for (var i = 0; i < outbounds.length; i++) {
+      final ob = outbounds[i];
+      if (ob is! Map || _groupTypes.contains(ob['type'])) continue;
+      final e = o.edits[ob['tag']];
+      if (e != null) outbounds[i] = e.applyTo(Map<String, dynamic>.from(ob));
+    }
   }
   final nodes = [
     for (final ob in outbounds)

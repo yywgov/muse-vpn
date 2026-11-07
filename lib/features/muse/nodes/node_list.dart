@@ -38,6 +38,7 @@ import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
+import 'package:hiddify/features/muse/nodes/node_form_dialog.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:hiddify/features/muse/data/speed_test.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart' show MuseNodeSettingsPage, musePushPage;
@@ -293,6 +294,8 @@ class MuseNodeList extends HookConsumerWidget {
       if (nodeTotal > 1) ('sort', '排序：${sortMode.title}'),
       if (!embedded && nodeTotal > 1) ('select', '多选'),
       if (group != null && group.selected.isNotEmpty) ('locate', '滚动到当前节点'),
+      // 1.14.0 R21: a node of one's own (kept in the subscription's 覆写)
+      if (!embedded && hasProfile) ('add', '手动添加节点'),
       if (!embedded) ('settings', '节点设置'),
     ];
     Future<void> onMore(String v) async {
@@ -326,6 +329,12 @@ class MuseNodeList extends HookConsumerWidget {
           if (l != null) return ref.read(MusePrefs.nodeLayout.notifier).update(l.key);
           final d = MuseNodeDensity.values.where((e) => 'density_${e.key}' == picked).firstOrNull;
           if (d != null) return ref.read(MusePrefs.nodeDensity.notifier).update(d.key);
+        case 'add':
+          final id = ref.read(museActiveProfileIdProvider);
+          if (id == null) return;
+          if (await showMuseAddNodeDialog(context, ref, id)) {
+            ref.read(inAppNotificationControllerProvider).showSuccessToast(running ? '已添加节点，正在应用' : '已添加节点，连接后出现在列表里');
+          }
         case 'select':
           selecting.value = true;
           picked.value = const {};
