@@ -291,15 +291,20 @@ Future<Map<String, Object?>> launchPaths() async {
     // 快捷开关磁贴
     // the tile only exists once it is in the panel and the panel has been opened (bound)
     r['addTile'] = '${(await adb(['shell', 'cmd', 'statusbar', 'add-tile', '$pkg/com.hiddify.hiddify.bg.TileService'])).stdout}'.trim();
-    await adb(['shell', 'cmd', 'statusbar', 'expand-settings']);
-    await sleep(3000);
     r['qsTiles'] = '${(await adb(['shell', 'settings', 'get', 'secure', 'sysui_qs_tiles'])).stdout}'.trim();
     for (final on in [false, true]) {
+      await adb(['shell', 'cmd', 'statusbar', 'expand-settings']);
+      await sleep(2000);
       final c = await adb(['shell', 'cmd', 'statusbar', 'click-tile', '$pkg/com.hiddify.hiddify.bg.TileService']);
       r['clickTile-$on'] = '${c.stdout}${c.stderr}'.trim();
+      // e2e #16: the tile did start the service, but 穿云's screen stays paused under the panel and
+      // only reads the new state when it comes back — close the panel and return to it, as a user does
+      await sleep(3000);
+      r['tileCore-$on'] = await cmd('bgPort');
+      await adb(['shell', 'cmd', 'statusbar', 'collapse']);
+      await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.MainActivity']);
       await want('tile', on);
     }
-    await adb(['shell', 'cmd', 'statusbar', 'collapse']);
     await adb(['shell', 'am', 'start', '-n', '$pkg/com.hiddify.hiddify.MainActivity']);
     await sleep(1500);
     // 开机自启: stopped (automation STOP), the user still wants the tunnel, then the boot path
