@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/features/muse/logic/qr_image_import.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -400,7 +403,14 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 // }
 
 class QrCodeScannerDialog extends ConsumerWidget {
-  const QrCodeScannerDialog({super.key});
+  const QrCodeScannerDialog({super.key, this.pickImage, this.decodeImage, this.showGallery});
+
+  /// 1.14.0 R11: test seams for 从相册选择 (default: the system picker and the scanner's decoder).
+  final MusePickImage? pickImage;
+  final MuseDecodeImage? decodeImage;
+
+  /// 从相册选择 is offered where the scanner can read a file (Android / iOS); null = by platform.
+  final bool? showGallery;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -437,6 +447,30 @@ class QrCodeScannerDialog extends ConsumerWidget {
                 // }
               },
             ),
+            // 1.14.0 R11: a QR code saved as a picture (an 机场 screenshot) — no storage permission
+            if (showGallery ?? (Platform.isAndroid || Platform.isIOS))
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Builder(
+                    builder: (context) => FilledButton.tonalIcon(
+                      key: const ValueKey('qr_pick_image'),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: const Text('从相册选择'),
+                      onPressed: () async {
+                        final r = await museScanQrFromImage(pick: pickImage, decode: decodeImage);
+                        if (!context.mounted) return;
+                        if (r.outcome == MuseQrImageOutcome.found) {
+                          context.pop(r.text);
+                        } else if (r.message != null) {
+                          ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(r.message!)));
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
             Align(
               alignment: AlignmentDirectional.topStart,
               child: Container(
