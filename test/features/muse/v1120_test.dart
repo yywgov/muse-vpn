@@ -280,6 +280,8 @@ void main() {
       'Google', 'YouTube', 'Netflix', 'Spotify', 'TikTok', 'Telegram', 'Twitter', 'Meta', 'Facebook', 'Instagram', 'WhatsApp',
       'Discord', 'Amazon', 'GitHub', 'npm', 'PyPI', 'Docker', 'Hub', 'PayPal', 'Stripe', 'Steam', 'QQ', 'ChatGPT', 'Claude',
       'Gemini', 'Disney+', 'HBO', 'Prime', 'Video',
+      // 1.13.0: VPN has no common Chinese word (连不上诊断「其他 VPN」、「已被其他 VPN 断开」)
+      'VPN',
     };
     final ui = RegExp(
       r'''(?:\bText\(|\b(?:title|label|tooltip|hintText|labelText|helperText|subtitle|header|footer|message|hint|semanticsLabel)\s*:|\bshow(?:Success|Error|Info)Toast\(|\bmuseAskText\(\s*context\s*,)\s*(?:const\s+)?(?:Text\(\s*)?(['"])((?:\\.|(?!\1).)*?)\1''',

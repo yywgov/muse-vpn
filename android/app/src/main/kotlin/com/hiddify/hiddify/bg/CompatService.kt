@@ -146,6 +146,7 @@ class CompatService(
             current = launch
             CompatState.markStarted(System.currentTimeMillis())
             DisconnectLog.record("VPN 服务已启动（兼容内核）")
+            ChuanyunHealth.startSucceeded()
             ChuanyunAlerts.cancel(ChuanyunAlerts.ID_DISCONNECTED)
             withContext(Dispatchers.Main) { notification.show(launch.profileName, R.string.status_started) }
             notification.start()
@@ -158,6 +159,7 @@ class CompatService(
 
     private suspend fun stopAndAlert(type: Alert, message: String? = null) {
         DisconnectLog.record("启动失败（兼容内核）: ${type.name} ${message ?: ""}".trim())
+        ChuanyunHealth.startFailed("兼容内核 ${type.name} ${message ?: ""}".trim())
         // no retry loop: a failed start is not brought back by the system
         CompatState.clearLaunch()
         releaseCore()
@@ -218,6 +220,7 @@ class CompatService(
 
     fun onRevoke() {
         DisconnectLog.record("VPN 权限被收回（兼容内核）")
+        ChuanyunHealth.markRevoked()
         CompatState.markStoppedByUser()
         CompatState.clearLaunch()
         stopService()

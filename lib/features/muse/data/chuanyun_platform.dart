@@ -20,6 +20,29 @@ abstract final class ChuanyunPlatform {
     }
   }
 
+  // ---- 1.13.0: 上次异常 / 安全模式 / 被其他 VPN 顶掉 (ChuanyunHealth.kt) and 连不上诊断 ----
+  static Future<Map<Object?, Object?>?> healthState() => _call<Map<Object?, Object?>>('health_state');
+
+  static Future<String> healthLog() async => await _call<String>('health_log') ?? '';
+
+  static Future<void> healthStartFailed(String reason) => _call<bool>('health_start_failed', {'reason': reason});
+
+  static Future<void> healthStartOk() => _call<bool>('health_start_ok');
+
+  static Future<void> healthExitSafeMode() => _call<bool>('health_exit_safe_mode');
+
+  static Future<void> healthDismissCrash() => _call<bool>('health_dismiss_crash');
+
+  static Future<void> healthDismissRevoked() => _call<bool>('health_dismiss_revoked');
+
+  /// another app's VPN is up (null = unknown / not Android)
+  static Future<bool?> otherVpnActive() => _call<bool>('other_vpn_active');
+
+  static Future<bool> openVpnSettings() async => await _call<bool>('open_vpn_settings') ?? false;
+
+  /// closes a background core (127.0.0.1:17079) left in this process while no service runs
+  static Future<void> releaseCore() => _call<bool>('release_core');
+
   /// 1.11.0: the node in use and its delay (0 = unknown) for the home-screen widget.
   static Future<void> updateWidget({required String node, required int delay}) =>
       _call<bool>('widget_update', {'node': node, 'delay': delay});

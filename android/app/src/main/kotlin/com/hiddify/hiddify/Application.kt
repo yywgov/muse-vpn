@@ -21,6 +21,8 @@ class Application : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 穿云 1.13.0: uncaught exceptions of every process go to the local crash log (首页「上次异常」)
+        com.hiddify.hiddify.bg.ChuanyunHealth.install(if (com.hiddify.hiddify.bg.ChuanyunProcess.isCompat) "兼容内核" else "主")
 
         // 穿云 1.7.0: the 兼容内核 process loads only its own core; the standard core's runtime,
         // the package receiver and the clean-up (which writes preferences) stay in the app process.

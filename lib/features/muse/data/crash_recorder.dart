@@ -4,6 +4,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:hiddify/core/logger/logger_setup.dart';
+import 'package:hiddify/features/muse/data/muse_health.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/redact.dart';
 import 'package:hiddify/features/muse/logic/stats_tools.dart';
@@ -26,6 +27,8 @@ abstract final class MuseCrashRecorder {
     try {
       final log = museAddCrash(museParseCrashes(prefs.getString(key) ?? ''), MuseCrash(now, '$error', '${stack ?? ''}'));
       prefs.setString(key, museCrashesToRaw(log));
+      // 1.13.0: 首页 shows 「上次异常」 next time (one line, no stack)
+      MuseHealth.markAppCrash('界面异常：${museRedact('$error'.split('\n').first)}');
     } catch (_) {}
   }
 

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/utils/platform_utils.dart';
+import 'package:hiddify/features/muse/data/muse_health.dart';
 import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/model/directories.dart';
@@ -56,6 +57,8 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
 
   static MuseSubOverride? Function(String) _overrideFromPrefs(Ref ref) => (id) {
     try {
+      // 1.13.0 安全模式: no 订阅覆写 either
+      if (ref.read(museSafeModeProvider)) return null;
       return museParseOverrides(ref.read(MusePrefs.subOverrides))[id];
     } catch (_) {
       return null;

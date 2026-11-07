@@ -10,6 +10,7 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/model/startup_connection.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/crash_recorder.dart';
+import 'package:hiddify/features/muse/data/muse_health.dart';
 import 'package:hiddify/features/muse/home/core_profile.dart';
 import 'package:hiddify/features/muse/logic/connect_flow.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
@@ -60,8 +61,21 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
         ChuanyunPlatform.recordDisconnect("界面收到断开及错误: $failure");
         // 1.5.0: keep the core's last log lines for 诊断 before newer lines push them out
         MuseCrashRecorder.recordCoreTail('$failure');
+        // 1.13.0: local crash log / 「上次异常」, two in a row → 安全模式
+        Future.microtask(() async {
+          await MuseHealth.startFailed('$failure');
+          await ref.read(museHealthProvider.notifier).refresh();
+        });
       } else {
         loggy.info(status);
+        // 1.13.0: 被其他 VPN 断开 is written by the service; 首页 reads it on the next status
+        if (event is Disconnected) Future.microtask(() => ref.read(museHealthProvider.notifier).refresh());
+        if (event is Connected) {
+          Future.microtask(() async {
+            await MuseHealth.startOk();
+            await ref.read(museHealthProvider.notifier).refresh();
+          });
+        }
       }
     });
   }

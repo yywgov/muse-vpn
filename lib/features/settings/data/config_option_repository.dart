@@ -3,6 +3,7 @@ import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:hiddify/features/muse/logic/quick_rules.dart';
+import 'package:hiddify/features/muse/data/muse_health.dart';
 import 'package:hiddify/features/muse/data/quick_rules_provider.dart';
 import 'package:dartx/dartx.dart';
 import 'package:fpdart/fpdart.dart';
@@ -498,6 +499,8 @@ abstract class ConfigOptions {
     final ipv6 = museIpv6Options(MuseIpv6Policy.fromKey(ref.watch(MusePrefs.ipv6Policy)));
     // 1.5.0: Fake-IP (设置 › 高级, off by default); it only changes anything in TUN mode
     final fakeIp = ref.watch(enableFakeDns);
+    // 1.13.0 安全模式 (2 failed starts in a row): none of the user's own rules until they leave it
+    final safe = ref.watch(museSafeModeProvider);
     return SingboxConfigOption(
       region: ref.watch(region).name,
       balancerStrategy: ref.watch(balancerStrategy),
@@ -594,10 +597,10 @@ abstract class ConfigOptions {
                       .watch(museRouteMode)
                       .applyTo(
                         museApplyPresets(
-                          ref.watch(rulesNotifierProvider),
+                          safe ? const <Rule>[] : ref.watch(rulesNotifierProvider),
                           museParsePresetChoice(ref.watch(MusePrefs.rulePresets)),
                           // 1.4.1: rule-sets the user added by link
-                          remote: museParseRemoteRuleSets(ref.watch(MusePrefs.remoteRuleSets)),
+                          remote: safe ? const <MuseRemoteRuleSet>[] : museParseRemoteRuleSets(ref.watch(MusePrefs.remoteRuleSets)),
                         ),
                       ),
                   MuseAdBlockLevel.fromKey(ref.watch(Preferences.museAdBlockLevel)),
@@ -606,8 +609,8 @@ abstract class ConfigOptions {
                   fakeIp: fakeIp,
                 ), block: ref.watch(MusePrefs.blockQuic)),
                   // 1.12.0: 从连接加的规则（已保存的 + 仅本次）
-                  [...museParseQuickRules(ref.watch(MusePrefs.quickRules)), ...ref.watch(museTempQuickRulesProvider)],
-                ), museParseBlockedHosts(ref.watch(MusePrefs.blockedHosts))),
+                  safe ? const <MuseQuickRule>[] : [...museParseQuickRules(ref.watch(MusePrefs.quickRules)), ...ref.watch(museTempQuickRulesProvider)],
+                ), safe ? const <String>[] : museParseBlockedHosts(ref.watch(MusePrefs.blockedHosts))),
               ).toProto3Json()!
               as Map<String, dynamic>,
     );

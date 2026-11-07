@@ -27,6 +27,7 @@ import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
 import 'package:hiddify/features/muse/home/exit_card.dart';
+import 'package:hiddify/features/muse/home/health_banner.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
@@ -172,6 +173,8 @@ class _Dashboard extends ConsumerWidget {
         padding: EdgeInsets.fromLTRB(margin, MuseSpace.s4, margin, museScrollEndGap(context)),
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         children: [
+          // 1.13.0: 安全模式 / 被其他 VPN 断开 / 上次异常 / 连接没有成功 (only when one applies)
+          const MuseHealthBanner(),
           const MuseHeroCard(),
           const SizedBox(height: MuseSpace.s12),
           const MuseTileGrid(),

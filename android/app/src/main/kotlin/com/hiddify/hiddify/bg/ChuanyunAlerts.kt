@@ -19,6 +19,7 @@ object ChuanyunAlerts {
     private const val CHANNEL = "chuanyun_alerts"
     const val ID_DISCONNECTED = 2101
     const val ID_SUBSCRIPTION = 2102
+    const val ID_REVOKED = 2103
 
     fun show(context: Context, id: Int, title: String, text: String) {
         val nm = Application.notification

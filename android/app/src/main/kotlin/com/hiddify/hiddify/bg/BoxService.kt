@@ -227,6 +227,8 @@ class BoxService(
 
             if (Settings.startCoreAfterStartingService){
                 Mobile.start("","")
+                // 穿云 1.13.0: the core runs (小组件 / 快捷开关 / 开机 / 系统重拉起): the failure streak ends
+                ChuanyunHealth.startSucceeded()
                 }
 //            if (delayStart) {
 //                delay(1000L)
@@ -444,6 +446,8 @@ class BoxService(
 
     private suspend fun stopAndAlert(type: Alert, message: String? = null) {
         DisconnectLog.record("启动失败: ${type.name} ${message ?: ""}".trim())
+        // 穿云 1.13.0: local crash log + 「上次异常」, and two in a row → 安全模式
+        ChuanyunHealth.startFailed("${type.name} ${message ?: ""}".trim())
         stopWatchdog()
         Settings.startedByUser = false
         // 穿云 1.12.1: a start that failed after Mobile.setup (e.g. the core start of a 桌面小组件 /
@@ -530,6 +534,9 @@ class BoxService(
 
     fun onRevoke() {
         DisconnectLog.record("VPN 权限被收回（其他 VPN 应用启动，或系统收回了权限）")
+        // 穿云 1.13.0: tell the user (notification + 首页); never reconnect by itself — stopService
+        // clears startedByUser, so neither the watchdog nor a system restart brings it back
+        ChuanyunHealth.markRevoked()
         stopService()
     }
 

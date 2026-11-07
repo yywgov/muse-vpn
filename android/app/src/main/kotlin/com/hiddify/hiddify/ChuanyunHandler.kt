@@ -283,6 +283,69 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
                     )
                 }
 
+                // ---- 穿云 1.13.0: 上次异常 / 安全模式 / 被其他 VPN 顶掉 (ChuanyunHealth) ----
+                "health_state" -> result.success(com.hiddify.hiddify.bg.ChuanyunHealth.state())
+                "health_log" -> result.success(com.hiddify.hiddify.bg.ChuanyunHealth.read())
+                "health_start_failed" -> {
+                    com.hiddify.hiddify.bg.ChuanyunHealth.startFailed(call.argument<String>("reason") ?: "")
+                    result.success(true)
+                }
+                "health_start_ok" -> {
+                    com.hiddify.hiddify.bg.ChuanyunHealth.startSucceeded()
+                    result.success(true)
+                }
+                "health_exit_safe_mode" -> {
+                    com.hiddify.hiddify.bg.ChuanyunHealth.exitSafeMode()
+                    result.success(true)
+                }
+                "health_dismiss_crash" -> {
+                    com.hiddify.hiddify.bg.ChuanyunHealth.dismissCrash()
+                    result.success(true)
+                }
+                "health_dismiss_revoked" -> {
+                    com.hiddify.hiddify.bg.ChuanyunHealth.dismissRevoked()
+                    result.success(true)
+                }
+                // 连不上诊断: another app's VPN is up (asked only while 穿云 is disconnected)
+                "other_vpn_active" -> {
+                    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                    @Suppress("DEPRECATION")
+                    val vpn = cm?.let { m ->
+                        m.allNetworks.any { n -> m.getNetworkCapabilities(n)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true }
+                    } ?: false
+                    result.success(vpn)
+                }
+                "open_vpn_settings" -> result.success(startFirst(listOf(Intent(android.provider.Settings.ACTION_VPN_SETTINGS))))
+                // 连不上诊断「释放内核」: the background core of this process (17079), when no service runs
+                "release_core" -> {
+                    com.hiddify.hiddify.bg.BoxService.releaseCore()
+                    result.success(true)
+                }
+                // debug builds only (the emulator e2e run): the 开机自启 and 小组件更新 paths
+                "e2e_boot" -> {
+                    if ((context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+                        result.success(false)
+                    } else {
+                        com.hiddify.hiddify.bg.BootReceiver.autoStart()
+                        result.success(true)
+                    }
+                }
+                "e2e_widget_update" -> {
+                    if ((context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+                        result.success(false)
+                    } else {
+                        val app = context.applicationContext
+                        val cn = ComponentName(app, com.hiddify.hiddify.bg.ChuanyunWidget::class.java)
+                        val ids = android.appwidget.AppWidgetManager.getInstance(app).getAppWidgetIds(cn)
+                        app.sendBroadcast(
+                            Intent(android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE).setComponent(cn)
+                                .putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                        )
+                        com.hiddify.hiddify.bg.ChuanyunWidget.onNode("e2e", 1)
+                        result.success(true)
+                    }
+                }
+
                 "record_disconnect" -> {
                     DisconnectLog.record(call.argument<String>("reason") ?: "")
                     result.success(true)

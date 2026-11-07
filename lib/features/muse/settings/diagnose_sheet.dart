@@ -17,6 +17,7 @@ import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/features/muse/data/diagnostics.dart';
+import 'package:hiddify/features/muse/settings/connect_doctor_sheet.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart';
 import 'package:hiddify/features/muse/shell/muse_shell.dart' show museScrollEndGap;
@@ -348,6 +349,16 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
                     ],
                   ),
                 ],
+              ],
+              // 1.13.0: 连不上 → the connect doctor (端口占用、其他 VPN、节点可达, with fixes)
+              if (!connected) ...[
+                const SizedBox(height: MuseSpace.s8),
+                TextButton.icon(
+                  key: const ValueKey('diagnose_connect_doctor'),
+                  onPressed: () => showMuseConnectDoctor(context),
+                  icon: const Icon(Icons.medical_services_outlined, size: MuseIconSize.small),
+                  label: const Text('连不上？一键诊断'),
+                ),
               ],
               const SizedBox(height: MuseSpace.s16),
               Row(

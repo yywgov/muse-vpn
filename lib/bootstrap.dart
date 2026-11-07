@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:hiddify/features/muse/data/muse_health.dart';
 import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/features/muse/data/bundled_compat_rule_sets.dart';
 import 'package:hiddify/features/muse/data/bundled_rule_sets.dart';
@@ -136,6 +137,9 @@ Future<void> _bootstrapSteps(ProviderContainer container, Environment env) async
   await _init("preferences", () => container.read(sharedPreferencesProvider.future));
   try {
     MuseCrashRecorder.attach(container.read(sharedPreferencesProvider).requireValue);
+    // 1.13.0: 安全模式 / 上次异常 known before anything connects
+    MuseHealth.attach(container.read(sharedPreferencesProvider).requireValue);
+    await container.read(museHealthProvider.future).timeout(const Duration(seconds: 2));
   } catch (_) {}
   // The ring starts at a safe default and only now learns the size the user
   // picked, since nothing could be read from disk before this point.

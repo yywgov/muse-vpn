@@ -61,6 +61,8 @@ class ChuanyunWidget : AppWidgetProvider() {
          */
         fun onStatus(status: Status) {
             try {
+                // 穿云 1.13.0 安全模式: no widget updates (cached flag only — no Context, no file read)
+                if (ChuanyunHealth.safeModeCached) return
                 val context = appContext() ?: return
                 val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 if (prefs.getString(KEY_STATUS, null) == status.name) return
@@ -73,6 +75,7 @@ class ChuanyunWidget : AppWidgetProvider() {
         /** 穿云 says the node in use or its delay changed. */
         fun onNode(node: String, delay: Int) {
             try {
+                if (ChuanyunHealth.safeModeCached) return
                 val context = appContext() ?: return
                 val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 if (prefs.getString(KEY_NODE, "") == node && prefs.getInt(KEY_DELAY, 0) == delay) return
