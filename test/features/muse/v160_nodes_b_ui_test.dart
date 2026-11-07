@@ -364,6 +364,9 @@ void main() {
       await tester.ensureVisible(find.byKey(const ValueKey('node_qr')));
       await tester.tap(find.byKey(const ValueKey('node_qr')));
       await tester.pumpAndSettle();
+      // 1.14.0 B5: asked first (the code carries the node's password)
+      await tester.tap(find.byKey(const ValueKey('qr_sensitive_ok')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('muse_qr')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('qr_copy')));
       await tester.pumpAndSettle();

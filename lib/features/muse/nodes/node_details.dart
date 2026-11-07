@@ -289,7 +289,7 @@ Future<void> showMuseNodeDetails(
                             ? null
                             : () async {
                                 Navigator.of(sheetContext).pop();
-                                await showMuseQrDialog(context, title: shownName, data: shareLink);
+                                await showMuseQrDialog(context, title: shownName, data: shareLink, warning: museQrNodeWarning);
                               },
                       ),
                     ),

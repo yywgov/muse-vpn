@@ -373,6 +373,7 @@ class ProfileActionsMenu extends HookConsumerWidget {
             title: remote.name,
             data: museSubscriptionQrPayload(remote.url, name: remote.name),
             copyText: remote.url,
+            warning: museQrSubscriptionWarning,
           ),
         ),
       // 1.6.0 C6: copy the link (it carries the subscription's key: asked first)
