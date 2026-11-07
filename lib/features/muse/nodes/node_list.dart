@@ -241,7 +241,9 @@ class MuseNodeList extends HookConsumerWidget {
       for (final e in group?.items ?? const <OutboundInfo>[]) museNodeProtocolShort(e),
     ]);
     final nodeTags = metas.allTags;
-    final nodeFilter = MuseNodeFilter.parse(ref.watch(MusePrefs.protocolFilter)).within(protocols: protocols, tags: nodeTags);
+    // 1.14.0 B4: 只看收藏 (when one of this list's nodes is a favourite)
+    final hasFavorites = favorites.isNotEmpty && (group?.items.any((e) => !e.isGroup && favorites.contains(e.tag)) ?? false);
+    final nodeFilter = MuseNodeFilter.parse(ref.watch(MusePrefs.protocolFilter)).within(protocols: protocols, tags: nodeTags, hasFavorites: hasFavorites);
     final recent = museRecentFromRaw(ref.watch(MusePrefs.recentNodes));
     final profileName = ref.watch(museActiveProfileNameProvider)?.trim() ?? '';
     // 1.6.0 C5: 列表 / 卡片 and 紧凑 / 标准 / 宽松 (the embedded lists stay a plain list)
@@ -285,7 +287,7 @@ class MuseNodeList extends HookConsumerWidget {
     }
 
     // 1.10.0: one ⋯ menu instead of the 多选 / 筛选 / 布局 / 排序 icons
-    final canFilter = nodeTotal > 1 && (protocols.length > 1 || nodeTags.isNotEmpty);
+    final canFilter = nodeTotal > 1 && (protocols.length > 1 || nodeTags.isNotEmpty || hasFavorites);
     final moreItems = <(String, String)>[
       if (canFilter) ('filter', '筛选：${nodeFilter.label}'),
       if (nodeTotal > 1) ('sort', '排序：${sortMode.title}'),
@@ -298,6 +300,7 @@ class MuseNodeList extends HookConsumerWidget {
         case 'filter':
           final raw = await _museNodeChoice<String>(context, '筛选', [
             ('node_filter_all', '', '全部', nodeFilter.isNone),
+            if (hasFavorites) ('node_filter_fav', MuseNodeFilter.favorites.toRaw(), '只看收藏', nodeFilter == MuseNodeFilter.favorites),
             for (final p in protocols)
               if (protocols.length > 1) ('node_filter_p_$p', MuseNodeFilter.protocol(p).toRaw(), p, nodeFilter == MuseNodeFilter.protocol(p)),
             for (final t in nodeTags) ('node_filter_t_$t', MuseNodeFilter.tag(t).toRaw(), '标签：$t', nodeFilter == MuseNodeFilter.tag(t)),
@@ -546,7 +549,7 @@ class MuseNodeList extends HookConsumerWidget {
                     !duplicates.contains(e.tag) &&
                     museNodeNamePasses(museNodeName(e), include: includeRe, exclude: excludeRe) &&
                     museNodeNamePasses(museNodeName(e), include: subFilter.include, exclude: subFilter.exclude) &&
-                    nodeFilter.passes(protocolShort: museNodeProtocolShort(e), tags: metas.of(e.tag).tags)),
+                    nodeFilter.passes(protocolShort: museNodeProtocolShort(e), tags: metas.of(e.tag).tags, favorite: favorites.contains(e.tag))),
           )
           .toList();
       final userHidden = {for (final t in metas.hiddenTags) if (t != group.selected) t};

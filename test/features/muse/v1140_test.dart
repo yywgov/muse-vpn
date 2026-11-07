@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/logic/qr_image_import.dart';
 import 'package:hiddify/features/muse/logic/sub_guard.dart';
 import 'package:hiddify/features/profile/model/profile_failure.dart';
@@ -142,6 +143,26 @@ void main() {
       expect(n, contains("positiveBtnTxt: '仍然更新'"));
       final bulk = _src('lib/features/profile/notifier/profiles_update_notifier.dart');
       expect(bulk, contains('museSubFailureReason(result.error)'));
+    });
+  });
+
+  group('B4 只看收藏（收藏、置顶、搜索、按地区折叠已有）', () {
+    test('filter', () {
+      final f = MuseNodeFilter.parse(MuseNodeFilter.favorites.toRaw());
+      expect(f, MuseNodeFilter.favorites);
+      expect(f.label, '收藏');
+      expect(f.passes(protocolShort: 'VLESS', tags: const [], favorite: true), isTrue);
+      expect(f.passes(protocolShort: 'VLESS', tags: const []), isFalse);
+      expect(f.within(protocols: const ['VLESS'], tags: const [], hasFavorites: true), f);
+      expect(f.within(protocols: const ['VLESS'], tags: const []).isNone, isTrue, reason: 'never an empty list');
+      expect(MuseNodeFilter.parse('p:VLESS').passes(protocolShort: 'VLESS', tags: const []), isTrue);
+    });
+
+    test('the existing parts are still there', () {
+      final list = _src('lib/features/muse/nodes/node_list.dart');
+      for (final k in ["'node_search_field'", "'node_filter_fav'", 'museFavoritesFirst', 'museToggleRegionFold', 'showMuseFavoriteOrder']) {
+        expect(list, contains(k), reason: k);
+      }
     });
   });
 }

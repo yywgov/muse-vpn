@@ -318,6 +318,22 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
+    testWidgets('1.14.0 B4 筛选 › 只看收藏 keeps only the favourites', (tester) async {
+      final c = await _pump(tester, size: const Size(412, 1400), prefs: {'muse_favorite_nodes': '🇺🇸 洛杉矶 01\n别的订阅'});
+      expect(find.byKey(const ValueKey('🇸🇬 新加坡 03')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('node_more_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('node_more_filter')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('node_filter_fav')));
+      await tester.pumpAndSettle();
+      expect(c.read(MusePrefs.protocolFilter), 'f:收藏');
+      expect(find.byKey(const ValueKey('🇺🇸 洛杉矶 01')), findsOneWidget);
+      expect(find.byKey(const ValueKey('🇸🇬 新加坡 03')), findsNothing);
+      expect(find.textContaining('仅收藏'), findsWidgets);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
     testWidgets('#34 favourites follow the order arranged in 收藏排序', (tester) async {
       final c = await _pump(tester, prefs: {'muse_favorite_nodes': '🇸🇬 新加坡 03\n🇺🇸 洛杉矶 01\n别的订阅', 'muse_node_sort': 'original'});
       // not arranged yet: the list's own order (美 after 新)

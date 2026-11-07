@@ -544,7 +544,7 @@ String museSpeedText(double bytesPerSecond) {
 class MuseNodeFilter {
   const MuseNodeFilter._(this.kind, this.value);
 
-  /// 'p' (protocol), 't' (tag) or '' (none)
+  /// 'p' (protocol), 't' (tag), 'f' (1.14.0 B4: 只看收藏) or '' (none)
   final String kind;
   final String value;
 
@@ -553,8 +553,12 @@ class MuseNodeFilter {
   factory MuseNodeFilter.protocol(String short) => MuseNodeFilter._('p', short);
   factory MuseNodeFilter.tag(String tag) => MuseNodeFilter._('t', tag);
 
+  /// 1.14.0 B4: only the favourites (stored as 「f:收藏」).
+  static const favorites = MuseNodeFilter._('f', '收藏');
+
   static MuseNodeFilter parse(String raw) {
     final r = raw.trim();
+    if (r.startsWith('f:')) return favorites;
     if (r.length > 2 && (r.startsWith('p:') || r.startsWith('t:'))) return MuseNodeFilter._(r[0], r.substring(2));
     if (r.isNotEmpty && !r.contains(':')) return MuseNodeFilter._('p', r.toUpperCase());
     return none;
@@ -567,18 +571,21 @@ class MuseNodeFilter {
   /// The label in the toolbar / menu.
   String get label => isNone ? '全部' : value;
 
-  /// Whether a node of [protocolShort] with [tags] stays in the list.
-  bool passes({required String protocolShort, required List<String> tags}) => switch (kind) {
+  /// Whether a node of [protocolShort] with [tags] stays in the list ([favorite]: it is one).
+  bool passes({required String protocolShort, required List<String> tags, bool favorite = false}) => switch (kind) {
     'p' => protocolShort.toUpperCase() == value.toUpperCase(),
     't' => tags.contains(value),
+    'f' => favorite,
     _ => true,
   };
 
   /// A filter whose protocol / tag no longer exists among the nodes filters nothing (so the
   /// list never stays empty after the subscription changed).
-  MuseNodeFilter within({required Iterable<String> protocols, required Iterable<String> tags}) => switch (kind) {
+  /// 只看收藏 with no favourite among the nodes filters nothing either.
+  MuseNodeFilter within({required Iterable<String> protocols, required Iterable<String> tags, bool hasFavorites = false}) => switch (kind) {
     'p' => protocols.any((p) => p.toUpperCase() == value.toUpperCase()) ? this : none,
     't' => tags.contains(value) ? this : none,
+    'f' => hasFavorites ? this : none,
     _ => none,
   };
 
