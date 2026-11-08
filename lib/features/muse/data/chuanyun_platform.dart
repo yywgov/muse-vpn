@@ -44,8 +44,14 @@ abstract final class ChuanyunPlatform {
   static Future<void> releaseCore() => _call<bool>('release_core');
 
   /// 1.11.0: the node in use and its delay (0 = unknown) for the home-screen widget.
-  static Future<void> updateWidget({required String node, required int delay}) =>
-      _call<bool>('widget_update', {'node': node, 'delay': delay});
+  /// 1.16.0 R25: plus the first 3 favourite nodes (tag, shown name) the widget offers to switch to.
+  static Future<void> updateWidget({required String node, required int delay, List<(String, String)> favs = const []}) =>
+      _call<bool>('widget_update', {
+        'node': node,
+        'delay': delay,
+        'favTags': [for (final f in favs) f.$1],
+        'favNames': [for (final f in favs) f.$2],
+      });
 
   static Future<bool> isLauncherIconHidden() async => await _call<bool>('is_launcher_icon_hidden') ?? false;
 

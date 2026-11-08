@@ -167,9 +167,14 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
 
                 // 穿云 1.11.0: the node in use / its delay for the home-screen widget (sent on a change only)
                 "widget_update" -> {
-                    com.hiddify.hiddify.bg.ChuanyunWidget.onNode(
+                    com.hiddify.hiddify.bg.ChuanyunWidget.onNodeFavs(
                         call.argument<String>("node") ?: "",
                         call.argument<Int>("delay") ?: 0,
+                        // 1.16.0 R25: 常用节点 (first 3 favourites)
+                        com.hiddify.hiddify.bg.ChuanyunWidget.zipFavs(
+                            call.argument<List<String>>("favTags") ?: emptyList(),
+                            call.argument<List<String>>("favNames") ?: emptyList(),
+                        ),
                     )
                     // 穿云 1.12.0: the quick-settings tile shows the same 「节点 · 延迟」
                     if (android.os.Build.VERSION.SDK_INT >= 24) com.hiddify.hiddify.bg.TileService.refresh(Application.application)

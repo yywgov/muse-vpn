@@ -116,7 +116,9 @@ void main() {
     test('ChuanyunHandler: widget_update passes only node and delay', () {
       final code = _code('$_kt/ChuanyunHandler.kt');
       expect(code, contains('"widget_update"'));
-      expect(code, matches(RegExp(r'ChuanyunWidget\.onNode\(\s*call\.argument<String>\("node"\)')));
+      // 1.16.0 R25: onNodeFavs also takes the 常用节点 (plain strings, still no Context)
+      expect(code, matches(RegExp(r'ChuanyunWidget\.onNode(?:Favs)?\(\s*call\.argument<String>\("node"\)')));
+      expect(code, isNot(matches(RegExp(r'ChuanyunWidget\.onNode(?:Favs)?\([^)]*context'))));
     });
 
     test('1.11.0 features stay (no rollback): widget registered, core muse.23', () {

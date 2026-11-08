@@ -2,7 +2,10 @@
 // them changed (the widget redraws on that and on connection changes, never on a timer).
 // Part of 穿云 (GPLv3).
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:hiddify/core/model/constants.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/features/muse/logic/node_prefs.dart' show museParseFavorites;
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
@@ -28,20 +31,37 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
   return (text, ConnectionConst.isValidDelay(delay) ? delay : 0);
 }
 
+/// 1.16.0 R25: the widget's 常用节点 — the first [max] favourite nodes in the list's order
+/// (tag, shown name). Groups and nodes no longer in the subscription are skipped.
+List<(String, String)> museWidgetFavs(OutboundGroup? group, Set<String> favorites, {int max = 3, String Function(String raw)? shown}) {
+  if (group == null || favorites.isEmpty) return const [];
+  final out = <(String, String)>[];
+  for (final item in group.items) {
+    if (out.length >= max) break;
+    if (item.isGroup || !favorites.contains(item.tag)) continue;
+    final full = museNodeName(item);
+    out.add((item.tag, museStripFlags(shown?.call(full) ?? full)));
+  }
+  return out;
+}
+
 final museWidgetSyncProvider = Provider<void>((ref) {
   (String, int)? last;
+  List<(String, String)>? lastFavs;
   void push() {
-    final next = museWidgetNode(
-      ref.read(museNodeGroupProvider).valueOrNull,
-      since: ref.read(museConnectedSinceProvider).valueOrNull,
-      shown: ref.read(museShownPickProvider),
-    );
-    if (next == last) return;
+    final group = ref.read(museNodeGroupProvider).valueOrNull;
+    final shown = ref.read(museShownPickProvider);
+    final next = museWidgetNode(group, since: ref.read(museConnectedSinceProvider).valueOrNull, shown: shown);
+    final favs = museWidgetFavs(group, museParseFavorites(ref.read(Preferences.museFavoriteNodes)), shown: shown);
+    // sent only when something the widget shows changed (no timer)
+    if (next == last && lastFavs != null && listEquals(favs, lastFavs)) return;
     last = next;
-    ChuanyunPlatform.updateWidget(node: next.$1, delay: next.$2);
+    lastFavs = favs;
+    ChuanyunPlatform.updateWidget(node: next.$1, delay: next.$2, favs: favs);
   }
 
   ref.listen(museNodeGroupProvider, (_, _) => push());
   ref.listen(museConnectedSinceProvider, (_, _) => push());
+  ref.listen(Preferences.museFavoriteNodes, (_, _) => push());
   push();
 });

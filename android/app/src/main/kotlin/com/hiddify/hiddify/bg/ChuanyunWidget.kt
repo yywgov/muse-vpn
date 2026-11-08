@@ -13,6 +13,8 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.view.View
 import android.widget.RemoteViews
 import com.hiddify.hiddify.Application
 import com.hiddify.hiddify.MainActivity
@@ -30,6 +32,26 @@ class ChuanyunWidget : AppWidgetProvider() {
         private const val KEY_STATUS = "status"
         private const val KEY_NODE = "node"
         private const val KEY_DELAY = "delay"
+        private const val KEY_FAVS = "favs"
+        private const val MAX_FAVS = 3
+        private val favIds = intArrayOf(R.id.widget_fav1, R.id.widget_fav2, R.id.widget_fav3)
+
+        /** 1.16.0 R25: (tag, name) pairs from the two lists 穿云 sends, at most 3. */
+        fun zipFavs(tags: List<String>, names: List<String>): List<Pair<String, String>> =
+            tags.zip(names).filter { it.first.isNotBlank() }.take(MAX_FAVS)
+
+        /** Saved form: one 「tag \u001F name」 per line (neither can hold these control characters). */
+        fun encodeFavs(favs: List<Pair<String, String>>): String =
+            favs.joinToString("\n") { "${it.first.replace('\n', ' ')}\u001F${it.second.replace('\n', ' ')}" }
+
+        fun decodeFavs(raw: String?): List<Pair<String, String>> =
+            (raw ?: "").split('\n').mapNotNull { line ->
+                val i = line.indexOf('\u001F')
+                if (i <= 0) null else Pair(line.substring(0, i), line.substring(i + 1))
+            }.take(MAX_FAVS)
+
+        /** The link a 常用节点 tap opens: switch to [tag] and connect (same as chuanyun://connect?node=). */
+        fun favLink(tag: String): String = "chuanyun://connect?node=" + Uri.encode(tag)
 
         /** The widget's text for a status, node name and delay (0 = unknown). */
         fun view(status: String, node: String, delay: Int): ChuanyunWidgetView {
@@ -77,12 +99,31 @@ class ChuanyunWidget : AppWidgetProvider() {
             try {
                 if (ChuanyunHealth.safeModeCached) return
                 val context = appContext() ?: return
-                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                if (prefs.getString(KEY_NODE, "") == node && prefs.getInt(KEY_DELAY, 0) == delay) return
-                prefs.edit().putString(KEY_NODE, node).putInt(KEY_DELAY, delay).apply()
-                redraw(context)
+                save(context, node, delay, null)
             } catch (_: Throwable) {
             }
+        }
+
+        /** 1.16.0 R25: the node, its delay and the 常用节点 in one redraw. */
+        fun onNodeFavs(node: String, delay: Int, favs: List<Pair<String, String>>) {
+            try {
+                if (ChuanyunHealth.safeModeCached) return
+                val context = appContext() ?: return
+                save(context, node, delay, encodeFavs(favs))
+            } catch (_: Throwable) {
+            }
+        }
+
+        /** [favRaw] null keeps the saved 常用节点. Redraws only when something changed. */
+        private fun save(context: Context, node: String, delay: Int, favRaw: String?) {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            if (prefs.getString(KEY_NODE, "") == node && prefs.getInt(KEY_DELAY, 0) == delay &&
+                (favRaw == null || prefs.getString(KEY_FAVS, "") == favRaw)
+            ) return
+            val edit = prefs.edit().putString(KEY_NODE, node).putInt(KEY_DELAY, delay)
+            if (favRaw != null) edit.putString(KEY_FAVS, favRaw)
+            edit.apply()
+            redraw(context)
         }
 
         /** The application context (never a Service / Activity that may not be attached yet). */
@@ -126,6 +167,26 @@ class ChuanyunWidget : AppWidgetProvider() {
                 R.id.widget_text,
                 PendingIntent.getActivity(context, 2, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT),
             )
+            // 1.16.0 R25: 常用节点 — tap one to switch to it and connect (opens 穿云 via chuanyun://connect?node=)
+            val favs = decodeFavs(prefs.getString(KEY_FAVS, ""))
+            views.setViewVisibility(R.id.widget_favs, if (favs.isEmpty()) View.GONE else View.VISIBLE)
+            for (i in favIds.indices) {
+                val id = favIds[i]
+                val fav = favs.getOrNull(i)
+                if (fav == null) {
+                    views.setViewVisibility(id, View.INVISIBLE)
+                    continue
+                }
+                views.setViewVisibility(id, View.VISIBLE)
+                views.setTextViewText(id, fav.second)
+                views.setContentDescription(id, "切换到节点 ${fav.second}")
+                val pick = Intent(Intent.ACTION_VIEW, Uri.parse(favLink(fav.first)), context, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                views.setOnClickPendingIntent(
+                    id,
+                    PendingIntent.getActivity(context, 10 + i, pick, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT),
+                )
+            }
             return views
         }
     }
