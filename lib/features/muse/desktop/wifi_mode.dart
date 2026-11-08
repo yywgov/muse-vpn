@@ -53,22 +53,21 @@ MuseWifiModeStep museWifiModeStep({
   required String applied,
 }) {
   if (!read.ok) return MuseWifiModeStep(saved: saved, applied: applied); // 读不到：保持现状
-  if (applied.isNotEmpty && current.key != applied) {
-    // 用户在我们切换后手动改了模式：以用户为准，不再恢复
-    saved = '';
-    applied = '';
-  }
+  // 用户在我们切换后手动改了模式：以用户为准，不再恢复
+  final userChanged = applied.isNotEmpty && current.key != applied;
+  final keep = userChanged ? '' : saved;
+  final mine = userChanged ? '' : applied;
   final ssid = read.ssid;
   final target = ssid == null ? null : modes[ssid];
   if (target != null) {
-    if (current == target) return MuseWifiModeStep(saved: saved, applied: applied.isEmpty ? '' : target.key);
-    return MuseWifiModeStep(setTo: target, saved: saved.isEmpty ? current.key : saved, applied: target.key);
+    if (current == target) return MuseWifiModeStep(saved: keep, applied: mine.isEmpty ? '' : target.key);
+    return MuseWifiModeStep(setTo: target, saved: keep.isEmpty ? current.key : keep, applied: target.key);
   }
-  if (saved.isNotEmpty) {
-    final back = MuseRouteMode.fromKey(saved);
+  if (keep.isNotEmpty) {
+    final back = MuseRouteMode.fromKey(keep);
     return MuseWifiModeStep(setTo: back == current ? null : back, saved: '', applied: '');
   }
-  return MuseWifiModeStep(saved: saved, applied: applied);
+  return MuseWifiModeStep(saved: keep, applied: mine);
 }
 
 /// Android：Wi‑Fi 连上 / 断开事件（Kotlin ChuanyunWifiWatch，只在订阅时注册）；测试可覆盖。
