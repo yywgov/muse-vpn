@@ -95,7 +95,14 @@ class MuseOverrideGroup {
 }
 
 class MuseSubOverride {
-  const MuseSubOverride({this.enabled = true, this.rules = const [], this.nodes = const [], this.groups = const [], this.edits = const {}});
+  const MuseSubOverride({
+    this.enabled = true,
+    this.rules = const [],
+    this.nodes = const [],
+    this.groups = const [],
+    this.edits = const {},
+    this.chains = const {},
+  });
 
   final bool enabled;
   final List<MuseOverrideRule> rules;
@@ -107,20 +114,34 @@ class MuseSubOverride {
   /// 1.14.0 R21: local patches of subscription nodes, by node name (编辑节点)
   final Map<String, MuseNodeEdit> edits;
 
+  /// 1.15.0 R22: 链式代理——节点名 → 前置节点名（先连前置节点，再经它连这个节点；sing-box detour）
+  final Map<String, String> chains;
+
   /// Nothing to apply: the core gets the subscription exactly as before.
-  bool get isEmpty => !enabled || (rules.isEmpty && nodes.isEmpty && groups.isEmpty && edits.isEmpty);
+  bool get isEmpty => !enabled || (rules.isEmpty && nodes.isEmpty && groups.isEmpty && edits.isEmpty && chains.isEmpty);
 
   /// Whether the body needs a runtime copy (rules alone go into the options).
-  bool get changesBody => !isEmpty && (nodes.isNotEmpty || groups.isNotEmpty || edits.isNotEmpty);
+  bool get changesBody => !isEmpty && (nodes.isNotEmpty || groups.isNotEmpty || edits.isNotEmpty || chains.isNotEmpty);
 
-  MuseSubOverride copyWith({bool? enabled, List<MuseOverrideRule>? rules, List<String>? nodes, List<MuseOverrideGroup>? groups, Map<String, MuseNodeEdit>? edits}) =>
-      MuseSubOverride(
-        enabled: enabled ?? this.enabled,
-        rules: rules ?? this.rules,
-        nodes: nodes ?? this.nodes,
-        groups: groups ?? this.groups,
-        edits: edits ?? this.edits,
-      );
+  MuseSubOverride copyWith({
+    bool? enabled,
+    List<MuseOverrideRule>? rules,
+    List<String>? nodes,
+    List<MuseOverrideGroup>? groups,
+    Map<String, MuseNodeEdit>? edits,
+    Map<String, String>? chains,
+  }) => MuseSubOverride(
+    enabled: enabled ?? this.enabled,
+    rules: rules ?? this.rules,
+    nodes: nodes ?? this.nodes,
+    groups: groups ?? this.groups,
+    edits: edits ?? this.edits,
+    chains: chains ?? this.chains,
+  );
+
+  /// 1.15.0 R22: [tag] 的前置节点设为 [via]（null / 空 = 取消）。
+  MuseSubOverride withChain(String tag, String? via) =>
+      copyWith(chains: {...chains}..remove(tag)..addAll({if (via != null && via.isNotEmpty && via != tag) tag: via}));
 
   /// [tag]'s patch replaced ([e] empty = removed).
   MuseSubOverride withEdit(String tag, MuseNodeEdit e) => copyWith(edits: {...edits}..remove(tag)..addAll({if (!e.isEmpty) tag: e}));
@@ -131,6 +152,7 @@ class MuseSubOverride {
     'nodes': nodes,
     'groups': [for (final g in groups) g.toJson()],
     if (edits.isNotEmpty) 'edits': {for (final e in edits.entries) e.key: e.value.toJson()},
+    if (chains.isNotEmpty) 'chains': chains,
   };
 
   static MuseSubOverride fromJson(Object? j) {
@@ -144,6 +166,11 @@ class MuseSubOverride {
         if (j['edits'] is Map)
           for (final e in (j['edits'] as Map).entries)
             if (!MuseNodeEdit.fromJson(e.value).isEmpty) '${e.key}': MuseNodeEdit.fromJson(e.value),
+      },
+      chains: {
+        if (j['chains'] is Map)
+          for (final e in (j['chains'] as Map).entries)
+            if ('${e.value}'.trim().isNotEmpty && '${e.value}' != '${e.key}') '${e.key}': '${e.value}',
       },
     );
   }
@@ -169,7 +196,7 @@ Map<String, MuseSubOverride> museParseOverrides(String raw) {
 /// Encodes [all], leaving out empty entries of profiles that have none.
 String museEncodeOverrides(Map<String, MuseSubOverride> all) => jsonEncode({
   for (final e in all.entries)
-    if (e.value.enabled == false || e.value.rules.isNotEmpty || e.value.nodes.isNotEmpty || e.value.groups.isNotEmpty || e.value.edits.isNotEmpty)
+    if (e.value.enabled == false || e.value.rules.isNotEmpty || e.value.nodes.isNotEmpty || e.value.groups.isNotEmpty || e.value.edits.isNotEmpty || e.value.chains.isNotEmpty)
       e.key: e.value.toJson(),
 });
 
@@ -278,6 +305,16 @@ String? _jsonBody(String body, MuseSubOverride o, List<Map<String, dynamic>> ext
     for (final ob in outbounds)
       if (ob is Map && ob['tag'] is String && !_groupTypes.contains(ob['type'])) ob['tag'] as String,
   ];
+  // 1.15.0 R22: 前置节点 → sing-box detour（两端都还在订阅里、不成环时才加）
+  final chains = museValidChains(o.chains, nodes.toSet());
+  if (chains.isNotEmpty) {
+    for (var i = 0; i < outbounds.length; i++) {
+      final ob = outbounds[i];
+      if (ob is! Map || _groupTypes.contains(ob['type'])) continue;
+      final via = chains[ob['tag']];
+      if (via != null) outbounds[i] = Map<String, dynamic>.from(ob)..['detour'] = via;
+    }
+  }
   for (final g in o.groups) {
     if (tags.contains(g.name)) continue; // never replace one of the subscription's own
     final members = [for (final n in nodes) if (g.matches(n)) n];
@@ -360,4 +397,40 @@ Future<String> museComposeRunFile(
   }
   await run.writeAsString(composed, flush: true);
   return run.path;
+}
+
+/// 1.15.0 R22: 能生效的前置节点：两端都是 [nodes] 里的节点，且沿前置走下去不会回到自己（成环的整条去掉）。
+Map<String, String> museValidChains(Map<String, String> chains, Set<String> nodes) {
+  final ok = <String, String>{};
+  for (final e in chains.entries) {
+    if (!nodes.contains(e.key) || !nodes.contains(e.value) || e.key == e.value) continue;
+    final seen = <String>{e.key};
+    var cur = e.value;
+    var loop = false;
+    while (true) {
+      if (!seen.add(cur)) {
+        loop = true;
+        break;
+      }
+      final next = chains[cur];
+      if (next == null || !nodes.contains(next)) break;
+      cur = next;
+    }
+    if (!loop) ok[e.key] = e.value;
+  }
+  return ok;
+}
+
+/// 1.15.0 R22: 可选作前置的节点（[raw] 是正在用的配置 JSON）：除 [tag] 自己与代理组 / 直连 / 拦截外的全部节点。
+List<String> museChainCandidates(String raw, String tag) {
+  try {
+    final j = jsonDecode(raw);
+    final list = j is Map ? (j['outbounds'] as List? ?? const []) : (j is List ? j : const []);
+    return [
+      for (final ob in list)
+        if (ob is Map && ob['tag'] is String && ob['tag'] != tag && !_groupTypes.contains(ob['type'])) ob['tag'] as String,
+    ];
+  } catch (_) {
+    return const [];
+  }
 }

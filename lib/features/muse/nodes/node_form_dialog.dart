@@ -12,6 +12,8 @@ import 'package:hiddify/features/muse/logic/sub_override.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+export 'package:hiddify/features/muse/logic/sub_override.dart' show museChainCandidates;
+
 MuseSubOverride _overrideOf(WidgetRef ref, String id) => museParseOverrides(ref.read(MusePrefs.subOverrides))[id] ?? const MuseSubOverride();
 
 /// Whether [tag] of [profileId] has a local patch.
@@ -47,6 +49,45 @@ Future<String?> showMuseEditNodeDialog(BuildContext context, WidgetRef ref, Stri
   await museSaveOverride(ref, profileId, o.withEdit(tag, result).copyWith(enabled: true));
   return result.isEmpty ? '' : '已保存本地修改，订阅更新后仍会保留';
 }
+
+/// 1.15.0 R22: 当前的前置节点（没有为 null）。
+String? museOverrideChainOf(WidgetRef ref, String profileId, String tag) => _overrideOf(ref, profileId).chains[tag];
+
+/// 1.15.0 R22: 链式代理——为 [tag] 选前置节点（[candidates] 来自正在用的配置）。返回提示文字，取消为 null。
+Future<String?> showMuseChainDialog(BuildContext context, WidgetRef ref, String profileId, String tag, List<String> candidates) async {
+  final current = museOverrideChainOf(ref, profileId, tag);
+  final picked = await showDialog<String>(
+    context: context,
+    builder: (ctx) => SimpleDialog(
+      key: const ValueKey('node_chain_dialog'),
+      title: const Text('通过另一个节点连接'),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(MuseSpace.s24, 0, MuseSpace.s24, MuseSpace.s8),
+          child: Text(museChainWarning, key: const ValueKey('node_chain_warning'), style: Theme.of(ctx).textTheme.bodySmall),
+        ),
+        SimpleDialogOption(
+          key: const ValueKey('node_chain_none'),
+          onPressed: () => Navigator.pop(ctx, ''),
+          child: Text(current == null ? '不使用前置节点（当前）' : '不使用前置节点'),
+        ),
+        for (final c in candidates)
+          SimpleDialogOption(
+            key: ValueKey('node_chain_pick_$c'),
+            onPressed: () => Navigator.pop(ctx, c),
+            child: Text(c == current ? '$c（当前）' : c, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+      ],
+    ),
+  );
+  if (picked == null || picked == (current ?? '')) return null;
+  final o = _overrideOf(ref, profileId);
+  await museSaveOverride(ref, profileId, o.withChain(tag, picked).copyWith(enabled: true));
+  return picked.isEmpty ? '已取消前置节点' : '已设置：先连「$picked」，再经它连「$tag」';
+}
+
+/// 开启前的提示（会变慢）。
+const museChainWarning = '流量会先到前置节点，再由它连到这个节点：落地 IP 不变，但速度会变慢、延迟会增加，部分节点不支持 UDP。仅标准内核生效。';
 
 Widget _field(TextEditingController c, String label, {String? key, bool number = false, bool secret = false, String? hint}) => Padding(
   padding: const EdgeInsets.only(bottom: MuseSpace.s8),

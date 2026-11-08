@@ -19,7 +19,6 @@ class MuseDnsLeakCard extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final busy = useState(false);
     final result = useState<MuseDnsLeakResult?>(null);
-    final mounted = useIsMounted();
     final r = result.value;
     final (IconData icon, Color color) = switch (r?.verdict) {
       MuseDnsLeakVerdict.safe => (Icons.verified_user_outlined, MusePalette.green),
@@ -31,7 +30,7 @@ class MuseDnsLeakCard extends HookConsumerWidget {
       busy.value = true;
       final res = await (run?.call() ??
           museRunDnsLeakTest(port: museEffectiveMixedPort(ref.read), connected: ref.read(serviceRunningProvider)));
-      if (!mounted()) return;
+      if (!context.mounted) return;
       result.value = res;
       busy.value = false;
     }

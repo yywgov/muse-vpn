@@ -331,6 +331,29 @@ Future<void> showMuseNodeDetails(
                   ),
                 ),
                 const SizedBox(height: MuseSpace.s12),
+                // 1.15.0 R22: 链式代理（前置节点），存进订阅覆写，标准内核 detour
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('node_chain'),
+                    icon: const Icon(Icons.link_outlined, size: MuseIconSize.small),
+                    label: Text(
+                      editProfileId != null && museOverrideChainOf(ref, editProfileId, proxy.tag) != null
+                          ? '前置节点：${museOverrideChainOf(ref, editProfileId, proxy.tag)}'
+                          : '通过另一个节点连接',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onPressed: editOriginal == null || editProfileId == null
+                        ? null
+                        : () async {
+                            Navigator.of(sheetContext).pop();
+                            final msg = await showMuseChainDialog(context, ref, editProfileId, proxy.tag, museChainCandidates(configRaw, proxy.tag));
+                            if (msg != null) toast(running ? '$msg，正在应用' : msg);
+                          },
+                  ),
+                ),
+                const SizedBox(height: MuseSpace.s12),
               ],
               Row(
                 children: [

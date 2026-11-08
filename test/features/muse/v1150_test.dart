@@ -15,6 +15,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
 import 'package:hiddify/features/muse/logic/dns_leak.dart';
 import 'package:hiddify/features/muse/logic/route_why.dart';
+import 'package:hiddify/features/muse/logic/sub_override.dart';
+import 'package:hiddify/features/muse/nodes/node_form_dialog.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'dart:convert';
 import 'package:hiddify/features/muse/settings/dns_leak_card.dart';
 import 'dart:async';
 import 'dart:math';
@@ -251,6 +255,70 @@ void main() {
       expect(find.text('重新检测'), findsOneWidget);
       expect(_src('lib/features/muse/settings/diagnose_sheet.dart'), contains('const MuseDnsLeakCard()'));
       expect(_src('lib/features/muse/logic/dns_leak.dart'), isNot(contains('Timer')));
+    });
+  });
+
+  group('R22 链式代理', () {
+    const body = '{"outbounds":[{"type":"selector","tag":"select","outbounds":["a","b"]},'
+        '{"type":"vless","tag":"a","server":"a.example.com","server_port":443},'
+        '{"type":"trojan","tag":"b","server":"b.example.com","server_port":443},{"type":"direct","tag":"direct"}]}';
+
+    test('保存与读取', () {
+      final o = const MuseSubOverride().withChain('a', 'b');
+      expect(o.chains, {'a': 'b'});
+      expect(o.changesBody, isTrue);
+      final back = museParseOverrides(museEncodeOverrides({'p': o}))['p']!;
+      expect(back.chains, {'a': 'b'});
+      expect(back.withChain('a', null).chains, isEmpty);
+      expect(const MuseSubOverride().withChain('a', 'a').chains, isEmpty);
+    });
+
+    test('运行副本里加 detour，订阅本身不变', () {
+      final out = museOverrideBody(body, const MuseSubOverride(chains: {'a': 'b'}))!;
+      final obs = (jsonDecode(out) as Map)['outbounds'] as List;
+      expect((obs[1] as Map)['detour'], 'b');
+      expect((obs[2] as Map).containsKey('detour'), isFalse);
+      expect((obs[0] as Map).containsKey('detour'), isFalse);
+      expect(body, isNot(contains('detour')));
+    });
+
+    test('前置节点不在订阅里、成环时不加', () {
+      expect(museValidChains({'a': 'gone'}, {'a', 'b'}), isEmpty);
+      expect(museValidChains({'a': 'b', 'b': 'a'}, {'a', 'b'}), isEmpty);
+      expect(museValidChains({'a': 'b', 'b': 'c'}, {'a', 'b', 'c'}), {'a': 'b', 'b': 'c'});
+      final out = museOverrideBody(body, const MuseSubOverride(chains: {'a': 'b', 'b': 'a'}))!;
+      expect(out, isNot(contains('detour')));
+      expect(museChainCandidates(body, 'a'), ['b']);
+      expect(museChainCandidates('坏', 'a'), isEmpty);
+    });
+
+    testWidgets('选择前置节点：先提示会变慢，保存到订阅覆写', (t) async {
+      SharedPreferences.setMockInitialValues({});
+      final sp = await SharedPreferences.getInstance();
+      final c = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) async => sp)]);
+      addTearDown(c.dispose);
+      await t.runAsync(() => c.read(sharedPreferencesProvider.future));
+      String? msg;
+      await t.pumpWidget(UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          home: Consumer(
+            builder: (context, ref, _) => TextButton(
+              onPressed: () async => msg = await showMuseChainDialog(context, ref, 'p', 'a', const ['b']),
+              child: const Text('开'),
+            ),
+          ),
+        ),
+      ));
+      await t.tap(find.text('开'));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('node_chain_warning')), findsOneWidget);
+      expect(find.textContaining('变慢'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('node_chain_pick_b')));
+      await t.pumpAndSettle();
+      expect(msg, contains('先连「b」'));
+      expect(museParseOverrides(c.read(MusePrefs.subOverrides))['p']!.chains, {'a': 'b'});
+      expect(_src('lib/features/muse/nodes/node_details.dart'), contains("ValueKey('node_chain')"));
     });
   });
 }
