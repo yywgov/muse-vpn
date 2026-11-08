@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/profile/add/add_profile_modal.dart' show MuseAddAction;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -88,7 +89,7 @@ class MuseFirstGuideSheet extends StatelessWidget {
     return SafeArea(
       child: SingleChildScrollView(
         key: const ValueKey('first_guide_sheet'),
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+        padding: const EdgeInsets.fromLTRB(MuseSpace.s24, 0, MuseSpace.s24, MuseSpace.s16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

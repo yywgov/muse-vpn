@@ -86,7 +86,9 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final locale = ref.watch(localePreferencesProvider);
     final themeMode = ref.watch(themePreferencesProvider);
     final blackFollow = ref.watch(MusePrefs.pureBlackFollowSystem);
-    museApplyPureBlack(themeMode.trueBlack || (themeMode == AppThemeMode.system && blackFollow));
+    museApplyPureBlack(themeMode.trueBlack);
+    // 1.16.0 B9: 跟随系统 + 纯黑
+    if (themeMode == AppThemeMode.system && blackFollow) museApplyPureBlack(true);
     // 1.4.0: accent colour and text size (设置 › 外观); 1.6.0 C7: custom accent, 纯黑, 文字缩放
     museApplyAccent(ref.watch(MusePrefs.accent));
     // 1.11.0: 配色风格 is fixed to 忠实 and text follows the system font size (a saved 配色风格 /

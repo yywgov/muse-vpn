@@ -42,8 +42,16 @@ Future<T> museWithSecureScreen<T>(ProviderContainer container, Future<T> Functio
 }
 
 /// [museWithSecureScreen] from a widget's context.
-Future<T> museSecureFor<T>(BuildContext context, Future<T> Function() body) =>
-    museWithSecureScreen(ProviderScope.containerOf(context, listen: false), body);
+/// Without a ProviderScope above [context] (never in the app) it just runs [body].
+Future<T> museSecureFor<T>(BuildContext context, Future<T> Function() body) {
+  ProviderContainer? container;
+  try {
+    container = ProviderScope.containerOf(context, listen: false);
+  } catch (_) {
+    container = null;
+  }
+  return container == null ? body() : museWithSecureScreen(container, body);
+}
 
 /// Keeps the window secured while [child] is on screen (a page rather than a dialog).
 class MuseSecureScope extends ConsumerStatefulWidget {
