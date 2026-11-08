@@ -3,8 +3,14 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/about/widget/about_page.dart';
+import 'package:flutter/services.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/desktop/hotkeys.dart';
+import 'package:hiddify/features/muse/settings/windows_extras.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final _signal = StateProvider<int>((_) => 0);
 final _other = Provider<int>((_) => 42);
@@ -32,6 +38,7 @@ final _outdated = NotifierProvider<_Outdated, int>(_Outdated.new);
 
 void main() {
   b12();
+  b13();
   group('上次异常 riverpod _didChangeDependency', () {
     test('a ref.read after a watched dependency changed trips the debug assertion (the root cause)', () {
       final c = ProviderContainer();
@@ -131,6 +138,80 @@ void b12() {
       expect(s, contains('museSha256AssetUrl(json!, release.apkUrl)'));
       final about = File('lib/features/about/widget/about_page.dart').readAsStringSync();
       expect(about, contains("startsOver ? '重新下载' : '重试'"));
+    });
+  });
+}
+
+class _Backend implements MuseHotkeyBackend {
+  final applied = <Map<MuseHotkeyAction, MuseHotkey>>[];
+  @override
+  Future<void> apply(Map<MuseHotkeyAction, MuseHotkey> bindings, void Function(MuseHotkeyAction action) onPressed) async =>
+      applied.add(Map.of(bindings));
+}
+
+class _Probe implements MuseHotkeyProbe {
+  _Probe(this.takenKeys);
+  final Set<MuseHotkey> takenKeys;
+  @override
+  bool isFree(MuseHotkey key) => !takenKeys.contains(key);
+}
+
+void b13() {
+  group('B13 Windows 全局快捷键', () {
+    final k = MuseHotkey(ctrl: true, alt: true, usage: PhysicalKeyboardKey.keyK.usbHidUsage);
+    final j = MuseHotkey(ctrl: true, alt: true, usage: PhysicalKeyboardKey.keyJ.usbHidUsage);
+    test('virtual-key codes and modifier flags for RegisterHotKey', () {
+      expect(museWindowsVk(PhysicalKeyboardKey.keyA), 0x41);
+      expect(museWindowsVk(PhysicalKeyboardKey.keyZ), 0x5a);
+      expect(museWindowsVk(PhysicalKeyboardKey.digit1), 0x31);
+      expect(museWindowsVk(PhysicalKeyboardKey.digit0), 0x30);
+      expect(museWindowsVk(PhysicalKeyboardKey.f12), 0x7b);
+      expect(museWindowsVk(PhysicalKeyboardKey.arrowDown), 0x28);
+      expect(museWindowsVk(PhysicalKeyboardKey.backquote), 0xc0);
+      for (final key in museBindableKeys.keys) {
+        expect(museWindowsVk(key), isNotNull, reason: museKeyLabel(key));
+      }
+      expect(museWindowsHotkeyMods(k), 2 | 1 | 0x4000);
+      expect(museWindowsHotkeyMods(MuseHotkey(win: true, shift: true, usage: 0x70004)), 8 | 4 | 0x4000);
+    });
+    test('a combination another program holds is not registered and is reported', () {
+      final split = museSplitTakenHotkeys(
+        {MuseHotkeyAction.toggleConnection: k, MuseHotkeyAction.showWindow: j},
+        const {},
+        (x) => x != k,
+      );
+      expect(split.free, {MuseHotkeyAction.showWindow: j});
+      expect(split.taken, {MuseHotkeyAction.toggleConnection});
+      // our own registration from last time is not mistaken for another program's
+      final again = museSplitTakenHotkeys({MuseHotkeyAction.toggleConnection: k}, {MuseHotkeyAction.toggleConnection: k}, (_) => false);
+      expect(again.taken, isEmpty);
+    });
+    test('provider: off by default (nothing bound), taken keys skipped', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final backend = _Backend();
+      final c = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWith((_) async => prefs),
+          museHotkeysForceProvider.overrideWithValue(true),
+          museHotkeyBackendProvider.overrideWithValue(backend),
+          museHotkeyProbeProvider.overrideWithValue(_Probe({k})),
+        ],
+      );
+      addTearDown(c.dispose);
+      await c.read(sharedPreferencesProvider.future);
+      final sub = c.listen(museHotkeysProvider, (_, _) {});
+      await Future<void>.delayed(Duration.zero);
+      expect(museParseHotkeys(c.read(MusePrefs.hotkeys)), isEmpty, reason: 'nothing bound by default');
+      expect(backend.applied.isEmpty || backend.applied.last.isEmpty, isTrue);
+      await c.read(MusePrefs.hotkeys.notifier).update(museHotkeysToRaw({MuseHotkeyAction.toggleConnection: k, MuseHotkeyAction.showWindow: j}));
+      c.read(museHotkeysProvider);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(backend.applied.last, {MuseHotkeyAction.showWindow: j});
+      expect(c.read(museHotkeysTakenProvider), {MuseHotkeyAction.toggleConnection});
+      sub.close();
+      expect(museHotkeyTakenText, contains('占用'));
     });
   });
 }

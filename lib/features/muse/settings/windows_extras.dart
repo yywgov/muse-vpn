@@ -200,6 +200,9 @@ class MuseOnDemandPage extends HookConsumerWidget {
 
 // ======================================================================= 快捷键
 
+/// 1.17.0 B13
+const museHotkeyTakenText = '这个组合已被其他程序占用，暂未生效，换一个吧';
+
 class MuseHotkeysPage extends ConsumerWidget {
   const MuseHotkeysPage({super.key});
 
@@ -207,12 +210,13 @@ class MuseHotkeysPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final on = ref.watch(MusePrefs.hotkeysOn);
     final bindings = museParseHotkeys(ref.watch(MusePrefs.hotkeys));
+    final taken = ref.watch(museHotkeysTakenProvider);
     return MuseScaffold(
       title: '快捷键',
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            footer: '全局快捷键在穿云隐藏到托盘时也能用。每个快捷键至少要带 Ctrl、Alt 或 Win 中的一个。',
+            footer: '全局快捷键在穿云隐藏到托盘时也能用。默认一个都没设置，不会和其他软件抢按键；每个快捷键至少要带 Ctrl、Alt 或 Win 中的一个。关掉开关即全部停用。',
             children: [
               MuseSwitchTile(
                 key: const ValueKey('hotkeys_switch'),
@@ -229,6 +233,8 @@ class MuseHotkeysPage extends ConsumerWidget {
                 MuseTile(
                   key: ValueKey('hotkey_${a.key}'),
                   title: a.title,
+                  // 1.17.0 B13: another program already holds this combination
+                  subtitle: on && taken.contains(a) ? museHotkeyTakenText : null,
                   trailing: Text(bindings[a]?.label ?? '未设置'),
                   chevron: true,
                   onTap: () => museRecordHotkey(context, ref, a),

@@ -8,6 +8,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
 
 import 'package:flutter/services.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
@@ -232,6 +233,90 @@ class _SystemHotkeyBackend implements MuseHotkeyBackend {
 
 final museHotkeyBackendProvider = Provider<MuseHotkeyBackend>((_) => _SystemHotkeyBackend());
 
+/// 1.17.0 B13: the Windows virtual-key code of a bindable key (null = none).
+int? museWindowsVk(PhysicalKeyboardKey key) {
+  final u = key.usbHidUsage;
+  if (u >= 0x00070004 && u <= 0x0007001d) return 0x41 + u - 0x00070004; // A–Z
+  if (u >= 0x0007001e && u <= 0x00070026) return 0x31 + u - 0x0007001e; // 1–9
+  if (u == 0x00070027) return 0x30; // 0
+  if (u >= 0x0007003a && u <= 0x00070045) return 0x70 + u - 0x0007003a; // F1–F12
+  return const {
+    0x0007002c: 0x20, // Space
+    0x00070028: 0x0d, // Enter
+    0x0007004a: 0x24, // Home
+    0x0007004d: 0x23, // End
+    0x0007004b: 0x21, // PageUp
+    0x0007004e: 0x22, // PageDown
+    0x00070052: 0x26, // ↑
+    0x00070051: 0x28, // ↓
+    0x00070050: 0x25, // ←
+    0x0007004f: 0x27, // →
+    0x0007002d: 0xbd, // -
+    0x0007002e: 0xbb, // =
+    0x00070036: 0xbc, // ,
+    0x00070037: 0xbe, // .
+    0x00070038: 0xbf, // /
+    0x00070035: 0xc0, // `
+  }[u];
+}
+
+/// RegisterHotKey modifier flags (MOD_ALT 1, MOD_CONTROL 2, MOD_SHIFT 4, MOD_WIN 8, MOD_NOREPEAT 0x4000).
+int museWindowsHotkeyMods(MuseHotkey k) =>
+    (k.alt ? 1 : 0) | (k.ctrl ? 2 : 0) | (k.shift ? 4 : 0) | (k.win ? 8 : 0) | 0x4000;
+
+/// 1.17.0 B13: whether a combination is free, i.e. not already taken by another program (Windows
+/// refuses a global hotkey somebody else registered, and the plugin would silently not fire).
+abstract class MuseHotkeyProbe {
+  bool isFree(MuseHotkey key);
+}
+
+class _Win32HotkeyProbe implements MuseHotkeyProbe {
+  @override
+  bool isFree(MuseHotkey key) {
+    final vk = museWindowsVk(key.physicalKey);
+    if (vk == null || !PlatformUtils.isWindows) return true;
+    try {
+      final user32 = DynamicLibrary.open('user32.dll');
+      final register = user32.lookupFunction<Int32 Function(IntPtr, Int32, Uint32, Uint32), int Function(int, int, int, int)>(
+        'RegisterHotKey',
+      );
+      final unregister = user32.lookupFunction<Int32 Function(IntPtr, Int32), int Function(int, int)>('UnregisterHotKey');
+      const id = 0xB713;
+      if (register(0, id, museWindowsHotkeyMods(key), vk) == 0) return false;
+      unregister(0, id);
+      return true;
+    } catch (_) {
+      return true; // can't tell: let the plugin try
+    }
+  }
+}
+
+final museHotkeyProbeProvider = Provider<MuseHotkeyProbe>((_) => _Win32HotkeyProbe());
+
+/// 1.17.0 B13: actions whose combination another program already holds (shown on 快捷键, not registered).
+final museHotkeysTakenProvider = StateProvider<Set<MuseHotkeyAction>>((_) => const {});
+
+/// The bindings to register: [active] minus the ones another program holds. A combination this app
+/// registered itself last time ([ours]) is not probed (it would look taken by us).
+({Map<MuseHotkeyAction, MuseHotkey> free, Set<MuseHotkeyAction> taken}) museSplitTakenHotkeys(
+  Map<MuseHotkeyAction, MuseHotkey> active,
+  Map<MuseHotkeyAction, MuseHotkey> ours,
+  bool Function(MuseHotkey key) isFree,
+) {
+  final free = <MuseHotkeyAction, MuseHotkey>{};
+  final taken = <MuseHotkeyAction>{};
+  for (final e in active.entries) {
+    if (ours.containsValue(e.value) || isFree(e.value)) {
+      free[e.key] = e.value;
+    } else {
+      taken.add(e.key);
+    }
+  }
+  return (free: free, taken: taken);
+}
+
+Map<MuseHotkeyAction, MuseHotkey> _museRegistered = const {};
+
 /// true while 设置 records a new combination (the registered keys are released meanwhile)
 final museHotkeyRecordingProvider = StateProvider<bool>((_) => false);
 
@@ -257,5 +342,15 @@ final museHotkeysProvider = Provider<void>((ref) {
   );
   final backend = ref.read(museHotkeyBackendProvider);
   final handler = ref.read(museHotkeyHandlerProvider);
-  unawaited(Future<void>.microtask(() => backend.apply(active, handler)).catchError((_) {}));
+  final probe = ref.read(museHotkeyProbeProvider);
+  // captured now: this provider's ref is not used after the microtask starts
+  final takenCtl = ref.read(museHotkeysTakenProvider.notifier);
+  unawaited(
+    Future<void>.microtask(() async {
+      final split = museSplitTakenHotkeys(active, _museRegistered, probe.isFree);
+      if (takenCtl.state.length != split.taken.length || !takenCtl.state.containsAll(split.taken)) takenCtl.state = split.taken;
+      _museRegistered = split.free;
+      await backend.apply(split.free, handler);
+    }).catchError((_) {}),
+  );
 });
