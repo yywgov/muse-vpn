@@ -299,7 +299,9 @@ class MuseSwitchTile extends StatelessWidget {
   Widget build(BuildContext context) {
     // 1.5.0: the same ListTile geometry as MuseTile, so switch rows line up with the others
     // (SwitchListTile put the title 8 px further right)
-    return ListTile(
+    // 1.16.0 B11: title and switch read as one item by the screen reader (「标题，开关，已开启」)
+    return MergeSemantics(
+      child: ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
       minLeadingWidth: MuseIconSize.regular,
       horizontalTitleGap: MuseSpace.s16,
@@ -313,6 +315,7 @@ class MuseSwitchTile extends StatelessWidget {
       trailing: Switch(value: value, onChanged: onChanged),
       enabled: onChanged != null,
       onTap: onChanged == null ? null : () => onChanged!(!value),
+      ),
     );
   }
 }

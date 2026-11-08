@@ -681,9 +681,12 @@ class MuseNodeCard extends StatelessWidget {
         ),
       ),
     );
+    // 1.16.0 B11: 读屏读「节点 名称，延迟」，并说明点按的作用
     return Semantics(
+      button: true,
       selected: selected,
-      label: '${museStripFlags(name)} ${view.text}',
+      label: museNodeSemanticsLabel(museStripFlags(name), view.text, selected: selected),
+      hint: selected ? null : '点按切换到这个节点',
       child: dimmed ? Opacity(opacity: 0.55, child: card) : card,
     );
   }
@@ -794,4 +797,10 @@ class MuseNodeModeBar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 1.16.0 B11: what the screen reader says for a node card (Chinese, the latency text included).
+String museNodeSemanticsLabel(String name, String latency, {required bool selected}) {
+  final l = latency.trim();
+  return [if (selected) '当前节点', '节点 $name', if (l.isNotEmpty) '延迟 $l'].join('，');
 }

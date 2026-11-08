@@ -58,6 +58,7 @@ class _MuseAskTextDialogState extends State<_MuseAskTextDialog> {
           suffixIcon: widget.obscure
               ? IconButton(
                   key: const ValueKey('ask_text_reveal'),
+                  tooltip: _hidden ? '显示内容' : '隐藏内容',
                   icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                   onPressed: () => setState(() => _hidden = !_hidden),
                 )
@@ -295,7 +296,7 @@ class _MuseTagDialogState extends State<_MuseTagDialog> {
             decoration: InputDecoration(
               isDense: true,
               hintText: '新标签，如 低倍率',
-              suffixIcon: IconButton(key: const ValueKey('node_tag_add'), icon: const Icon(Icons.add_outlined), onPressed: _add),
+              suffixIcon: IconButton(key: const ValueKey('node_tag_add'), tooltip: '添加标签', icon: const Icon(Icons.add_outlined), onPressed: _add),
             ),
             onSubmitted: (_) => _add(),
           ),

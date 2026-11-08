@@ -323,7 +323,7 @@ class MuseNodeRulesPage extends HookConsumerWidget {
 
     return MuseScaffold(
       title: '指定节点',
-      actions: [IconButton(key: const ValueKey('node_rule_add'), icon: const Icon(Icons.add_outlined), onPressed: () => edit())],
+      actions: [IconButton(key: const ValueKey('node_rule_add'), tooltip: '添加', icon: const Icon(Icons.add_outlined), onPressed: () => edit())],
       body: MuseGroupedBody(
         children: [
           MuseSection(
@@ -340,6 +340,7 @@ class MuseNodeRulesPage extends HookConsumerWidget {
                   subtitleMaxLines: 2,
                   trailing: IconButton(
                     key: ValueKey('node_rule_delete_$i'),
+                    tooltip: '删除',
                     icon: const Icon(Icons.delete_outlined),
                     onPressed: () => save([...rules]..removeAt(i)),
                   ),
@@ -376,7 +377,7 @@ class MuseRemoteRuleSetsPage extends HookConsumerWidget {
 
     return MuseScaffold(
       title: '远程规则集',
-      actions: [IconButton(key: const ValueKey('remote_set_add'), icon: const Icon(Icons.add_outlined), onPressed: add)],
+      actions: [IconButton(key: const ValueKey('remote_set_add'), tooltip: '添加', icon: const Icon(Icons.add_outlined), onPressed: add)],
       body: MuseGroupedBody(
         children: [
           MuseSection(
@@ -391,6 +392,7 @@ class MuseRemoteRuleSetsPage extends HookConsumerWidget {
                   subtitle: '${museOutboundTitle(sets[i].outbound)} · ${Uri.tryParse(sets[i].url)?.host ?? ''}',
                   trailing: IconButton(
                     key: ValueKey('remote_set_delete_$i'),
+                    tooltip: '删除',
                     icon: const Icon(Icons.delete_outlined),
                     onPressed: () => save([...sets]..removeAt(i)),
                   ),
@@ -437,7 +439,7 @@ class MuseRuleTesterPage extends HookConsumerWidget {
                 filled: true,
                 fillColor: mt.card,
                 border: const OutlineInputBorder(borderRadius: MuseRadius.cardAll, borderSide: BorderSide.none),
-                suffixIcon: IconButton(key: const ValueKey('rule_test_go'), icon: const Icon(Icons.arrow_forward_outlined), onPressed: run),
+                suffixIcon: IconButton(key: const ValueKey('rule_test_go'), tooltip: '开始测试', icon: const Icon(Icons.arrow_forward_outlined), onPressed: run),
               ),
             ),
           ),
