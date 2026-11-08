@@ -18,6 +18,7 @@ import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/features/muse/data/diagnostics.dart';
 import 'package:hiddify/features/muse/settings/connect_doctor_sheet.dart';
+import 'package:hiddify/features/muse/settings/dns_leak_card.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart';
 import 'package:hiddify/features/muse/shell/muse_shell.dart' show museScrollEndGap;
@@ -360,6 +361,9 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
                   label: const Text('连不上？一键诊断'),
                 ),
               ],
+              // 1.15.0 R20: DNS 泄漏检测（点按才测）
+              const SizedBox(height: MuseSpace.s16),
+              const MuseDnsLeakCard(),
               const SizedBox(height: MuseSpace.s16),
               Row(
                 children: [

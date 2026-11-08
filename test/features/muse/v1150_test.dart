@@ -13,7 +13,11 @@ import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
+import 'package:hiddify/features/muse/logic/dns_leak.dart';
 import 'package:hiddify/features/muse/logic/route_why.dart';
+import 'package:hiddify/features/muse/settings/dns_leak_card.dart';
+import 'dart:async';
+import 'dart:math';
 
 String _src(String p) => File(p).readAsStringSync();
 
@@ -188,6 +192,65 @@ void main() {
       expect(s, contains('FutureProvider.autoDispose<Map<String, String>>'));
       expect(s, contains('FutureProvider.autoDispose.family<Uint8List?, String>'));
       expect(s, isNot(contains('Timer.periodic')));
+    });
+  });
+
+  group('R20 DNS 泄漏检测', () {
+    test('随机子域名、结论', () {
+      final h = museDnsLeakHost(Random(1));
+      expect(h, matches(RegExp(r'^[0-9a-f]{32}\.edns\.ip-api\.com$')));
+      expect(museDnsLeakHost(), isNot(h));
+      expect(museDnsLeakUrl(h), 'http://$h/json');
+      final leak = museParseDnsLeak('{"dns":{"geo":"China - Chinanet","ip":"202.96.1.1"}}', connected: true);
+      expect(leak.verdict, MuseDnsLeakVerdict.leak);
+      expect(leak.text, contains('运营商'));
+      final safe = museParseDnsLeak('{"dns":{"geo":"Japan - Google LLC","ip":"74.125.1.1"},"edns":{}}', connected: true);
+      expect(safe.verdict, MuseDnsLeakVerdict.safe);
+      expect(safe.resolverIp, '74.125.1.1');
+      // 香港不是大陆
+      expect(museParseDnsLeak('{"dns":{"geo":"Hong Kong - X","ip":"1.1.1.1"}}', connected: true).verdict, MuseDnsLeakVerdict.safe);
+      expect(museParseDnsLeak('{"dns":{"geo":"China - X","ip":"1.1.1.1"}}', connected: false).verdict, MuseDnsLeakVerdict.unknown);
+      final bad = museParseDnsLeak('<html>', connected: true);
+      expect(bad.failed, isTrue);
+      expect(bad.error, '检测服务返回了无法识别的结果');
+    });
+
+    test('失败显示中文原因', () async {
+      expect(museDnsLeakErrorText(TimeoutException('x')), '检测超时，请检查网络后重试');
+      expect(museDnsLeakErrorText(const SocketException('x')), '无法连接检测服务，请稍后重试');
+      final r = await museRunDnsLeakTest(port: 1, connected: true, get: (_, _) async => throw const SocketException('x'));
+      expect(r.failed, isTrue);
+      expect(r.text, '无法连接检测服务，请稍后重试');
+      String? url;
+      final ok = await museRunDnsLeakTest(port: 7890, connected: true, get: (u, p) async {
+        url = u;
+        return '{"dns":{"geo":"United States - Cloudflare","ip":"172.64.1.1"}}';
+      });
+      expect(url, startsWith('http://'));
+      expect(ok.verdict, MuseDnsLeakVerdict.safe);
+    });
+
+    testWidgets('诊断里点按才测', (t) async {
+      var calls = 0;
+      await t.pumpWidget(ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: MuseDnsLeakCard(run: () async {
+              calls++;
+              return museParseDnsLeak('{"dns":{"geo":"China - Chinanet","ip":"202.96.1.1"}}', connected: true);
+            }),
+          ),
+        ),
+      ));
+      expect(calls, 0);
+      expect(find.text('开始检测'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('dns_leak_start')));
+      await t.pumpAndSettle();
+      expect(calls, 1);
+      expect(find.text('DNS 泄漏检测：可能泄漏'), findsOneWidget);
+      expect(find.text('重新检测'), findsOneWidget);
+      expect(_src('lib/features/muse/settings/diagnose_sheet.dart'), contains('const MuseDnsLeakCard()'));
+      expect(_src('lib/features/muse/logic/dns_leak.dart'), isNot(contains('Timer')));
     });
   });
 }
