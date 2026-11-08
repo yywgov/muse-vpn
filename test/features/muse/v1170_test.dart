@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/about/widget/about_page.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hiddify/features/muse/desktop/hidden_release.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
 import 'package:hiddify/features/muse/desktop/uwp_loopback.dart';
@@ -46,6 +48,7 @@ void main() {
   b13();
   r18();
   r12();
+  r19();
   group('上次异常 riverpod _didChangeDependency', () {
     test('a ref.read after a watched dependency changed trips the debug assertion (the root cause)', () {
       final c = ProviderContainer();
@@ -301,4 +304,64 @@ void r12() {
       expect(File('lib/features/muse/settings/network_page.dart').readAsStringSync(), contains('MuseUwpLoopbackTile()'));
     });
   });
+}
+
+void r19() {
+  group('R19 隐藏到托盘时释放界面', () {
+    test('pages released only on Windows while hidden; events follow the real window', () {
+      expect(museReleasePages(windows: true, hidden: true), isTrue);
+      expect(museReleasePages(windows: true, hidden: false), isFalse);
+      expect(museReleasePages(windows: false, hidden: true), isFalse);
+      expect(museHiddenAfterEvent('hide', false), isTrue);
+      expect(museHiddenAfterEvent('show', true), isFalse);
+      expect(museHiddenAfterEvent('focus', true), isFalse);
+      expect(museHiddenAfterEvent('restore', true), isFalse);
+      expect(museHiddenAfterEvent('moved', true), isTrue);
+      expect(museHiddenAfterEvent('blur', false), isFalse);
+    });
+
+    testWidgets('hidden: the page and its animation leave the tree; shown: rebuilt', (t) async {
+      var built = 0;
+      final c = ProviderContainer(overrides: [museHiddenReleaseForceProvider.overrideWithValue(true)]);
+      addTearDown(c.dispose);
+      await t.pumpWidget(
+        UncontrolledProviderScope(
+          container: c,
+          child: MaterialApp(
+            home: MuseHiddenRelease(
+              child: Builder(
+                builder: (_) {
+                  built++;
+                  return const Center(child: CircularProgressIndicator(key: ValueKey('spinner')));
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(find.byKey(const ValueKey('spinner')), findsOneWidget);
+      expect(t.binding.transientCallbackCount, greaterThan(0));
+      c.read(museWindowHiddenProvider.notifier).state = true;
+      await t.pump();
+      expect(find.byKey(const ValueKey('spinner')), findsNothing);
+      expect(find.byKey(const ValueKey('muse_pages_released')), findsOneWidget);
+      expect(t.binding.transientCallbackCount, 0, reason: 'no animation ticker left running');
+      c.read(museWindowHiddenProvider.notifier).state = false;
+      await t.pump();
+      expect(find.byKey(const ValueKey('spinner')), findsOneWidget);
+      expect(built, 2);
+    });
+
+    test('wired: app builder, window hide / show / silent start, window events', () {
+      expect(File('lib/features/app/widget/app.dart').readAsStringSync(), contains('MuseHiddenRelease(child: routed'));
+      final w = File('lib/features/window/notifier/window_notifier.dart').readAsStringSync();
+      expect('museWindowHiddenProvider.notifier).state = true'.allMatchesIn(w), 2);
+      expect(w, contains('museWindowHiddenProvider.notifier).state = false'));
+      expect(File('lib/features/window/widget/window_wrapper.dart').readAsStringSync(), contains('museHiddenAfterEvent(eventName'));
+    });
+  });
+}
+
+extension on String {
+  int allMatchesIn(String s) => allMatches(s).length;
 }

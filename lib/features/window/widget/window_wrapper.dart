@@ -5,6 +5,7 @@ import 'package:hiddify/core/preferences/actions_at_closing.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
+import 'package:hiddify/features/muse/desktop/hidden_release.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -47,6 +48,18 @@ class _WindowWrapperState extends ConsumerState<WindowWrapper> with WindowListen
   void dispose() {
     windowManager.removeListener(this);
     super.dispose();
+  }
+
+  // 1.17.0 R19: the window can also come back without WindowNotifier.show (a second launch
+  // restores it natively, Windows can show it from the taskbar): follow the real show / hide.
+  @override
+  void onWindowEvent(String eventName) {
+    if (!PlatformUtils.isWindows) return;
+    final next = museHiddenAfterEvent(eventName, ref.read(museWindowHiddenProvider));
+    if (next != ref.read(museWindowHiddenProvider)) {
+      ref.read(museWindowHiddenProvider.notifier).state = next;
+      if (next) museReleaseImageCache();
+    }
   }
 
   @override

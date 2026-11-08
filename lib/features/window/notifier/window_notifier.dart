@@ -9,6 +9,7 @@ import 'package:hiddify/features/muse/desktop/connection_keeper.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/desktop/recovery.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
+import 'package:hiddify/features/muse/desktop/hidden_release.dart';
 import 'package:hiddify/features/muse/settings/service_mode_switch.dart' show MuseRead;
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -98,6 +99,7 @@ class WindowNotifier extends _$WindowNotifier with AppLogger {
       loggy.debug("showing app window on start");
     } else {
       loggy.debug("silent start, remain hidden accessible via tray");
+      if (Platform.isWindows) ref.container.read(museWindowHiddenProvider.notifier).state = true;
     }
   }
 
@@ -122,6 +124,8 @@ class WindowNotifier extends _$WindowNotifier with AppLogger {
   }
 
   Future<void> show({bool focus = true}) async {
+    // 1.17.0 R19: build the pages again before the window appears
+    ref.container.read(museWindowHiddenProvider.notifier).state = false;
     await windowManager.show();
     if (focus) await windowManager.focus();
     // 穿云 1.2.1: the window coming back from the tray re-syncs the connection state (no setup)
@@ -148,6 +152,11 @@ class WindowNotifier extends _$WindowNotifier with AppLogger {
 
   Future<void> hide() async {
     await windowManager.hide();
+    // 1.17.0 R19: release the pages and decoded images while in the tray (Windows)
+    if (Platform.isWindows) {
+      ref.container.read(museWindowHiddenProvider.notifier).state = true;
+      museReleaseImageCache();
+    }
     if (Platform.isMacOS) {
       await windowManager.setSkipTaskbar(true);
     }

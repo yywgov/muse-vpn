@@ -1,6 +1,7 @@
 import 'package:hiddify/features/muse/data/quick_rules_provider.dart';
 import 'package:hiddify/features/muse/home/new_node_test.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart' show museRestoreLauncherIconProvider;
+import 'package:hiddify/features/muse/desktop/hidden_release.dart';
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
 import 'package:hiddify/features/muse/desktop/on_demand.dart';
 import 'package:hiddify/features/muse/home/auto_run.dart';
@@ -166,7 +167,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
               title: Constants.appName,
               builder: (context, routed) {
                 final theme = Theme.of(context);
-                final child = routed ?? const SizedBox();
+                // 1.17.0 R19: no pages while the window is hidden in the tray (Windows)
+                final child = MuseHiddenRelease(child: routed ?? const SizedBox());
                 if (kDebugMode && _debugAccessibility) {
                   return AccessibilityTools(checkFontOverflows: true, child: child);
                 }
