@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/widget/muse_motion_widgets.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/muse/settings/sub_filter_dialog.dart';
 import 'package:hiddify/features/muse/settings/sub_headers_dialog.dart';
@@ -10,7 +11,6 @@ import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/subscription_bar.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
-import 'package:hiddify/features/muse/widget/muse_motion_widgets.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';

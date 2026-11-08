@@ -1,3 +1,4 @@
+import 'package:hiddify/features/muse/data/motion_level.dart';
 import 'package:hiddify/features/muse/data/quick_rules_provider.dart';
 import 'package:hiddify/features/muse/home/new_node_test.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart' show museRestoreLauncherIconProvider;
@@ -8,7 +9,6 @@ import 'package:hiddify/features/muse/home/auto_run.dart';
 import 'package:hiddify/features/muse/desktop/title_bar.dart';
 import 'package:hiddify/features/muse/data/core_extras_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/data/motion_level.dart';
 import 'package:hiddify/features/muse/data/traffic_recorder.dart';
 import 'package:hiddify/features/muse/home/net_watch.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart' show museDefaultColorStyle;

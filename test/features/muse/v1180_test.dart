@@ -151,7 +151,7 @@ void main() {
       final sp = await SharedPreferences.getInstance();
       final c = ProviderContainer(
         overrides: [
-          sharedPreferencesProvider.overrideWith((ref) async => sp),
+          sharedPreferencesProvider.overrideWith((ref) => sp),
           musePowerSaveEventsProvider.overrideWithValue(power.stream),
         ],
       );

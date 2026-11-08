@@ -11,6 +11,7 @@
 
 import 'package:hiddify/features/muse/data/secure_screen.dart';
 import 'package:hiddify/features/muse/logic/fail_reason.dart';
+import 'package:hiddify/features/muse/widget/muse_motion_widgets.dart';
 import 'package:hiddify/features/muse/data/port_override.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -39,7 +40,6 @@ import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
-import 'package:hiddify/features/muse/widget/muse_motion_widgets.dart';
 import 'package:hiddify/features/muse/nodes/node_form_dialog.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:hiddify/features/muse/data/speed_test.dart';

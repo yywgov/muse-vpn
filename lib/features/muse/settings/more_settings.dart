@@ -3,6 +3,7 @@
 // Network-affecting options start off; nothing here changes the default connection path.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/data/motion_level.dart';
 import 'package:hiddify/features/muse/data/secure_screen.dart';
 import 'package:hiddify/features/muse/data/app_traffic_recorder.dart';
 import 'package:hiddify/features/muse/logic/app_traffic.dart';
@@ -28,7 +29,6 @@ import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/log/model/log_level.dart' as log;
 import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/data/motion_level.dart';
 import 'package:hiddify/features/muse/data/sync_service.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';
