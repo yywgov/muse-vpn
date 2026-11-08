@@ -51,6 +51,27 @@ bool museRangePartDone(String path, (int, int) range) {
   }
 }
 
+/// 1.17.0 B12: how many bytes of [range] a half-finished part at [path] already holds (0 = none,
+/// or a file longer than the range, which can't be continued).
+int museRangePartHave(String path, (int, int) range) {
+  try {
+    final f = File(path);
+    if (!f.existsSync()) return 0;
+    final len = f.lengthSync();
+    return len <= range.$2 - range.$1 + 1 ? len : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+/// The Range header that continues [range] after [have] bytes.
+String museResumeRange((int, int) range, int have) => 'bytes=${range.$1 + have}-${range.$2}';
+
+/// 1.17.0 B12: files in the update folder that belong to another version (removed before a new
+/// download; the current version's file and parts are kept for 断点续传).
+List<String> museStaleUpdateFiles(List<String> names, String version) =>
+    [for (final n in names) if (!n.startsWith('Chuanyun-$version-')) n];
+
 /// 穿云 Windows: the installer the Windows workflow publishes (preferred) ...
 const museWindowsSetupAssetName = 'Chuanyun-Windows-x64-Setup.exe';
 
@@ -78,6 +99,83 @@ String? museAssetSha256(Map<String, dynamic> asset) {
 /// SHA-256 (lower case hex) of a file, read in chunks.
 Future<String> museFileSha256(File file) async => (await sha256.bind(file.openRead()).first).toString();
 
+/// 1.17.0 B12: the checksum file the release CI publishes next to every package
+/// ("Chuanyun-Android-arm64.apk.sha256", `sha256sum` format).
+String museSha256AssetNameFor(String assetUrl) => '${Uri.decodeComponent(assetUrl.split('/').last)}.sha256';
+
+/// The download URL of the `.sha256` file for [assetUrl] in a release (JSON of the releases API),
+/// or null. Only files in this repository's release downloads count.
+String? museSha256AssetUrl(Map<String, dynamic> json, String assetUrl) {
+  final wanted = museSha256AssetNameFor(assetUrl).toLowerCase();
+  for (final asset in (json['assets'] as List? ?? const []).whereType<Map<String, dynamic>>()) {
+    final name = (asset['name'] as String? ?? '').toLowerCase();
+    final url = asset['browser_download_url'] as String?;
+    if (name == wanted && url != null && url.startsWith(museReleaseDownloadPrefix)) return url;
+  }
+  return null;
+}
+
+/// The hex SHA-256 for [assetName] out of a `sha256sum` file ("<hex>  <name>", "<hex> *<name>" or
+/// just "<hex>"), lower case, or null when the file does not name it.
+String? museParseSha256File(String text, String assetName) {
+  final want = assetName.toLowerCase();
+  String? lone;
+  for (final raw in text.split(RegExp(r'\r?\n'))) {
+    final m = RegExp(r'^\s*([0-9a-fA-F]{64})(?:\s+\*?(.+?))?\s*$').firstMatch(raw);
+    if (m == null) continue;
+    final hex = m.group(1)!.toLowerCase();
+    final name = m.group(2)?.trim().split(RegExp(r'[\\/]')).last.toLowerCase();
+    if (name == null) {
+      lone ??= hex;
+    } else if (name == want) {
+      return hex;
+    }
+  }
+  return lone;
+}
+
+/// 1.17.0 B12: the SHA-256 a download is checked against: GitHub's digest and the release's
+/// `.sha256` file must agree when both are known (else [MuseUpdateFailure.mismatchInfo]);
+/// either one alone is used as is.
+String? museExpectedSha256({String? digest, String? file}) {
+  if (digest != null && file != null && digest != file) throw const MuseUpdateFailure(MuseUpdateFailureKind.mismatchInfo);
+  return digest ?? file;
+}
+
+/// 1.17.0 B12: why an update could not be installed, with the words 关于 shows.
+enum MuseUpdateFailureKind { network, incomplete, checksum, mismatchInfo, noSpace }
+
+class MuseUpdateFailure implements Exception {
+  const MuseUpdateFailure(this.kind, [this.detail = '']);
+
+  final MuseUpdateFailureKind kind;
+  final String detail;
+
+  /// A failed checksum means the downloaded bytes are bad: they are deleted and the download
+  /// starts over. Anything else keeps the finished parts, so 「重试」 continues where it stopped.
+  bool get startsOver => kind == MuseUpdateFailureKind.checksum || kind == MuseUpdateFailureKind.mismatchInfo;
+
+  @override
+  String toString() => 'MuseUpdateFailure($kind${detail.isEmpty ? '' : ': $detail'})';
+}
+
+/// The message for a failed update (Chinese, one or two sentences).
+String museUpdateFailureText(Object error) {
+  final kind = switch (error) {
+    MuseUpdateFailure(:final kind) => kind,
+    FileSystemException(:final osError) when (osError?.errorCode == 28 || osError?.errorCode == 112) =>
+      MuseUpdateFailureKind.noSpace,
+    _ => MuseUpdateFailureKind.network,
+  };
+  return switch (kind) {
+    MuseUpdateFailureKind.network => '下载中断了（网络不稳定或下载地址都连不上）。已下载的部分会保留，点「重试」从断开的地方继续。',
+    MuseUpdateFailureKind.incomplete => '安装包没有下载完整。已下载的部分会保留，点「重试」继续下载剩下的部分。',
+    MuseUpdateFailureKind.checksum => '安装包校验失败：文件的 SHA-256 与发布页附带的校验值不一致，可能下载时损坏了。已删除这个文件，点「重新下载」再下一次。',
+    MuseUpdateFailureKind.mismatchInfo => '发布页给出的两份校验值不一致，为安全起见没有安装。请稍后点「重新下载」，或到发布页手动下载。',
+    MuseUpdateFailureKind.noSpace => '存储空间不足，安装包放不下。清理一些空间后点「重试」。',
+  };
+}
+
 /// 1.2.4: the new APK is signed with another key than the installed app (builds before 1.2.4 had
 /// a different throw-away key each), so Android would refuse it: uninstall once, then install.
 class MuseSignatureChanged implements Exception {
@@ -95,6 +193,11 @@ class MuseUpdateIdle extends MuseUpdateState {
 
 class MuseUpdateChecking extends MuseUpdateState {
   const MuseUpdateChecking();
+}
+
+/// 1.17.0 B12: checking the downloaded file's SHA-256.
+class MuseUpdateVerifying extends MuseUpdateState {
+  const MuseUpdateVerifying();
 }
 
 class MuseUpdateDownloading extends MuseUpdateState {
@@ -291,14 +394,13 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
         if (e is DioException && e.type == DioExceptionType.cancel) rethrow;
       }
     }
-    // nothing worked: no half-downloaded parts left behind
-    for (var i = 0; i < 8; i++) {
-      try {
-        final f = File('$path.part$i');
-        if (f.existsSync()) f.deleteSync();
-      } catch (_) {}
+    // 1.17.0 B12: nothing worked. The parts stay (finished and half-finished ones) so 「重试」
+    // continues from where it stopped; the SHA-256 check at the end catches a bad part.
+    if (lastError is FileSystemException && lastError.message == 'incomplete download') {
+      throw const MuseUpdateFailure(MuseUpdateFailureKind.incomplete);
     }
-    throw lastError ?? const FileSystemException('download failed');
+    if (lastError is FileSystemException && lastError.osError != null) throw lastError;
+    throw MuseUpdateFailure(MuseUpdateFailureKind.network, '${lastError ?? 'download failed'}');
   }
 
   /// Bytes/s of a 64 KB range from each source (null = failed), 5 s at most in total.
@@ -361,7 +463,9 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
     // 1.5.0 #207: parts finished by an earlier source are kept (the whole file's SHA-256 is still
     // checked at the end), so a switch to the next mirror only fetches what is missing
     final done = [for (var i = 0; i < ranges.length; i++) museRangePartDone(parts[i], ranges[i])];
-    final got = [for (var i = 0; i < ranges.length; i++) done[i] ? ranges[i].$2 - ranges[i].$1 + 1 : 0];
+    // 1.17.0 B12 断点续传: a half-finished part continues from its own length
+    final have = [for (var i = 0; i < ranges.length; i++) museRangePartHave(parts[i], ranges[i])];
+    final got = [for (var i = 0; i < ranges.length; i++) done[i] ? ranges[i].$2 - ranges[i].$1 + 1 : have[i]];
     var ok = false;
     try {
       await Future.wait([
@@ -372,9 +476,10 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
                 url,
                 parts[i],
                 cancelToken: _cancel,
-                options: Options(headers: {'Range': 'bytes=${ranges[i].$1}-${ranges[i].$2}'}),
+                fileAccessMode: have[i] > 0 ? FileAccessMode.append : FileAccessMode.write,
+                options: Options(headers: {'Range': museResumeRange(ranges[i], have[i])}),
                 onReceiveProgress: (received, _) {
-                  got[i] = received;
+                  got[i] = have[i] + received;
                   progress(got.fold(0, (a, b) => a + b));
                 },
               )
@@ -392,9 +497,10 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
       await out.close();
       ok = true;
     } finally {
-      // a failed part is dropped; finished ones stay for the next source (see museRangePartDone)
+      // finished and half-finished parts stay for the next source / 「重试」 (see
+      // museRangePartHave); a part longer than its range is unusable and dropped
       for (var i = 0; i < parts.length; i++) {
-        if (ok || !museRangePartDone(parts[i], ranges[i])) {
+        if (ok || (!museRangePartDone(parts[i], ranges[i]) && museRangePartHave(parts[i], ranges[i]) == 0)) {
           try {
             File(parts[i]).deleteSync();
           } catch (_) {}
@@ -443,21 +549,100 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
       if (data == null) throw lastError ?? const FileSystemException('release check failed');
       final windows = PlatformUtils.isWindows;
       MuseRelease? release;
+      Map<String, dynamic>? json;
       lastNotes = const [];
       if (data is List) {
         // a mirror that answers with a release list: its newest stable entry
-        final picked = musePickRelease([for (final e in data) if (e is Map<String, dynamic>) e]);
-        release = picked == null ? null : museParseRelease(picked, windows: windows, apkAsset: museApkAssetFor(Abi.current()));
-        if (picked != null) lastNotes = museReleaseNotes(picked['body']);
+        json = musePickRelease([for (final e in data) if (e is Map<String, dynamic>) e]);
       } else if (data is Map<String, dynamic>) {
-        release = museParseRelease(data, windows: windows, apkAsset: museApkAssetFor(Abi.current()));
-        lastNotes = museReleaseNotes(data['body']);
+        json = data;
+      }
+      if (json != null) {
+        release = museParseRelease(json, windows: windows, apkAsset: museApkAssetFor(Abi.current()));
+        lastNotes = museReleaseNotes(json['body']);
       }
       final current = ref.read(appInfoProvider).requireValue.version;
       if (release == null || !museIsNewer(release.version, current)) return null;
+      // 1.17.0 B12: the release's own .sha256 file, checked against GitHub's digest
+      final shaUrl = museSha256AssetUrl(json!, release.apkUrl);
+      if (shaUrl != null) {
+        final text = await _fetchSmall(shaUrl, mirrors: !windows);
+        final fromFile = text == null ? null : museParseSha256File(text, museSha256AssetNameFor(release.apkUrl));
+        final expected = museExpectedSha256(digest: release.sha256, file: fromFile);
+        release = (
+          version: release.version,
+          apkUrl: release.apkUrl,
+          apkSize: release.apkSize,
+          pageUrl: release.pageUrl,
+          sha256: expected,
+        );
+      }
       return release;
     } finally {
       state = const MuseUpdateIdle();
+    }
+  }
+
+  /// 1.17.0 B12: a small text file (the .sha256) from the running connection or GitHub (and, with
+  /// [mirrors], the download mirrors); null when none answers.
+  Future<String?> _fetchSmall(String url, {required bool mirrors}) async {
+    for (final src in museDownloadSources(url, proxyPort: await _proxyPort(), mirrors: mirrors)) {
+      final dio = _dio(proxyPort: src.proxyPort);
+      try {
+        final r = await dio
+            .get<String>(src.url, options: Options(responseType: ResponseType.plain))
+            .timeout(const Duration(seconds: 10));
+        final text = r.data ?? '';
+        if (r.statusCode == 200 && text.length < 4096 && RegExp('[0-9a-fA-F]{64}').hasMatch(text)) return text;
+      } catch (_) {
+      } finally {
+        dio.close(force: true);
+      }
+    }
+    return null;
+  }
+
+  /// 1.17.0 B12: the folder updates are downloaded to; files of other versions are removed, the
+  /// current version's file and parts stay (断点续传 after 「重试」).
+  Future<Directory> _updateDir(String version, {bool fresh = false}) async {
+    final tmp = (await getTemporaryDirectory()).path;
+    final dir = Directory(PlatformUtils.isWindows ? '$tmp\\chuanyun-update' : '$tmp/updates');
+    if (dir.existsSync()) {
+      final names = [for (final e in dir.listSync()) e.uri.pathSegments.lastWhere((x) => x.isNotEmpty)];
+      for (final n in fresh ? names : museStaleUpdateFiles(names, version)) {
+        try {
+          final e = File('${dir.path}${Platform.pathSeparator}$n');
+          if (e.existsSync()) e.deleteSync();
+        } catch (_) {}
+      }
+    }
+    dir.createSync(recursive: true);
+    return dir;
+  }
+
+  /// 1.17.0 B12: 「重新下载」 — drops everything downloaded for [release] so far.
+  Future<void> discardDownload(MuseRelease release) async => _updateDir(release.version, fresh: true);
+
+  /// Checks the finished file; a mismatch deletes it (and its parts) and throws.
+  Future<void> _verify(File file, String path, MuseRelease release) async {
+    if (!file.existsSync() || (release.apkSize > 0 && file.lengthSync() != release.apkSize)) {
+      throw const MuseUpdateFailure(MuseUpdateFailureKind.incomplete);
+    }
+    final expected = release.sha256;
+    if (expected == null) return;
+    state = const MuseUpdateVerifying();
+    final actual = await museFileSha256(file);
+    if (actual != expected) {
+      try {
+        file.deleteSync();
+      } catch (_) {}
+      for (var i = 0; i < 8; i++) {
+        try {
+          final f = File('$path.part$i');
+          if (f.existsSync()) f.deleteSync();
+        } catch (_) {}
+      }
+      throw MuseUpdateFailure(MuseUpdateFailureKind.checksum, 'expected $expected, got $actual');
     }
   }
 
@@ -477,7 +662,7 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
     state = const MuseUpdateDownloading(null);
     _cancel = CancelToken();
     try {
-      final dir = Directory('${(await getTemporaryDirectory()).path}/updates');
+      final dir = await _updateDir(release.version);
       final path = '${dir.path}/Chuanyun-${release.version}-arm64.apk';
       final existing = File(path);
       // already downloaded (e.g. the first try stopped at 「安装未知应用」): install it right away
@@ -488,18 +673,12 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
         if (await ChuanyunPlatform.apkSignatureMatches(path) == false) throw MuseSignatureChanged(path);
         return await ChuanyunPlatform.installApk(path);
       }
-      if (dir.existsSync()) dir.deleteSync(recursive: true);
-      dir.createSync(recursive: true);
+      // a whole file of the wrong size / content from an earlier try is not reused
+      if (existing.existsSync()) existing.deleteSync();
       await _download(release.apkUrl, path, release.apkSize, verified: release.sha256 != null);
-      final file = File(path);
-      if (!file.existsSync() || (release.apkSize > 0 && file.lengthSync() != release.apkSize)) {
-        throw const FileSystemException('incomplete download');
-      }
-      // 1.2.2: the installer also checks the signing key; a digest catches a corrupt download
-      if (release.sha256 != null && await museFileSha256(file) != release.sha256) {
-        file.deleteSync();
-        throw const FileSystemException('SHA-256 mismatch');
-      }
+      // 1.2.2: the installer also checks the signing key; the SHA-256 catches a corrupt download
+      // (1.17.0 B12: checked against the release's .sha256 file too; a mismatch deletes the file)
+      await _verify(File(path), path, release);
       if (await ChuanyunPlatform.apkSignatureMatches(path) == false) throw MuseSignatureChanged(path);
         return await ChuanyunPlatform.installApk(path);
     } catch (e, st) {
@@ -517,20 +696,14 @@ class MuseUpdater extends Notifier<MuseUpdateState> with AppLogger {
     state = const MuseUpdateDownloading(null);
     _cancel = CancelToken();
     try {
-      final dir = Directory('${(await getTemporaryDirectory()).path}\\chuanyun-update');
-      if (dir.existsSync()) dir.deleteSync(recursive: true);
-      dir.createSync(recursive: true);
+      final dir = await _updateDir(release.version);
       final path = '${dir.path}\\Chuanyun-${release.version}-Setup.exe';
-      await _download(release.apkUrl, path, release.apkSize, verified: release.sha256 != null);
       final file = File(path);
-      if (!file.existsSync() || (release.apkSize > 0 && file.lengthSync() != release.apkSize)) {
-        throw const FileSystemException('incomplete download');
-      }
-      final actual = await museFileSha256(file);
-      if (actual != release.sha256) {
-        file.deleteSync();
-        throw FileSystemException('SHA-256 mismatch (expected ${release.sha256}, got $actual)');
-      }
+      if (file.existsSync()) file.deleteSync();
+      await _download(release.apkUrl, path, release.apkSize, verified: release.sha256 != null);
+      // never run without a matching SHA-256 (museCanInstallSilently already requires one)
+      if (release.sha256 == null) throw const MuseUpdateFailure(MuseUpdateFailureKind.mismatchInfo);
+      await _verify(file, path, release);
       await Process.start(path, const [
         '/SILENT',
         '/SUPPRESSMSGBOXES',

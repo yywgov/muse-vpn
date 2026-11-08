@@ -39,6 +39,7 @@ const museAboutCheckUpdateLabel = '点击检测更新';
 /// idle, the line then says [museAboutCheckUpdateLabel]).
 String? museAboutUpdateStatus(MuseUpdateState state) => switch (state) {
   MuseUpdateChecking() => '正在检查更新…',
+  MuseUpdateVerifying() => '正在校验安装包…',
   MuseUpdateDownloading(:final progress) => progress == null ? '正在下载…' : '正在下载 ${(progress * 100).toStringAsFixed(0)}%',
   MuseUpdateIdle() => null,
 };
@@ -95,8 +96,8 @@ class AboutPage extends HookConsumerWidget {
       final MuseRelease? release;
       try {
         release = await updater.check();
-      } catch (_) {
-        toast.showErrorToast('检查更新失败，请稍后再试');
+      } catch (e) {
+        toast.showErrorToast(e is MuseUpdateFailure ? museUpdateFailureText(e) : '检查更新失败，请稍后再试');
         return;
       }
       if (release == null) {
@@ -117,9 +118,13 @@ class AboutPage extends HookConsumerWidget {
             positiveBtnTxt: pageOnly ? '打开下载页面' : '下载并安装',
           );
       if (!ok) return;
+      // 1.17.0 B12: a failed download offers 「重试」 (keeps what was downloaded, 断点续传) or, after a
+      // failed checksum, 「重新下载」 (starts over); at most 5 rounds without leaving the dialog
+      for (var round = 0; ; round++) {
       try {
         final opened = await updater.downloadAndInstall(release);
         if (!opened && !PlatformUtils.isWindows) toast.showInfoToast('请允许穿云「安装未知应用」，然后再点一次「点击检测更新」');
+        return;
       } on MuseSignatureChanged catch (e) {
         // 1.2.4: earlier builds were signed with a different key each time; from now on the key
         // stays the same. This one switch needs the old version removed first.
@@ -132,8 +137,23 @@ class AboutPage extends HookConsumerWidget {
               positiveBtnTxt: '打开安装包',
             );
         if (go) await ChuanyunPlatform.installApk(e.path);
-      } catch (_) {
-        toast.showErrorToast('下载失败，请稍后再试');
+        return;
+      } catch (e) {
+        final startsOver = e is MuseUpdateFailure && e.startsOver;
+        if (startsOver) await updater.discardDownload(release);
+        if (round >= 4 || !context.mounted) {
+          toast.showErrorToast('更新没有完成，请稍后再试');
+          return;
+        }
+        final again = await ref
+            .read(dialogNotifierProvider.notifier)
+            .showConfirmation(
+              title: '更新没有完成',
+              message: museUpdateFailureText(e),
+              positiveBtnTxt: startsOver ? '重新下载' : '重试',
+            );
+        if (!again) return;
+      }
       }
     }
 

@@ -2,6 +2,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/features/about/widget/about_page.dart';
+import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 final _signal = StateProvider<int>((_) => 0);
@@ -29,6 +31,7 @@ class _Outdated extends Notifier<int> {
 final _outdated = NotifierProvider<_Outdated, int>(_Outdated.new);
 
 void main() {
+  b12();
   group('上次异常 riverpod _didChangeDependency', () {
     test('a ref.read after a watched dependency changed trips the debug assertion (the root cause)', () {
       final c = ProviderContainer();
@@ -60,6 +63,74 @@ void main() {
       final s = File('test_driver/muse_e2e_test.dart').readAsStringSync();
       expect(s, contains("cmd('crashLog')"));
       expect(s, contains("crashLog.contains('package:riverpod/')"));
+    });
+  });
+}
+
+void b12() {
+  group('B12 应用内更新校验与重试', () {
+    const hex = 'ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12';
+    const apk = 'https://github.com/yywgov/muse-vpn/releases/download/v1.17.0/Chuanyun-Android-arm64.apk';
+    test('finds the .sha256 asset of the package', () {
+      final json = {
+        'assets': [
+          {'name': 'Chuanyun-Android-arm64.apk', 'browser_download_url': apk},
+          {'name': 'Chuanyun-Android-arm64.apk.sha256', 'browser_download_url': '$apk.sha256'},
+          {'name': 'Chuanyun-Windows-x64.zip.sha256', 'browser_download_url': 'https://evil.example/x.sha256'},
+        ],
+      };
+      expect(museSha256AssetNameFor(apk), 'Chuanyun-Android-arm64.apk.sha256');
+      expect(museSha256AssetUrl(json, apk), '$apk.sha256');
+      expect(museSha256AssetUrl(json, 'https://github.com/yywgov/muse-vpn/releases/download/v1/Chuanyun-Windows-x64.zip'), isNull);
+    });
+    test('parses sha256sum output', () {
+      expect(museParseSha256File('$hex  Chuanyun-Android-arm64.apk\n', 'Chuanyun-Android-arm64.apk'), hex);
+      expect(museParseSha256File('${hex.toUpperCase()} *out/Chuanyun-Android-arm64.apk', 'Chuanyun-Android-arm64.apk'), hex);
+      expect(museParseSha256File(hex, 'x.apk'), hex);
+      expect(museParseSha256File('$hex  other.apk', 'x.apk'), isNull);
+      expect(museParseSha256File('<html>not found</html>', 'x.apk'), isNull);
+    });
+    test('digest and file must agree', () {
+      expect(museExpectedSha256(digest: hex, file: hex), hex);
+      expect(museExpectedSha256(digest: null, file: hex), hex);
+      expect(museExpectedSha256(digest: hex, file: null), hex);
+      expect(museExpectedSha256(digest: null, file: null), isNull);
+      expect(
+        () => museExpectedSha256(digest: hex, file: 'f' * 64),
+        throwsA(isA<MuseUpdateFailure>().having((e) => e.kind, 'kind', MuseUpdateFailureKind.mismatchInfo)),
+      );
+    });
+    test('resume: continues a half part, keeps the current version only', () {
+      final dir = Directory.systemTemp.createTempSync('cy117');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final part = File('${dir.path}/p')..writeAsBytesSync(List.filled(30, 1));
+      expect(museRangePartHave(part.path, (100, 199)), 30);
+      expect(museResumeRange((100, 199), 30), 'bytes=130-199');
+      expect(museRangePartHave(part.path, (0, 9)), 0, reason: 'longer than the range: unusable');
+      expect(museRangePartHave('${dir.path}/none', (0, 9)), 0);
+      expect(
+        museStaleUpdateFiles(['Chuanyun-1.17.0-arm64.apk.part0', 'Chuanyun-1.16.0-arm64.apk', 'Chuanyun-1.17.0-arm64.apk'], '1.17.0'),
+        ['Chuanyun-1.16.0-arm64.apk'],
+      );
+    });
+    test('Chinese messages; checksum failures start over, others continue', () {
+      for (final k in MuseUpdateFailureKind.values) {
+        final t = museUpdateFailureText(MuseUpdateFailure(k));
+        expect(RegExp('[A-Za-z]{3,}').allMatches(t).map((m) => m.group(0)).toSet().difference({'SHA'}), isEmpty, reason: t);
+      }
+      expect(const MuseUpdateFailure(MuseUpdateFailureKind.checksum).startsOver, isTrue);
+      expect(const MuseUpdateFailure(MuseUpdateFailureKind.network).startsOver, isFalse);
+      expect(museUpdateFailureText(Exception('x')), contains('重试'));
+      expect(museUpdateFailureText(const MuseUpdateFailure(MuseUpdateFailureKind.checksum)), contains('重新下载'));
+      expect(museAboutUpdateStatus(const MuseUpdateVerifying()), '正在校验安装包…');
+    });
+    test('the updater keeps parts on failure and verifies with the .sha256 file', () {
+      final s = File('lib/features/muse/update/muse_updater.dart').readAsStringSync();
+      expect(s, isNot(contains('dir.deleteSync(recursive: true)')));
+      expect(s, contains('FileAccessMode.append'));
+      expect(s, contains('museSha256AssetUrl(json!, release.apkUrl)'));
+      final about = File('lib/features/about/widget/about_page.dart').readAsStringSync();
+      expect(about, contains("startsOver ? '重新下载' : '重试'"));
     });
   });
 }
