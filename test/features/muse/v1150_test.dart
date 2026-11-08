@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
 import 'package:hiddify/features/muse/logic/dns_leak.dart';
 import 'package:hiddify/features/muse/logic/route_why.dart';
+import 'package:hiddify/features/muse/data/changelog.dart';
 import 'package:hiddify/features/muse/desktop/wifi_mode.dart';
 import 'package:hiddify/features/muse/desktop/on_demand.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
@@ -428,6 +429,18 @@ void main() {
       expect(museParseWifiModes(c.read(MusePrefs.wifiModes)), {'公司': MuseRouteMode.global});
       expect(find.byKey(const ValueKey('wifi_mode_ssid_公司')), findsOneWidget);
       expect(t.takeException(), isNull);
+    });
+  });
+
+  group('版本 1.15.0', () {
+    test('pubspec, changelog, CHANGELOG.md', () {
+      expect(_src('pubspec.yaml'), contains('version: 1.15.0+204'));
+      expect(museChangelog.keys.first, '1.15.0');
+      final lines = museChangelog['1.15.0']!.join();
+      for (final w in ['为什么走这条', '应用', '通过另一个节点连接', '清空 DNS 缓存', 'DNS 泄漏检测', '按 Wi‑Fi 切换模式']) {
+        expect(lines, contains(w));
+      }
+      expect(_src('CHANGELOG.md'), contains('### 1.15.0'));
     });
   });
 }
