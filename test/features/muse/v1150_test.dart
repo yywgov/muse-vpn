@@ -2,7 +2,16 @@
 // B6 规则集打开时过期才更新, R22 链式代理, R23 按 Wi-Fi 切换模式.
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
+import 'package:hiddify/features/muse/connections/conn_app.dart';
+import 'package:hiddify/features/muse/connections/connections_page.dart';
+import 'package:hiddify/features/muse/home/home_data.dart';
+import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
 import 'package:hiddify/features/muse/logic/route_why.dart';
 
@@ -25,6 +34,9 @@ MuseConn _conn({String rule = '', List<String> chains = const [], String process
 void main() {
   group('R13 DNS 清缓存', () {
     test('POST /cache/dns/flush with the secret', () async {
+      final saved = HttpOverrides.current;
+      HttpOverrides.global = null; // the widget binding fakes HttpClient
+      addTearDown(() => HttpOverrides.global = saved);
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       String? seen;
       String? auth;
@@ -83,6 +95,99 @@ void main() {
       expect(s, contains("ValueKey('conn_why')"));
       expect(s, contains("title: '为什么走这条'"));
       expect(s, contains("kv('命中规则', why.rule)"));
+    });
+  });
+
+  group('R16 连接显示应用', () {
+    test('进程字段 → 包名 / 程序名', () {
+      expect(museProcessPackage('com.tencent.mm (10123)'), 'com.tencent.mm');
+      expect(museProcessPackage('com.android.chrome'), 'com.android.chrome');
+      expect(museProcessPackage(r'C:\Program Files\Google\chrome.exe'), isNull);
+      expect(museProcessPackage('chrome.exe'), isNull);
+      expect(museProcessPackage('10123'), isNull);
+      final labels = museParseAppLabels('[{"package-name":"com.tencent.mm","name":"微信","is-system-app":false},{"package-name":"x.y","name":"null"}]');
+      expect(labels, {'com.tencent.mm': '微信'});
+      expect(museParseAppLabels('坏'), isEmpty);
+      final a = museConnApp('com.tencent.mm (10123)', labels)!;
+      expect((a.name, a.package), ('微信', 'com.tencent.mm'));
+      expect(museConnApp('com.example.x', labels)!.name, 'com.example.x');
+      expect(museConnApp(r'C:\Apps\chrome.exe', labels)!.name, 'chrome.exe');
+      expect(museConnApp('10123', labels), isNull);
+      expect(museConnApp('', labels), isNull);
+    });
+
+    test('图标缓存有上限，最近用过的留下', () {
+      final c = MuseLru<String, int>(2)
+        ..put('a', 1)
+        ..put('b', 2);
+      expect(c.get('a'), 1);
+      c.put('c', 3);
+      expect(c.get('b'), isNull);
+      expect(c.get('a'), 1);
+      expect(c.length, 2);
+      expect(museAppIconCacheMax, lessThanOrEqualTo(64));
+    });
+
+    testWidgets('连接行显示应用名与图标，详情显示「应用」', (t) async {
+      SharedPreferences.setMockInitialValues({});
+      final sp = await SharedPreferences.getInstance();
+      final conns = [
+        MuseConn.fromJson({
+          'id': 'a',
+          'metadata': {'network': 'tcp', 'type': 'tun', 'destinationIP': '1.2.3.4', 'destinationPort': '443', 'host': 'weixin.qq.com', 'processPath': 'com.tencent.mm (10123)'},
+          'upload': 1,
+          'download': 2,
+          'start': '2026-11-08T09:00:00+08:00',
+          'chains': ['direct'],
+          'rule': 'rule_set=[geosite-cn] => route(direct)',
+          'rulePayload': '',
+        })!,
+        MuseConn.fromJson({
+          'id': 'b',
+          'metadata': {'network': 'tcp', 'type': 'tun', 'destinationIP': '1.2.3.5', 'destinationPort': '443', 'host': 'no-app.example.com'},
+          'chains': ['direct'],
+          'rule': 'final',
+        })!,
+      ];
+      final c = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWith((ref) async => sp),
+          museRunningProvider.overrideWithValue(true),
+          museConnectionsProvider.overrideWith((ref) => Stream.value(MuseConnState(connections: conns))),
+          museConnAppsEnabledProvider.overrideWithValue(true),
+          museAppLabelsProvider.overrideWith((ref) async => {'com.tencent.mm': '微信'}),
+          museAppIconProvider.overrideWith((ref, pkg) async => null),
+        ],
+      );
+      addTearDown(c.dispose);
+      await t.runAsync(() => c.read(sharedPreferencesProvider.future));
+      t.view.physicalSize = const Size(412, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(theme: ThemeData(colorScheme: museSeededScheme(brightness: Brightness.light)), home: const MuseConnectionsPage()),
+      ));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 50));
+      expect(find.textContaining('微信 · direct'), findsOneWidget);
+      expect(find.byType(MuseConnAppIcon), findsOneWidget); // 没有进程信息的连接不显示图标
+      await t.tap(find.text('weixin.qq.com'));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('conn_why')), findsOneWidget);
+      expect(find.text('应用'), findsOneWidget);
+      expect(find.text('规则集 geosite-cn'), findsOneWidget);
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 6));
+    });
+
+    test('只在 Android 读应用信息，页面离开即释放', () {
+      final s = _src('lib/features/muse/connections/conn_app.dart');
+      expect(s, contains('Platform.isAndroid'));
+      expect(s, contains('FutureProvider.autoDispose<Map<String, String>>'));
+      expect(s, contains('FutureProvider.autoDispose.family<Uint8List?, String>'));
+      expect(s, isNot(contains('Timer.periodic')));
     });
   });
 }

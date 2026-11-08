@@ -4,6 +4,7 @@
 // the connection state.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/connections/conn_app.dart';
 import 'package:hiddify/features/muse/logic/route_why.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -246,7 +247,9 @@ class MuseConnRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final dur = (conn.end ?? DateTime.now()).difference(conn.start);
-    final sub = [if (conn.node.isNotEmpty) conn.node, if (conn.rule.isNotEmpty) conn.rule, if (wide && conn.process.isNotEmpty) conn.process].join(' · ');
+    // 1.15.0 R16: 发起的应用（内核报告了进程时）——图标 + 名称
+    final app = conn.process.isEmpty ? null : museConnApp(conn.process, ref.watch(museAppLabelsProvider).valueOrNull ?? const {});
+    final sub = [if (app != null) app.name, if (conn.node.isNotEmpty) conn.node, if (conn.rule.isNotEmpty) conn.rule].join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: MuseSpace.s4),
       child: MuseCard(
@@ -255,6 +258,7 @@ class MuseConnRow extends ConsumerWidget {
         onTap: () => showMuseConnDetail(context, ref, conn, ended: ended),
         child: Row(
           children: [
+            if (app != null) ...[MuseConnAppIcon(app: app), const SizedBox(width: MuseSpace.s8)],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -369,6 +373,7 @@ Future<void> showMuseConnDetail(BuildContext context, WidgetRef ref, MuseConn c,
               kv('入站', c.inbound),
               kv('链路', c.chains.reversed.join(' → ')),
               kv('规则', c.rule),
+              kv('应用', museConnApp(c.process, ref.read(museAppLabelsProvider).valueOrNull ?? const {})?.name ?? ''),
               kv('进程', c.process),
               kv('上传', c.upload.size()),
               kv('下载', c.download.size()),
@@ -513,4 +518,30 @@ Future<void> museAddHostToNode(BuildContext context, WidgetRef ref, String host,
   final raw = ref.read(MusePrefs.nodeRules);
   await n.update(museNodeRulesToRaw(museAddHostToNodeRule(museParseNodeRules(raw), node, host)));
   toast.showSuccessToast('已设置 $host 走所选节点，可在 规则 › 分流 › 指定节点 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
+}
+
+
+/// 1.15.0 R16: 连接行左侧的应用图标（Android 有包名时读图标，缩小解码；其余显示通用图标）。
+class MuseConnAppIcon extends ConsumerWidget {
+  const MuseConnAppIcon({super.key, required this.app});
+
+  final MuseConnApp app;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final px = (MuseSize.appIcon * MediaQuery.devicePixelRatioOf(context)).round();
+    final fallback = Icon(app.package != null ? Icons.android_outlined : Icons.terminal_outlined, size: MuseSize.appIcon, color: scheme.onSurfaceVariant);
+    final pkg = app.package;
+    if (pkg == null) return Semantics(label: app.name, child: fallback);
+    final icon = ref.watch(museAppIconProvider(pkg)).valueOrNull;
+    return Semantics(
+      label: app.name,
+      child: icon == null
+          ? fallback
+          : ClipOval(
+              child: Image.memory(icon, key: ValueKey('conn_app_icon_$pkg'), width: MuseSize.appIcon, height: MuseSize.appIcon, cacheWidth: px, cacheHeight: px, gaplessPlayback: true),
+            ),
+    );
+  }
 }
