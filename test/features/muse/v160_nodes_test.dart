@@ -182,7 +182,7 @@ void main() {
     });
 
     for (final scale in [1.0, 2.0]) {
-      testWidgets('#37 recent row (${scale}x)', (tester) async {
+      testWidgets('1.17.1 no recent row on the nodes page (${scale}x)', (tester) async {
         await _pump(
           tester,
           prefs: {'muse_recent_nodes': museRecentToRaw(['🇯🇵 东京 02', '🇭🇰 香港 01', 'gone', 'Relay A'])},
@@ -190,12 +190,13 @@ void main() {
           scale: scale,
         );
         expect(tester.takeException(), isNull);
-        expect(find.byKey(const ValueKey('node_recent_row')), findsOneWidget);
-        expect(find.byKey(const ValueKey('node_recent_🇭🇰 香港 01')), findsOneWidget);
-        expect(find.byKey(const ValueKey('node_recent_Relay A')), findsOneWidget);
-        // the node in use and nodes no longer in the list are not offered
-        expect(find.byKey(const ValueKey('node_recent_🇯🇵 东京 02')), findsNothing);
-        expect(find.byKey(const ValueKey('node_recent_gone')), findsNothing);
+        // 1.17.1: the 「最近」 row was removed from the nodes page — even with recent nodes saved
+        expect(find.byKey(const ValueKey('node_recent_row')), findsNothing);
+        expect(find.byKey(const ValueKey('node_recent_🇭🇰 香港 01')), findsNothing);
+        expect(find.byKey(const ValueKey('node_recent_Relay A')), findsNothing);
+        expect(find.text('最近'), findsNothing);
+        // the node list itself still renders
+        expect(find.byKey(const ValueKey('🇭🇰 香港 01')), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
       });
     }

@@ -497,35 +497,8 @@ class MuseNodeList extends HookConsumerWidget {
         ),
       );
     } else {
-      // 1.6.0 #37: 最近使用 — tap to switch back
-      final byTagAll = {for (final e in group.items) if (!e.isGroup) e.tag: e};
-      final offers = selecting.value ? const <String>[] : museRecentToOffer(recent, present: byTagAll.keys, selected: group.selected);
-      if (offers.isNotEmpty) {
-        children.add(
-          SingleChildScrollView(
-            key: const ValueKey('node_recent_row'),
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.fromLTRB(margin, 0, margin, MuseSpace.s8),
-            child: Row(
-              children: [
-                Text('最近', style: MuseType.caption(context)),
-                for (final t in offers) ...[
-                  const SizedBox(width: MuseSpace.s8),
-                  ActionChip(
-                    key: ValueKey('node_recent_$t'),
-                    visualDensity: VisualDensity.compact,
-                    label: Text(shownName(byTagAll[t]!), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    onPressed: () async {
-                      await musePickNode(ref, group.tag, t);
-                      onPicked?.call();
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      }
+      // 1.17.1: the 「最近」 chip row above the list is gone (user: not useful). 最近使用 is still
+      // recorded (museRememberRecent) for the Windows tray menu (R18) and 「手动选择」.
       final dedupParams = dedupConfig.isEmpty ? const <String, String>{} : museOutboundParamsByTag(dedupConfig);
       final duplicates = !hideDuplicates
           ? const <String>{}
