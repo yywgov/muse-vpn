@@ -76,7 +76,7 @@ void main() {
       expect(nodes.first.label, 'Slow   超时');
       expect(nodes[1].label, 'Node 0   100 ms');
       expect(nodes.length, museTrayMaxNodes + 1);
-      expect(museTrayNodes([(tag: 'new', name: 'New', delay: 0)], selected: '').single.label, 'New');
+      expect(museTrayNodes([(tag: 'new', name: 'New', delay: 0)], selected: '').single.label, 'New   未测'); // 1.17.0 R18: 未测 vs 超时
     });
 
     test('submenu only while connected; top-level order unchanged', () {

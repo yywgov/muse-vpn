@@ -15,6 +15,10 @@ import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/muse/home/node_memory.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/logic/node_prefs.dart' show museParseFavorites;
+import 'package:hiddify/features/muse/logic/node_tools.dart' show museAddRecent, museRecentFromRaw, museRecentToRaw;
 import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart' show Notifier, NotifierProvider;
@@ -76,20 +80,28 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
     final running = ref.watch(serviceRunningProvider);
     final group = running ? ref.watch(proxiesOverviewNotifierProvider).valueOrNull : null;
     _groupTag = group?.tag;
-    final nodes = group == null
-        ? const <MuseTrayNode>[]
-        : museTrayNodes(
-            [
-              for (final e in group.items)
-                if (!e.isGroup) (tag: e.tag, name: e.tagDisplay.isNotEmpty ? e.tagDisplay : e.tag, delay: e.urlTestDelay),
-            ],
+    final items = group == null
+        ? const <({String tag, String name, int delay})>[]
+        : [
+            for (final e in group.items)
+              if (!e.isGroup) (tag: e.tag, name: e.tagDisplay.isNotEmpty ? e.tagDisplay : e.tag, delay: e.urlTestDelay),
+          ];
+    final nodes = group == null ? const <MuseTrayNode>[] : museTrayNodes(items, selected: group.selected);
+    final pinned = group == null
+        ? (favorites: const <MuseTrayNode>[], recent: const <MuseTrayNode>[])
+        : museTrayPinned(
+            items,
             selected: group.selected,
+            favorites: museParseFavorites(ref.watch(Preferences.museFavoriteNodes)),
+            recent: museRecentFromRaw(ref.watch(MusePrefs.recentNodes)),
           );
     final windows = PlatformUtils.isWindows;
     final spec = museTrayMenuSpec(
       connection,
       ref.watch(ConfigOptions.museRouteMode),
       nodes: nodes,
+      favorites: pinned.favorites,
+      recent: pinned.recent,
       speed: speed,
       moreNodes: group != null && group.items.where((e) => !e.isGroup).length > museTrayMaxNodes,
       serviceMode: windows ? ref.watch(ConfigOptions.serviceMode) : null,
@@ -173,7 +185,13 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
       } else if (key.startsWith('node:')) {
         final group = _groupTag;
         if (group == null) return;
-        await museSelectNodeFrom(ref, group, key.substring(5));
+        final tag = key.substring(5);
+        await museSelectNodeFrom(ref, group, tag);
+        // 1.17.0 R18: a switch from the tray counts as 最近使用 too (same list as the 节点 page)
+        final c = ref.container;
+        await c
+            .read(MusePrefs.recentNodes.notifier)
+            .update(museRecentToRaw(museAddRecent(museRecentFromRaw(c.read(MusePrefs.recentNodes)), tag, keep: 8)));
       } else if (key == 'urltest') {
         final group = _groupTag;
         if (group == null) return;
@@ -431,8 +449,28 @@ List<MuseTrayNode> museTrayNodes(List<({String tag, String name, int delay})> it
     final sel = sorted.where((e) => e.tag == selected).firstOrNull;
     if (sel != null) picked.insert(0, sel);
   }
-  String delayText(int d) => d == 0 ? '' : (ConnectionConst.isValidDelay(d) ? '   $d ms' : '   超时');
-  return [for (final e in picked) MuseTrayNode(e.tag, '${e.name}${delayText(e.delay)}', selected: e.tag == selected)];
+  return [for (final e in picked) MuseTrayNode(e.tag, '${e.name}${museTrayDelayText(e.delay)}', selected: e.tag == selected)];
+}
+
+/// 1.17.0 R18: `   123 ms`, `   超时` or `   未测` (never tested since the list was loaded).
+String museTrayDelayText(int d) => d == 0 ? '   未测' : (ConnectionConst.isValidDelay(d) ? '   $d ms' : '   超时');
+
+/// 1.17.0 R18: the tray's 收藏 / 最近使用 submenus: only nodes of the current group, in the user's
+/// order (favourites as stored, recent newest first), at most [max] each. Read from the stored
+/// lists when the menu is rebuilt; nothing is tested for it.
+({List<MuseTrayNode> favorites, List<MuseTrayNode> recent}) museTrayPinned(
+  List<({String tag, String name, int delay})> items, {
+  required String selected,
+  required Iterable<String> favorites,
+  required List<String> recent,
+  int max = 10,
+}) {
+  final byTag = {for (final e in items) e.tag: e};
+  List<MuseTrayNode> pick(Iterable<String> tags) => [
+    for (final t in tags.where(byTag.containsKey).take(max))
+      MuseTrayNode(t, '${byTag[t]!.name}${museTrayDelayText(byTag[t]!.delay)}', selected: t == selected),
+  ];
+  return (favorites: pick(favorites), recent: pick(recent));
 }
 
 /// 穿云 tray right-click menu: 连接/断开 · 规则/全局 · 节点 ▸ (1.2.3, while connected) · 显示窗口 · 退出.
@@ -444,6 +482,8 @@ List<MuseTrayItem> museTrayMenuSpec(
   ConnectionStatus connection,
   MuseRouteMode mode, {
   List<MuseTrayNode> nodes = const [],
+  List<MuseTrayNode> favorites = const [],
+  List<MuseTrayNode> recent = const [],
   String? speed,
   bool moreNodes = false,
   ServiceMode? serviceMode,
@@ -484,6 +524,16 @@ List<MuseTrayItem> museTrayMenuSpec(
         'nodes',
         '节点',
         children: [
+          // 1.17.0 R18: 收藏 / 最近使用 first (only when there are any)
+          if (favorites.isNotEmpty)
+            MuseTrayItem('nodes:fav', '收藏', children: [
+              for (final n in favorites) MuseTrayItem('node:${n.tag}', n.label, checkable: true, checked: n.selected),
+            ]),
+          if (recent.isNotEmpty)
+            MuseTrayItem('nodes:recent', '最近使用', children: [
+              for (final n in recent) MuseTrayItem('node:${n.tag}', n.label, checkable: true, checked: n.selected),
+            ]),
+          if (favorites.isNotEmpty || recent.isNotEmpty) const MuseTrayItem('-', ''),
           for (final n in nodes) MuseTrayItem('node:${n.tag}', n.label, checkable: true, checked: n.selected),
           const MuseTrayItem('-', ''),
           if (moreNodes) const MuseTrayItem('nodes:more', '更多…'),

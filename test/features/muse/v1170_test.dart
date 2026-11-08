@@ -8,6 +8,9 @@ import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
 import 'package:hiddify/features/muse/settings/windows_extras.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
+import 'package:hiddify/features/connection/model/connection_status.dart';
+import 'package:hiddify/features/muse/model/route_mode.dart';
+import 'package:hiddify/features/system_tray/notifier/system_tray_notifier.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,6 +42,7 @@ final _outdated = NotifierProvider<_Outdated, int>(_Outdated.new);
 void main() {
   b12();
   b13();
+  r18();
   group('上次异常 riverpod _didChangeDependency', () {
     test('a ref.read after a watched dependency changed trips the debug assertion (the root cause)', () {
       final c = ProviderContainer();
@@ -212,6 +216,49 @@ void b13() {
       expect(c.read(museHotkeysTakenProvider), {MuseHotkeyAction.toggleConnection});
       sub.close();
       expect(museHotkeyTakenText, contains('占用'));
+    });
+  });
+}
+
+void r18() {
+  group('R18 托盘切节点 收藏/最近', () {
+    final items = [
+      (tag: 'hk', name: '香港 01', delay: 80),
+      (tag: 'jp', name: '日本 01', delay: 65000),
+      (tag: 'us', name: '美国 01', delay: 0),
+    ];
+    test('收藏 / 最近使用 only list nodes of the group, in the user\'s order, 未测 vs 超时', () {
+      final p = museTrayPinned(items, selected: 'hk', favorites: ['us', 'gone', 'hk'], recent: ['jp', 'hk']);
+      expect(p.favorites.map((e) => e.label), ['美国 01   未测', '香港 01   80 ms']);
+      expect(p.favorites.last.selected, isTrue);
+      expect(p.recent.map((e) => e.label), ['日本 01   超时', '香港 01   80 ms']);
+      final many = museTrayPinned(
+        [for (var i = 0; i < 20; i++) (tag: 'n$i', name: 'N$i', delay: 1)],
+        selected: '',
+        favorites: [for (var i = 0; i < 20; i++) 'n$i'],
+        recent: const [],
+      );
+      expect(many.favorites.length, 10);
+      expect(many.recent, isEmpty);
+    });
+    test('submenus come first inside 节点, top-level order unchanged', () {
+      final p = museTrayPinned(items, selected: 'hk', favorites: ['us'], recent: ['jp']);
+      final spec = museTrayMenuSpec(
+        const Connected(),
+        MuseRouteMode.rule,
+        nodes: museTrayNodes(items, selected: 'hk'),
+        favorites: p.favorites,
+        recent: p.recent,
+      );
+      expect(spec.where((e) => e.key != '-').map((e) => e.label).toList(), ['断开', '规则', '全局', '节点', '显示窗口', '退出']);
+      final sub = spec.firstWhere((e) => e.key == 'nodes').children;
+      expect(sub[0].label, '收藏');
+      expect(sub[0].children.single.key, 'node:us');
+      expect(sub[1].label, '最近使用');
+      expect(sub[1].children.single.label, '日本 01   超时');
+      expect(sub[2].key, '-');
+      final none = museTrayMenuSpec(const Connected(), MuseRouteMode.rule, nodes: museTrayNodes(items, selected: 'hk'));
+      expect(none.firstWhere((e) => e.key == 'nodes').children.first.key, startsWith('node:'));
     });
   });
 }
