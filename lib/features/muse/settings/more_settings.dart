@@ -4,6 +4,9 @@
 // Part of 穿云 (GPLv3).
 
 import 'package:hiddify/features/muse/data/secure_screen.dart';
+import 'package:hiddify/features/muse/data/app_traffic_recorder.dart';
+import 'package:hiddify/features/muse/logic/app_traffic.dart';
+import 'package:hiddify/features/muse/connections/conn_app.dart' show museAppLabelsProvider;
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
 import 'package:hiddify/features/muse/logic/quick_rules.dart';
 import 'package:hiddify/features/muse/widget/muse_sheet.dart';

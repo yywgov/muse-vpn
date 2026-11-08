@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:hiddify/core/preferences/preferences_provider.dart';
+import 'package:hiddify/features/muse/data/app_traffic_recorder.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/local_api/dns_queries.dart';
@@ -90,10 +91,27 @@ final museConnectionsProvider = StreamProvider.autoDispose<MuseConnState>((ref) 
     return;
   }
   final tracker = MuseConnTracker(history: ref.read(museRequestHistoryProvider));
+  // 1.16.0 B7: 按应用流量 from the frames this page receives anyway (written every 30 s and on leaving)
+  final prefs = ref.read(MusePrefs.appTraffic.notifier);
+  var lastRaw = ref.read(MusePrefs.appTraffic);
+  String read() {
+    try {
+      return lastRaw = ref.read(MusePrefs.appTraffic);
+    } catch (_) {
+      return lastRaw; // on dispose
+    }
+  }
+
+  final feed = MuseAppTrafficFeed(ref.read(museAppSamplerProvider), read, (v) {
+    lastRaw = v;
+    return prefs.update(v);
+  });
+  ref.onDispose(feed.flush);
   yield const MuseConnState(loading: true);
   try {
     await for (final raw in museUntilDisposed(ref, api.stream('/connections', query: const {'interval': '1000'}))) {
       final frame = await museParseConnFrameAsync(raw);
+      feed.frame(frame.connections);
       yield MuseConnState(connections: tracker.apply(frame, DateTime.now()), frame: frame);
     }
     yield const MuseConnState(error: '连接已断开');

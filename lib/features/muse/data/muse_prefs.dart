@@ -208,6 +208,8 @@ abstract final class MusePrefs {
 
   // ---- 统计
   static final trafficLog = PreferencesNotifier.create<String, String>("muse_traffic_log", "");
+  /// 1.16.0 B7: 按应用流量 (30 days, this device only, never synced or backed up)
+  static final appTraffic = PreferencesNotifier.create<String, String>("muse_app_traffic", "");
   static final connectStats = PreferencesNotifier.create<String, String>("muse_connect_stats", "");
   static final crashLog = PreferencesNotifier.create<String, String>("muse_crash_log", "");
 

@@ -14,6 +14,12 @@ import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hiddify/features/muse/logic/domestic_apps.dart';
+import 'package:hiddify/features/muse/logic/app_traffic.dart';
+import 'package:hiddify/features/muse/data/app_traffic_recorder.dart';
+import 'package:hiddify/features/muse/local_api/local_api_client.dart';
+import 'package:hiddify/features/muse/settings/more_settings.dart' show museAppBars;
+import 'package:hiddify/features/muse/home/widget_sync.dart';
+import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart' show museNodeSemanticsLabel;
 import 'package:hiddify/features/muse/widget/grouped_list.dart' show MuseSwitchTile;
 import 'package:hiddify/features/profile/add/add_profile_modal.dart' show MuseAddAction;
@@ -254,6 +260,136 @@ void main() {
       expect(kt, contains('addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)'));
       expect(kt, contains('clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)'));
       expect(_src('lib/features/muse/settings/appearance_page.dart'), contains("ValueKey('appearance_secure_sensitive')"));
+    });
+  });
+
+  group('R25 小组件常用节点', () {
+    OutboundGroup group() => OutboundGroup(
+      tag: 'select',
+      selected: 'b',
+      items: [
+        OutboundInfo(tag: 'auto', tagDisplay: '自动选择', isGroup: true),
+        OutboundInfo(tag: 'a', tagDisplay: '香港 01'),
+        OutboundInfo(tag: 'b', tagDisplay: '日本 02'),
+        OutboundInfo(tag: 'c', tagDisplay: '美国 03'),
+        OutboundInfo(tag: 'd', tagDisplay: '新加坡 04'),
+      ],
+    );
+
+    test('first 3 favourites in list order; groups and unknown tags skipped', () {
+      final favs = museWidgetFavs(group(), {'d', 'c', 'a', 'b', 'auto', 'gone'});
+      expect([for (final f in favs) f.$1], ['a', 'b', 'c']);
+      expect(favs.first.$2, contains('香港 01'));
+      expect(museWidgetFavs(group(), const {}), isEmpty);
+      expect(museWidgetFavs(null, {'a'}), isEmpty);
+      expect(museWidgetFavs(group(), {'c'}).single.$1, 'c');
+    });
+
+    test('sent only on a change (no timer), favourites included', () {
+      final src = _src('lib/features/muse/home/widget_sync.dart');
+      expect(src, contains('ref.listen(Preferences.museFavoriteNodes, (_, _) => push());'));
+      expect(src, contains('listEquals(favs, lastFavs)'));
+      expect(src, isNot(contains('Timer')));
+      expect(_src('lib/features/muse/data/chuanyun_platform.dart'), contains("'favTags': [for (final f in favs) f.\$1]"));
+    });
+
+    test('Android widget: 3 slots, tap = chuanyun://connect?node=, application context only, no timer', () {
+      final kt = _src('android/app/src/main/kotlin/com/hiddify/hiddify/bg/ChuanyunWidget.kt');
+      expect(kt, contains('fun favLink(tag: String): String = "chuanyun://connect?node=" + Uri.encode(tag)'));
+      expect(kt, contains('intArrayOf(R.id.widget_fav1, R.id.widget_fav2, R.id.widget_fav3)'));
+      expect(kt, contains('val context = appContext() ?: return'));
+      expect(kt, contains('setContentDescription(id, "切换到节点 \${fav.second}")'));
+      final layout = _src('android/app/src/main/res/layout/chuanyun_widget.xml');
+      for (final id in ['widget_favs', 'widget_fav1', 'widget_fav2', 'widget_fav3', 'widget_toggle', 'widget_text']) {
+        expect(layout, contains('@+id/$id'));
+      }
+      final info = _src('android/app/src/main/res/xml/chuanyun_widget_info.xml');
+      expect(info, contains('android:updatePeriodMillis="0"'));
+      final handler = _src('android/app/src/main/kotlin/com/hiddify/hiddify/ChuanyunHandler.kt');
+      expect(handler, contains('ChuanyunWidget.zipFavs('));
+    });
+  });
+
+  group('B7 按天/按应用流量图', () {
+    MuseConn conn(String id, String process, int up, int down, {DateTime? end}) => MuseConn(
+      id: id,
+      host: 'h',
+      destination: '1.2.3.4:443',
+      network: 'tcp',
+      inbound: 'tun',
+      chains: const ['n'],
+      rule: '',
+      process: process,
+      upload: up,
+      download: down,
+      start: DateTime(2026),
+      end: end,
+    );
+
+    test('sampler: first sight counts from zero, then deltas; gone connections forgotten; no app = skipped', () {
+      final s = MuseAppTrafficSampler();
+      var d = s.sample([conn('1', 'com.tencent.mm (10123)', 100, 900), conn('2', '', 50, 50), conn('3', 'com.tencent.mm', 10, 0)]);
+      expect(d, {'com.tencent.mm': (1010, 'com.tencent.mm')});
+      d = s.sample([conn('1', 'com.tencent.mm (10123)', 200, 1000)]);
+      expect(d['com.tencent.mm']!.$1, 200);
+      expect(s.tracked, 1);
+      d = s.sample([conn('4', r'C:\Program Files\App\app.exe', 5, 5)]);
+      expect(d.values.single, (10, 'app.exe'));
+      s.reset();
+      expect(s.tracked, 0);
+    });
+
+    test('log: per day per app, 30 days kept, top over a range', () {
+      var log = MuseAppTrafficLog.empty;
+      final day = DateTime(2026, 11, 8);
+      log = log.add(day, {'a': (100, 'A'), 'b': (300, 'B')});
+      log = log.add(day, {'a': (250, 'A'), 'zero': (0, 'Z')});
+      log = log.add(DateTime(2026, 11, 2), {'c': (1000, 'C')});
+      log = log.add(DateTime(2026, 10, 1), {'old': (5, 'O')}); // older than 30 days before 11-08? added later than 11-08 entries
+      final again = MuseAppTrafficLog.parse(log.toRaw());
+      expect(again.days['2026-11-08'], {'a': (350, 'A'), 'b': (300, 'B')});
+      expect([for (final t in again.top(day)) t.$1], ['a', 'b']);
+      expect([for (final t in again.top(day, n: 7)) t.$1], ['c', 'a', 'b']);
+      // the next write on 11-08 drops days before 10-10
+      final pruned = again.add(day, {'a': (1, 'A')});
+      expect(pruned.days.containsKey('2026-10-01'), isFalse);
+      expect(pruned.days.containsKey('2026-11-02'), isTrue);
+      expect(MuseAppTrafficLog.parse('nope').days, isEmpty);
+    });
+
+    test('feed: flushes every 30 frames and on close; bars use app names', () async {
+      var raw = '';
+      final writes = <String>[];
+      final feed = MuseAppTrafficFeed(MuseAppTrafficSampler(), () => raw, (v) async {
+        raw = v;
+        writes.add(v);
+      }, flushEvery: 3);
+      feed.frame([conn('1', 'com.a', 1, 1)]);
+      feed.frame([conn('1', 'com.a', 2, 2)]);
+      expect(writes, isEmpty);
+      feed.frame([conn('1', 'com.a', 3, 3)]);
+      expect(writes, hasLength(1));
+      feed.frame([conn('1', 'com.a', 10, 3)]);
+      feed.flush();
+      expect(writes, hasLength(2));
+      feed.flush(); // nothing pending
+      expect(writes, hasLength(2));
+      final log = MuseAppTrafficLog.parse(raw);
+      final bars = museAppBars(log, DateTime.now(), range: 0, labels: const {'com.a': '应用甲'});
+      expect(bars.single, ('应用甲', 13));
+    });
+
+    test('no background sampling: only the 统计 open read and the 连接 page frames', () {
+      final rec = _src('lib/features/muse/data/app_traffic_recorder.dart');
+      expect(rec, isNot(contains('Timer')));
+      expect(rec, contains('FutureProvider.autoDispose<void>'));
+      final api = _src('lib/features/muse/local_api/local_api_providers.dart');
+      expect(api, contains('feed.frame(frame.connections);'));
+      expect(api, contains('ref.onDispose(feed.flush);'));
+      final page = _src('lib/features/muse/settings/stats_page.dart');
+      expect(page, contains('ref.watch(museAppTrafficOnOpenProvider);'));
+      expect(page, contains("header: '按应用流量'"));
+      expect(_src('lib/features/muse/data/sync_service.dart'), isNot(contains('muse_app_traffic')));
     });
   });
 }

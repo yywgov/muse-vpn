@@ -31,6 +31,12 @@ class MuseStatsPage extends HookConsumerWidget {
     final thisMonth = months.isEmpty || months.last.$1 != museMonthKey(now) ? 0 : months.last.$2 + months.last.$3;
     final report = museMonthlyReport(log, museMonthKey(now), bytes: museBytes);
     final mt = MuseTheme.of(context);
+    // 1.16.0 B7: 按应用 — opening this page counts the live connections once (no background sampling)
+    ref.watch(museAppTrafficOnOpenProvider);
+    final appLog = MuseAppTrafficLog.parse(ref.watch(MusePrefs.appTraffic));
+    final appRange = useState(0);
+    final labels = ref.watch(museAppLabelsProvider).valueOrNull ?? const <String, String>{};
+    final apps = museAppBars(appLog, now, range: appRange.value, labels: labels);
 
     final body = MuseGroupedBody(
         children: [
@@ -68,6 +74,32 @@ class MuseStatsPage extends HookConsumerWidget {
                       : _MuseBarChart(bars: bars),
                 ),
               ),
+            ],
+          ),
+          MuseSection(
+            header: '按应用流量',
+            footer: '只在本机统计：打开「连接」或「统计」页时累计各应用的流量，保留 30 天',
+            headerTrailing: SizedBox(
+              width: MuseSize.segmentedRange,
+              child: MuseSegmented<int>(
+                key: const ValueKey('stats_app_range'),
+                values: const [0, 1, 2],
+                selected: appRange.value,
+                label: (v) => const ['今天', '7 天', '30 天'][v],
+                onChanged: (v) => appRange.value = v,
+              ),
+            ),
+            children: [
+              if (apps.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(MuseSpace.s16),
+                  child: Text('还没有按应用的记录', key: const ValueKey('stats_app_empty'), style: MuseType.body(context).copyWith(color: mt.text2)),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.all(MuseSpace.s16),
+                  child: _MuseAppBars(key: const ValueKey('stats_app_bars'), apps: apps),
+                ),
             ],
           ),
           MuseSection(
@@ -130,6 +162,57 @@ class _MuseBarChart extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// 1.16.0 B7: the 按应用 bars for [range] (0 今天, 1 近 7 天, 2 近 30 天): (name, bytes), biggest first.
+List<(String, int)> museAppBars(MuseAppTrafficLog log, DateTime now, {required int range, Map<String, String> labels = const {}}) => [
+  for (final a in log.top(now, n: const [1, 7, 30][range.clamp(0, 2)], count: 8)) (labels[a.$1] ?? a.$2, a.$3),
+];
+
+class _MuseAppBars extends StatelessWidget {
+  const _MuseAppBars({super.key, required this.apps});
+
+  final List<(String, int)> apps;
+
+  @override
+  Widget build(BuildContext context) {
+    final mt = MuseTheme.of(context);
+    final maxV = apps.map((a) => a.$2).fold<int>(1, math.max);
+    return Column(
+      children: [
+        for (final a in apps)
+          Semantics(
+            label: '${a.$1} ${museBytes(a.$2)}',
+            excludeSemantics: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: MuseSpace.s4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text(a.$1, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.caption(context))),
+                      Text(museBytes(a.$2), style: MuseType.caption(context).copyWith(color: mt.text2, fontFeatures: MuseType.tabular)),
+                    ],
+                  ),
+                  const SizedBox(height: MuseSpace.s4),
+                  LayoutBuilder(
+                    builder: (context, c) => Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        height: MuseSize.barMin * 2,
+                        width: math.max(MuseSize.barMin, c.maxWidth * a.$2 / maxV),
+                        decoration: BoxDecoration(color: museBrandOf(context), borderRadius: MuseRadius.fullAll),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
