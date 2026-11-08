@@ -142,7 +142,7 @@ void main() {
     test('a reload with the new subscription refreshes the group stream', () {
       final src = File('lib/features/connection/notifier/connection_notifier.dart').readAsStringSync();
       expect(src, contains('museCoreProfileIdProvider.notifier).state = profile.id'));
-      expect(src, contains('ref.invalidate(proxiesOverviewNotifierProvider)'));
+      expect(src, contains('invalidate(proxiesOverviewNotifierProvider)')); // 1.17.0: via ref.container
     });
   });
 
