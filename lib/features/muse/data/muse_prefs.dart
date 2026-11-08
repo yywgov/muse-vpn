@@ -174,6 +174,12 @@ abstract final class MusePrefs {
   /// 按需运行: pause the connection on the listed Wi‑Fi, resume after leaving it
   static final onDemand = PreferencesNotifier.create<bool, bool>("muse_on_demand", false);
 
+  /// 1.15.0 R23 按 Wi‑Fi 切换模式: `{"SSID": "rule" | "global"}`；我们替用户切换前的模式、我们切到的模式
+  /// （离开 Wi‑Fi 时恢复；用户手动改了模式则以用户为准）
+  static final wifiModes = PreferencesNotifier.create<String, String>("muse_wifi_modes", "");
+  static final wifiModeSaved = PreferencesNotifier.create<String, String>("muse_wifi_mode_saved", "");
+  static final wifiModeApplied = PreferencesNotifier.create<String, String>("muse_wifi_mode_applied", "");
+
   /// 全局快捷键: master switch + bindings (desktop/hotkeys.dart, JSON action → "ctrl+shift+0x70004")
   static final hotkeysOn = PreferencesNotifier.create<bool, bool>("muse_hotkeys_on", true);
   static final hotkeys = PreferencesNotifier.create<String, String>("muse_hotkeys", "");

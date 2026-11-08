@@ -15,6 +15,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
 import 'package:hiddify/features/muse/logic/dns_leak.dart';
 import 'package:hiddify/features/muse/logic/route_why.dart';
+import 'package:hiddify/features/muse/desktop/wifi_mode.dart';
+import 'package:hiddify/features/muse/desktop/on_demand.dart';
+import 'package:hiddify/features/muse/data/wifi_ssid.dart';
+import 'package:hiddify/features/muse/model/route_mode.dart';
+import 'package:hiddify/features/muse/settings/wifi_mode_page.dart';
+import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/muse/logic/sub_override.dart';
 import 'package:hiddify/features/muse/nodes/node_form_dialog.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
@@ -319,6 +325,109 @@ void main() {
       expect(msg, contains('先连「b」'));
       expect(museParseOverrides(c.read(MusePrefs.subOverrides))['p']!.chains, {'a': 'b'});
       expect(_src('lib/features/muse/nodes/node_details.dart'), contains("ValueKey('node_chain')"));
+    });
+  });
+
+  group('R23 按 Wi‑Fi 切换模式', () {
+    const home = MuseSsidRead.ok('家');
+    const other = MuseSsidRead.ok('咖啡店');
+    final modes = {'家': MuseRouteMode.global};
+
+    test('读写', () {
+      expect(museParseWifiModes(museWifiModesToRaw(modes)), modes);
+      expect(museParseWifiModes('坏'), isEmpty);
+      expect(museParseWifiModes('{"a":"direct","b":"rule"}'), {'b': MuseRouteMode.rule});
+      expect(museWifiModesToRaw(const {}), '');
+      expect(museWifiModeSummary(''), '关');
+    });
+
+    test('连上切换、离开恢复、读不到不动、手动改了以用户为准', () {
+      var s = museWifiModeStep(modes: modes, read: home, current: MuseRouteMode.rule, saved: '', applied: '');
+      expect((s.setTo, s.saved, s.applied), (MuseRouteMode.global, 'rule', 'global'));
+      final failed = museWifiModeStep(modes: modes, read: const MuseSsidRead.failed('x'), current: MuseRouteMode.global, saved: 'rule', applied: 'global');
+      expect((failed.setTo, failed.saved), (null, 'rule'));
+      s = museWifiModeStep(modes: modes, read: other, current: MuseRouteMode.global, saved: 'rule', applied: 'global');
+      expect((s.setTo, s.saved, s.applied), (MuseRouteMode.rule, '', ''));
+      // 用户在家里手动改回规则：离开时不再「恢复」
+      s = museWifiModeStep(modes: modes, read: const MuseSsidRead.ok(null), current: MuseRouteMode.rule, saved: 'rule', applied: 'global');
+      expect((s.setTo, s.saved, s.applied), (null, '', ''));
+      // 已经是目标模式：不保存、不切换
+      s = museWifiModeStep(modes: modes, read: home, current: MuseRouteMode.global, saved: '', applied: '');
+      expect((s.setTo, s.saved, s.applied), (null, '', ''));
+    });
+
+    test('事件驱动：Wi‑Fi 变化后检查一次，不轮询', () {
+      final src = _src('lib/features/muse/desktop/wifi_mode.dart');
+      expect(src, isNot(contains('Timer.periodic')));
+      expect(src, contains("EventChannel('com.chuanyun.app/network')"));
+      final kt = _src('android/app/src/main/kotlin/com/hiddify/hiddify/bg/ChuanyunWifiWatch.kt');
+      expect(kt, contains('override fun onListen'));
+      expect(kt, contains('unregisterNetworkCallback'));
+      // 构造时不读 Context：只保存取 Context 的函数
+      expect(kt, contains('class ChuanyunWifiWatch(private val contextOf: () -> Context)'));
+      expect(_src('lib/features/app/widget/app.dart'), contains('ref.listen(museWifiModeProvider'));
+    });
+
+    testWidgets('provider：事件后切换，离开后恢复', (t) async {
+      SharedPreferences.setMockInitialValues({'flutter.muse_wifi_modes': museWifiModesToRaw(modes)});
+      final sp = await SharedPreferences.getInstance();
+      final events = StreamController<Object?>.broadcast();
+      var ssid = const MuseSsidRead.ok('家');
+      final c = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWith((ref) async => sp),
+          museOnDemandForceProvider.overrideWithValue(true),
+          museSsidReaderProvider.overrideWithValue(() async => ssid),
+          museWifiEventsProvider.overrideWithValue(events.stream),
+        ],
+      );
+      addTearDown(c.dispose);
+      await t.runAsync(() => c.read(sharedPreferencesProvider.future));
+      c.listen(museWifiModeProvider, (_, _) {});
+      await t.pump(museWifiModeSettle + const Duration(milliseconds: 100));
+      await t.pump();
+      expect(c.read(ConfigOptions.museRouteMode), MuseRouteMode.global);
+      ssid = const MuseSsidRead.ok('咖啡店');
+      events.add('wifi_off');
+      await t.pump(museWifiModeSettle + const Duration(milliseconds: 100));
+      await t.pump();
+      expect(c.read(ConfigOptions.museRouteMode), MuseRouteMode.rule);
+      expect(c.read(MusePrefs.wifiModeSaved), '');
+      await events.close();
+    });
+
+    testWidgets('页面：先说明再请求权限，拒绝时仍可手动输入', (t) async {
+      SharedPreferences.setMockInitialValues({});
+      final sp = await SharedPreferences.getInstance();
+      var asked = 0;
+      final c = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWith((ref) async => sp),
+          museOnDemandAndroidProvider.overrideWithValue(true),
+          museWifiPermissionRequestProvider.overrideWithValue(() async {
+            asked++;
+            return 'denied';
+          }),
+        ],
+      );
+      addTearDown(c.dispose);
+      await t.runAsync(() => c.read(sharedPreferencesProvider.future));
+      await t.pumpWidget(UncontrolledProviderScope(container: c, child: const MaterialApp(home: MuseWifiModePage())));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('wifi_mode_add_current')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('wifi_mode_permission_explain')), findsOneWidget);
+      expect(asked, 0); // 说明之前不请求
+      await t.tap(find.byKey(const ValueKey('wifi_mode_permission_go')));
+      await t.pumpAndSettle();
+      expect(asked, 1);
+      expect(find.byKey(const ValueKey('wifi_mode_hint')), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('wifi_mode_input')), '公司');
+      await t.tap(find.byKey(const ValueKey('wifi_mode_add')));
+      await t.pumpAndSettle();
+      expect(museParseWifiModes(c.read(MusePrefs.wifiModes)), {'公司': MuseRouteMode.global});
+      expect(find.byKey(const ValueKey('wifi_mode_ssid_公司')), findsOneWidget);
+      expect(t.takeException(), isNull);
     });
   });
 }

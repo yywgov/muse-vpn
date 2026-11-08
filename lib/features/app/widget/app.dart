@@ -16,6 +16,7 @@ import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/desktop/wifi_mode.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -124,11 +125,14 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     if (PlatformUtils.isWindows) {
       ref.listen(museHotkeysProvider, (_, _) {});
       ref.listen(museOnDemandProvider, (_, _) {});
+      // 1.15.0 R23: 按 Wi‑Fi 切换模式（列表为空时什么都不做）
+      ref.listen(museWifiModeProvider, (_, _) {});
     }
     // 1.6.0 C9 (Android): 自动运行 (once per launch, after the first frame) and 按需运行
     if (PlatformUtils.isAndroid) {
       ref.listen(museAutoRunProvider, (_, _) {});
       ref.listen(museOnDemandProvider, (_, _) {});
+      ref.listen(museWifiModeProvider, (_, _) {});
       // 1.11.0: 隐藏桌面图标 removed — an icon hidden before comes back once
       ref.listen(museRestoreLauncherIconProvider, (_, _) {});
       // 1.11.0: home-screen widget (node · delay, sent only on a change)

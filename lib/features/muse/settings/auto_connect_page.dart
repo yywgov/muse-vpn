@@ -7,6 +7,7 @@
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/settings/wifi_mode_page.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
@@ -118,6 +119,15 @@ class MuseAutoConnectPage extends HookConsumerWidget {
                   trailing: Text(onDemandOn ? '开' : '关'),
                   chevron: true,
                   onTap: () => musePushPage(context, const MuseOnDemandPage()),
+                ),
+                // 1.15.0 R23
+                MuseTile(
+                  key: const ValueKey('settings_wifi_mode'),
+                  leading: const Icon(Icons.network_wifi_outlined),
+                  title: '按 Wi‑Fi 切换模式',
+                  trailing: Text(museWifiModeSummary(ref.watch(MusePrefs.wifiModes))),
+                  chevron: true,
+                  onTap: () => musePushPage(context, const MuseWifiModePage()),
                 ),
                 if (isWindows) const MuseWindowsSilentStartTile(),
               ],

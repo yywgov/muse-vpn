@@ -44,7 +44,7 @@ const _singKeys = <String, String>{
   'process_path': '进程路径',
   'user': '用户',
   'clash_mode': '代理模式',
-  'wifi_ssid': 'Wi-Fi 名称',
+  'wifi_ssid': 'Wi‑Fi 名称',
   'ip_version': 'IP 版本',
   'query_type': '查询类型',
 };
