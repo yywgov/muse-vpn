@@ -4,6 +4,17 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.16.0 - 2026-11-08
+
+- B7 按天/按应用流量图：统计页新增「按应用流量」（今天/7 天/30 天，前 8 个应用）；数据只存本机 muse_app_traffic、保留 30 天、不同步不备份；只在打开统计页（读一次 /connections）与连接页开着时（复用每秒帧，30 帧及离开时写入）累计，连接/断开清基线，无后台采样与轮询（logic/app_traffic.dart、data/app_traffic_recorder.dart）；按天图沿用原有
+- B8 敏感页禁截屏与后台模糊：节点详情、订阅详情、二维码、导出配置打开期间窗口加 FLAG_SECURE（最近任务缩略图空白），全部关闭即清除；外观「敏感页禁止截屏」默认开、可关（data/secure_screen.dart，ChuanyunHandler set_secure_screen）
+- B9 纯黑深色：跟随系统也可开纯黑（系统深色时生效，设置 muse_pure_black_follow）；深色下原有纯黑不变
+- B10 新用户一步引导：全新安装首次打开弹一次（粘贴/扫码添加订阅 → 添加后问「现在连接？」），可跳过，只出现一次；老用户升级（打开过旧版或已有订阅）不弹（home/first_guide.dart）
+- B11 读屏标签：节点卡片「当前节点，节点 名称，延迟」+ 点按提示，开关行合并朗读，穿云页面纯图标按钮全部带中文提示（测试扫描）
+- R25 小组件常用节点：小组件下方显示收藏前 3 个节点，点按经 chuanyun://connect?node= 切换并连接；变化时才推送，无计时器；入口只用应用 Context（onNodeFavs）
+- R17 国内应用识别：分应用代理（以下 App 不走代理）⋯「选中常见国内应用」，内置包名清单本机比对，不联网（logic/domestic_apps.dart）
+- 测试：v1160_test
+
 ### 1.15.0 - 2026-11-08
 
 - R24 连接详情「为什么走这条」：把内核报告的规则（标准内核 `rule_set=[…] => route(…)`，兼容内核 `RuleSet(…)` / `Match`）翻成中文，显示命中规则 → 出站 → 实际节点（logic/route_why.dart）

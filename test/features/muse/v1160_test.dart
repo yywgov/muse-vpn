@@ -14,6 +14,7 @@ import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hiddify/features/muse/logic/domestic_apps.dart';
+import 'package:hiddify/features/muse/data/changelog.dart';
 import 'package:hiddify/features/muse/logic/app_traffic.dart';
 import 'package:hiddify/features/muse/data/app_traffic_recorder.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
@@ -390,6 +391,18 @@ void main() {
       expect(page, contains('ref.watch(museAppTrafficOnOpenProvider);'));
       expect(page, contains("header: '按应用流量'"));
       expect(_src('lib/features/muse/data/sync_service.dart'), isNot(contains('muse_app_traffic')));
+    });
+  });
+
+  group('版本 1.16.0', () {
+    test('pubspec, changelog, CHANGELOG.md', () {
+      expect(_src('pubspec.yaml'), contains('version: 1.16.0+205'));
+      expect(museChangelog.keys.first, '1.16.0');
+      final lines = museChangelog['1.16.0']!.join();
+      for (final w in ['按应用流量', '禁止截屏', '纯黑', '一步开始', '读屏', '小组件', '常见国内应用']) {
+        expect(lines, contains(w));
+      }
+      expect(_src('CHANGELOG.md'), contains('### 1.16.0'));
     });
   });
 }
