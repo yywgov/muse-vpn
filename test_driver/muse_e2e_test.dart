@@ -374,9 +374,27 @@ Future<void> main() async {
   await nightMode(false);
   await cmd('theme:light');
 
+  // 1.16.0 B10: a new install (the emulator's is fresh) opens with the 「欢迎使用穿云」 guide …
+  try {
+    await driver.waitFor(find.byValueKey('first_guide_sheet'), timeout: const Duration(seconds: 15));
+    results['firstGuideShown'] = true;
+  } catch (e) {
+    results['firstGuideShown'] = false;
+    failures.add('first-run guide: not shown on a new install: $e');
+  }
+
   final added = await cmd('addProfile:$profile');
   results['addProfile'] = added;
   stdout.writeln('[e2e] addProfile -> $added');
+  // … and closes by itself once a subscription is added another way (e2e #20: it stayed open over
+  // 首页 and every tap on home_connect_switch timed out)
+  try {
+    await driver.waitForAbsent(find.byValueKey('first_guide_sheet'), timeout: const Duration(seconds: 15));
+    results['firstGuideClosed'] = true;
+  } catch (e) {
+    results['firstGuideClosed'] = false;
+    failures.add('first-run guide: still open after a subscription was added: $e');
+  }
 
   await cmd('connect');
   final connected = await waitRunning(true, seconds: 90);

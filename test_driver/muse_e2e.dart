@@ -94,8 +94,19 @@ Future<String> _handler(String? message) async {
         return 'ok';
       case 'addProfile':
         await _c().read(addProfileNotifierProvider.notifier).addClipboard(arg);
-        final p = await _c().read(activeProfileProvider.future);
-        return p == null ? 'no-active-profile' : 'ok:${p.name}';
+        // the active-profile stream emits the new row a moment after the insert (e2e #19/#20 read the
+        // old null): wait for it, up to 15 s, before reporting
+        final sub = _c().listen(activeProfileProvider, (_, _) {});
+        try {
+          for (var i = 0; i < 60; i++) {
+            final p = _c().read(activeProfileProvider).valueOrNull;
+            if (p != null) return 'ok:${p.name}';
+            await Future<void>.delayed(const Duration(milliseconds: 250));
+          }
+          return 'no-active-profile';
+        } finally {
+          sub.close();
+        }
       case 'connect':
       case 'disconnect':
         final running = _c().read(serviceRunningProvider);

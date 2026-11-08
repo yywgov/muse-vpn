@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/features/muse/home/first_guide.dart';
+import 'package:hiddify/features/muse/home/home_data.dart' show museHasProfileProvider;
 import 'package:hiddify/features/muse/data/secure_screen.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
@@ -138,6 +139,52 @@ void main() {
       await tester.pumpAndSettle();
       expect(closed, isTrue);
       expect(got, isNull);
+    });
+
+    testWidgets('e2e #20: the guide closes by itself when a subscription is added some other way', (tester) async {
+      final has = StateProvider<bool?>((_) => false);
+      final container = ProviderContainer(overrides: [museHasProfileProvider.overrideWith((ref) => ref.watch(has))]);
+      addTearDown(container.dispose);
+      MuseAddAction? got = MuseAddAction.paste;
+      var closed = false;
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  got = await showModalBottomSheet<MuseAddAction>(
+                    context: context,
+                    builder: (_) => const MuseFirstGuideCloser(child: MuseFirstGuideSheet(qr: true)),
+                  );
+                  closed = true;
+                },
+                child: const Text('打开'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('打开'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('first_guide_sheet')), findsOneWidget);
+      // still no subscription: stays open
+      container.read(has.notifier).state = null;
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('first_guide_sheet')), findsOneWidget);
+      // a subscription arrives (import link, 订阅 page, backup): closes as 跳过, no 「现在连接？」
+      container.read(has.notifier).state = true;
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('first_guide_sheet')), findsNothing);
+      expect(closed, isTrue);
+      expect(got, isNull);
+      expect(find.text('打开'), findsOneWidget); // only the guide closed, not the page under it
+      expect(container.read(museGuideAwaitConnectProvider), isFalse);
+    });
+
+    test('the home guide is shown wrapped in the closer', () {
+      expect(_src('lib/features/muse/home/first_guide.dart'), contains('MuseFirstGuideCloser(child: MuseFirstGuideSheet(qr: qr))'));
     });
 
     test('home decides before the 更新说明 effect records the version, and records the guide as done first', () {

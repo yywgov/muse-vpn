@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/home/home_data.dart' show museHasProfileProvider;
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/profile/add/add_profile_modal.dart' show MuseAddAction;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -52,7 +53,7 @@ Future<void> museMaybeShowFirstGuide(
   final picked = await showModalBottomSheet<MuseAddAction>(
     context: context,
     showDragHandle: true,
-    builder: (c) => MuseFirstGuideSheet(qr: qr),
+    builder: (c) => MuseFirstGuideCloser(child: MuseFirstGuideSheet(qr: qr)),
   );
   if (picked == null) return; // 跳过
   ref.read(museGuideAwaitConnectProvider.notifier).state = true;
@@ -75,6 +76,23 @@ Future<void> museGuideAskConnect(BuildContext context, WidgetRef ref) async {
     ),
   );
   if (go == true) await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+}
+
+/// Closes the guide by itself (as 跳过) once a subscription exists that was added some other way
+/// while it was open — a chuanyun:// / share import, the 订阅 page, a restored backup — so it never
+/// stays over a 首页 that already has one (e2e #20). Reacts to the profile count only; no timer.
+class MuseFirstGuideCloser extends ConsumerWidget {
+  const MuseFirstGuideCloser({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<bool?>(museHasProfileProvider, (prev, next) {
+      if (next == true && context.mounted) Navigator.of(context).maybePop();
+    });
+    return child;
+  }
 }
 
 class MuseFirstGuideSheet extends StatelessWidget {
