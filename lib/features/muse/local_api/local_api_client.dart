@@ -339,6 +339,9 @@ class MuseLocalApi {
   /// 1.8.0: empties the core's DNS query buffer.
   Future<bool> clearDnsQueries() async => _ok(await _send('DELETE', '/dns/queries'));
 
+  /// 1.15.0 R13: empties the core's DNS cache (标准内核与兼容内核都有 POST /cache/dns/flush).
+  Future<bool> flushDnsCache() async => _ok(await _send('POST', '/cache/dns/flush'));
+
   static bool _ok(int code) => code >= 200 && code < 300;
 
   /// A text WebSocket at [path] (frames as strings). Errors close the stream.

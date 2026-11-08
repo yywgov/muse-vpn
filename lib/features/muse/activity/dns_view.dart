@@ -66,6 +66,13 @@ class MuseDnsPage extends HookConsumerWidget {
     return MuseScaffold(
       title: header == null ? 'DNS' : '活动',
       actions: [
+        // 1.15.0 R13: 清空 DNS 缓存 — 改了 hosts / 规则后立即生效（只在点按时调用内核）
+        IconButton(
+          key: const ValueKey('dns_flush_cache'),
+          tooltip: '清空 DNS 缓存',
+          icon: const Icon(Icons.cleaning_services_outlined),
+          onPressed: ref.watch(museLocalApiProvider) == null ? null : () => museFlushDnsCache(ref),
+        ),
         IconButton(
           key: const ValueKey('dns_clear'),
           tooltip: '清空',
@@ -208,4 +215,17 @@ class _Hint extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 1.15.0 R13: 清空内核的 DNS 缓存；结果用中文提示。
+Future<bool> museFlushDnsCache(WidgetRef ref) async {
+  final n = ref.read(inAppNotificationControllerProvider);
+  final api = ref.read(museLocalApiProvider);
+  if (api == null) {
+    n.showInfoToast('连接后才能清空 DNS 缓存');
+    return false;
+  }
+  final ok = await api.flushDnsCache().catchError((_) => false);
+  ok ? n.showSuccessToast('已清空 DNS 缓存，新的查询会重新解析') : n.showErrorToast('清空失败，内核暂不可用');
+  return ok;
 }
