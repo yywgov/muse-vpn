@@ -328,7 +328,7 @@ void main() {
     test('pubspec and changelog', () {
       expect(_src('pubspec.yaml'), contains('version: 1.1')); // 1.12.x or later
       final lines = museChangelog['1.12.0']!;
-      expect(museChangelog.keys.take(3), contains('1.12.0'));
+      expect(museChangelog.keys, contains('1.12.0'));
       expect(lines.join(), contains('解锁'));
       expect(lines.join(), contains('快捷方式'));
       expect(_src('CHANGELOG.md'), contains('### 1.12.0'));

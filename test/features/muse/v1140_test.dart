@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/logic/qr_image_import.dart';
+import 'package:hiddify/features/muse/data/changelog.dart';
 import 'package:hiddify/features/muse/logic/node_form.dart';
 import 'package:hiddify/features/muse/logic/sub_override.dart';
 import 'package:hiddify/features/muse/nodes/node_form_dialog.dart';
@@ -390,11 +391,24 @@ void main() {
     test('wired into the node pages', () {
       final list = _src('lib/features/muse/nodes/node_list.dart');
       expect(list, contains("('add', '手动添加节点')"));
-      expect(list, contains('showMuseAddNodeDialog(context, ref, id)'));
+      expect(list, contains('museAddNodeFromMenu(context, ref'));
+      expect(_src('lib/features/muse/nodes/node_form_dialog.dart'), contains('showMuseAddNodeDialog(context, ref, profileId)'));
       final details = _src('lib/features/muse/nodes/node_details.dart');
       expect(details, contains("ValueKey('node_edit')"));
       expect(details, contains('showMuseEditNodeDialog(context, ref, editProfileId, proxy.tag, editOriginal)'));
       expect(_src('lib/features/muse/config/sub_override_page.dart'), contains("'修改 \${o.edits.length}'"));
+    });
+  });
+
+  group('版本 1.14.0', () {
+    test('pubspec, changelog, CHANGELOG.md', () {
+      expect(_src('pubspec.yaml'), contains('version: 1.14.0+203'));
+      expect(museChangelog.keys.first, '1.14.0');
+      final lines = museChangelog['1.14.0']!.join();
+      for (final w in ['保留上次成功的节点', '手动添加节点', '从相册选择', '只看收藏', '二维码', '请求头']) {
+        expect(lines, contains(w));
+      }
+      expect(_src('CHANGELOG.md'), contains('### 1.14.0'));
     });
   });
 }

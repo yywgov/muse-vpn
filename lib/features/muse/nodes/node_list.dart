@@ -330,11 +330,7 @@ class MuseNodeList extends HookConsumerWidget {
           final d = MuseNodeDensity.values.where((e) => 'density_${e.key}' == picked).firstOrNull;
           if (d != null) return ref.read(MusePrefs.nodeDensity.notifier).update(d.key);
         case 'add':
-          final id = ref.read(museActiveProfileIdProvider);
-          if (id == null) return;
-          if (await showMuseAddNodeDialog(context, ref, id)) {
-            ref.read(inAppNotificationControllerProvider).showSuccessToast(running ? '已添加节点，正在应用' : '已添加节点，连接后出现在列表里');
-          }
+          await museAddNodeFromMenu(context, ref, profileId: ref.read(museActiveProfileIdProvider), running: running);
         case 'select':
           selecting.value = true;
           picked.value = const {};

@@ -4,6 +4,7 @@
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/muse/config/sub_override_page.dart' show museSaveOverride;
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/node_form.dart';
@@ -23,6 +24,14 @@ Future<bool> showMuseAddNodeDialog(BuildContext context, WidgetRef ref, String p
   final o = _overrideOf(ref, profileId);
   await museSaveOverride(ref, profileId, o.copyWith(enabled: true, nodes: [...o.nodes, link]));
   return true;
+}
+
+/// 节点 ⋯ › 手动添加节点, with the toast.
+Future<void> museAddNodeFromMenu(BuildContext context, WidgetRef ref, {required String? profileId, required bool running}) async {
+  if (profileId == null || !await showMuseAddNodeDialog(context, ref, profileId)) return;
+  try {
+    ref.read(inAppNotificationControllerProvider).showSuccessToast(running ? '已添加节点，正在应用' : '已添加节点，连接后出现在列表里');
+  } catch (_) {}
 }
 
 /// 编辑节点 [tag] of [profileId]; [original] is the node as the subscription has it.
