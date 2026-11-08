@@ -16,7 +16,9 @@ import 'package:hiddify/features/app_based_routing/model/pkg_flag.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/logic/domestic_apps.dart';
 import 'package:hiddify/features/muse/logic/per_app_tools.dart';
+import 'package:hiddify/features/app_based_routing/model/per_app_proxy_mode.dart';
 import 'package:hiddify/features/muse/widget/muse_sheet.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -198,6 +200,17 @@ class AppListPage extends HookConsumerWidget with PresLogger {
       );
     }
 
+    // 1.16.0 R17: 一键选中已装的常见国内应用（内置包名清单，本机比对，不联网）
+    Future<void> selectDomestic() async {
+      final installed = asyncApps.valueOrNull ?? const <MuseAppRow>[];
+      final flags = flagsNow();
+      final targets = museDomesticTargets(installed, flags);
+      final already = installed.where((a) => museDomesticPackages.contains(a.packageName)).length - targets.length;
+      await ref.read(AppListProvider(mode).notifier).setSelected(targets, selected: true);
+      sortListener.value = !sortListener.value;
+      toast(museDomesticSummary(added: targets.length, already: already));
+    }
+
     Future<void> exportClipboard() async {
       final text = museExportPackageList(flagsNow());
       await Clipboard.setData(ClipboardData(text: text));
@@ -295,6 +308,8 @@ class AppListPage extends HookConsumerWidget with PresLogger {
                       ),
                     MuseMenuItem(label: '全选', icon: Icons.select_all_outlined, onTap: mode == null ? null : selectAll),
                     MuseMenuItem(label: '反选', icon: Icons.flip_outlined, onTap: mode == null ? null : invert),
+                    if (mode == AppProxyMode.exclude)
+                      MuseMenuItem(label: '选中常见国内应用', icon: Icons.flag_outlined, onTap: selectDomestic),
                     MuseMenuItem(
                       label: '从剪贴板导入',
                       icon: Icons.content_paste_outlined,
