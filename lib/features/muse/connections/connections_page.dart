@@ -4,6 +4,7 @@
 // the connection state.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/logic/route_why.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart';
@@ -287,6 +288,7 @@ Future<void> showMuseConnDetail(BuildContext context, WidgetRef ref, MuseConn c,
     title: '连接详情',
     builder: (ctx, controller) {
       final scheme = Theme.of(ctx).colorScheme;
+      final why = museRouteWhy(c);
       Widget kv(String k, String v) => v.isEmpty
           ? const SizedBox.shrink()
           : MuseTile(
@@ -347,8 +349,19 @@ Future<void> showMuseConnDetail(BuildContext context, WidgetRef ref, MuseConn c,
               ],
             ],
           ),
-          const SizedBox(height: MuseSpace.s16),
+          // 1.15.0 R24: 为什么走这条 — 命中的规则 → 出站 → 节点
           MuseSectionGroup(
+            key: const ValueKey('conn_why'),
+            title: '为什么走这条',
+            summary: why.summary,
+            children: [
+              kv('命中规则', why.rule),
+              kv('出站', why.outbound),
+              kv('节点', why.node),
+            ],
+          ),
+          MuseSectionGroup(
+            title: '详情',
             children: [
               kv('主机', c.host),
               kv('目标', c.destination),
