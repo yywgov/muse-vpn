@@ -4,6 +4,16 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.17.0 - 2026-11-08
+
+- B12 应用内更新校验与重试：下载后用 Release 附带的 `.sha256` 文件校验（与 GitHub digest 都有时须一致，否则不安装）；失败保留已下载分段，「重试」按 Range 断点续传，校验失败删除后「重新下载」；新增「正在校验安装包…」与中文失败说明；只清理其他版本的旧下载
+- B13 Windows 全局快捷键：注册前用 user32 RegisterHotKey 试探，被其他程序占用的组合不注册并在「快捷键」页标出；默认不绑定（等于关闭），总开关可停用
+- R18 Windows 托盘切节点：节点 ▸ 收藏 / 最近使用（当前代理组内、按用户顺序、各最多 10 个，菜单重建时读已存列表，不测速），延迟区分「超时 / 未测」；托盘切换记入最近使用
+- R12 Windows 商店应用回环豁免：设置 › 网络「允许商店应用走代理」，点按并确认后经 UAC 用 CheckNetIsolation 为未豁免的 AppContainer 开通回环，绝不自动执行；可只撤销穿云开通的
+- R19 Windows 隐藏到托盘时释放界面：隐藏期间页面移出组件树、清图片缓存，显示（含二次启动原生恢复）时重建
+- 修复：调试/e2e 构建首页「上次异常」riverpod `_didChangeDependency` 断言——内核启动 bump coreRestartSignalProvider 后，ConnectionNotifier 在 await 之后 `ref.read`；改经 `ref.container` 读取（release 构建不受影响）；e2e 读本机崩溃记录，出现 riverpod 断言即失败
+- 测试：v1170_test
+
 ### 1.16.0 - 2026-11-08
 
 - B7 按天/按应用流量图：统计页新增「按应用流量」（今天/7 天/30 天，前 8 个应用）；数据只存本机 muse_app_traffic、保留 30 天、不同步不备份；只在打开统计页（读一次 /connections）与连接页开着时（复用每秒帧，30 帧及离开时写入）累计，连接/断开清基线，无后台采样与轮询（logic/app_traffic.dart、data/app_traffic_recorder.dart）；按天图沿用原有

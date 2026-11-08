@@ -6,6 +6,7 @@ import 'package:hiddify/features/about/widget/about_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hiddify/features/muse/desktop/hidden_release.dart';
+import 'package:hiddify/features/muse/data/changelog.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
 import 'package:hiddify/features/muse/desktop/uwp_loopback.dart';
@@ -49,6 +50,7 @@ void main() {
   r18();
   r12();
   r19();
+  version();
   group('上次异常 riverpod _didChangeDependency', () {
     test('a ref.read after a watched dependency changed trips the debug assertion (the root cause)', () {
       final c = ProviderContainer();
@@ -364,4 +366,18 @@ void r19() {
 
 extension on String {
   int allMatchesIn(String s) => allMatches(s).length;
+}
+
+void version() {
+  group('版本 1.17.0', () {
+    test('pubspec, changelog, CHANGELOG.md', () {
+      expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.17.0+206'));
+      expect(museChangelog.keys.first, '1.17.0');
+      final lines = museChangelog['1.17.0']!.join();
+      for (final w in ['校验', '重试', '快捷键', '收藏', '最近使用', '商店应用', '托盘']) {
+        expect(lines, contains(w));
+      }
+      expect(File('CHANGELOG.md').readAsStringSync(), contains('### 1.17.0'));
+    });
+  });
 }
