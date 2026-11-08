@@ -13,7 +13,10 @@ const museExportConfigTitle = '导出配置';
 const museImportConfigTitle = '导入配置';
 
 /// 1.11.0: 导出配置 — the dialog (脱敏 / password), then a save dialog for the file.
-Future<void> museExportConfig(BuildContext context, WidgetRef ref) async {
+/// 1.16.0 B8: no screenshots while 导出配置 (a password, subscription links) is on screen.
+Future<void> museExportConfig(BuildContext context, WidgetRef ref) => museSecureFor(context, () => _museExportConfig(context, ref));
+
+Future<void> _museExportConfig(BuildContext context, WidgetRef ref) async {
   final choice = await showMuseExportBackupDialog(context);
   if (choice == null || !context.mounted) return;
   try {

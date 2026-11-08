@@ -3,6 +3,7 @@
 // Network-affecting options start off; nothing here changes the default connection path.
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/data/secure_screen.dart';
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
 import 'package:hiddify/features/muse/logic/quick_rules.dart';
 import 'package:hiddify/features/muse/widget/muse_sheet.dart';

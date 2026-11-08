@@ -187,6 +187,20 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
                     result.success(true)
                 }
 
+                // 1.16.0 B8: 敏感页禁截屏（FLAG_SECURE 同时让最近任务里的缩略图变空白）。只作用于当前窗口，
+                // 在主线程调用（MethodChannel 回调本来就在主线程），离开敏感页即清除。
+                "set_secure_screen" -> {
+                    val on = call.argument<Boolean>("on") ?: false
+                    val window = activity?.window
+                    if (window == null) {
+                        result.success(false)
+                    } else {
+                        if (on) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                        else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                        result.success(true)
+                    }
+                }
+
                 "set_exclude_from_recents" -> {
                     applyExcludeFromRecents(context, call.argument<Boolean>("exclude") ?: false)
                     result.success(true)

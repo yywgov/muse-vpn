@@ -41,6 +41,8 @@ abstract final class MusePrefs {
   /// 隐私模式: 首页 numbers blurred
   /// 1.16.0 B9: 跟随系统时也用纯黑（只在系统切到深色时生效）
   static final pureBlackFollowSystem = PreferencesNotifier.create<bool, bool>("muse_pure_black_follow", false);
+  /// 1.16.0 B8: 敏感页（节点详情、订阅链接、二维码、备份导出）禁截屏并在最近任务里隐藏内容
+  static final secureSensitive = PreferencesNotifier.create<bool, bool>("muse_secure_sensitive", true);
   static final privacyMask = PreferencesNotifier.create<bool, bool>("muse_privacy_mask", false);
 
   /// 节假日云朵小彩蛋

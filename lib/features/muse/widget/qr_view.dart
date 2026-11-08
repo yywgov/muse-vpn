@@ -1,6 +1,7 @@
 // 穿云 1.4.0 - a QR code drawn from the qr package (no image assets, no network).
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/data/secure_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
@@ -81,7 +82,8 @@ Future<void> showMuseQrDialog(BuildContext context, {required String title, requ
     if (!await museConfirmSensitiveShare(context, warning: warning)) return;
     if (!context.mounted) return;
   }
-  await showDialog<void>(
+  // 1.16.0 B8: no screenshots of a QR code while it is shown
+  await museSecureFor(context, () => showDialog<void>(
     context: context,
     builder: (c) => AlertDialog(
       title: Text(title),
@@ -111,5 +113,5 @@ Future<void> showMuseQrDialog(BuildContext context, {required String title, requ
         FilledButton(onPressed: () => Navigator.of(c).pop(), child: const Text('关闭')),
       ],
     ),
-  );
+  ));
 }

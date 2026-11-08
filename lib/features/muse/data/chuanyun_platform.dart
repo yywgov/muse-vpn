@@ -52,6 +52,9 @@ abstract final class ChuanyunPlatform {
   static Future<bool> setLauncherIconHidden(bool hidden) async =>
       await _call<bool>('set_launcher_icon_hidden', {'hidden': hidden}) ?? false;
 
+  /// 1.16.0 B8: 当前窗口禁截屏 / 最近任务模糊（Android FLAG_SECURE）；其他平台无操作。
+  static Future<bool> setSecureScreen(bool on) async => await _call<bool>('set_secure_screen', {'on': on}) ?? false;
+
   static Future<void> setExcludeFromRecents(bool exclude) =>
       _call<bool>('set_exclude_from_recents', {'exclude': exclude});
 

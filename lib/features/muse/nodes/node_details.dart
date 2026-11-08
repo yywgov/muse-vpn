@@ -5,7 +5,17 @@ part of 'node_list.dart';
 
 /// Long-press a node: full name, protocol, latency and when it was measured, with
 /// 收藏 / 只测这个节点 / 复制名称 / 使用此节点.
+/// 1.16.0 B8: 节点详情 is a sensitive page (address, port): no screenshots while it is open.
 Future<void> showMuseNodeDetails(
+  BuildContext context,
+  WidgetRef ref,
+  OutboundInfo proxy, {
+  required DateTime? since,
+  required String groupTag,
+}) =>
+    museSecureFor(context, () => _showMuseNodeDetails(context, ref, proxy, since: since, groupTag: groupTag));
+
+Future<void> _showMuseNodeDetails(
   BuildContext context,
   WidgetRef ref,
   OutboundInfo proxy, {

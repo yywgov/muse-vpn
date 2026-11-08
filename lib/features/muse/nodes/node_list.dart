@@ -9,6 +9,7 @@
 // Works while disconnected from the cached list (picking then only remembers the node).
 // Part of 穿云 (GPLv3).
 
+import 'package:hiddify/features/muse/data/secure_screen.dart';
 import 'package:hiddify/features/muse/logic/fail_reason.dart';
 import 'package:hiddify/features/muse/data/port_override.dart';
 import 'dart:async';

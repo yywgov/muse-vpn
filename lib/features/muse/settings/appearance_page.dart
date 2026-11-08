@@ -85,6 +85,16 @@ class MuseAppearancePage extends HookConsumerWidget {
                 value: ref.watch(MusePrefs.privacyMask),
                 onChanged: (v) => ref.read(MusePrefs.privacyMask.notifier).update(v),
               ),
+              // 1.16.0 B8: 敏感页禁截屏 (Android only: the window flag)
+              if (android ?? PlatformUtils.isAndroid)
+                MuseSwitchTile(
+                  key: const ValueKey('appearance_secure_sensitive'),
+                  leading: const Icon(Icons.screenshot_monitor_outlined),
+                  title: '敏感页禁止截屏',
+                  info: '节点详情、订阅详情、二维码、导出配置打开时禁止截屏和录屏，在最近任务里也只显示空白',
+                  value: ref.watch(MusePrefs.secureSensitive),
+                  onChanged: (v) => ref.read(MusePrefs.secureSensitive.notifier).update(v),
+                ),
               // 1.10.0: from the removed 帮助与隐私 page (same preference)
               MuseSwitchTile(
                 key: const ValueKey('clear_clipboard_switch'),

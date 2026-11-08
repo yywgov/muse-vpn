@@ -1,4 +1,5 @@
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
+import 'package:hiddify/features/muse/data/secure_screen.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:flutter/material.dart';
@@ -57,7 +58,8 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                 return KeyEventResult.ignored;
               },
             );
-            return Scaffold(
+            // 1.16.0 B8: 订阅详情 shows the subscription link: no screenshots while it is open
+            return MuseSecureScope(child: Scaffold(
               appBar: AppBar(
                 title: Text(t.pages.profileDetails.title),
                 actions: [
@@ -249,7 +251,7 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                   ),
                 ],
               ),
-            );
+            ));
           },
           error: (error, stackTrace) => Scaffold(
             appBar: AppBar(title: Text(t.pages.profileDetails.title)),
