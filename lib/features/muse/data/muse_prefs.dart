@@ -275,6 +275,9 @@ abstract final class MusePrefs {
 
   /// 1.5.3: last 出口 results (logic/exit_check.dart MuseExitCache); local only, never synced
   static final exitCache = PreferencesNotifier.create<String, String>("muse_exit_cache", "");
+
+  /// 1.17.0 R12: store-app SIDs 穿云 exempted from loopback isolation (JSON list; local only, for 撤销)
+  static final uwpLoopbackAdded = PreferencesNotifier.create<String, String>("muse_uwp_loopback_added", "");
 }
 
 /// 1.6.0 C7 文字缩放 range (percent).

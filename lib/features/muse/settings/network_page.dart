@@ -28,7 +28,7 @@ class MuseNetworkPage extends HookConsumerWidget {
       title: '网络',
       body: MuseGroupedBody(
         children: [
-          if (windows ?? PlatformUtils.isWindows) const MuseSection(children: [MuseWindowsModeTile()]),
+          if (windows ?? PlatformUtils.isWindows) const MuseSection(children: [MuseWindowsModeTile(), MuseUwpLoopbackTile()]),
           MuseSection(
             children: [
               MuseTile(

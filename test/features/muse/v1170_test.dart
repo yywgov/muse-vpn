@@ -6,6 +6,8 @@ import 'package:hiddify/features/about/widget/about_page.dart';
 import 'package:flutter/services.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
+import 'package:hiddify/features/muse/desktop/uwp_loopback.dart';
+import 'package:hiddify/features/muse/settings/windows_settings.dart';
 import 'package:hiddify/features/muse/settings/windows_extras.dart';
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
@@ -43,6 +45,7 @@ void main() {
   b12();
   b13();
   r18();
+  r12();
   group('上次异常 riverpod _didChangeDependency', () {
     test('a ref.read after a watched dependency changed trips the debug assertion (the root cause)', () {
       final c = ProviderContainer();
@@ -259,6 +262,43 @@ void r18() {
       expect(sub[2].key, '-');
       final none = museTrayMenuSpec(const Connected(), MuseRouteMode.rule, nodes: museTrayNodes(items, selected: 'hk'));
       expect(none.firstWhere((e) => e.key == 'nodes').children.first.key, startsWith('node:'));
+    });
+  });
+}
+
+void r12() {
+  group('R12 商店应用回环豁免', () {
+    const a = 'S-1-15-2-1234567890-1111111111-2222222222-3333333333-444444444-555555555-666666666';
+    const b = 'S-1-15-2-9876543210-1111111111-2222222222-3333333333-444444444-555555555-777777777';
+    test('reads store-app SIDs from reg query and the exempt list', () {
+      final reg = '\r\n$museAppContainerKey\\$a\r\n$museAppContainerKey\\${b.toLowerCase()}\r\n$museAppContainerKey\\$a\r\n';
+      expect(museParseAppContainerSids(reg), [a, b]);
+      expect(museParseAppContainerSids('ERROR: nothing'), isEmpty);
+      expect(museParseLoopbackExempt('List Loopback Exempted AppContainers\r\n\r\n[1] -----\r\n    Name: x\r\n    SID:  $a\r\nOK.'), {a});
+    });
+    test('script adds / removes exactly the given SIDs; elevation is explicit', () {
+      final add = museLoopbackScript([a, b]);
+      expect(add, contains('CheckNetIsolation.exe LoopbackExempt -a -p=$a'));
+      expect(add, contains('-a -p=$b'));
+      expect(add, isNot(contains(' -c')), reason: 'never clears exemptions the user made');
+      expect(museLoopbackScript([a], remove: true), contains('LoopbackExempt -d -p=$a'));
+      final args = museLoopbackElevateArgs(r"C:\Users\o'k\loopback.cmd");
+      expect(args.last, contains('-Verb RunAs'));
+      expect(args.last, contains("o''k"));
+      expect(args.last, contains('exit 1223'));
+    });
+    test('Chinese results and explanation; tile only runs when tapped', () {
+      expect(museLoopbackResultText(const MuseLoopbackDone(3)), contains('3 个商店应用'));
+      expect(museLoopbackResultText(const MuseLoopbackDone(0)), contains('不用再开通'));
+      expect(museLoopbackResultText(const MuseLoopbackDone(2, removed: true)), contains('撤销'));
+      expect(museLoopbackResultText(const MuseLoopbackDeclined()), contains('管理员授权'));
+      expect(museLoopbackExplain, contains('管理员授权'));
+      expect(museLoopbackExplain, contains('不会自动运行'));
+      expect(museUwpAddedFromRaw('["$a"]'), [a]);
+      expect(museUwpAddedFromRaw(''), isEmpty);
+      final src = File('lib/features/muse/desktop/uwp_loopback.dart').readAsStringSync();
+      expect(RegExp('Timer|periodic').hasMatch(src), isFalse);
+      expect(File('lib/features/muse/settings/network_page.dart').readAsStringSync(), contains('MuseUwpLoopbackTile()'));
     });
   });
 }

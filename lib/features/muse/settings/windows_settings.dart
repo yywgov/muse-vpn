@@ -6,6 +6,8 @@
 // Preferences and behaviour are unchanged.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -13,6 +15,8 @@ import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/windows_admin.dart';
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
+import 'package:hiddify/features/muse/desktop/uwp_loopback.dart';
+import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart' show musePushPage;
 import 'package:hiddify/features/muse/settings/windows_extras.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
@@ -58,6 +62,86 @@ class MuseWindowsModeTile extends ConsumerWidget {
         }
         await museSwitchServiceMode(ref.read, picked);
       },
+    );
+  }
+}
+
+/// 1.17.0 R12: the SIDs stored by 「允许商店应用走代理」.
+List<String> museUwpAddedFromRaw(String raw) {
+  try {
+    return [for (final e in jsonDecode(raw) as List) '$e'];
+  } catch (_) {
+    return const [];
+  }
+}
+
+/// 1.17.0 R12: 允许商店应用走代理 (设置 › 网络, Windows). Runs only when tapped, after the explanation.
+class MuseUwpLoopbackTile extends ConsumerStatefulWidget {
+  const MuseUwpLoopbackTile({super.key});
+
+  @override
+  ConsumerState<MuseUwpLoopbackTile> createState() => _MuseUwpLoopbackTileState();
+}
+
+class _MuseUwpLoopbackTileState extends ConsumerState<MuseUwpLoopbackTile> {
+  bool _busy = false;
+
+  Future<void> _run({required bool revert}) async {
+    final dialogs = ref.read(dialogNotifierProvider.notifier);
+    final added = museUwpAddedFromRaw(ref.read(MusePrefs.uwpLoopbackAdded));
+    final ok = await dialogs.showConfirmation(
+      title: revert ? '撤销商店应用开通' : '允许商店应用走代理',
+      message: revert
+          ? '将撤销穿云之前为 ${added.length} 个商店应用开通的本机回环，需要一次管理员授权。你自己用其他工具开通的不受影响。'
+          : museLoopbackExplain,
+      positiveBtnTxt: revert ? '撤销' : '开通',
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busy = true);
+    final MuseLoopbackResult r;
+    try {
+      r = revert
+          ? await MuseUwpLoopback.revert(added)
+          : await MuseUwpLoopback.exemptAll(
+              onAdded: (sids) => ref
+                  .read(MusePrefs.uwpLoopbackAdded.notifier)
+                  .update(jsonEncode({...added, ...sids}.toList())),
+            );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (revert && r is MuseLoopbackDone) await ref.read(MusePrefs.uwpLoopbackAdded.notifier).update('');
+    final toast = ref.read(inAppNotificationControllerProvider);
+    final text = museLoopbackResultText(r);
+    if (r is MuseLoopbackDone) {
+      toast.showSuccessToast(text);
+    } else {
+      toast.showErrorToast(text);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final added = museUwpAddedFromRaw(ref.watch(MusePrefs.uwpLoopbackAdded));
+    return MuseTile(
+      key: const ValueKey('settings_uwp_loopback'),
+      leading: const Icon(Icons.storefront_outlined),
+      title: '允许商店应用走代理',
+      subtitle: added.isEmpty ? '邮件、天气等商店应用默认连不上本机代理；点一下开通（需管理员授权）' : '已为 ${added.length} 个商店应用开通 · 点一下可再次开通或撤销',
+      trailing: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+      chevron: !_busy,
+      onTap: _busy
+          ? null
+          : () async {
+              if (added.isEmpty) return _run(revert: false);
+              final picked = await ref.read(dialogNotifierProvider.notifier).showSettingPicker<String>(
+                title: '允许商店应用走代理',
+                selected: '',
+                options: const ['add', 'revert'],
+                getTitle: (v) => v == 'revert' ? '撤销穿云开通的' : '为新装的商店应用开通',
+              );
+              if (picked == 'add' || picked == 'revert') await _run(revert: picked == 'revert');
+            },
     );
   }
 }
