@@ -29,7 +29,10 @@ SystemUiOverlayStyle museSystemOverlayStyle(Brightness themeBrightness) {
 const museLightScrim = Color(0x52000000);
 
 class AppTheme {
-  AppTheme(this.mode, this.fontFamily);
+  AppTheme(this.mode, this.fontFamily, {this.blackWhenSystemDark = false});
+
+  /// 1.16.0 B9: 跟随系统 + 纯黑 (系统切到深色时用纯黑背景)
+  final bool blackWhenSystemDark;
 
   static Color get brand => MusePalette.brand;
 
@@ -49,7 +52,7 @@ class AppTheme {
     seed: seed,
     brightness: brightness,
     style: MuseColorStyle.fromKey(MusePalette.colorStyle),
-    pureBlack: brightness == Brightness.dark && mode.trueBlack,
+    pureBlack: museUsePureBlack(mode, blackWhenSystemDark: blackWhenSystemDark, brightness: brightness),
   );
 
   ThemeData lightTheme(ColorScheme? lightColorScheme) => _cached(scheme(Brightness.light));
@@ -225,3 +228,8 @@ class AppTheme {
     );
   }
 }
+
+/// 1.16.0 B9: whether the dark scheme is pure black: 深色 + 纯黑, or 跟随系统 + 纯黑 while the
+/// system is dark. 浅色 is never black.
+bool museUsePureBlack(AppThemeMode mode, {required bool blackWhenSystemDark, required Brightness brightness}) =>
+    brightness == Brightness.dark && (mode.trueBlack || (mode == AppThemeMode.system && blackWhenSystemDark));

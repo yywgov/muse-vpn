@@ -39,6 +39,8 @@ abstract final class MusePrefs {
   static final customAccents = PreferencesNotifier.create<String, String>("muse_custom_accents", "");
 
   /// 隐私模式: 首页 numbers blurred
+  /// 1.16.0 B9: 跟随系统时也用纯黑（只在系统切到深色时生效）
+  static final pureBlackFollowSystem = PreferencesNotifier.create<bool, bool>("muse_pure_black_follow", false);
   static final privacyMask = PreferencesNotifier.create<bool, bool>("muse_privacy_mask", false);
 
   /// 节假日云朵小彩蛋

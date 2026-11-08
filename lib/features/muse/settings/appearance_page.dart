@@ -57,6 +57,16 @@ class MuseAppearancePage extends HookConsumerWidget {
                       .read(themePreferencesProvider.notifier)
                       .changeThemeMode(v ? AppThemeMode.black : AppThemeMode.dark),
                 ),
+              // 1.16.0 B9: 跟随系统也能选纯黑（系统切到深色时才生效，浅色不变）
+              if (shownTheme == AppThemeMode.system)
+                MuseSwitchTile(
+                  key: const ValueKey('appearance_pure_black_follow'),
+                  leading: const Icon(Icons.contrast_outlined),
+                  title: '纯黑',
+                  info: '系统切到深色时背景用纯黑，有机发光屏幕更省电；浅色不变',
+                  value: ref.watch(MusePrefs.pureBlackFollowSystem),
+                  onChanged: (v) => ref.read(MusePrefs.pureBlackFollowSystem.notifier).update(v),
+                ),
             ],
           ),
           MuseSection(

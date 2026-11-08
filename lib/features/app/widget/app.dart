@@ -30,6 +30,7 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
+import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_based_routing_notifier.dart';
 import 'package:hiddify/features/connection/widget/connection_wrapper.dart';
@@ -84,13 +85,14 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final router = ref.watch(goRouterNotiferProvider);
     final locale = ref.watch(localePreferencesProvider);
     final themeMode = ref.watch(themePreferencesProvider);
-    museApplyPureBlack(themeMode.trueBlack);
+    final blackFollow = ref.watch(MusePrefs.pureBlackFollowSystem);
+    museApplyPureBlack(themeMode.trueBlack || (themeMode == AppThemeMode.system && blackFollow));
     // 1.4.0: accent colour and text size (设置 › 外观); 1.6.0 C7: custom accent, 纯黑, 文字缩放
     museApplyAccent(ref.watch(MusePrefs.accent));
     // 1.11.0: 配色风格 is fixed to 忠实 and text follows the system font size (a saved 配色风格 /
     // 文字缩放 from an older version is ignored, never applied)
     museApplyColorStyle(museDefaultColorStyle);
-    final theme = AppTheme(themeMode, locale.preferredFontFamily);
+    final theme = AppTheme(themeMode, locale.preferredFontFamily, blackWhenSystemDark: blackFollow);
     final activeBreakpoint = Breakpoint(context).activeBreakpoint;
 
     ref.listen(foregroundProfilesUpdateNotifierProvider, (_, _) {});
