@@ -500,6 +500,17 @@ Future<void> main() async {
 
   await cmd('disconnect');
   results['disconnected'] = await waitRunning(false, seconds: 30);
+  // 1.17.0: no riverpod assertion may reach the local crash log (首页「上次异常」 showed
+  // '_didChangeDependency' in every debug e2e from #16 to #21)
+  try {
+    final crashLog = await cmd('crashLog');
+    File('${out.path}/crash_log.txt').writeAsStringSync(crashLog);
+    if (crashLog.contains('package:riverpod/')) {
+      failures.add('crash log: riverpod assertion recorded: ${crashLog.split('\n').first}');
+    }
+  } catch (e) {
+    failures.add('crash log: could not read: $e');
+  }
   results['failures'] = failures;
   File('${out.path}/results.json').writeAsStringSync(const JsonEncoder.withIndent('  ').convert(results));
   stdout.writeln('[e2e] results: ${jsonEncode(results)}');

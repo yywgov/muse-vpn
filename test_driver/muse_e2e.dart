@@ -14,6 +14,8 @@ import 'package:flutter_driver/driver_extension.dart';
 import 'package:hiddify/bootstrap.dart';
 import 'package:hiddify/core/model/environment.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
+import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
@@ -181,6 +183,9 @@ Future<String> _handler(String? message) async {
       case 'wantConnected':
         await _c().read(Preferences.startedByUser.notifier).update(true);
         return 'ok';
+      case 'crashLog':
+        // 1.17.0: the local crash log (redacted), so the host can fail on framework assertions
+        return MuseCrashRecorder.exportText(await _c().read(sharedPreferencesProvider.future));
       case 'health':
         return jsonEncode(await const MethodChannel('com.chuanyun.app/system').invokeMethod<Map<Object?, Object?>>('health_state'));
       case 'bgPort':

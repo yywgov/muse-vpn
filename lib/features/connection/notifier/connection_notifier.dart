@@ -45,11 +45,11 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
 
     yield* _connectionRepo.watchConnectionStatus().doOnData((event) {
       // 1.5.3: a stopped core runs no subscription (a restart by the tile / watchdog is then trusted)
-      if (event is Disconnected) Future.microtask(() => ref.read(museCoreProfileIdProvider.notifier).state = null);
+      if (event is Disconnected) Future.microtask(() => _read(museCoreProfileIdProvider.notifier).state = null);
       // 穿云 Windows 1.2.1: a failure no longer drops the user's intent on Windows; the connection
       // keeper retries with backoff and gives up (startedByUser = false) itself.
       if (event case Disconnected(connectionFailure: final _?) when PlatformUtils.isDesktop && !PlatformUtils.isWindows) {
-        Future.microtask(() => ref.read(Preferences.startedByUser.notifier).update(false));
+        Future.microtask(() => _read(Preferences.startedByUser.notifier).update(false));
       }
       // One call for every status buried failures at info, next to the ordinary
       // comings and goings. A failure carries the core's own panic text, which
@@ -64,23 +64,32 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
         // 1.13.0: local crash log / 「上次异常」, two in a row → 安全模式
         Future.microtask(() async {
           await MuseHealth.startFailed('$failure');
-          await ref.read(museHealthProvider.notifier).refresh();
+          await _read(museHealthProvider.notifier).refresh();
         });
       } else {
         loggy.info(status);
         // 1.13.0: 被其他 VPN 断开 is written by the service; 首页 reads it on the next status
-        if (event is Disconnected) Future.microtask(() => ref.read(museHealthProvider.notifier).refresh());
+        if (event is Disconnected) Future.microtask(() => _read(museHealthProvider.notifier).refresh());
         if (event is Connected) {
           Future.microtask(() async {
             await MuseHealth.startOk();
-            await ref.read(museHealthProvider.notifier).refresh();
+            await _read(museHealthProvider.notifier).refresh();
           });
         }
       }
     });
   }
 
-  ConnectionRepository get _connectionRepo => ref.read(connectionRepositoryProvider);
+
+  // 1.17.0: reads after an await / from status callbacks go through the container. Every core
+  // start bumps coreRestartSignalProvider (watched in build), which marks this notifier "outdated"
+  // until its next rebuild; a ref.read in that window trips riverpod's debug assertion
+  // "Cannot use ref functions after the dependency of a provider changed but before the provider
+  // rebuilt" (首页「上次异常」 in debug / e2e builds since 1.13.0). Release builds drop the
+  // assertion, so behaviour is the same; this only removes the debug-only error.
+  T _read<T>(ProviderListenable<T> provider) => ref.container.read(provider);
+
+  ConnectionRepository get _connectionRepo => _read(connectionRepositoryProvider);
 
   Future<void> mayConnect() async {
     if (state case AsyncData(:final value)) {
@@ -91,8 +100,8 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   /// Restores the tunnel on desktop start when the user had it running before quitting,
   /// so a session started manually survives a reboot or an autostart login.
   Future<void> restoreConnectionOnStartup() async {
-    final startedByUser = ref.read(Preferences.startedByUser);
-    final activeProfile = await ref.read(activeProfileProvider.future);
+    final startedByUser = _read(Preferences.startedByUser);
+    final activeProfile = await _read(activeProfileProvider.future);
     final shouldRestore = shouldRestoreConnectionOnStartup(
       isDesktop: PlatformUtils.isDesktop,
       startedByUser: startedByUser,
@@ -104,7 +113,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     }
     loggy.info("restoring previous connection on startup");
     intentGeneration++;
-    await ref.read(Preferences.startedByUser.notifier).update(true);
+    await _read(Preferences.startedByUser.notifier).update(true);
     await _connect();
   }
 
@@ -120,12 +129,12 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
           await _cancelConnect();
         case Disconnected():
           intentGeneration++;
-          await ref.read(Preferences.startedByUser.notifier).update(true);
+          await _read(Preferences.startedByUser.notifier).update(true);
           await _connect();
         case Connected():
           // default:
           intentGeneration++;
-          await ref.read(Preferences.startedByUser.notifier).update(false);
+          await _read(Preferences.startedByUser.notifier).update(false);
           await _disconnect();
         case Connecting():
           // 穿云 1.2.2: a tap while the connection keeper is reconnecting cancels the recovery.
@@ -142,7 +151,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
 
   Future<void> _cancelConnect() async {
     intentGeneration++;
-    await ref.read(Preferences.startedByUser.notifier).update(false);
+    await _read(Preferences.startedByUser.notifier).update(false);
     _setPreparing(false);
     await _disconnect();
   }
@@ -157,7 +166,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     if (_preparing == v) return;
     _preparing = v;
     try {
-      ref.read(museConnectPreparingProvider.notifier).state = v;
+      _read(museConnectPreparingProvider.notifier).state = v;
     } catch (_) {}
   }
 
@@ -169,18 +178,17 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       }
       loggy.info("active profile changed, reconnecting");
       intentGeneration++;
-      await ref.read(Preferences.startedByUser.notifier).update(true);
-      await _connectionRepo.reconnect(profile, ref.read(Preferences.disableMemoryLimit)).map((done) {
+      await _read(Preferences.startedByUser.notifier).update(true);
+      await _connectionRepo.reconnect(profile, _read(Preferences.disableMemoryLimit)).map((done) {
         // 1.5.3: the node list follows the new subscription (fresh group stream from the reloaded core)
-        ref.read(museCoreProfileIdProvider.notifier).state = profile.id;
-        ref.invalidate(proxiesOverviewNotifierProvider);
+        _read(museCoreProfileIdProvider.notifier).state = profile.id;
+        ref.container.invalidate(proxiesOverviewNotifierProvider);
         return done;
       }).mapLeft((err) async {
         loggy.warning("error reconnecting", err);
         state = AsyncError(err, StackTrace.current);
-        await ref
-            .read(dialogNotifierProvider.notifier)
-            .showCustomAlertFromErr(museFriendlyPresent(err.present(ref.read(translationsProvider).requireValue)));
+        await _read(dialogNotifierProvider.notifier)
+            .showCustomAlertFromErr(museFriendlyPresent(err.present(_read(translationsProvider).requireValue)));
       }).run();
     }
   }
@@ -216,21 +224,21 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     return attempt;
   }
 
-  bool _userTookOver(int generation) => generation != intentGeneration || !ref.read(Preferences.startedByUser);
+  bool _userTookOver(int generation) => generation != intentGeneration || !_read(Preferences.startedByUser);
 
   Future<bool> _recoverOnce(int generation) async {
-    final profile = await ref.read(activeProfileProvider.future);
+    final profile = await _read(activeProfileProvider.future);
     if (profile == null || _userTookOver(generation)) return false;
     await _connectionRepo.disconnect().run();
     if (_userTookOver(generation)) return false;
-    final res = await _connectionRepo.connect(profile, ref.read(Preferences.disableMemoryLimit)).run();
+    final res = await _connectionRepo.connect(profile, _read(Preferences.disableMemoryLimit)).run();
     final ok = res.match((err) {
       loggy.warning("recovery connect failed", err);
       return false;
     }, (_) => true);
     if (_userTookOver(generation)) {
       // the user tapped 断开 while this connect was running: honour that, not the recovery
-      if (!ref.read(Preferences.startedByUser)) {
+      if (!_read(Preferences.startedByUser)) {
         loggy.info("recovery finished after the user disconnected: stopping again");
         lastIntentionalStopAt = DateTime.now();
         await _connectionRepo.disconnect().run();
@@ -259,11 +267,11 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   /// 穿云 1.2 watchdog: the core stopped answering while connected. Restart it in place
   /// (reconnect); when that fails too, stop and start again.
   Future<void> restartAfterWatchdog() async {
-    final profile = await ref.read(activeProfileProvider.future);
+    final profile = await _read(activeProfileProvider.future);
     if (profile == null) return;
     loggy.warning("core watchdog: core not answering, restarting");
     final ok = await _connectionRepo
-        .reconnect(profile, ref.read(Preferences.disableMemoryLimit))
+        .reconnect(profile, _read(Preferences.disableMemoryLimit))
         .match((err) {
           loggy.warning("watchdog reconnect failed", err);
           return false;
@@ -271,7 +279,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
         .run();
     if (ok) return;
     await _connectionRepo.disconnect().run();
-    await _connectionRepo.connect(profile, ref.read(Preferences.disableMemoryLimit)).run();
+    await _connectionRepo.connect(profile, _read(Preferences.disableMemoryLimit)).run();
   }
 
   Future<void> abortConnection() async {
@@ -301,7 +309,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   Future<void> _connectThrottled() async {
     final generation = intentGeneration;
     _setPreparing(true);
-    final activeProfile = await ref.read(activeProfileProvider.future);
+    final activeProfile = await _read(activeProfileProvider.future);
     if (activeProfile == null) {
       _setPreparing(false);
       loggy.info("no active profile, not connecting");
@@ -313,29 +321,28 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       return;
     }
     final result = await _connectionRepo
-        .connect(activeProfile, ref.read(Preferences.disableMemoryLimit))
+        .connect(activeProfile, _read(Preferences.disableMemoryLimit))
         .run();
     _setPreparing(false);
     await result.match((ConnectionFailure err) async {
       if (generation != intentGeneration) return; // cancelled: no error dialog for it
       loggy.warning("error connecting", err);
       //Go err is not normal object to see the go errors are string and need to be dumped
-      await ref
-          .read(dialogNotifierProvider.notifier)
-          .showCustomAlertFromErr(museFriendlyPresent(err.present(ref.read(translationsProvider).requireValue)));
+      await _read(dialogNotifierProvider.notifier)
+          .showCustomAlertFromErr(museFriendlyPresent(err.present(_read(translationsProvider).requireValue)));
       loggy.warning(err);
-      await ref.read(Preferences.startedByUser.notifier).update(false);
+      await _read(Preferences.startedByUser.notifier).update(false);
       state = AsyncError(err, StackTrace.current);
     }, (_) async {
-      ref.read(museCoreProfileIdProvider.notifier).state = activeProfile.id;
+      _read(museCoreProfileIdProvider.notifier).state = activeProfile.id;
       // 1.5.3: the subscription was switched while the core was starting: reload with the new one
-      final now = ref.read(activeProfileProvider).valueOrNull;
+      final now = _read(activeProfileProvider).valueOrNull;
       if (generation == intentGeneration && now != null && now.id != activeProfile.id) {
         loggy.info("active profile changed while connecting, reloading");
         Future.microtask(() => reconnect(now));
       }
       // 1.5.0: the user cancelled while the core was starting: undo the connect
-      if (generation != intentGeneration && !ref.read(Preferences.startedByUser)) {
+      if (generation != intentGeneration && !_read(Preferences.startedByUser)) {
         loggy.info("connect finished after it was cancelled: stopping again");
         await _disconnect();
       }
@@ -346,9 +353,8 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     lastIntentionalStopAt = DateTime.now();
     await _connectionRepo.disconnect().mapLeft((err) {
       loggy.warning("error disconnecting", err);
-      ref
-          .read(dialogNotifierProvider.notifier)
-          .showCustomAlertFromErr(err.present(ref.read(translationsProvider).requireValue));
+      _read(dialogNotifierProvider.notifier)
+          .showCustomAlertFromErr(err.present(_read(translationsProvider).requireValue));
       state = AsyncError(err, StackTrace.current);
     }).run();
   }
