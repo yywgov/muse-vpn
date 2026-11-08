@@ -1,7 +1,7 @@
 name: hiddify
 description: 穿云 - Android proxy client (fork of Hiddify, GPLv3).
 publish_to: "none"
-version: 1.17.1+207
+version: 1.18.0+208
 
 environment:
   sdk: ^3.10.4
@@ -138,6 +138,7 @@ flutter:
     - assets/rule-sets/
     # 穿云 1.9.0 #14: 兼容内核's default lists (.mrs), only those the default rules use
     - assets/rule-sets-compat/
+    - assets/fonts/OFL-Inter.txt
     - assets/images/logo.svg
     - assets/images/glyph.svg
     - assets/images/tray_icon.ico
@@ -158,6 +159,18 @@ flutter:
     - family: Emoji
       fonts:
         - asset: assets/fonts/Emoji.ttf
+    # 穿云 1.18.0 P7: Inter (SIL OFL 1.1, assets/fonts/OFL-Inter.txt), static instances subset to
+    # Latin + digits + common symbols; Chinese falls back to the system font
+    - family: MuseSans
+      fonts:
+        - asset: assets/fonts/MuseSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/MuseSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/MuseSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/MuseSans-Bold.ttf
+          weight: 700
 
 flutter_gen:
   output: lib/gen/

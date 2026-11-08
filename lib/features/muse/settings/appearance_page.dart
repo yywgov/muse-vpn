@@ -67,6 +67,8 @@ class MuseAppearancePage extends HookConsumerWidget {
                   value: ref.watch(MusePrefs.pureBlackFollowSystem),
                   onChanged: (v) => ref.read(MusePrefs.pureBlackFollowSystem.notifier).update(v),
                 ),
+              // 1.18.0 P6: 动效三档；跟随系统 = 移除动画 → 关闭，省电模式 → 精简
+              const MuseMotionTile(),
             ],
           ),
           MuseSection(
@@ -112,6 +114,44 @@ class MuseAppearancePage extends HookConsumerWidget {
           if (windows ?? PlatformUtils.isWindows) MuseWindowsWindowSection(advancedOpen: windowAdvancedOpen),
         ],
       ),
+    );
+  }
+}
+
+/// 1.18.0 P6 外观 › 动效：跟随系统 / 标准 / 精简 / 关闭。
+class MuseMotionTile extends ConsumerWidget {
+  const MuseMotionTile({super.key});
+
+  static String describe(MuseMotionLevel level) => switch (level) {
+    MuseMotionLevel.standard => '完整动效',
+    MuseMotionLevel.reduced => '缩短动画，去掉扫光等效果',
+    MuseMotionLevel.off => '不播放动画，直接显示结果',
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final choice = ref.watch(museMotionChoiceProvider);
+    final level = museMotionLevel(context);
+    final why = choice != MuseMotionChoice.auto
+        ? ''
+        : (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+        ? '（系统已移除动画）'
+        : level == MuseMotionLevel.reduced
+        ? '（省电模式中）'
+        : '';
+    return MuseTile(
+      key: const ValueKey('appearance_motion'),
+      leading: const Icon(Icons.animation_outlined),
+      title: '动效',
+      subtitle: '${describe(level)}$why',
+      info: '跟随系统：系统「移除动画」时关闭，安卓省电模式时精简；也可以手动选择。所有动画只播放一次，不会常驻耗电',
+      trailing: Text(choice.title),
+      chevron: true,
+      onTap: () async {
+        final picked = await musePick<MuseMotionChoice>(context, '动效', [for (final c in MuseMotionChoice.values) (c, c.title)], choice);
+        if (picked == null || picked == choice) return;
+        await ref.read(MusePrefs.motionLevel.notifier).update(picked.key);
+      },
     );
   }
 }

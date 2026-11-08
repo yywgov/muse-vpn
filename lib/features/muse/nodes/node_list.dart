@@ -39,6 +39,7 @@ import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
+import 'package:hiddify/features/muse/widget/muse_motion_widgets.dart';
 import 'package:hiddify/features/muse/nodes/node_form_dialog.dart';
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:hiddify/features/muse/data/speed_test.dart';
@@ -66,6 +67,9 @@ final museActiveConfigProvider = FutureProvider<String>((ref) async {
 /// When the running 测速 started (null = none). Shared by the 测速 button, pull-to-test and the
 /// 首页 pull-down, so the list keeps its order while results stream in wherever it was started.
 final museNodeTestStartedProvider = StateProvider<DateTime?>((ref) => null);
+
+/// 1.18.0 P3: the 测速 button's sweep stops after this (the 已测 x / y count keeps going).
+const museNodeTestSweepTimeout = Duration(seconds: 90);
 
 /// Runs 测速 over the main group (no-op while one runs or when not connected).
 Future<void> museRunNodeTest(WidgetRef ref) async {
@@ -415,17 +419,21 @@ class MuseNodeList extends HookConsumerWidget {
               key: const ValueKey('node_test_button'),
               style: FilledButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16)),
               onPressed: group == null || !running ? null : () => testing ? museStopNodeTest(ref) : museRunNodeTest(ref),
+              // 1.18.0 P3: 测速中 the label sweeps (标准档) instead of a spinner; 精简 / 关闭 show a
+              // still hourglass
               child: testing
                   ? Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const SizedBox(
-                          width: MuseSpace.s12,
-                          height: MuseSpace.s12,
-                          child: CircularProgressIndicator(strokeWidth: MuseSize.spinnerStroke),
+                        if (!museMotionRich(context)) ...[
+                          Icon(Icons.hourglass_top_outlined, size: MuseIconSize.tiny, color: museBrandOf(context)),
+                          const SizedBox(width: MuseSpace.s4),
+                        ],
+                        MuseSweep(
+                          key: const ValueKey('node_test_sweep'),
+                          timeout: museNodeTestSweepTimeout,
+                          child: Text('停止', style: MuseType.body(context).copyWith(color: museBrandOf(context))),
                         ),
-                        const SizedBox(width: MuseSpace.s8),
-                        Text('停止', style: MuseType.body(context).copyWith(color: museBrandOf(context))),
                       ],
                     )
                   : const Text('测速'),

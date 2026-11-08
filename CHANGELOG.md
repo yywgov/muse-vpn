@@ -4,6 +4,15 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.18.0 - 2026-11-09
+
+- P0 动效令牌与页面转场：`widget/muse_motion.dart` 统一令牌——主曲线 cubic(.32,.86,.22,1)、进场 380ms、退场 200ms（emphasized accelerate）、反馈 150ms、到达 450ms，无回弹弹簧（350ms）与「到达」轻回弹弹簧（400ms / bounce 0.15，`MuseSpringCurve` 供隐式动画使用）；修复页面转场线性（原 150/100ms 无曲线），原有 `MuseMotion.curve` / `tabCurve` 改用主曲线
+- P6 动效三档：外观 › 动效（跟随系统 / 标准 / 精简 / 关闭，设置 `muse_motion_level`）；跟随系统 = 系统「移除动画」→ 关闭、Android 省电模式 → 精简（Kotlin `ChuanyunPowerWatch` 只在订阅时动态注册 `ACTION_POWER_SAVE_MODE_CHANGED`，不轮询）；精简 = 时长 ×0.6、无回弹、无扫光；关闭 = 直接终态并同时设置 `MediaQuery.disableAnimations`；系统「移除动画」始终优先；修复订阅更新转圈不尊重「移除动画」
+- P2 连接按钮形变：同一形状圆 → 圆角方形（半径 32 → 18，连接时到达弹簧、断开时无回弹），图标独立交叉淡入 + 0.9→1 缩放
+- P3 数字遮罩滚动（`MuseRoll`）：首页节点名与延迟——旧字 260ms 上滑出、新字延迟 90ms 后 420ms 滑入；实时速率等每秒数值不动画、用等宽数字；等待态文字扫光（`MuseSweep`，1100ms 一趟）代替转圈：连接中标题、切换节点时的节点名、测速按钮、订阅更新图标；只在标准档、可见时运行，各有超时；首页连接中的循环光带移除
+- P7 字体：内置 Inter（SIL OFL 1.1）静态 400/500/600/700，子集化为拉丁 + 数字 + 常用符号，共约 190 KB，family `MuseSans`；用于首页大号数字、节点名与延迟；中文逐字回退系统字体；许可随附 `assets/fonts/OFL-Inter.txt`，关于 › 开源许可与致谢、THIRD_PARTY_NOTICES.md 致谢
+- 测试：v1180_test；文案白名单加 Inter、SIL
+
 ### 1.17.1 - 2026-11-08
 
 - 节点页去掉「最近」一行（顶部最近用过的节点芯片，用户反馈没意义）；「最近使用」数据仍照常记录，Windows 托盘 R18 与「手动选择」继续使用

@@ -196,6 +196,8 @@ class _MuseTabTransitionState extends State<MuseTabTransition> with SingleTicker
       if (museReduceMotion(context)) {
         _c.value = 1;
       } else {
+        // 1.18.0 P6: 精简 shortens the switch
+        _c.duration = museDuration(context, MuseMotion.tab);
         _c.forward(from: 0);
       }
     }

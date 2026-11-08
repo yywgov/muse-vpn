@@ -28,6 +28,7 @@ import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/log/model/log_level.dart' as log;
 import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/data/motion_level.dart';
 import 'package:hiddify/features/muse/data/sync_service.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';

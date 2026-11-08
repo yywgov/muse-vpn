@@ -227,7 +227,8 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.byKey(const ValueKey('home_stage_starting')), findsOneWidget);
         expect(find.bySemanticsLabel(RegExp('取消连接')), findsOneWidget);
-        expect(find.byWidgetPredicate((w) => w.runtimeType.toString() == '_Shimmer'), findsOneWidget);
+        // 1.18.0: the card's looping band became a sweep across the 连接中 label (bounded, 标准档 only)
+        expect(find.byKey(const ValueKey('muse_sweep_mask')), findsOneWidget);
         semantics.dispose();
         await _shot(tester, '${s.$2}-$label-home-connecting');
         await _done(tester);
@@ -377,6 +378,7 @@ void main() {
     expect(find.byKey(const ValueKey('home_stage_starting')), findsOneWidget);
     expect(museReduceMotion(tester.element(find.byType(MuseHomePage))), isTrue);
     expect(find.byWidgetPredicate((w) => w.runtimeType.toString() == '_Shimmer'), findsNothing);
+    expect(find.byKey(const ValueKey('muse_sweep_mask')), findsNothing);
     await _done(tester);
   });
 }

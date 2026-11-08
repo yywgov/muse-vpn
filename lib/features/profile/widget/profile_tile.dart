@@ -10,6 +10,7 @@ import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/subscription_bar.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
+import 'package:hiddify/features/muse/widget/muse_motion_widgets.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
@@ -313,30 +314,20 @@ class ProfileActionButton extends HookConsumerWidget {
   }
 }
 
-/// A minimal, continuously spinning icon shown in the leading slot while a
-/// remote profile is being updated.
-class _UpdatingIndicator extends StatefulWidget {
+/// 1.18.0 P6: was a 1 s spinning icon that ignored 「移除动画」. Now a still sync icon in the
+/// accent; on 标准 a light band sweeps across it while updating (stops after a timeout, and with
+/// the page off screen).
+class _UpdatingIndicator extends StatelessWidget {
   const _UpdatingIndicator();
 
-  @override
-  State<_UpdatingIndicator> createState() => _UpdatingIndicatorState();
-}
-
-class _UpdatingIndicatorState extends State<_UpdatingIndicator> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1))
-    ..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  static const timeout = Duration(seconds: 60);
 
   @override
   Widget build(BuildContext context) {
-    return RotationTransition(
-      turns: ReverseAnimation(_controller),
-      child: Icon(Icons.sync_outlined, color: Theme.of(context).colorScheme.onSurface),
+    return MuseSweep(
+      key: const ValueKey('profile_updating_sweep'),
+      timeout: timeout,
+      child: Icon(Icons.sync_outlined, color: Theme.of(context).colorScheme.primary),
     );
   }
 }

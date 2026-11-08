@@ -8,6 +8,7 @@ import 'package:hiddify/features/muse/home/auto_run.dart';
 import 'package:hiddify/features/muse/desktop/title_bar.dart';
 import 'package:hiddify/features/muse/data/core_extras_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/data/motion_level.dart';
 import 'package:hiddify/features/muse/data/traffic_recorder.dart';
 import 'package:hiddify/features/muse/home/net_watch.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart' show museDefaultColorStyle;
@@ -87,6 +88,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final locale = ref.watch(localePreferencesProvider);
     final themeMode = ref.watch(themePreferencesProvider);
     final blackFollow = ref.watch(MusePrefs.pureBlackFollowSystem);
+    // 1.18.0 P6: 动效档位（外观 › 动效 + Android 省电模式）
+    final motionLevel = ref.watch(museAppMotionLevelProvider);
     museApplyPureBlack(themeMode.trueBlack);
     // 1.16.0 B9: 跟随系统 + 纯黑
     if (themeMode == AppThemeMode.system && blackFollow) museApplyPureBlack(true);
@@ -168,7 +171,9 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
               builder: (context, routed) {
                 final theme = Theme.of(context);
                 // 1.17.0 R19: no pages while the window is hidden in the tray (Windows)
-                final child = MuseHiddenRelease(child: routed ?? const SizedBox());
+                Widget child = MuseHiddenRelease(child: routed ?? const SizedBox());
+                // 1.18.0 P6: 动效档位给所有页面；「关闭」同时告诉 Flutter 自带控件不做动画
+                child = museWrapMotion(context, motionLevel, child);
                 if (kDebugMode && _debugAccessibility) {
                   return AccessibilityTools(checkFontOverflows: true, child: child);
                 }

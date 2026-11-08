@@ -284,6 +284,8 @@ void main() {
       'VPN',
       // 1.14.0 R21: transport name in 手动添加节点 (no common Chinese word)
       'WebSocket',
+      // 1.18.0 P7: the bundled font and its licence (关于 › 开源许可与致谢)
+      'Inter', 'SIL',
     };
     final ui = RegExp(
       r'''(?:\bText\(|\b(?:title|label|tooltip|hintText|labelText|helperText|subtitle|header|footer|message|hint|semanticsLabel)\s*:|\bshow(?:Success|Error|Info)Toast\(|\bmuseAskText\(\s*context\s*,)\s*(?:const\s+)?(?:Text\(\s*)?(['"])((?:\\.|(?!\1).)*?)\1''',

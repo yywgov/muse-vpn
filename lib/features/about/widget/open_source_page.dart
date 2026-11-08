@@ -76,6 +76,15 @@ class OpenSourcePage extends ConsumerWidget {
                 chevron: true,
                 onTap: () => open('https://github.com/hiddify/hiddify-app'),
               ),
+              // 1.18.0 P7: the bundled Latin / digits face (subset, renamed MuseSans in the app)
+              MuseTile(
+                key: const ValueKey('about_credit_font'),
+                leading: const Icon(Icons.font_download_outlined),
+                title: '数字与西文字体 Inter',
+                subtitle: 'Inter 项目作者 · SIL 开放字体许可 1.1（已精简为西文、数字和常用符号）',
+                chevron: true,
+                onTap: () => open('https://github.com/rsms/inter'),
+              ),
             ],
           ),
         ],

@@ -33,6 +33,7 @@ import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
+import 'package:hiddify/features/muse/home/node_memory.dart' show museNodeSwitchingProvider;
 import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/muse/logic/connect_flow.dart';
@@ -54,6 +55,7 @@ import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_segmented.dart';
 import 'package:hiddify/features/muse/widget/muse_sheet.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
+import 'package:hiddify/features/muse/widget/muse_motion_widgets.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/profile/add/add_profile_modal.dart' show MuseAddAction;
@@ -318,8 +320,8 @@ class MuseHeroCard extends HookConsumerWidget {
         borderRadius: MuseRadius.cardAll,
         child: Stack(
           children: [
-            // 1.5.0: no moving shimmer when the system asks for reduced motion
-            if (state == _HeroState.connecting && !museReduceMotion(context)) const Positioned.fill(child: _Shimmer()),
+            // 1.18.0: the moving band across the card is gone; 连接中 sweeps its own label instead
+            // (标准档 only, stops after a timeout — see MuseSweep)
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -344,13 +346,18 @@ class MuseHeroCard extends HookConsumerWidget {
                                         Flexible(
                                           child: AnimatedSwitcher(
                                             duration: museMotion(context),
-                                            child: Text(
-                                              label,
+                                            switchInCurve: museCurve(context),
+                                            child: MuseSweep(
                                               key: ValueKey(label),
-                                              maxLines: 1,
-                                              style: MuseType.largeTitle(
-                                                context,
-                                              ).copyWith(color: failed ? MusePalette.red : fg),
+                                              active: link == MuseLinkState.connecting,
+                                              child: Text(
+                                                label,
+                                                key: ValueKey(label),
+                                                maxLines: 1,
+                                                style: MuseType.largeTitle(
+                                                  context,
+                                                ).copyWith(color: failed ? MusePalette.red : fg),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -419,7 +426,7 @@ class MuseHeroCard extends HookConsumerWidget {
                                 ),
                               ),
                               const SizedBox(width: MuseSpace.s12),
-                              _BigSwitch(
+                              MuseStartButton(
                                 key: const ValueKey('home_connect_switch'),
                                 on: connected || busy,
                                 onBrand: onBrand,
@@ -542,10 +549,11 @@ class _ModePill extends ConsumerWidget {
   }
 }
 
-/// The hero card's start button (1.6.1: a filled squircle in the accent with ▶ / ❚❚, the
-/// way the dashboard's start button looks; it was a 64 × 36 switch before).
-class _BigSwitch extends StatelessWidget {
-  const _BigSwitch({
+/// The hero card's start button (1.6.1: a filled squircle in the accent with ▶ / ❚❚).
+/// 1.18.0 P2: one shape morphing — a circle when off, a rounded square when on (a spring with a
+/// light bounce on arrival, none on the way back); the glyph cross-fades on its own.
+class MuseStartButton extends StatelessWidget {
+  const MuseStartButton({
     super.key,
     required this.on,
     required this.onBrand,
@@ -558,9 +566,17 @@ class _BigSwitch extends StatelessWidget {
   final VoidCallback? onTap;
   final String semanticLabel;
 
+  /// corner radius off (a circle) / on (a rounded square)
+  static const radiusOff = MuseSize.startButton / 2;
+  static const radiusOn = 18.0;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final level = museMotionLevel(context);
+    final spring = on ? MuseMotion.arriveCurve : MuseMotion.smoothCurve;
+    final shapeDuration = level == MuseMotionLevel.standard ? spring.settleDuration : museScaleDuration(level, MuseMotion.fast);
+    final color = onTap == null ? scheme.primary.withValues(alpha: 0.5) : scheme.primary;
     return Semantics(
       button: true,
       toggled: on,
@@ -569,22 +585,35 @@ class _BigSwitch extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: museMotion(context),
-          curve: MuseMotion.curve,
-          width: MuseSize.startButton,
-          height: MuseSize.startButton,
-          decoration: ShapeDecoration(
-            color: onTap == null ? scheme.primary.withValues(alpha: 0.5) : scheme.primary,
-            shape: on ? MuseShape.xl : MuseShape.full,
+        child: TweenAnimationBuilder<double>(
+          key: const ValueKey('home_connect_shape'),
+          tween: Tween(end: on ? radiusOn : radiusOff),
+          duration: shapeDuration,
+          curve: level == MuseMotionLevel.standard ? spring : MuseMotion.plainCurve,
+          builder: (context, r, child) => DecoratedBox(
+            decoration: ShapeDecoration(
+              color: color,
+              // the bounce may overshoot below radiusOn; never past a circle
+              shape: MuseShape.of(r.clamp(0.0, radiusOff)),
+            ),
+            child: child,
           ),
-          child: AnimatedSwitcher(
-            duration: museMotion(context),
-            child: Icon(
-              on ? Icons.pause_outlined : Icons.play_arrow_outlined,
-              key: ValueKey(on),
-              size: MuseIconSize.large,
-              color: scheme.onPrimary,
+          child: SizedBox.square(
+            dimension: MuseSize.startButton,
+            child: AnimatedSwitcher(
+              duration: museDuration(context, MuseMotion.fast),
+              switchInCurve: MuseMotion.curve,
+              switchOutCurve: MuseMotion.exitCurve,
+              transitionBuilder: (child, a) => FadeTransition(
+                opacity: a,
+                child: ScaleTransition(scale: Tween(begin: 0.9, end: 1.0).animate(a), child: child),
+              ),
+              child: Icon(
+                on ? Icons.pause_outlined : Icons.play_arrow_outlined,
+                key: ValueKey(on),
+                size: MuseIconSize.large,
+                color: scheme.onPrimary,
+              ),
             ),
           ),
         ),
@@ -593,52 +622,8 @@ class _BigSwitch extends StatelessWidget {
   }
 }
 
-/// A soft light band moving across the card while connecting.
-class _Shimmer extends HookWidget {
-  const _Shimmer();
-
-  @override
-  Widget build(BuildContext context) {
-    final c = useAnimationController(duration: const Duration(milliseconds: 1600));
-    useEffect(() {
-      c.repeat();
-      return null;
-    }, const []);
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: c,
-        builder: (context, _) => CustomPaint(painter: _ShimmerPainter(c.value)),
-      ),
-    );
-  }
-}
-
-class _ShimmerPainter extends CustomPainter {
-  _ShimmerPainter(this.t);
-
-  final double t;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final x = -w * 0.5 + t * w * 2;
-    final rect = Rect.fromLTWH(x - w * 0.25, 0, w * 0.5, size.height);
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = LinearGradient(
-          colors: [
-            MusePalette.white.withValues(alpha: 0),
-            MusePalette.white.withValues(alpha: 0.16),
-            MusePalette.white.withValues(alpha: 0),
-          ],
-        ).createShader(rect),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ShimmerPainter old) => old.t != t;
-}
+/// 1.18.0 P3: the node-name sweep stops after this even if the core never answers.
+const museSwitchSweepTimeout = Duration(seconds: 10);
 
 /// Bottom row of the hero card: flag | current node | latency ›  (opens the node picker).
 class _HeroNodeRow extends ConsumerWidget {
@@ -653,6 +638,7 @@ class _HeroNodeRow extends ConsumerWidget {
     final since = ref.watch(museConnectedSinceProvider).valueOrNull;
     final item = group?.items.where((e) => e.tag == group.selected).firstOrNull;
     final shown = ref.watch(museShownPickProvider);
+    final switching = ref.watch(museNodeSwitchingProvider);
     final fg = onBrand ? mt.onHero : mt.text1;
     final fg2 = onBrand ? mt.onHero.withValues(alpha: 0.78) : mt.text2;
     String text = '选择节点';
@@ -716,17 +702,34 @@ class _HeroNodeRow extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: MuseType.caption(context).copyWith(color: fg2),
                         ),
-                      Text(
-                        text,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: MuseType.body(context).copyWith(color: fg, fontWeight: FontWeight.w700),
+                      // 1.18.0 P3: the name rolls when it changes and sweeps while switching
+                      MuseRoll(
+                        value: text,
+                        child: MuseSweep(
+                          active: switching != null,
+                          timeout: museSwitchSweepTimeout,
+                          child: Text(
+                            text,
+                            key: const ValueKey('home_node_name'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: MuseType.body(context).copyWith(
+                              color: fg,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: MuseFont.family,
+                              fontFeatures: MuseType.tabular,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 if (showDelay)
-                  Text.rich(
+                  MuseRoll(
+                    value: delay,
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: Text.rich(
                     key: const ValueKey('home_node_delay'),
                     TextSpan(
                       children: [
@@ -735,12 +738,14 @@ class _HeroNodeRow extends ConsumerWidget {
                           style: MuseType.body(context).copyWith(
                             color: onBrand ? fg : MuseColors.delay(context, delay),
                             fontWeight: FontWeight.w700,
+                            fontFamily: MuseFont.family,
                             fontFeatures: MuseType.tabular,
                           ),
                         ),
                         TextSpan(text: ' ms', style: MuseType.caption(context).copyWith(color: fg2)),
                       ],
                     ),
+                  ),
                   ),
                 Icon(Icons.chevron_right_outlined, size: MuseIconSize.small, color: fg2),
               ],

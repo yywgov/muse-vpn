@@ -19,8 +19,17 @@ Future<void> museSelectNode(WidgetRef ref, String groupTag, String tag) =>
 /// The same from a provider / notifier (the tray).
 Future<void> museSelectNodeFrom(Ref ref, String groupTag, String tag) => _select(ref.read, groupTag, tag);
 
+/// 1.18.0 P3: the node being switched to while the core changes it (首页 sweeps the node name).
+final museNodeSwitchingProvider = StateProvider<String?>((ref) => null);
+
 Future<void> _select(T Function<T>(ProviderListenable<T>) read, String groupTag, String tag) async {
-  await read(proxiesOverviewNotifierProvider.notifier).changeProxy(groupTag, tag);
+  final switching = read(museNodeSwitchingProvider.notifier);
+  switching.state = tag;
+  try {
+    await read(proxiesOverviewNotifierProvider.notifier).changeProxy(groupTag, tag);
+  } finally {
+    if (switching.state == tag) switching.state = null;
+  }
   // 1.6.0 C3: 切换节点时关闭旧连接 (设置 › 通用, on by default)
   unawaited(museCloseConnectionsAfterSwitch(read));
   final profileId = read(activeProfileProvider).valueOrNull?.id;

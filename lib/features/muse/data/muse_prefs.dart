@@ -43,6 +43,8 @@ abstract final class MusePrefs {
   static final pureBlackFollowSystem = PreferencesNotifier.create<bool, bool>("muse_pure_black_follow", false);
   /// 1.16.0 B8: 敏感页（节点详情、订阅链接、二维码、备份导出）禁截屏并在最近任务里隐藏内容
   static final secureSensitive = PreferencesNotifier.create<bool, bool>("muse_secure_sensitive", true);
+  /// 1.18.0 P6 动效：auto（跟随系统：移除动画 → 关闭，Android 省电模式 → 精简）/ standard / reduced / off
+  static final motionLevel = PreferencesNotifier.create<String, String>("muse_motion_level", "auto");
   static final privacyMask = PreferencesNotifier.create<bool, bool>("muse_privacy_mask", false);
 
   /// 节假日云朵小彩蛋

@@ -60,6 +60,9 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
     // 1.15.0 R23: Wi‑Fi 变化事件（只在 Dart 订阅时注册系统回调）
     private var wifiEvents: io.flutter.plugin.common.EventChannel? = null
     private val wifiWatch = com.hiddify.hiddify.bg.ChuanyunWifiWatch { context }
+    // 1.18.0 P6: 省电模式事件（只在 Dart 订阅时注册广播接收器）
+    private var powerEvents: io.flutter.plugin.common.EventChannel? = null
+    private val powerWatch = com.hiddify.hiddify.bg.ChuanyunPowerWatch { context }
     private var activity: Activity? = null
     private var binding: ActivityPluginBinding? = null
 
@@ -68,6 +71,8 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
         channel!!.setMethodCallHandler(this)
         wifiEvents = io.flutter.plugin.common.EventChannel(flutterPluginBinding.binaryMessenger, com.hiddify.hiddify.bg.ChuanyunWifiWatch.channelName)
         wifiEvents!!.setStreamHandler(wifiWatch)
+        powerEvents = io.flutter.plugin.common.EventChannel(flutterPluginBinding.binaryMessenger, com.hiddify.hiddify.bg.ChuanyunPowerWatch.channelName)
+        powerEvents!!.setStreamHandler(powerWatch)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -76,6 +81,9 @@ class ChuanyunHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Activity
         wifiEvents?.setStreamHandler(null)
         wifiEvents = null
         wifiWatch.unregister()
+        powerEvents?.setStreamHandler(null)
+        powerEvents = null
+        powerWatch.unregister()
     }
 
     private fun attach(b: ActivityPluginBinding) {

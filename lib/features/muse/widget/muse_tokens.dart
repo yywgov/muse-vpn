@@ -5,6 +5,8 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 
+export 'package:hiddify/features/muse/widget/muse_motion.dart';
+
 /// Spacing scale (dp). Nothing else is used for gaps and paddings.
 abstract final class MuseSpace {
   static const s4 = 4.0;
@@ -65,28 +67,7 @@ double museAdaptiveSpace(BuildContext context, double v) {
   return v * (k > 1 ? 1.0 : k);
 }
 
-/// Motion: one duration and curve for fades / slides.
-abstract final class MuseMotion {
-  static const fast = Duration(milliseconds: 200);
-  static const curve = Curves.easeOutCubic;
-
-  /// 1.6.0 C1: FlClash-style durations
-  static const mid = Duration(milliseconds: 200);
-  static const common = Duration(milliseconds: 300);
-  static const tab = Duration(milliseconds: 220);
-  static const pressFeedback = Duration(milliseconds: 150);
-  static const tabCurve = Curves.easeInOut;
-  static const sheetDetents = [9 / 16, 0.9];
-
-  /// 1.5.0: one half of a skeleton's pulse
-  static const skeletonPulse = Duration(milliseconds: 900);
-}
-
-/// 1.5.0: whether the system asks for reduced motion (Android 「移除动画」, Windows 「动画效果」 off).
-bool museReduceMotion(BuildContext context) => MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-
-/// 1.5.0: [MuseMotion.fast], or no animation at all when the system asks for reduced motion.
-Duration museMotion(BuildContext context) => museReduceMotion(context) ? Duration.zero : MuseMotion.fast;
+// 1.18.0: MuseMotion, museReduceMotion, museMotion live in muse_motion.dart (exported here).
 
 /// Icon sizes (one rounded line-icon set).
 abstract final class MuseIconSize {
@@ -518,6 +499,13 @@ class MuseTheme {
 }
 
 /// Four text levels. Numbers use tabular figures.
+/// 1.18.0 P7: the bundled Latin / digits face (Inter, SIL OFL 1.1, subset to Latin + digits +
+/// common symbols; assets/fonts/MuseSans-*.ttf, licence assets/fonts/OFL-Inter.txt). Chinese and
+/// anything else outside the subset falls back to the system font glyph by glyph.
+abstract final class MuseFont {
+  static const family = 'MuseSans';
+}
+
 abstract final class MuseType {
   static const tabular = [FontFeature.tabularFigures()];
 
@@ -531,7 +519,9 @@ abstract final class MuseType {
       TextStyle(fontSize: 20, height: 1.25, fontWeight: FontWeight.w600, color: MuseTheme.of(context).text1, fontFeatures: tabular);
 
   /// 1.4.0: the big number on a 首页 tile (one weight for every value, digits tabular).
+  /// 1.18.0 P7: in the bundled Latin / digits face (Chinese falls back to the system font).
   static TextStyle number(BuildContext context) => TextStyle(
+    fontFamily: MuseFont.family,
     fontSize: numberSize,
     height: 1.2,
     fontWeight: FontWeight.w700,

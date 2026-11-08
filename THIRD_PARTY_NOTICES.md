@@ -13,3 +13,11 @@ their header.
 ## Original upstream
 
 This client is derived from Hiddify — https://github.com/hiddify/hiddify-app — GPL-3.0.
+
+## Font (1.18.0)
+
+The bundled Latin / digits face `assets/fonts/MuseSans-*.ttf` is Inter —
+https://github.com/rsms/inter — Copyright 2020 The Inter Project Authors, licensed under the
+SIL Open Font License 1.1 (full text in `assets/fonts/OFL-Inter.txt`, also shipped in the app).
+It is a Modified Version: static weights 400/500/600/700 instanced from the variable font and
+subset to Latin, digits and common symbols. Chinese text uses the system font.
