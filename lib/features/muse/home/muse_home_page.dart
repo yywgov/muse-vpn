@@ -27,6 +27,7 @@ import 'package:hiddify/features/muse/home/changelog_dialog.dart';
 import 'package:hiddify/features/muse/home/clipboard_import.dart';
 import 'package:hiddify/features/muse/home/core_watchdog.dart';
 import 'package:hiddify/features/muse/home/exit_card.dart';
+import 'package:hiddify/features/muse/home/first_guide.dart';
 import 'package:hiddify/features/muse/home/health_banner.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
@@ -99,6 +100,28 @@ class MuseHomePage extends HookConsumerWidget {
       });
       return null;
     }, [hasProfile, appVersion]);
+
+    // 1.16.0 B10: 新用户一步引导 — once, on a new install only (decided before the 更新说明 effect
+    // above records this version)
+    final guideChecked = useRef(false);
+    useEffect(() {
+      if (hasProfile == null || guideChecked.value) return null;
+      guideChecked.value = true;
+      // read now, before the 更新说明 microtask records this version
+      final shownBefore = ref.read(Preferences.museChangelogShown);
+      Future.microtask(() {
+        if (context.mounted) {
+          return museMaybeShowFirstGuide(context, ref, hasProfile: hasProfile, changelogShown: shownBefore, qr: museFirstRunQr());
+        }
+      });
+      return null;
+    }, [hasProfile]);
+    // the subscription added from the guide → 「现在连接？」 once
+    ref.listen<bool?>(museHasProfileProvider, (prev, next) {
+      if (prev != true && next == true && ref.read(museGuideAwaitConnectProvider) && context.mounted) {
+        museGuideAskConnect(context, ref);
+      }
+    });
 
     // 1.3.0: a subscription link on the clipboard puts a dot on 添加 (no banner)
     useMuseClipboardWatcher(ref);
