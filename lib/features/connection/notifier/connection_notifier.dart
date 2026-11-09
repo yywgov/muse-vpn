@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
@@ -13,6 +14,7 @@ import 'package:hiddify/features/muse/data/crash_recorder.dart';
 import 'package:hiddify/features/muse/data/muse_health.dart';
 import 'package:hiddify/features/muse/home/core_profile.dart';
 import 'package:hiddify/features/muse/logic/connect_flow.dart';
+import 'package:hiddify/features/muse/logic/startup_restore.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
@@ -114,7 +116,8 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     loggy.info("restoring previous connection on startup");
     intentGeneration++;
     await _read(Preferences.startedByUser.notifier).update(true);
-    await _connect();
+    // 1.19.3: one transient gRPC / connection error no longer drops the intent (startup_restore.dart)
+    await _connect(restoring: true);
   }
 
   Future<void> toggleConnection() async {
@@ -295,10 +298,10 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
 
   final _singleStart = SingleCall();
 
-  Future<void> _connect() async {
+  Future<void> _connect({bool restoring = false}) async {
     _singleStart.run(
       () async {
-        await _connectThrottled();
+        await _connectThrottled(restoring: restoring);
       },
       onIgnored: () {
         loggy.debug("connect called while another connect/disconnect is still running, ignoring");
@@ -306,7 +309,18 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     );
   }
 
-  Future<void> _connectThrottled() async {
+  /// 1.19.3: stops whatever a failed start-up restore left of the core (marked as our own stop, so
+  /// the connection keeper does not treat it as an unexpected one).
+  Future<void> _releaseCore() async {
+    lastIntentionalStopAt = DateTime.now();
+    try {
+      await _connectionRepo.disconnect().run();
+    } catch (e) {
+      loggy.debug("releasing the core after a failed restore: $e");
+    }
+  }
+
+  Future<void> _connectThrottled({bool restoring = false}) async {
     final generation = intentGeneration;
     _setPreparing(true);
     final activeProfile = await _read(activeProfileProvider.future);
@@ -320,9 +334,18 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       _setPreparing(false);
       return;
     }
-    final result = await _connectionRepo
-        .connect(activeProfile, _read(Preferences.disableMemoryLimit))
-        .run();
+    Future<Either<ConnectionFailure, Unit>> attempt() =>
+        _connectionRepo.connect(activeProfile, _read(Preferences.disableMemoryLimit)).run();
+    final result = restoring
+        ? await museRestoreConnect<ConnectionFailure>(
+            attempt: attempt,
+            isTransient: museIsTransientCoreFailure,
+            reopenChannel: _connectionRepo.reopenCoreChannel,
+            release: _releaseCore,
+            stillWanted: () => generation == intentGeneration && _read(Preferences.startedByUser),
+            log: loggy.warning,
+          )
+        : await attempt();
     _setPreparing(false);
     await result.match((ConnectionFailure err) async {
       if (generation != intentGeneration) return; // cancelled: no error dialog for it

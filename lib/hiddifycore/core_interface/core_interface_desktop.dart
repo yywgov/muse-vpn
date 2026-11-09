@@ -147,6 +147,15 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
     return "";
   }
 
+  /// 穿云 1.19.3: the connection under [_channel] was reset; [setup] opens a new one (the old one
+  /// is shut down gracefully in the background).
+  @override
+  Future<void> resetChannel() async {
+    final old = _channel;
+    _channel = null;
+    if (old != null) unawaited(old.shutdown().catchError((_) {}));
+  }
+
   @override
   Future<bool> restart(String path, String name) async {
     return false;

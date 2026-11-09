@@ -465,6 +465,23 @@ class HiddifyCoreService with InfraLogger {
   // Stream<SingboxStatus> watchStatus() => _status;
 
   /// 穿云 1.2 watchdog: whether the core answers a gRPC call within [timeout].
+  /// 穿云 1.19.3: a new gRPC channel to the core (the old connection was reset), the log / status
+  /// streams armed on it, then one ping. True when the core answers on the new channel.
+  Future<bool> reopenChannel() async {
+    try {
+      await core.resetChannel();
+      final res = await setup().run();
+      if (res.isLeft()) {
+        loggy.warning("reopening the core channel failed: ${res.getLeft().toNullable()}");
+        return false;
+      }
+      return await ping(timeout: const Duration(seconds: 3));
+    } catch (e) {
+      loggy.warning("reopening the core channel failed: $e");
+      return false;
+    }
+  }
+
   Future<bool> ping({Duration timeout = const Duration(seconds: 4)}) async {
     try {
       await core.bgClient.getSystemInfo(Empty(), options: CallOptions(timeout: timeout));

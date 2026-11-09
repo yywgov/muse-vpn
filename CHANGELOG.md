@@ -4,6 +4,13 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.19.3 - 2026-11-10
+
+- 修复：电脑 / 手机重启或异常退出后偶尔不会自动恢复连接。根因：启动恢复连接时重新订阅日志 / 状态流（取消旧流 → RST_STREAM），内核恰好在写该流的响应 HEADERS；http2 2.3.1 客户端把「已取消流上的 HEADERS」当作连接级 PROTOCOL_ERROR，整条 gRPC 连接被关闭，同一连接上的 ChangeHiddifySettings 失败 → started_by_user 被置 false → 下次启动不再自动连接
+  - `pubspec.yaml` `dependency_overrides: http2: ^3.1.0`（dart-lang/http #1799 已修；grpc 至 5.2.0 仍锁 ^2.3.1，待 grpc 支持后移除）
+  - 加固：启动恢复连接遇到一次连接 / gRPC 传输类错误时不立刻放弃——先释放内核，等 400 ms（单次，无轮询、无常驻计时器），重建 gRPC 通道并确认内核应答后重试一次；仍失败、内核不应答或错误不是传输类（如配置无效）才判失败并按原逻辑处理（提示、started_by_user=false）。每条失败路径都释放内核；释放记为应用自己的停止，连接守护不会误判。用户手动连接 / 断开的路径不变（`lib/features/muse/logic/startup_restore.dart`，`CoreInterface.resetChannel`、`HiddifyCoreService.reopenChannel`、`ConnectionRepository.reopenCoreChannel`）
+- 测试：v1193_grpc_cancel_test（真实 http2 回环复现：2.3.1 红、3.1.0 绿）、v1193_restore_retry_test（一次瞬断后恢复成功、连续两次失败才置 false、内核不应答不重试、配置错误不重试、用户断开 / 手动连接不重试）
+
 ### 1.19.2 - 2026-11-09
 
 - 按实机反馈一次改完：

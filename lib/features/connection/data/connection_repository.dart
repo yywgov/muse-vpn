@@ -38,6 +38,10 @@ abstract interface class ConnectionRepository {
   TaskEither<ConnectionFailure, Unit> connect(ProfileEntity activeProfile, bool disableMemoryLimit);
   TaskEither<ConnectionFailure, Unit> disconnect();
   TaskEither<ConnectionFailure, Unit> reconnect(ProfileEntity activeProfile, bool disableMemoryLimit);
+
+  /// 穿云 1.19.3: drops the gRPC channel to the core, opens a new one and asks the core whether it
+  /// answers (true) — the start-up restore's single retry after a transport error.
+  Future<bool> reopenCoreChannel();
 }
 
 class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements ConnectionRepository {
@@ -127,6 +131,9 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
       // .mapLeft(UnexpectedConnectionFailure.new),
     ),
   );
+
+  @override
+  Future<bool> reopenCoreChannel() => singbox.reopenChannel();
 
   @override
   TaskEither<ConnectionFailure, Unit> disconnect() => singbox.stop().mapLeft(UnexpectedConnectionFailure.new);

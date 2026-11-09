@@ -23,6 +23,10 @@ class CoreInterface {
     return false;
   }
 
+  /// 穿云 1.19.3: forget the gRPC channel so the next [setup] opens a new one (desktop only;
+  /// elsewhere a no-op).
+  Future<void> resetChannel() async {}
+
   Future<bool> isBgClientAvailable() async {
     return true;
   }
