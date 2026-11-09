@@ -90,7 +90,8 @@ class MuseScaffold extends StatelessWidget {
                 surfaceTintColor: Colors.transparent,
                 scrolledUnderElevation: 0,
                 centerTitle: large || desk ? false : null,
-                toolbarHeight: large || desk ? 64 : null,
+                // 1.19.2: 56 on a computer window (Vercel-like compact density; the phone keeps 64)
+                toolbarHeight: desk ? MuseDesk.titleBarHeight : (large ? 64 : null),
                 titleSpacing: large || (desk && topLevel) ? MuseSpace.page(context) : null,
                 // 1.2.1: never guess the status bar icons from the transparent background
                 systemOverlayStyle: museSystemOverlayStyle(Theme.of(context).brightness),

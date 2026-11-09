@@ -363,7 +363,7 @@ class MuseNodeRow extends StatelessWidget {
                                     flag == null ? name : museStripFlags(name),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: MuseType.body(context).copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w400, fontFamily: MuseFont.family),
+                                    style: MuseType.body(context).copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w400, fontFamily: MuseFont.family, fontFamilyFallback: MuseFont.fallback),
                                   ),
                                 ),
                                 if (showTag) ...[
@@ -392,7 +392,7 @@ class MuseNodeRow extends StatelessWidget {
                         delayText,
                         key: ValueKey(delayText),
                         textAlign: TextAlign.right,
-                        style: MuseType.body(context).copyWith(color: delayColor, fontFeatures: MuseType.tabular, fontFamily: MuseFont.family),
+                        style: MuseType.body(context).copyWith(color: delayColor, fontFeatures: MuseType.tabular, fontFamily: MuseFont.family, fontFamilyFallback: MuseFont.fallback),
                       ),
                     ),
                   ),
@@ -633,7 +633,7 @@ class MuseNodeCard extends StatelessWidget {
                 flag == null ? name : museStripFlags(name),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: MuseTextLevel.subheadline.style(context, color: mt.text1, weight: highlighted ? FontWeight.w700 : FontWeight.w600).copyWith(fontFamily: MuseFont.family),
+                style: MuseTextLevel.subheadline.style(context, color: mt.text1, weight: highlighted ? FontWeight.w700 : FontWeight.w600).copyWith(fontFamily: MuseFont.family, fontFamilyFallback: MuseFont.fallback),
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -649,7 +649,9 @@ class MuseNodeCard extends StatelessWidget {
                           maxLines: 1,
                           softWrap: false,
                           overflow: TextOverflow.ellipsis,
-                          style: MuseTextLevel.caption2.style(context, color: highlighted ? brand : mt.text2),
+                          // 1.19.2: on the selected card the tag text is the card's own text colour (the accent on its
+                          // 16 % tint read about 1.5:1 on the dark theme)
+                          style: MuseTextLevel.caption2.style(context, color: highlighted ? mt.text1 : mt.text2),
                         ),
                       ),
                     )
@@ -665,7 +667,7 @@ class MuseNodeCard extends StatelessWidget {
                         children: [
                           TextSpan(
                             text: parts.number,
-                            style: MuseTextLevel.subheadline.style(context, color: delayColor, weight: parts.unit.isEmpty ? FontWeight.w500 : FontWeight.w700).copyWith(fontFamily: MuseFont.family),
+                            style: MuseTextLevel.subheadline.style(context, color: delayColor, weight: parts.unit.isEmpty ? FontWeight.w500 : FontWeight.w700).copyWith(fontFamily: MuseFont.family, fontFamilyFallback: MuseFont.fallback),
                           ),
                           if (parts.unit.isNotEmpty)
                             TextSpan(text: ' ${parts.unit}', style: MuseTextLevel.caption2.style(context, color: mt.text2)),

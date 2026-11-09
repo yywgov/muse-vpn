@@ -2,6 +2,9 @@
 // page background. Screens use these names instead of hand-written numbers / hex literals.
 // Part of 穿云 (GPLv3).
 
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 
@@ -558,6 +561,9 @@ abstract final class MuseDesk {
   static const captionGlyph = 10.0;
   static const inactiveAlpha = 0.45;
 
+  /// 1.19.2：电脑窗口页面标题行高 64 → 56（更紧凑）
+  static const titleBarHeight = 56.0;
+
   /// A9：单栏页面最大宽度（标题与卡片同一列）
   static const contentMax = 840.0;
 
@@ -582,6 +588,11 @@ abstract final class MuseFont {
   /// of a modified version; 400 and 600 (assets/fonts/MuseHei-*.ttf, licence OFL-NotoSansSC.txt).
   /// The app's default family on every platform, so Android and Windows read the same.
   static const cjk = 'MuseHei';
+
+  /// 1.19.2: what a [family] (Latin / digits only) text falls back to glyph by glyph — the bundled
+  /// Chinese face first (a node name like 「东京 02」 was drawn half in Inter, half in the system
+  /// font), then on Windows the bundled Emoji face for flags.
+  static List<String> get fallback => !kIsWeb && Platform.isWindows ? const [cjk, 'Emoji'] : const [cjk];
 }
 
 abstract final class MuseType {
@@ -600,6 +611,7 @@ abstract final class MuseType {
   /// 1.18.0 P7: in the bundled Latin / digits face (Chinese falls back to the system font).
   static TextStyle number(BuildContext context) => TextStyle(
     fontFamily: MuseFont.family,
+    fontFamilyFallback: MuseFont.fallback,
     fontSize: numberSize,
     height: 1.2,
     fontWeight: FontWeight.w700,

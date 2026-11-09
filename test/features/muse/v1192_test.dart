@@ -3,40 +3,33 @@
 // Part of 穿云 (GPLv3).
 import 'dart:io';
 
-import 'package:hiddify/core/localization/locale_extensions.dart';
-import 'package:hiddify/features/muse/home/route_map/route_geo.dart';
-import 'package:hiddify/features/muse/widget/muse_tokens.dart';
-import 'package:hiddify/gen/translations.g.dart';
-
 import 'package:fixnum/fixnum.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/core/localization/locale_extensions.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
-import 'package:hiddify/features/muse/desktop/title_bar.dart';
 import 'package:hiddify/features/muse/home/exit_card.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart';
 import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/muse/home/route_map/muse_route_map.dart';
+import 'package:hiddify/features/muse/home/route_map/route_geo.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
 import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
-import 'package:hiddify/features/muse/widget/muse_card.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/hiddifycore/generated/google/protobuf/timestamp.pb.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:window_manager/window_manager.dart';
 
 class _Exit extends MuseExitNotifier {
   _Exit([String country = 'JP']) : super(() => 0) {
@@ -48,23 +41,6 @@ class _Reach extends MuseReachNotifier {
   _Reach() : super(() => 0) {
     state = MuseReach.ok;
   }
-}
-
-class _Ops implements MuseWindowOps {
-  @override
-  Future<void> close() async {}
-  @override
-  Future<bool> isMaximized() async => false;
-  @override
-  Future<void> maximize() async {}
-  @override
-  Future<void> minimize() async {}
-  @override
-  Future<void> setAlwaysOnTop(bool on) async {}
-  @override
-  Future<void> startDragging() async {}
-  @override
-  Future<void> unmaximize() async {}
 }
 
 const _longName = '🇯🇵 日本东京 IPLC 专线 08 | 0.5x 倍率 | 解锁流媒体 | 限速 300M | 备用线路（家宽）';
@@ -533,6 +509,32 @@ void main() {
       expect(src, contains('about_credit_font_cjk'));
       expect(src, contains('思源黑体'));
       expect(src, contains('SIL 开放字体许可 1.1'));
+    });
+  });
+
+  group('8 打磨', () {
+    test('数字字体（Inter）里的汉字回退到内置思源黑体，Windows 再回退 Emoji', () {
+      expect(MuseFont.fallback.first, MuseFont.cjk);
+      final src = Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'));
+      for (final f in src) {
+        final text = f.readAsStringSync();
+        final uses = 'fontFamily: MuseFont.family'.allMatches(text).length;
+        final falls = 'fontFamilyFallback: MuseFont.fallback'.allMatches(text).length;
+        expect(falls, greaterThanOrEqualTo(uses), reason: f.path);
+      }
+    });
+
+    test('选中节点卡的协议标签用卡片正文色（深色主题下主色字在主色底上只有约 1.5:1）', () {
+      final src = File('lib/features/muse/nodes/node_rows.dart').readAsStringSync();
+      expect(src, contains('color: highlighted ? mt.text1 : mt.text2'));
+    });
+
+    test('电脑窗口页面标题行 56；Windows 冒烟脚本点击侧栏的 x 落在 64 宽图标栏内', () {
+      expect(MuseDesk.titleBarHeight, 56);
+      final smoke = File('tool/smoke/app_smoke.ps1').readAsStringSync();
+      expect(smoke, contains(r'$x = $r.L + [int](32 * $scale)'));
+      expect(32, lessThan(MuseSize.navRailCollapsed));
+      expect(smoke, contains('(32 + 48 + 52 * 2 + 26)'));
     });
   });
 }

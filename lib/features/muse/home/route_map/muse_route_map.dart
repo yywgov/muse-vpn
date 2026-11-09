@@ -330,7 +330,6 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
                     final bg = MuseSurfaceScope.of(context).color(scheme);
                     return Stack(
                       fit: StackFit.expand,
-                      clipBehavior: Clip.hardEdge,
                       children: [
                         if (img != null)
                           RepaintBoundary(
@@ -420,7 +419,7 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
     }
 
     Widget place(Offset p, Size box, {required bool before, required bool above, required Widget child}) {
-      final o = museLabelOffset(p, box, size, before: before, above: above, gap: MuseDesk.mapLabelGap);
+      final o = museLabelOffset(p, box, size, before: before, above: above);
       return Positioned(
         left: o.dx,
         top: o.dy,
@@ -444,7 +443,6 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
           final before = e == null ? h.dx > size.width * 0.25 : e.dx >= h.dx;
           return Stack(
             fit: StackFit.expand,
-            clipBehavior: Clip.hardEdge,
             children: [
               place(
                 h,
