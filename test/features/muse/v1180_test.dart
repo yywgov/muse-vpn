@@ -421,12 +421,13 @@ void main() {
       }
     });
 
-    test('大号数字与节点名用内置字体，中文回退系统字体', () {
+    // 1.19.2：中文不再回退系统字体，而是回退内置思源黑体（MuseFont.fallback），断言随改
+    test('大号数字与节点名用内置字体，中文回退内置思源黑体', () {
       expect(MuseFont.family, 'MuseSans');
       final tokens = _src('lib/features/muse/widget/muse_tokens.dart');
-      expect(tokens, contains('fontFamily: MuseFont.family,\n    fontSize: numberSize,'));
-      // no fontFamilyFallback: glyphs outside the subset (Chinese) use the system font
-      expect(tokens, isNot(contains('fontFamilyFallback')));
+      expect(tokens, contains('fontFamily: MuseFont.family,\n    fontFamilyFallback: MuseFont.fallback,\n    fontSize: numberSize,'));
+      // glyphs outside the subset (Chinese) use the bundled Chinese face, not the system font
+      expect(MuseFont.fallback.first, MuseFont.cjk);
       expect('fontFamily: MuseFont.family'.allMatches(_src('lib/features/muse/nodes/node_rows.dart')).length, 4);
       expect('fontFamily: MuseFont.family'.allMatches(_src('lib/features/muse/home/muse_home_page.dart')).length, 2);
     });
