@@ -43,6 +43,15 @@ class _Reach extends MuseReachNotifier {
   }
 }
 
+class _History extends MuseSpeedHistory {
+  _History(this.values);
+
+  final List<int> values;
+
+  @override
+  List<int> build() => values;
+}
+
 OutboundInfo _node(String tag, String type, int delay) =>
     OutboundInfo(tag: tag, tagDisplay: tag, type: type, urlTestDelay: delay);
 
@@ -73,6 +82,7 @@ Future<ProviderContainer> _pumpHome(
   WidgetTester tester, {
   Map<String, Object> prefs = const {},
   bool connected = true,
+  List<int>? history,
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sp = await SharedPreferences.getInstance();
@@ -102,6 +112,7 @@ Future<ProviderContainer> _pumpHome(
         ),
       ),
       museReachProvider.overrideWith((ref) => _Reach()),
+      if (history != null) museSpeedHistoryProvider.overrideWith(() => _History(history)),
     ],
   );
   addTearDown(container.dispose);
@@ -303,6 +314,75 @@ void main() {
         2,
         reason: '首页仍只有 1.6.1 已连接时长那一个计时器',
       );
+    });
+  });
+
+  group('1.19.0 P4 一句话路由与按路由颜色的速度柱', () {
+    test('一句话：各类取流量最多的出站，节点名换成城市名；有直连时说「其余直连」；无数据为 null', () {
+      final n = MuseRouteShareNotifier();
+      expect(museRouteSentence(n.state), isNull);
+      n.frame([
+        _conn('a', 'api.x.ai', 500, chains: const ['🇯🇵 东京 02', 'select']),
+        _conn('b', 'video.x.com', 300, chains: const ['🇭🇰 香港 01', 'select']),
+        _conn('c', 'video.y.com', 50, chains: const ['🇯🇵 东京 02', 'select']),
+        _conn('d', 'www.x.cn', 150, chains: const ['direct']),
+      ]);
+      expect(n.state.nodes[MuseRouteKind.ai], '🇯🇵 东京 02');
+      expect(n.state.nodes[MuseRouteKind.video], '🇭🇰 香港 01');
+      expect(n.state.nodes.containsKey(MuseRouteKind.direct), isFalse);
+      final s = museRouteSentence(n.state, place: (node) => museCityForNodeName(node)?.name);
+      expect(s, 'AI 走 东京 · 视频 走 香港 · 其余直连');
+      // 认不出城市时用节点名本身
+      expect(museRouteSentence(n.state, place: (_) => null), startsWith('AI 走 🇯🇵 东京 02'));
+      // 只有直连
+      final d = MuseRouteShareNotifier()..frame([_conn('x', 'www.x.cn', 100, chains: const ['direct'])]);
+      expect(museRouteSentence(d.state), '全部直连');
+      // 主出站换了，签名跟着变（首页会重画）
+      final before = n.state.signature;
+      n.frame([_conn('e', 'api.y.ai', 5000, chains: const ['🇺🇸 洛杉矶 01'])]);
+      expect(n.state.signature, isNot(before));
+      expect(n.state.nodes[MuseRouteKind.ai], '🇺🇸 洛杉矶 01');
+    });
+
+    testWidgets('首页路由卡：无数据显示简短提示；有数据显示一句话', (tester) async {
+      final c = await _pumpHome(tester);
+      expect(find.text('有流量后显示各类流量走哪里'), findsOneWidget);
+      c.read(museRouteShareProvider.notifier).frame([
+        _conn('a', 'api.x.ai', 600),
+        _conn('b', 'video.x.com', 300, chains: const ['🇭🇰 香港 01']),
+        _conn('c', 'www.x.cn', 100, chains: const ['direct']),
+      ]);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('AI 走 东京 · 视频 走 香港 · 其余直连'), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('未连接时不显示一句话', (tester) async {
+      await _pumpHome(tester, connected: false);
+      expect(find.byKey(const ValueKey('home_route_sentence')), findsNothing);
+      await _done(tester);
+    });
+
+    test('堆叠柱：各段按占比，剩余给主色，总高不变', () {
+      final parts = MuseStackedBarsPainter.split(100, [0.5, 0.3]);
+      expect(parts, [50, 30, 20]);
+      expect(MuseStackedBarsPainter.split(10, [0.8, 0.8]).fold<double>(0, (a, b) => a + b), 10);
+      expect(MuseStackedBarsPainter.split(10, const []), [10]);
+    });
+
+    testWidgets('新首页有分类数据时网速按路由颜色堆叠；无数据退回单色折线；经典首页不变', (tester) async {
+      final h = [for (var i = 0; i < 12; i++) 2048 + i * 100];
+      final c = await _pumpHome(tester, history: h);
+      expect(find.byKey(const ValueKey('tile_speed')), findsOneWidget);
+      expect(find.byKey(const ValueKey('speed_stacked_bars')), findsNothing);
+      c.read(museRouteShareProvider.notifier).frame([_conn('a', 'api.x.ai', 700), _conn('b', 'www.x.com', 300)]);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const ValueKey('speed_stacked_bars')), findsOneWidget);
+      await c.read(MusePrefs.homeStyle.notifier).update('classic');
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byKey(const ValueKey('speed_stacked_bars')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await _done(tester);
     });
   });
 }

@@ -22,6 +22,7 @@ class MuseAppearancePage extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final themeMode = ref.watch(themePreferencesProvider);
     final shownTheme = themeMode == AppThemeMode.black ? AppThemeMode.dark : themeMode;
+    final themeStyle = MuseThemeStyle.fromKey(ref.watch(MusePrefs.themeStyle));
     return MuseScaffold(
       title: '外观',
       body: MuseGroupedBody(
@@ -32,6 +33,8 @@ class MuseAppearancePage extends HookConsumerWidget {
                 key: const ValueKey('appearance_theme'),
                 leading: const Icon(Icons.dark_mode_outlined),
                 title: '深浅色',
+                // 1.19.0 P5: 选了固定深浅的主题时，深浅色设置暂不生效（主题选回「默认」即恢复）
+                subtitle: themeStyle == MuseThemeStyle.auto ? null : '主题为「${themeStyle.title}」时不生效',
                 trailing: Text(shownTheme.present(t)),
                 chevron: true,
                 onTap: () async {
@@ -67,6 +70,8 @@ class MuseAppearancePage extends HookConsumerWidget {
                   value: ref.watch(MusePrefs.pureBlackFollowSystem),
                   onChanged: (v) => ref.read(MusePrefs.pureBlackFollowSystem.notifier).update(v),
                 ),
+              // 1.19.0 P5: 主题（默认 / 浅色 / 纯黑 / 终端绿 / 暖纸），切换时圆形揭开
+              const MuseThemeStyleTile(),
               // 1.18.0 P6: 动效三档；跟随系统 = 移除动画 → 关闭，省电模式 → 精简
               const MuseMotionTile(),
               // 1.19.0: 首页样式（新首页 / 经典首页）
@@ -115,6 +120,37 @@ class MuseAppearancePage extends HookConsumerWidget {
           if (android ?? PlatformUtils.isAndroid) const MuseAndroidAppearanceSection(),
           if (windows ?? PlatformUtils.isWindows) MuseWindowsWindowSection(advancedOpen: windowAdvancedOpen),
         ],
+      ),
+    );
+  }
+}
+
+/// 1.19.0 P5 外观 › 主题。切换时从点按位置圆形揭开（动效档位决定：标准揭开、精简淡入、关闭直接切换）。
+class MuseThemeStyleTile extends ConsumerWidget {
+  const MuseThemeStyleTile({super.key});
+
+  /// 最近一次按下的位置（全局坐标），揭开从这里开始
+  static Offset? _lastDown;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final style = MuseThemeStyle.fromKey(ref.watch(MusePrefs.themeStyle));
+    return Listener(
+      onPointerDown: (e) => _lastDown = e.position,
+      child: MuseTile(
+        key: const ValueKey('appearance_theme_style'),
+        leading: const Icon(Icons.palette_outlined),
+        title: '主题',
+        subtitle: style.describe,
+        info: '默认按「深浅色」设置；浅色、纯黑固定深浅；终端绿、暖纸使用自带配色（主题色不生效）。所有主题的文字都满足对比度要求',
+        trailing: Text(style.title),
+        chevron: true,
+        onTap: () async {
+          final at = _lastDown;
+          final picked = await musePick<MuseThemeStyle>(context, '主题', [for (final s in MuseThemeStyle.values) (s, s.title)], style);
+          if (picked == null || picked == style || !context.mounted) return;
+          await MuseThemeReveal.run(context, at, () => ref.read(MusePrefs.themeStyle.notifier).update(picked.key));
+        },
       ),
     );
   }

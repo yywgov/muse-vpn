@@ -432,8 +432,10 @@ void main() {
 
   group('版本 1.18.0', () {
     test('pubspec, changelog, CHANGELOG.md', () {
-      expect(_src('pubspec.yaml'), contains('version: 1.18.0+208'));
-      expect(museChangelog.keys.first, '1.18.0');
+      // 1.19.0 and later: the 1.18.0 notes stay in the changelog, the version only moves forward
+      expect(_src('pubspec.yaml'), contains('version: 1.1'));
+      expect(museChangelog.keys, contains('1.18.0'));
+      expect(museChangelog.keys.toList().indexOf('1.18.0'), lessThan(museChangelog.keys.toList().indexOf('1.17.1')));
       expect(museChangelog['1.18.0']!.join(), contains('动效'));
       expect(_src('CHANGELOG.md'), contains('### 1.18.0'));
     });

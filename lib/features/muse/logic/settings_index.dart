@@ -59,6 +59,8 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('深浅色', MuseSettingPage.appearance, keywords: ['深色模式', '浅色模式', '跟随系统', '主题']),
   MuseSettingEntry('纯黑', MuseSettingPage.appearance, keywords: ['黑色', 'OLED', '省电', '深色模式', 'AMOLED']),
   // 1.18.0 P6
+  // 1.19.0 P5
+  MuseSettingEntry('主题', MuseSettingPage.appearance, keywords: ['浅色', '纯黑', '终端绿', '暖纸', '配色', '皮肤', '黑底绿字', '米色', '纸']),
   MuseSettingEntry('首页样式', MuseSettingPage.appearance, keywords: ['新首页', '经典首页', '旧首页', '路由图', '弧线图', '地图', '首页']),
   MuseSettingEntry('动效', MuseSettingPage.appearance, keywords: ['动画', '移除动画', '减少动画', '省电模式', '精简']),
   MuseSettingEntry('主题色', MuseSettingPage.appearance, keywords: ['颜色', '强调色', '中国传统色', '传统色', '景泰蓝', '宝蓝', '竹青', '松花', '胭脂', '枣红', '藤黄', '青碧', '丁香', '赭石', '蓝', '绿', '紫', '青', '红', '黄', '灰', '棕']),

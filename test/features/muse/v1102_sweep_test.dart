@@ -479,6 +479,9 @@ void main() {
         }
         expect(row, findsOneWidget);
         expect(find.text(museExcludeRecentsTitle, skipOffstage: false), findsOneWidget);
+        // 1.19.0: 外观 多了「首页样式」「主题」两行，这一行在手机上滚到屏幕外了，先滚到可见再操作
+        await t.ensureVisible(row);
+        await t.pump();
         final sw = t.widget<Switch>(find.descendant(of: row, matching: find.byType(Switch), skipOffstage: false));
         expect(sw.value, isFalse);
         sw.onChanged!(true);

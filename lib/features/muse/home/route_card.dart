@@ -33,6 +33,14 @@ class MuseRouteCard extends ConsumerWidget {
     ref.watch(museRouteShareProvider.select((s) => s.signature));
     final shares = connected ? ref.read(museRouteShareProvider).shares() : const <(MuseRouteKind, double)>[];
     final colors = museRouteKindColors(Theme.of(context).colorScheme);
+    // 1.19.0 P4 一句话路由：节点名换成城市名（当前节点用上面判断出的出口城市）
+    final sentence = connected
+        ? museRouteSentence(
+            ref.read(museRouteShareProvider),
+            place: (node) => node == nodeName ? exit.city?.name : museCityForNodeName(node)?.name,
+            fallbackPlace: exit.city?.name,
+          )
+        : null;
     return MuseCard(
       key: const ValueKey('home_route_card'),
       padding: const EdgeInsets.fromLTRB(MuseSpace.s12, MuseSpace.s12, MuseSpace.s12, MuseSpace.s8),
@@ -65,6 +73,17 @@ class MuseRouteCard extends ConsumerWidget {
                     ],
                   ),
               ],
+            ),
+          ],
+          if (connected) ...[
+            const SizedBox(height: MuseSpace.s4),
+            Text(
+              sentence ?? '有流量后显示各类流量走哪里',
+              key: const ValueKey('home_route_sentence'),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: sentence == null ? MuseType.caption(context) : MuseType.body(context),
             ),
           ],
         ],

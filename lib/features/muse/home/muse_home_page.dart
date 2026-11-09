@@ -1007,7 +1007,7 @@ class _SpeedTile extends ConsumerWidget {
       titleTrailing: Text('↑ ${museSpeedText(stats.uplink.toInt())}', style: MuseType.caption(context)),
       value: '↓ ${museSpeedText(stats.downlink.toInt())}',
       bottom: SizedBox.expand(
-        child: CustomPaint(painter: _SparklinePainter(history, museBrandOf(context), MuseTheme.of(context).hairline)),
+        child: museSpeedChart(context, ref, history),
       ),
       onTap: () => _showSessionSheet(context),
     );
@@ -1033,10 +1033,7 @@ class _FlowTile extends ConsumerWidget {
         children: [
           Expanded(
             flex: 2,
-            child: CustomPaint(
-              size: Size.infinite,
-              painter: _SparklinePainter(history, museBrandOf(context), MuseTheme.of(context).hairline),
-            ),
+            child: SizedBox.expand(child: museSpeedChart(context, ref, history)),
           ),
           const SizedBox(width: MuseSpace.s12),
           // 1.4.1: may shrink (ellipsis) in a narrow tile / large text instead of overflowing
@@ -1056,6 +1053,75 @@ class _FlowTile extends ConsumerWidget {
       onTap: () => _showSessionSheet(context),
     );
   }
+}
+
+/// 1.19.0 P4：新首页上网速图按路由颜色堆叠成柱（每根柱 = 一次网速读数，按本次连接各类占比分段，
+/// 其余流量用主色）；经典首页或还没有分类数据时退回原来的单色折线。只随已有网速读数重画，不另开计时器。
+Widget museSpeedChart(BuildContext context, WidgetRef ref, List<int> history) {
+  final hairline = MuseTheme.of(context).hairline;
+  final brand = museBrandOf(context);
+  final classic = ref.watch(MusePrefs.homeStyle) == 'classic';
+  ref.watch(museRouteShareProvider.select((s) => s.signature));
+  final shares = classic ? const <(MuseRouteKind, double)>[] : ref.read(museRouteShareProvider).shares();
+  if (shares.isEmpty) return CustomPaint(painter: _SparklinePainter(history, brand, hairline));
+  final colors = museRouteKindColors(Theme.of(context).colorScheme);
+  return CustomPaint(
+    key: const ValueKey('speed_stacked_bars'),
+    painter: MuseStackedBarsPainter(history, [for (final (k, v) in shares) (colors[k]!, v)], brand, hairline),
+  );
+}
+
+/// 堆叠速度柱：[segments] 为（颜色, 占比）从下往上，剩下的占比画成 [rest] 色。
+class MuseStackedBarsPainter extends CustomPainter {
+  MuseStackedBarsPainter(this.values, this.segments, this.rest, this.baseline);
+
+  final List<int> values;
+  final List<(Color, double)> segments;
+  final Color rest;
+  final Color baseline;
+
+  /// 一根柱从下往上各段的高度（像素），总和 = [h]。
+  static List<double> split(double h, List<double> shares) {
+    final out = <double>[];
+    var used = 0.0;
+    for (final v in shares) {
+      final seg = (h * v.clamp(0.0, 1.0)).clamp(0.0, h - used);
+      out.add(seg);
+      used += seg;
+    }
+    out.add(h - used);
+    return out;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final y0 = size.height - 1;
+    canvas.drawLine(Offset(0, y0), Offset(size.width, y0), Paint()..color = baseline..strokeWidth = 1);
+    if (values.isEmpty) return;
+    final maxV = math.max(values.reduce(math.max), 1);
+    final slot = size.width / MuseSpeedHistory.length;
+    final w = math.max(slot - MuseSize.barGap, 1.0);
+    final start = size.width - slot * values.length;
+    final shares = [for (final s in segments) s.$2];
+    final paint = Paint();
+    for (var i = 0; i < values.length; i++) {
+      final h = (values[i] / maxV) * (size.height - 2);
+      if (h <= 0) continue;
+      final x = start + slot * i + MuseSize.barGap / 2;
+      var y = y0;
+      final parts = split(h, shares);
+      for (var j = 0; j < parts.length; j++) {
+        if (parts[j] <= 0) continue;
+        paint.color = j < segments.length ? segments[j].$1 : rest;
+        canvas.drawRect(Rect.fromLTWH(x, y - parts[j], w, parts[j]), paint);
+        y -= parts[j];
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(MuseStackedBarsPainter old) =>
+      old.values != values || old.rest != rest || old.segments.toString() != segments.toString();
 }
 
 class _SparklinePainter extends CustomPainter {

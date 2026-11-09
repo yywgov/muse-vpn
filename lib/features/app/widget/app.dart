@@ -14,7 +14,9 @@ import 'package:hiddify/features/muse/home/net_watch.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart' show museDefaultColorStyle;
 import 'package:hiddify/features/muse/home/widget_sync.dart';
 import 'package:hiddify/features/muse/desktop/launch_control.dart';
+import 'package:hiddify/features/muse/widget/muse_theme_reveal.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_theme.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -98,7 +100,11 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     // 1.11.0: 配色风格 is fixed to 忠实 and text follows the system font size (a saved 配色风格 /
     // 文字缩放 from an older version is ignored, never applied)
     museApplyColorStyle(museDefaultColorStyle);
-    final theme = AppTheme(themeMode, locale.preferredFontFamily, blackWhenSystemDark: blackFollow);
+    // 1.19.0 P5: 外观 › 主题（浅色 / 纯黑 / 终端绿 / 暖纸；默认按深浅色）
+    final themeStyle = MuseThemeStyle.fromKey(ref.watch(MusePrefs.themeStyle));
+    if (themeStyle == MuseThemeStyle.black) museApplyPureBlack(true);
+    if (themeStyle == MuseThemeStyle.light) museApplyPureBlack(false);
+    final theme = AppTheme(themeMode, locale.preferredFontFamily, blackWhenSystemDark: blackFollow, style: themeStyle);
     final activeBreakpoint = Breakpoint(context).activeBreakpoint;
 
     ref.listen(foregroundProfilesUpdateNotifierProvider, (_, _) {});
@@ -164,7 +170,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
               supportedLocales: AppLocaleUtils.supportedLocales,
               localizationsDelegates: GlobalMaterialLocalizations.delegates,
               debugShowCheckedModeBanner: false,
-              themeMode: themeMode.flutterThemeMode,
+              themeMode: theme.themeMode,
               theme: theme.lightTheme(null),
               darkTheme: theme.darkTheme(null),
               title: Constants.appName,
@@ -174,6 +180,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                 Widget child = MuseHiddenRelease(child: routed ?? const SizedBox());
                 // 1.18.0 P6: 动效档位给所有页面；「关闭」同时告诉 Flutter 自带控件不做动画
                 child = museWrapMotion(context, motionLevel, child);
+                // 1.19.0 P5: 切换主题时的圆形揭开（一次性；关闭档直接切换）
+                child = MuseThemeReveal(child: child);
                 if (kDebugMode && _debugAccessibility) {
                   return AccessibilityTools(checkFontOverflows: true, child: child);
                 }

@@ -46,12 +46,15 @@ MuseRouteKind? museRouteKindOf(MuseConn c) {
 
 /// 本次连接以来各类的字节数（含「其他」），由连接帧累加。
 class MuseRouteShareState {
-  const MuseRouteShareState({this.bytes = const {}, this.other = 0});
+  const MuseRouteShareState({this.bytes = const {}, this.other = 0, this.nodes = const {}});
 
   static const empty = MuseRouteShareState();
 
   final Map<MuseRouteKind, int> bytes;
   final int other;
+
+  /// 1.19.0 P4：各类里流量最多的那个出站节点（直连类不记）。
+  final Map<MuseRouteKind, String> nodes;
 
   int get total => other + bytes.values.fold(0, (a, b) => a + b);
 
@@ -67,7 +70,7 @@ class MuseRouteShareState {
   }
 
   /// 首页只在整数百分比变化时重画
-  String get signature => [for (final s in shares()) '${s.$1.name}${(s.$2 * 100).round()}'].join(',');
+  String get signature => [for (final s in shares()) '${s.$1.name}${(s.$2 * 100).round()}${nodes[s.$1] ?? ''}'].join(',');
 }
 
 class MuseRouteShareNotifier extends StateNotifier<MuseRouteShareState> {
@@ -75,6 +78,7 @@ class MuseRouteShareNotifier extends StateNotifier<MuseRouteShareState> {
 
   final _seen = <String, int>{};
   final _bytes = <MuseRouteKind, int>{};
+  final _nodeBytes = <MuseRouteKind, Map<String, int>>{};
   var _other = 0;
 
   /// 喂一帧连接（连接页的每一帧、统计页打开时的一次读取）。
@@ -93,16 +97,27 @@ class MuseRouteShareNotifier extends StateNotifier<MuseRouteShareState> {
         _other += delta;
       } else {
         _bytes[k] = (_bytes[k] ?? 0) + delta;
+        final node = c.node.trim();
+        if (k != MuseRouteKind.direct && node.isNotEmpty) {
+          final m = _nodeBytes.putIfAbsent(k, () => {});
+          m[node] = (m[node] ?? 0) + delta;
+        }
       }
     }
     _seen.removeWhere((id, _) => !alive.contains(id));
-    final next = MuseRouteShareState(bytes: Map.unmodifiable(_bytes), other: _other);
+    final next = MuseRouteShareState(bytes: Map.unmodifiable(_bytes), other: _other, nodes: Map.unmodifiable(_topNodes()));
     if (next.signature != state.signature) state = next;
   }
+
+  Map<MuseRouteKind, String> _topNodes() => {
+    for (final e in _nodeBytes.entries)
+      if (e.value.isNotEmpty) e.key: e.value.entries.reduce((a, b) => b.value > a.value ? b : a).key,
+  };
 
   void reset() {
     _seen.clear();
     _bytes.clear();
+    _nodeBytes.clear();
     _other = 0;
     if (state.total != 0) state = MuseRouteShareState.empty;
   }
@@ -114,3 +129,24 @@ final museRouteShareProvider = StateNotifierProvider<MuseRouteShareNotifier, Mus
   ref.listen<bool>(museRunningProvider, (_, _) => n.reset());
   return n;
 });
+
+/// 1.19.0 P4「每类流量走哪里」一句话：如「AI 走 东京 · 视频 走 香港 · 其余直连」。
+/// [place] 把节点名换成城市名（认不出城市时返回 null，用节点名本身）。无数据时返回 null（不显示）。
+String? museRouteSentence(MuseRouteShareState s, {String? Function(String node)? place, String? fallbackPlace}) {
+  final shares = s.shares();
+  if (shares.isEmpty) return null;
+  final parts = <String>[];
+  var hasDirect = false;
+  for (final (kind, _) in shares) {
+    if (kind == MuseRouteKind.direct) {
+      hasDirect = true;
+      continue;
+    }
+    final node = s.nodes[kind];
+    final where = node == null ? fallbackPlace : (place?.call(node) ?? node);
+    if (where == null || where.isEmpty) continue;
+    parts.add('${kind.label} 走 $where');
+  }
+  if (hasDirect) parts.add(parts.isEmpty ? '全部直连' : '其余直连');
+  return parts.isEmpty ? null : parts.join(' · ');
+}

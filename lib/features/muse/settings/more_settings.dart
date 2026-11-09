@@ -47,6 +47,8 @@ import 'package:hiddify/features/muse/settings/theme_preview_page.dart';
 import 'package:hiddify/features/muse/settings/windows_settings.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_segmented.dart';
+import 'package:hiddify/features/muse/widget/muse_theme_reveal.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_theme.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';

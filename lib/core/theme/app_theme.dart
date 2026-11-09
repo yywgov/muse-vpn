@@ -6,6 +6,7 @@ import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_theme.dart';
 
 /// 穿云 1.2.1: status / navigation bar icons that contrast with the page: dark icons on the light
 /// theme, light icons on the dark and true-black themes. Every app bar (AppBarTheme) and the app
@@ -29,7 +30,13 @@ SystemUiOverlayStyle museSystemOverlayStyle(Brightness themeBrightness) {
 const museLightScrim = Color(0x52000000);
 
 class AppTheme {
-  AppTheme(this.mode, this.fontFamily, {this.blackWhenSystemDark = false});
+  AppTheme(this.mode, this.fontFamily, {this.blackWhenSystemDark = false, this.style = MuseThemeStyle.auto});
+
+  /// 1.19.0 P5 外观 › 主题（默认 = 按深浅色）
+  final MuseThemeStyle style;
+
+  /// 1.19.0 P5: MaterialApp 的 themeMode（固定深浅的主题优先于深浅色设置）
+  ThemeMode get themeMode => style.forcedMode ?? mode.flutterThemeMode;
 
   /// 1.16.0 B9: 跟随系统 + 纯黑 (系统切到深色时用纯黑背景)
   final bool blackWhenSystemDark;
@@ -48,12 +55,18 @@ class AppTheme {
 
   /// 1.6.1: the Material 3 colour scheme seeded by 主题色 in the chosen 配色风格 (纯黑 lowers the
   /// dark surfaces). Material You wallpaper colours are ignored on purpose.
-  ColorScheme scheme(Brightness brightness) => museSeededScheme(
-    seed: seed,
-    brightness: brightness,
-    style: MuseColorStyle.fromKey(MusePalette.colorStyle),
-    pureBlack: museUsePureBlack(mode, blackWhenSystemDark: blackWhenSystemDark, brightness: brightness),
-  );
+  ColorScheme scheme(Brightness brightness) {
+    final own = museThemeOwnScheme(style);
+    if (own != null && own.brightness == brightness) return own;
+    return museSeededScheme(
+      seed: seed,
+      brightness: brightness,
+      style: MuseColorStyle.fromKey(MusePalette.colorStyle),
+      pureBlack:
+          style == MuseThemeStyle.black ||
+          (style == MuseThemeStyle.auto && museUsePureBlack(mode, blackWhenSystemDark: blackWhenSystemDark, brightness: brightness)),
+    );
+  }
 
   ThemeData lightTheme(ColorScheme? lightColorScheme) => _cached(scheme(Brightness.light));
 
