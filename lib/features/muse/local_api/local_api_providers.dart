@@ -9,6 +9,7 @@ import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/app_traffic_recorder.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
+import 'package:hiddify/features/muse/home/route_map/route_share.dart';
 import 'package:hiddify/features/muse/local_api/dns_queries.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
 import 'package:hiddify/features/muse/logic/compat_profile.dart' show museEffectiveCoreKind;
@@ -112,6 +113,8 @@ final museConnectionsProvider = StreamProvider.autoDispose<MuseConnState>((ref) 
     await for (final raw in museUntilDisposed(ref, api.stream('/connections', query: const {'interval': '1000'}))) {
       final frame = await museParseConnFrameAsync(raw);
       feed.frame(frame.connections);
+      // 1.19.0 分类线：同一帧顺带累加各类流量（不另读接口）
+      ref.read(museRouteShareProvider.notifier).frame(frame.connections);
       yield MuseConnState(connections: tracker.apply(frame, DateTime.now()), frame: frame);
     }
     yield const MuseConnState(error: '连接已断开');

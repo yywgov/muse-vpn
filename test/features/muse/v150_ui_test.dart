@@ -259,7 +259,8 @@ void main() {
     testWidgets('320 px + 2× $label: tiles in one column, nothing overflows', (tester) async {
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      await _pump(tester, page: const MuseHomePage(), brightness: b, size: small);
+      // 1.19.0: the tile layout of 经典首页 (新首页 puts the route map on top, below which the tiles start offscreen)
+      await _pump(tester, page: const MuseHomePage(), brightness: b, size: small, initialPrefs: const {'muse_home_style': 'classic'});
       expect(tester.takeException(), isNull);
       final speed = tester.getRect(find.byKey(const ValueKey('tile_speed')));
       final traffic = tester.getRect(find.byKey(const ValueKey('tile_traffic')));

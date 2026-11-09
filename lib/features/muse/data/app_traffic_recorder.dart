@@ -5,6 +5,7 @@
 
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
+import 'package:hiddify/features/muse/home/route_map/route_share.dart';
 import 'package:hiddify/features/muse/local_api/local_api_client.dart';
 import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/muse/logic/app_traffic.dart';
@@ -47,6 +48,8 @@ final museAppTrafficOnOpenProvider = FutureProvider.autoDispose<void>((ref) asyn
         if (c is Map) MuseConn.fromJson(c.cast<String, dynamic>()),
     ].whereType<MuseConn>();
     final bytes = ref.read(museAppSamplerProvider).sample(conns);
+    // 1.19.0 分类线：这一次读取顺带更新首页各类流量
+    ref.read(museRouteShareProvider.notifier).frame(conns);
     final n = ref.read(MusePrefs.appTraffic.notifier);
     museSaveAppBytes(_PrefWriter(n.update), ref.read(MusePrefs.appTraffic), bytes);
   } catch (_) {}

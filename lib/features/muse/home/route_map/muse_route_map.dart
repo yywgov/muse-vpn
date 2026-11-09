@@ -10,6 +10,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hiddify/features/muse/home/route_map/route_geo.dart';
+import 'package:hiddify/features/muse/home/route_map/route_share.dart';
 import 'package:hiddify/features/muse/widget/muse_motion.dart';
 
 /// 弧线图动效时长。
@@ -83,7 +84,15 @@ class MuseRouteMap extends StatefulWidget {
     this.home = museHomeCity,
     this.dots,
     this.aspectRatio = 2.2,
+    this.connecting = false,
+    this.shares = const [],
   });
+
+  /// 连接中（未连接时说明文字显示「连接中…」）
+  final bool connecting;
+
+  /// 1.19.0 分类线：各类占全部流量的比例；为空时只画主弧线
+  final List<(MuseRouteKind, double)> shares;
 
   /// 是否已连接（未连接只显示底图与本机）
   final bool connected;
@@ -227,7 +236,7 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
     final exit = widget.exit;
     final shown = widget.connected && exit.known;
     final caption = !widget.connected
-        ? '未连接'
+        ? (widget.connecting ? '连接中…' : '未连接')
         : exit.known
         ? '${widget.home.name} → ${exit.city!.name} · ${exit.source.label}'
         : '出口位置未知';
@@ -265,6 +274,8 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
                         fade: _level == MuseMotionLevel.reduced,
                         color: scheme.primary,
                         homeColor: scheme.onSurface,
+                        shares: widget.shares,
+                        shareColors: museRouteKindColors(scheme),
                       ),
                     ),
                   ],
@@ -308,6 +319,8 @@ class _ArcPainter extends CustomPainter {
     required this.fade,
     required this.color,
     required this.homeColor,
+    this.shares = const [],
+    this.shareColors = const {},
   }) : super(repaint: Listenable.merge([state._arc, state._dot, state._slide]));
 
   final MuseRouteMapState state;
@@ -316,6 +329,8 @@ class _ArcPainter extends CustomPainter {
   final bool fade;
   final Color color;
   final Color homeColor;
+  final List<(MuseRouteKind, double)> shares;
+  final Map<MuseRouteKind, Color> shareColors;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -341,6 +356,7 @@ class _ArcPainter extends CustomPainter {
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
     canvas.drawPath(metric.extractPath(0, metric.length * progress), line);
+    if (progress >= 1 && shares.isNotEmpty) _paintShares(canvas, size, pts, alpha);
     if (progress >= 1) {
       final e = museProject(pts.last.lat, pts.last.lon, size, wrap: false);
       canvas.drawCircle(e, 7, Paint()..color = color.withValues(alpha: 0.18 * alpha));
@@ -357,7 +373,59 @@ class _ArcPainter extends CustomPainter {
     }
   }
 
+  /// 分类线：走代理的类别画成主弧线两侧微微鼓起的细弧，直连画成本机周围的一圈；线宽随占比。
+  void _paintShares(Canvas canvas, Size size, List<MuseGeoPoint> pts, double alpha) {
+    final screen = [for (final p in pts) museProject(p.lat, p.lon, size, wrap: false)];
+    final h = screen.first;
+    var side = 0;
+    for (final (kind, share) in shares) {
+      final w = museRouteShareWidth(share);
+      final c = (shareColors[kind] ?? color).withValues(alpha: 0.75 * alpha);
+      final paint = Paint()
+        ..color = c
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w
+        ..strokeCap = StrokeCap.round;
+      if (kind == MuseRouteKind.direct) {
+        canvas.drawCircle(h, 6 + w / 2, paint);
+        continue;
+      }
+      // 交替放在两侧，越往后离主弧越远
+      side++;
+      final offset = (side.isOdd ? 1 : -1) * (4.0 + 3.0 * ((side - 1) ~/ 2));
+      final path = Path();
+      for (var i = 0; i < screen.length; i++) {
+        final t = i / (screen.length - 1);
+        final a = screen[i == 0 ? 0 : i - 1];
+        final b = screen[i == screen.length - 1 ? i : i + 1];
+        final d = b - a;
+        final len = d.distance;
+        final n = len == 0 ? Offset.zero : Offset(-d.dy / len, d.dx / len);
+        // 两端贴住起止点，中间离开主弧
+        final o = screen[i] + n * (offset * 4 * t * (1 - t));
+        i == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
   @override
   bool shouldRepaint(_ArcPainter old) =>
-      old.shown != shown || old.home != home || old.fade != fade || old.color != color || old.homeColor != homeColor;
+      old.shares != shares ||
+      old.shown != shown ||
+      old.home != home ||
+      old.fade != fade ||
+      old.color != color ||
+      old.homeColor != homeColor;
 }
+
+/// 分类线线宽：占比 0–1 → 1–6 逻辑像素。
+double museRouteShareWidth(double share) => 1.0 + 5.0 * share.clamp(0.0, 1.0);
+
+/// 各类分类线的颜色（跟随当前配色）。
+Map<MuseRouteKind, Color> museRouteKindColors(ColorScheme s) => {
+  MuseRouteKind.ai: s.tertiary,
+  MuseRouteKind.video: s.secondary,
+  MuseRouteKind.dev: s.error.withValues(alpha: 0.9),
+  MuseRouteKind.direct: s.onSurfaceVariant,
+};

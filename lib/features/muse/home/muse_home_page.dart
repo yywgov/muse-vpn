@@ -36,6 +36,9 @@ import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
 import 'package:hiddify/features/muse/home/reachability.dart';
+import 'package:hiddify/features/muse/home/route_map/muse_route_map.dart';
+import 'package:hiddify/features/muse/home/route_map/route_geo.dart';
+import 'package:hiddify/features/muse/home/route_map/route_share.dart';
 import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/muse/logic/connect_flow.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
@@ -63,12 +66,14 @@ import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/gen/assets.gen.dart';
+import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart' show OutboundGroup;
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/utils/number_formatters.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 part 'dashboard_cards.dart';
+part 'route_card.dart';
 
 /// Content width from which the node list is shown as a right-hand column.
 const museHomeSideListWidth = 1000.0;
@@ -188,6 +193,8 @@ class _Dashboard extends ConsumerWidget {
       );
     }
     if (hasProfile == false) return const _EmptyState();
+    // 1.19.0: 新首页 = 顶部路由弧线图 + 经典首页的全部内容；经典首页 = 1.18 的首页原样
+    final classic = ref.watch(MusePrefs.homeStyle) == 'classic';
     return RefreshIndicator(
       key: const ValueKey('home_pull_refresh'),
       onRefresh: () => museNodePull(ref),
@@ -200,6 +207,7 @@ class _Dashboard extends ConsumerWidget {
         children: [
           // 1.13.0: 安全模式 / 被其他 VPN 断开 / 上次异常 / 连接没有成功 (only when one applies)
           const MuseHealthBanner(),
+          if (!classic) ...[const MuseRouteCard(), const SizedBox(height: MuseSpace.s12)],
           const MuseHeroCard(),
           const SizedBox(height: MuseSpace.s12),
           const MuseTileGrid(),

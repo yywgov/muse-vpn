@@ -45,6 +45,8 @@ abstract final class MusePrefs {
   static final secureSensitive = PreferencesNotifier.create<bool, bool>("muse_secure_sensitive", true);
   /// 1.18.0 P6 动效：auto（跟随系统：移除动画 → 关闭，Android 省电模式 → 精简）/ standard / reduced / off
   static final motionLevel = PreferencesNotifier.create<String, String>("muse_motion_level", "auto");
+  /// 1.19.0 外观 › 首页样式：new（新首页：路由弧线图）/ classic（经典首页，即 1.18 的首页）
+  static final homeStyle = PreferencesNotifier.create<String, String>("muse_home_style", "new");
   static final privacyMask = PreferencesNotifier.create<bool, bool>("muse_privacy_mask", false);
 
   /// 节假日云朵小彩蛋
@@ -348,4 +350,5 @@ const museSyncedPrefKeys = [
   'muse_dock_style',
   'muse_blocked_hosts',
   'muse_tab_animation',
+  'muse_home_style',
 ];

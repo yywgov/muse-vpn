@@ -69,6 +69,8 @@ class MuseAppearancePage extends HookConsumerWidget {
                 ),
               // 1.18.0 P6: 动效三档；跟随系统 = 移除动画 → 关闭，省电模式 → 精简
               const MuseMotionTile(),
+              // 1.19.0: 首页样式（新首页 / 经典首页）
+              const MuseHomeStyleTile(),
             ],
           ),
           MuseSection(
@@ -114,6 +116,34 @@ class MuseAppearancePage extends HookConsumerWidget {
           if (windows ?? PlatformUtils.isWindows) MuseWindowsWindowSection(advancedOpen: windowAdvancedOpen),
         ],
       ),
+    );
+  }
+}
+
+/// 1.19.0 外观 › 首页样式：新首页（路由弧线图在顶部）/ 经典首页（1.18 的首页）。
+class MuseHomeStyleTile extends ConsumerWidget {
+  const MuseHomeStyleTile({super.key});
+
+  static const choices = [('new', '新首页'), ('classic', '经典首页')];
+
+  static String titleOf(String key) => key == 'classic' ? '经典首页' : '新首页';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final style = ref.watch(MusePrefs.homeStyle) == 'classic' ? 'classic' : 'new';
+    return MuseTile(
+      key: const ValueKey('appearance_home_style'),
+      leading: const Icon(Icons.public_outlined),
+      title: '首页样式',
+      subtitle: style == 'classic' ? '1.18 及以前的首页' : '顶部显示本机到出口的路由图',
+      info: '新首页在顶部显示从本机到出口城市的路由图；经典首页保持原来的样子。两种首页的连接、节点、网速等功能相同',
+      trailing: Text(titleOf(style)),
+      chevron: true,
+      onTap: () async {
+        final picked = await musePick<String>(context, '首页样式', choices, style);
+        if (picked == null || picked == style) return;
+        await ref.read(MusePrefs.homeStyle.notifier).update(picked);
+      },
     );
   }
 }
