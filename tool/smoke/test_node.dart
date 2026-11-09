@@ -19,7 +19,16 @@ String _arg(List<String> args, String name, String fallback) {
   return i >= 0 && i + 1 < args.length ? args[i + 1] : fallback;
 }
 
-Future<void> main(List<String> args) async {
+// 1.19.0: a write to a connection the app has already reset (sing-box closes connections hard
+// when it reloads or cancels a fetch) fails with "connection reset / aborted". That error goes to
+// the socket's `done` future; unhandled, it ended the whole node process, so every later check
+// saw "connection refused" (tag run #244, attempt 1). Each connection now handles its own errors
+// and an unexpected one is printed instead of stopping the node.
+Future<void> main(List<String> args) => runZonedGuarded(() => _main(args), (e, st) {
+      stderr.writeln('test node: ignored error: $e');
+    })!;
+
+Future<void> _main(List<String> args) async {
   final port = int.parse(_arg(args, '--port', '11080'));
   final counters = int.parse(_arg(args, '--counters', '11990'));
   final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, port);
@@ -74,13 +83,13 @@ class _Reader {
   /// hands the rest of the stream over (pending bytes first)
   void pipeTo(Socket dst, void Function(int) count) {
     if (_buf.isNotEmpty) {
-      dst.add(_buf);
+      _send(dst, List<int>.of(_buf));
       count(_buf.length);
       _buf.clear();
     }
     _sub.onData((d) {
       count(d.length);
-      dst.add(d);
+      _send(dst, d);
     });
     _sub.onDone(() => dst.destroy());
     _sub.onError((_) => dst.destroy());
@@ -88,13 +97,23 @@ class _Reader {
   }
 }
 
+/// Writes to [s] unless it is already closed; a failed write only closes this connection.
+void _send(Socket s, List<int> data) {
+  try {
+    s.add(data);
+  } catch (_) {
+    s.destroy();
+  }
+}
+
 Future<void> _handle(Socket client) async {
+  unawaited(client.done.catchError((_) {}));
   final r = _Reader(client);
   try {
     final head = await r.take(2);
     if (head[0] != 5) throw 'not socks5';
     await r.take(head[1]);
-    client.add([5, 0]);
+    _send(client, [5, 0]);
     final req = await r.take(4);
     String host;
     if (req[3] == 1) {
@@ -111,23 +130,22 @@ Future<void> _handle(Socket client) async {
     final pb = await r.take(2);
     final port = pb[0] << 8 | pb[1];
     if (req[1] != 1) {
-      client.add([5, 7, 0, 1, 0, 0, 0, 0, 0, 0]);
+      _send(client, [5, 7, 0, 1, 0, 0, 0, 0, 0, 0]);
       await client.close();
       return;
     }
     connections++;
     hosts.add('$host:$port');
     final upstream = await Socket.connect(host, port, timeout: const Duration(seconds: 10));
-    client.add([5, 0, 0, 1, 0, 0, 0, 0, 0, 0]);
+    unawaited(upstream.done.catchError((_) {}));
+    _send(client, [5, 0, 0, 1, 0, 0, 0, 0, 0, 0]);
     r.pipeTo(upstream, (n) => bytesUp += n);
     upstream.listen((d) {
       bytesDown += d.length;
-      client.add(d);
+      _send(client, d);
     }, onDone: client.destroy, onError: (_) => client.destroy());
   } catch (_) {
-    try {
-      client.add([5, 1, 0, 1, 0, 0, 0, 0, 0, 0]);
-    } catch (_) {}
+    _send(client, [5, 1, 0, 1, 0, 0, 0, 0, 0, 0]);
     client.destroy();
   }
 }

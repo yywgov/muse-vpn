@@ -155,6 +155,19 @@ function WaitCtl([int]$seconds) {
   }
   return $false
 }
+# 1.19.0: diagnostics only (no check depends on them) - this run's in-memory app log and the
+# saved started_by_user / file size of shared_preferences.json, written to recovery-logs\
+function DiagDir { $d = Join-Path $Out "recovery-logs"; New-Item -ItemType Directory -Force -Path $d | Out-Null; return $d }
+function SaveRing([string]$name) {
+  $r = Ctl "/log?n=600"
+  $lines = if ($r -and $r.lines) { $r.lines } else { @("(no answer)") }
+  Add-Content -Path (Join-Path (DiagDir) "ring-$name.txt") -Value (@("==== $(Get-Date -Format o)") + $lines) -Encoding UTF8
+}
+function SavePrefs([string]$name) {
+  $f = Get-ChildItem -Path $env:APPDATA -Recurse -Depth 4 -Filter "shared_preferences.json" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "Chuanyun" } | Select-Object -First 1
+  $line = if ($f) { $t = Get-Content -Raw -Path $f.FullName -ErrorAction SilentlyContinue; $m = [regex]::Match("$t", '"[a-z.]*started_by_user":(true|false)'); "$name $(Get-Date -Format o) size=$($f.Length) $($m.Value) $($f.FullName)" } else { "$name $(Get-Date -Format o) no shared_preferences.json" }
+  Add-Content -Path (Join-Path (DiagDir) "prefs.txt") -Value $line -Encoding UTF8
+}
 function DataDir {
   foreach ($root in @($env:APPDATA, $env:LOCALAPPDATA)) {
     $f = Get-ChildItem -Path $root -Recurse -Depth 5 -Filter "guard.log" -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -182,7 +195,7 @@ $nodeExe = Join-Path $Out "test_node.exe"
 Push-Location $RepoDir
 & dart compile exe tool/smoke/test_node.dart -o $nodeExe | Out-Null
 Pop-Location
-$node = Start-Process -FilePath $nodeExe -ArgumentList "--port", "11080", "--counters", "11990" -PassThru -WindowStyle Hidden
+$node = Start-Process -FilePath $nodeExe -ArgumentList "--port", "11080", "--counters", "11990" -PassThru -WindowStyle Hidden -RedirectStandardError (Join-Path (DiagDir) "test_node-$(Get-Date -Format HHmmss).err.txt") -RedirectStandardOutput (Join-Path (DiagDir) "test_node-$(Get-Date -Format HHmmss).out.txt")
 Start-Sleep -Seconds 2
 $profilePath = Join-Path $Out "smoke-profile.json"
 '{"outbounds":[{"type":"socks","tag":"smoke-node","server":"127.0.0.1","server_port":11080,"version":"5"}]}' | Set-Content -Path $profilePath -Encoding ASCII
@@ -262,6 +275,8 @@ Start-Sleep -Seconds 2
 Shot "6-restored-from-tray"
 
 # ---- (a) the app process is killed while connected ----
+SavePrefs "before-kill"
+SaveRing "before-kill"
 Stop-Process -Id $p.Id -Force
 Start-Sleep -Seconds 2
 $st = GuardStatus
@@ -278,6 +293,8 @@ $p = LaunchApp
 $up = WaitCtl 90
 $c = WaitConnected 90
 Rec "restart-restores" "next launch restores the connection the user had on" $c[0] (StateText $c[1])
+SavePrefs "after-relaunch"
+SaveRing "after-relaunch"
 Ctl "/crash" | Out-Null
 Start-Sleep -Milliseconds 1500
 $st = GuardStatus
@@ -316,6 +333,7 @@ $startupRestore = @($glog | Where-Object { $_ -match "restore\(startup\)" }).Cou
 Rec "stale-cleared" "next launch restored the leftover proxy at start-up (guard.log: restore(startup))" $startupRestore (($glog | Where-Object { $_ -match "restore\(startup\)" } | Select-Object -Last 1) -join "")
 $c = WaitConnected 90
 Rec "stale-reconnect" "and reconnected" $c[0] ((StateText $c[1]) + "; before the kill: " + (StateText $pre))
+SaveRing "stale-relaunch"
 
 # ---- the user disconnects: own settings back, no auto-reconnect ----
 Ctl "/disconnect" | Out-Null

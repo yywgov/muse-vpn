@@ -9,6 +9,7 @@
 //   /core-stop                  the core stops without the app asking for it
 //   /resume                     the window-restore / wake path
 //   /crash                      exit(2), like a Go fatal error in the core
+//   /log?n=<lines>              1.19.0: the last lines of this run's in-memory log (diagnostics)
 //   /go?route=<name>            1.6.0: opens a page by route name (config, settings, about, connections…)
 //   /sheet?name=add-profile     1.6.0: opens the 添加订阅 sheet
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
@@ -17,6 +18,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:hiddify/core/logger/logger_setup.dart' show formatRecord, logRing;
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
@@ -121,6 +123,10 @@ abstract final class MuseSmokeControl {
         if (uri.queryParameters['name'] != 'add-profile') return {'ok': false};
         unawaited(c.read(bottomSheetsNotifierProvider.notifier).showAddProfile());
         return {'ok': true};
+      case '/log':
+        final n = int.tryParse(uri.queryParameters['n'] ?? '') ?? 400;
+        final all = logRing.records.map(formatRecord).toList();
+        return {'lines': all.length > n ? all.sublist(all.length - n) : all};
       case '/crash':
         _logger.warning('smoke: simulated crash exit(2)');
         Timer(const Duration(milliseconds: 200), () => exit(2));
