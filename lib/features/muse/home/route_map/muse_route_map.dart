@@ -328,8 +328,11 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
             caption,
             key: const ValueKey('muse_route_caption'),
             textAlign: TextAlign.center,
-            // 1.19.1 A3: 13 (was the 12 bodySmall)
-            style: MuseTextLevel.footnote.style(context, color: scheme.onSurfaceVariant),
+            // 1.19.1 A3: 13 on a computer window (was the 12 bodySmall, which a phone keeps so its
+            // layout stays exactly as in 1.19.0)
+            style: widget.maxHeight != null
+                ? MuseTextLevel.footnote.style(context, color: scheme.onSurfaceVariant)
+                : Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),

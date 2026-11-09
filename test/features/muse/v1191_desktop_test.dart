@@ -268,6 +268,8 @@ void main() {
       final w = t.getSize(find.byKey(const ValueKey('muse_route_arc'))).width;
       expect(_mapHeight(t), closeTo(w / 2.2, 0.5));
       expect(t.getSize(find.byKey(const ValueKey('home_connect_press'))).width, MuseSize.startButton);
+      // 图注字号不变（12），手机布局高度与 1.19.0 一致
+      expect(t.widget<Text>(find.byKey(const ValueKey('muse_route_caption'))).style!.fontSize, 12);
       await _done(t);
     });
   });
