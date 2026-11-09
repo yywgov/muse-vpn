@@ -21,3 +21,7 @@ https://github.com/rsms/inter — Copyright 2020 The Inter Project Authors, lice
 SIL Open Font License 1.1 (full text in `assets/fonts/OFL-Inter.txt`, also shipped in the app).
 It is a Modified Version: static weights 400/500/600/700 instanced from the variable font and
 subset to Latin, digits and common symbols. Chinese text uses the system font.
+
+## Natural Earth（1.19.0 路由弧线图底图）
+
+assets/map/world_dots.bin 由 tool/world_dots/gen_world_dots.py 从 Natural Earth 1:110m Land（ne_110m_land）生成。Natural Earth 数据为公有领域（Public Domain），见 https://www.naturalearthdata.com/about/terms-of-use/ 。

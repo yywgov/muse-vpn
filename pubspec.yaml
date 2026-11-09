@@ -139,6 +139,8 @@ flutter:
     # 穿云 1.9.0 #14: 兼容内核's default lists (.mrs), only those the default rules use
     - assets/rule-sets-compat/
     - assets/fonts/OFL-Inter.txt
+    # 穿云 1.19.0 P1: 路由弧线图点阵底图（Natural Earth 公有领域，tool/world_dots/gen_world_dots.py 生成）
+    - assets/map/world_dots.bin
     - assets/images/logo.svg
     - assets/images/glyph.svg
     - assets/images/tray_icon.ico
