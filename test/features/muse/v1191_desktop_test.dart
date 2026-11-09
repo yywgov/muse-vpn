@@ -158,7 +158,9 @@ void main() {
   group('A1 路由图限高', () {
     test('上限：≤ 260 且 ≤ 窗口高 32%，不低于 160；手机不限', () {
       expect(museRouteMapMaxHeight(const Size(1000, 700)), closeTo(224, 0.01));
-      expect(museRouteMapMaxHeight(const Size(1600, 1000)), 260);
+      // 1.19.2：上限 260 → 240（地图改为铺满卡片宽度）
+      expect(museRouteMapMaxHeight(const Size(1600, 1000)), MuseDesk.mapMaxHeight);
+      expect(MuseDesk.mapMaxHeight, 240);
       expect(museRouteMapMaxHeight(const Size(1000, 400)), 160);
       expect(museRouteMapMaxHeight(const Size(390, 844)), isNull);
     });
@@ -250,13 +252,15 @@ void main() {
       await _done(t);
     });
 
-    testWidgets('899 宽：保持 1.19.0 单栏（路由图在连接卡上面、大标题「穿云」）', (t) async {
-      await _pumpHome(t, const Size(899, 700));
+    // 1.19.2：电脑布局从 800（原 900）起；更窄的单栏也没有大标题「穿云」，顶部是同一行工具行（无测速）
+    testWidgets('799 宽：单栏（路由图在连接卡上面），无大标题、有工具行', (t) async {
+      await _pumpHome(t, const Size(799, 700));
       expect(find.byKey(const ValueKey('home_desk_columns')), findsNothing);
-      expect(find.byKey(const ValueKey('home_desk_toolbar')), findsNothing);
+      expect(find.byKey(const ValueKey('home_desk_toolbar')), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_desk_speedtest')), findsNothing);
       expect(find.byKey(const ValueKey('home_dashboard')), findsOneWidget);
       expect(t.getTopLeft(find.byKey(const ValueKey('home_route_card'))).dy, lessThan(t.getTopLeft(find.byKey(const ValueKey('home_connect_section'))).dy));
-      expect(find.text('穿云'), findsOneWidget);
+      expect(find.text('穿云'), findsNothing);
       await _done(t);
     });
 
@@ -313,18 +317,22 @@ void main() {
       await _done(t);
     });
 
-    testWidgets('手机：仍有大标题「穿云」', (t) async {
+    // 1.19.2：手机也去掉大标题，换成同一行工具行（不加测速）
+    testWidgets('手机：无大标题「穿云」，顶部为工具行（无测速）', (t) async {
       await _pumpHome(t, const Size(390, 844));
-      expect(find.text('穿云'), findsOneWidget);
-      expect(find.byKey(const ValueKey('home_desk_toolbar')), findsNothing);
+      expect(find.text('穿云'), findsNothing);
+      expect(find.byKey(const ValueKey('home_desk_toolbar')), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_desk_speedtest')), findsNothing);
       await _done(t);
     });
   });
 
   group('A7 侧栏', () {
-    testWidgets('200 宽、品牌行、选中项圆角底 + 左侧指示条、侧栏底色与分隔线', (t) async {
+    // 1.19.2：展开侧栏 200 → 184
+    testWidgets('184 宽、品牌行、选中项圆角底 + 左侧指示条、侧栏底色与分隔线', (t) async {
       await _pumpShell(t, const Size(1280, 800), index: 1);
-      expect(t.getSize(find.byKey(const ValueKey('muse_sidebar_expanded'))).width, 200);
+      expect(t.getSize(find.byKey(const ValueKey('muse_sidebar_expanded'))).width, MuseSize.navSidebarExpanded);
+      expect(MuseSize.navSidebarExpanded, 184);
       expect(t.getSize(find.byKey(const ValueKey('muse_sidebar_brand'))).height, MuseSidebar.headerHeight);
       expect(find.descendant(of: find.byKey(const ValueKey('muse_sidebar_brand')), matching: find.text('穿云')), findsOneWidget);
       expect(find.descendant(of: find.byKey(const ValueKey('muse_nav_1')), matching: find.byKey(const ValueKey('muse_nav_indicator'))), findsOneWidget);

@@ -34,7 +34,8 @@ abstract final class MuseRadius {
 /// 1.6.0 C1: layout breakpoints (dp) of the adaptive shell and the dashboard.
 abstract final class MuseBreak {
   static const mobile = 600.0;
-  static const laptop = 840.0;
+  /// 1.19.2: 840 → 1080 — a window up to 1080 gets the 64 icon rail (no 200 sidebar at 880)
+  static const laptop = 1080.0;
   static const dashDesktop = 640.0;
   static const dashFour = 860.0;
   static const dashStandard = 1040.0;
@@ -200,9 +201,11 @@ abstract final class MuseSize {
   static const titleBar = 32.0;
   static const captionButton = 46.0;
   static const pinIcon = 16.0;
-  static const navRailCollapsed = 80.0;
+  /// 1.19.2: 80 → 64 (a 48 target + 8 each side)
+  static const navRailCollapsed = 64.0;
   /// 1.19.1 A7: 220 → 200 (1000 宽窗口时少占一点)
-  static const navSidebarExpanded = 200.0;
+  /// 1.19.2: 200 → 184
+  static const navSidebarExpanded = 184.0;
   static const dockHeight = 64.0;
 
   /// 1.6.1: the Material 3 bottom navigation bar
@@ -503,14 +506,21 @@ class MuseTheme {
 abstract final class MuseDesk {
   /// A4：首页按**窗口**宽度分栏——≥ [twoColumn] 双栏（左连接卡 + 路由图、右卡片），
   /// ≥ [threeColumn] 再加右侧节点栏；更窄保持 1.19.0 的单栏（手机布局）。
-  static const twoColumn = 900.0;
+  /// 1.19.2: 900 → 800 (an 800–900 window gets the computer layout too)
+  static const twoColumn = 800.0;
+
+  /// 1.19.2: two columns on 首页 only when the page itself (window minus the side bar) is this wide
+  static const twoColumnContent = 700.0;
   static const threeColumn = 1280.0;
-  static const leftShare = 0.58;
+
+  /// 1.19.2: 0.58 → 0.56 and the gap 16 → 12 (a narrow two-column 首页 keeps its tiles readable)
+  static const leftShare = 0.56;
   static const nodeColumn = 340.0;
-  static const columnGap = 16.0;
+  static const columnGap = 12.0;
 
   /// A1：路由图限高（≤ [mapMaxHeight] 且 ≤ 窗口高 × [mapWindowShare]，不低于 [mapMinHeight]）
-  static const mapMaxHeight = 260.0;
+  /// 1.19.2: 260 → 240 (the map now spans the card's full width)
+  static const mapMaxHeight = 240.0;
   static const mapWindowShare = 0.32;
   static const mapMinHeight = 160.0;
 
@@ -566,6 +576,12 @@ bool museDeskWide(BuildContext context) => MediaQuery.sizeOf(context).width >= M
 /// anything else outside the subset falls back to the system font glyph by glyph.
 abstract final class MuseFont {
   static const family = 'MuseSans';
+
+  /// 1.19.2: the bundled Chinese face — 思源黑体 / Noto Sans SC (SIL OFL 1.1), subset to GB2312 + every
+  /// character the app's own text uses (tool/fonts/subset_cjk.py), renamed MuseHei as the OFL asks
+  /// of a modified version; 400 and 600 (assets/fonts/MuseHei-*.ttf, licence OFL-NotoSansSC.txt).
+  /// The app's default family on every platform, so Android and Windows read the same.
+  static const cjk = 'MuseHei';
 }
 
 abstract final class MuseType {

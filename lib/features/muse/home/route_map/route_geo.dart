@@ -206,12 +206,64 @@ double museWrapLon(double lon, {double center = museMapCenterLon}) {
   return x + center - 180;
 }
 
+/// 1.19.2 地图取景：经度始终 360° 铺满宽度，纬度只取 [north]–[south] 这一段。
+class MuseMapView {
+  const MuseMapView(this.north, this.south);
+
+  /// 1.19 的整幅（北 84° 到南 60°）
+  static const full = MuseMapView(museMapNorth, museMapSouth);
+
+  final double north;
+  final double south;
+
+  @override
+  bool operator ==(Object other) => other is MuseMapView && other.north == north && other.south == south;
+
+  @override
+  int get hashCode => Object.hash(north, south);
+
+  @override
+  String toString() => 'MuseMapView($north, $south)';
+}
+
+/// 取景时纬度跨度的下限（北纬 ~62° 到南纬 ~38°：伦敦、莫斯科、悉尼、圣保罗、开普敦都在内）与中心纬度。
+const museMapMinLatSpan = 100.0;
+const museMapCenterLat = 12.0;
+
+/// 1.19.2：[size] 这么大的地图取哪一段纬度——宽高比不比整幅（360:144 = 2.5）扁时整幅不变（手机 2.2 与 1.19 完全一样，
+/// 只是纵向略拉伸）；更扁时按宽度等比、上下裁掉（中心北纬 12°），最多裁到 [museMapMinLatSpan]。
+MuseMapView museMapView(Size size) {
+  if (size.width <= 0 || size.height <= 0) return MuseMapView.full;
+  final span = (360 * size.height / size.width).clamp(museMapMinLatSpan, museMapNorth - museMapSouth);
+  if (span >= museMapNorth - museMapSouth) return MuseMapView.full;
+  return MuseMapView(museMapCenterLat + span / 2, museMapCenterLat - span / 2);
+}
+
 /// 经纬度 → 画布坐标。[lon] 不再取模（大圆弧采样已展开成连续经度时用 [wrap] = false）。
-Offset museProject(double lat, double lon, Size size, {bool wrap = true}) {
+/// 1.19.2：[view] 是纬度取景（默认整幅）。
+Offset museProject(double lat, double lon, Size size, {bool wrap = true, MuseMapView view = MuseMapView.full}) {
   final l = wrap ? museWrapLon(lon) : lon;
   final x = (l - (museMapCenterLon - 180)) / 360 * size.width;
-  final y = (museMapNorth - lat) / (museMapNorth - museMapSouth) * size.height;
+  final y = (view.north - lat) / (view.north - view.south) * size.height;
   return Offset(x, y);
+}
+
+/// 1.19.2 地图上一段文字（城市名）放在哪：点 [dot] 的 [before]（左）或右侧、[above]（上）或与点平齐，
+/// 但永远整块落在 [map] 里——靠右边缘放不下就翻到左边，靠左边缘就翻到右边，靠上边缘就放到点下方，
+/// 最后再夹进地图（窄到放不下时贴边）。返回文字左上角。
+Offset museLabelOffset(Offset dot, Size label, Size map, {required bool before, required bool above, double gap = 6}) {
+  double xFor(bool b) => b ? dot.dx - gap - label.width : dot.dx + gap;
+  var x = xFor(before);
+  if (x < 0 || x + label.width > map.width) {
+    final flipped = xFor(!before);
+    if (flipped >= 0 && flipped + label.width <= map.width) x = flipped;
+  }
+  var y = above ? dot.dy - gap / 2 - label.height : dot.dy - gap;
+  if (y < 0) y = dot.dy + gap / 2;
+  if (y + label.height > map.height) y = dot.dy - gap / 2 - label.height;
+  final maxX = math.max(0.0, map.width - label.width);
+  final maxY = math.max(0.0, map.height - label.height);
+  return Offset(x.clamp(0.0, maxX), y.clamp(0.0, maxY));
 }
 
 /// 两点间大圆弧上的 [n]+1 个采样点（经度连续展开，起点经度落在视窗内）。

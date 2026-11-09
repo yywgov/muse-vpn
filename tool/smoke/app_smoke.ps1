@@ -141,8 +141,9 @@ if ($w -ge 600 * $scale) {
   # lib/features/muse/desktop/title_bar.dart, MuseSize.titleBar), header row 48 (1.19.1 A7: the
   # brand row, MuseSidebar.headerHeight = MuseDesk.sidebarBrand; was 56), items 52 tall
   # (MuseSidebar.itemHeight); 订阅 is the third item. Best effort: the screenshot shows whether the
-  # click landed.
-  $x = $r.L + [int](40 * $scale)
+  # click landed. 1.19.2: up to 1080 wide the side bar is the 64 wide icon rail (MuseSize.navRailCollapsed,
+  # was 80), above that 184 (was 200); x = 32 is inside both, the rows' heights are unchanged.
+  $x = $r.L + [int](32 * $scale)
   Click $x ($r.T + [int]((32 + 48 + 52 * 2 + 26) * $scale))
   Start-Sleep -Seconds 3
   Shot "2c-config-click"

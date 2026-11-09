@@ -3,6 +3,8 @@
 // 分类线与终点在弧线最后 15% 淡入（1.19.1）。
 // 动效档位：标准=完整；精简=弧线直接淡入、无光点；关闭=静态。所有动画一次性，结束后不再出帧；
 // 页面不可见（TickerMode 关）时 Ticker 静音即停；无循环、无轮询。底图只在尺寸/颜色变化时预渲染一次成 ui.Image。
+// 1.19.2：地图铺满卡片宽度（按宽高比裁纬度取景）；终点名与弧线同一坐标、夹在地图内靠边翻转；已连接时起点、终点、
+// 弧线用「已连接色」（主色，对比度不足时向前景色调到 ≥ 3:1），未连接 / 连接中起点为中性色，颜色切换一次性 200ms。
 // 只借鉴公开思路，不含任何第三方代码或素材。
 // Part of 穿云 (GPLv3).
 
@@ -58,10 +60,11 @@ Future<MuseWorldDots?> museLoadWorldDots([AssetBundle? bundle]) => _dotsFuture ?
 final _imageCache = <String, ui.Image>{};
 
 /// 把点阵画成一张图（同尺寸、同颜色只画一次）。测试可读 [museDotImageRenders] 确认没有重复渲染。
-ui.Image museDotMapImage(MuseWorldDots dots, Size size, double dpr, Color color) {
+ui.Image museDotMapImage(MuseWorldDots dots, Size size, double dpr, Color color, {MuseMapView? view}) {
+  final v = view ?? museMapView(size);
   final w = (size.width * dpr).round().clamp(1, 4096);
   final h = (size.height * dpr).round().clamp(1, 4096);
-  final key = '${identityHashCode(dots)}:$w:$h:${color.toARGB32()}';
+  final key = '${identityHashCode(dots)}:$w:$h:${color.toARGB32()}:${v.north}:${v.south}';
   final hit = _imageCache[key];
   if (hit != null) return hit;
   museDotImageRenders++;
@@ -80,8 +83,8 @@ ui.Image museDotMapImage(MuseWorldDots dots, Size size, double dpr, Color color)
     for (var col = 0; col < dots.width; col += k) {
       if (!dots.isLand(row, col)) continue;
       final p = dots.cellCenter(row, col);
-      if (p.lat > museMapNorth || p.lat < museMapSouth) continue;
-      canvas.drawCircle(museProject(p.lat, p.lon, px), r, paint);
+      if (p.lat > v.north || p.lat < v.south) continue;
+      canvas.drawCircle(museProject(p.lat, p.lon, px, view: v), r, paint);
     }
   }
   final img = rec.endRecording().toImageSync(w, h);
@@ -155,6 +158,13 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
   );
   late final AnimationController _slide = AnimationController(vsync: this, duration: MuseRouteMotion.slide);
 
+  /// 1.19.2：中性色 (0) ↔ 已连接色 (1)，连接状态变化时一次性过渡
+  late final AnimationController _tint = AnimationController(
+    vsync: this,
+    duration: MuseMotion.fast,
+    value: widget.connected ? 1 : 0,
+  );
+
   MuseWorldDots? _dots;
   MuseMotionLevel _level = MuseMotionLevel.standard;
   bool _started = false;
@@ -164,7 +174,10 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
   MuseGeoPoint? _to;
 
   /// 测试用：当前是否有动画在跑。
-  bool get animating => _arc.isAnimating || _dot.isAnimating || _slide.isAnimating;
+  bool get animating => _arc.isAnimating || _dot.isAnimating || _slide.isAnimating || _tint.isAnimating;
+
+  /// 测试用：已连接色的混合程度（0 = 中性，1 = 已连接）。
+  double get tint => _tint.value;
 
   @override
   void initState() {
@@ -199,6 +212,15 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
   void didUpdateWidget(MuseRouteMap old) {
     super.didUpdateWidget(old);
     if (widget.dots != null && widget.dots != old.dots) _dots = widget.dots;
+    if (widget.connected != old.connected) {
+      final target = widget.connected ? 1.0 : 0.0;
+      if (_level == MuseMotionLevel.off) {
+        _tint.value = target;
+      } else {
+        _tint.duration = museScaleDuration(_level, MuseMotion.fast);
+        _tint.animateTo(target, curve: MuseMotion.curve);
+      }
+    }
     final city = widget.exit.city?.point;
     if (!widget.connected || city == null) {
       _arc.value = 0;
@@ -248,6 +270,7 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
     _dot.value = 0;
     if (_arc.isAnimating) _arc.value = 1;
     if (_slide.isAnimating) _slide.value = 1;
+    if (_tint.isAnimating) _tint.value = widget.connected ? 1 : 0;
   }
 
   MuseGeoPoint? _current() {
@@ -262,6 +285,7 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
     _arc.dispose();
     _dot.dispose();
     _slide.dispose();
+    _tint.dispose();
     super.dispose();
   }
 
@@ -285,43 +309,55 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          museCapHeight(
-            widget.maxHeight,
-            AspectRatio(
-              aspectRatio: widget.aspectRatio,
-              child: LayoutBuilder(
-                builder: (context, c) {
-                  final size = Size(c.maxWidth, c.maxHeight);
-                  final dots = _dots;
-                  final img = dots == null || size.isEmpty ? null : museDotMapImage(dots, size, dpr, museDotColor(scheme));
-                  return Stack(
-                    fit: StackFit.expand,
-                    clipBehavior: Clip.none,
-                    children: [
-                      if (img != null)
-                        RepaintBoundary(
-                          child: CustomPaint(key: const ValueKey('muse_route_base'), painter: _ImagePainter(img)),
+          // 1.19.2: as wide as the card (was centred at its aspect ratio under the height cap, which left
+          // wide blank margins on a computer window); a flatter map shows less latitude instead
+          LayoutBuilder(
+            builder: (context, c) {
+              final w = c.maxWidth.isFinite ? c.maxWidth : 0.0;
+              final h = museRouteMapHeight(w, widget.aspectRatio, widget.maxHeight);
+              return SizedBox(
+                key: const ValueKey('muse_route_map_box'),
+                width: w,
+                height: h,
+                child: Builder(
+                  builder: (context) {
+                    final size = Size(w, h);
+                    final view = museMapView(size);
+                    final dots = _dots;
+                    final img = dots == null || size.isEmpty
+                        ? null
+                        : museDotMapImage(dots, size, dpr, museDotColor(scheme), view: view);
+                    final bg = MuseSurfaceScope.of(context).color(scheme);
+                    return Stack(
+                      fit: StackFit.expand,
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        if (img != null)
+                          RepaintBoundary(
+                            child: CustomPaint(key: const ValueKey('muse_route_base'), painter: _ImagePainter(img)),
+                          ),
+                        CustomPaint(
+                          key: const ValueKey('muse_route_arc'),
+                          painter: _ArcPainter(
+                            state: this,
+                            home: widget.home.point,
+                            shown: shown,
+                            view: view,
+                            fade: _level == MuseMotionLevel.reduced,
+                            color: museLinkedColor(scheme, bg),
+                            homeColor: museRouteIdleColor(scheme),
+                            shares: widget.shares,
+                            shareColors: museRouteKindColors(scheme),
+                          ),
                         ),
-                      CustomPaint(
-                        key: const ValueKey('muse_route_arc'),
-                        painter: _ArcPainter(
-                          state: this,
-                          home: widget.home.point,
-                          shown: shown,
-                          fade: _level == MuseMotionLevel.reduced,
-                          color: scheme.primary,
-                          homeColor: scheme.onSurface,
-                          shares: widget.shares,
-                          shareColors: museRouteKindColors(scheme),
-                        ),
-                      ),
-                      // 1.19.1 A3: the two city names on the map (the exit fades in with the arc's tail)
-                      if (!size.isEmpty) ..._labels(context, size, shown),
-                    ],
-                  );
-                },
-              ),
-            ),
+                        // 1.19.1 A3: the two city names on the map (the exit fades in with the arc's tail)
+                        if (!size.isEmpty) ..._labels(context, size, view, shown, bg),
+                      ],
+                    );
+                  },
+                ),
+              );
+            },
           ),
           const SizedBox(height: 6),
           Text(
@@ -340,65 +376,92 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
   }
 
   /// 1.19.1 A3: 本机 and exit names beside their dots — 13 / w600 with a halo in the card's colour
-  /// so the dot grid never runs through the letters; the exit name in the accent. The names sit on
-  /// the far sides of the two dots (they are often close together).
-  List<Widget> _labels(BuildContext context, Size size, bool shown) {
+  /// so the dot grid never runs through the letters; the exit name in the 已连接 colour. The names sit
+  /// on the far sides of the two dots (they are often close together).
+  /// 1.19.2: the exit name sits where the arc ends (the wrapped longitude — 洛杉矶 used to land left of
+  /// the map), measured and kept wholly inside the map: flipped inward at an edge, never wrapped.
+  List<Widget> _labels(BuildContext context, Size size, MuseMapView view, bool shown, Color bg) {
     final scheme = Theme.of(context).colorScheme;
-    final halo = MuseSurfaceScope.of(context).color(scheme);
-    final h = museProject(widget.home.point.lat, widget.home.point.lon, size);
+    final scaler = MediaQuery.textScalerOf(context);
+    final h = museProject(widget.home.point.lat, widget.home.point.lon, size, view: view);
+    final style = MuseTextLevel.footnote.style(context, weight: FontWeight.w600);
+    Size measure(String text) {
+      final tp = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      final s = Size(tp.width + MuseDesk.mapLabelHalo, tp.height);
+      tp.dispose();
+      return s;
+    }
+
     Widget label(String text, Color color, Key key) {
-      final style = MuseTextLevel.footnote.style(context, color: color, weight: FontWeight.w600);
+      final st = style.copyWith(color: color);
       return Stack(
         key: key,
         children: [
           Text(
             text,
             maxLines: 1,
-            style: style.copyWith(
+            softWrap: false,
+            style: st.copyWith(
               foreground: Paint()
                 ..style = PaintingStyle.stroke
                 ..strokeWidth = MuseDesk.mapLabelHalo
                 ..strokeJoin = StrokeJoin.round
-                ..color = halo,
+                ..color = bg,
             ),
           ),
-          Text(text, maxLines: 1, style: style),
+          Text(text, maxLines: 1, softWrap: false, style: st),
         ],
       );
     }
 
-    Widget place(Offset p, {required bool before, required bool above, required Widget child}) {
-      const gap = MuseDesk.mapLabelGap;
-      final top = above ? null : p.dy - gap;
-      final bottom = above ? size.height - p.dy + gap / 2 : null;
-      return before
-          ? Positioned(right: size.width - p.dx + gap, top: top, bottom: bottom, child: IgnorePointer(child: child))
-          : Positioned(left: p.dx + gap, top: top, bottom: bottom, child: IgnorePointer(child: child));
+    Widget place(Offset p, Size box, {required bool before, required bool above, required Widget child}) {
+      final o = museLabelOffset(p, box, size, before: before, above: above, gap: MuseDesk.mapLabelGap);
+      return Positioned(
+        left: o.dx,
+        top: o.dy,
+        width: box.width,
+        height: box.height,
+        child: IgnorePointer(child: child),
+      );
     }
 
     final exitName = widget.exit.city?.name;
+    final homeBox = measure(widget.home.name);
+    final exitBox = exitName == null ? Size.zero : measure(exitName);
+    final exitColor = museLinkedColor(scheme, bg, ratio: 4.5);
     return [
-      // the home name stays where its dot is (left of it unless the dot is at the left edge)
       AnimatedBuilder(
         animation: Listenable.merge([_arc, _slide]),
         builder: (context, _) {
           final end = shown ? _current() : null;
-          final e = end == null ? null : museProject(end.lat, end.lon, size, wrap: false);
+          final e = end == null ? null : museProject(end.lat, end.lon, size, view: view);
           // the home name on the side away from the exit
           final before = e == null ? h.dx > size.width * 0.25 : e.dx >= h.dx;
           return Stack(
             fit: StackFit.expand,
-            clipBehavior: Clip.none,
+            clipBehavior: Clip.hardEdge,
             children: [
-              place(h, before: before && h.dx > size.width * 0.15, above: false, child: label(widget.home.name, scheme.onSurface, const ValueKey('muse_route_label_home'))),
+              place(
+                h,
+                homeBox,
+                before: before,
+                above: false,
+                child: label(widget.home.name, scheme.onSurface, const ValueKey('muse_route_label_home')),
+              ),
               if (e != null && exitName != null && _arc.value > 0)
                 place(
                   e,
-                  before: e.dx < h.dx || e.dx > size.width * 0.85,
+                  exitBox,
+                  before: e.dx < h.dx,
                   above: true,
                   child: Opacity(
                     opacity: _level == MuseMotionLevel.reduced ? _arc.value : museRouteTailAlpha(_arc.value),
-                    child: label(exitName, scheme.primary, const ValueKey('muse_route_label_exit')),
+                    child: label(exitName, exitColor, const ValueKey('muse_route_label_exit')),
                   ),
                 ),
             ],
@@ -409,9 +472,36 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
   }
 }
 
+/// 1.19.2: the map's height for a card [width] wide — width / [aspectRatio], no more than [maxHeight]
+/// (computer windows); the map always spans the full width.
+double museRouteMapHeight(double width, double aspectRatio, double? maxHeight) {
+  final h = width / aspectRatio;
+  return maxHeight == null ? h : math.min(h, maxHeight);
+}
+
+/// 1.19.2 「已连接色」：主色；与底色 [bg] 的对比度不足 [ratio]（图形 3:1，文字 4.5:1）时向前景色（onSurface）
+/// 逐步混合直到够（如藤黄、松花这类浅主色在浅色卡片上）。
+Color museLinkedColor(ColorScheme s, Color bg, {double ratio = 3}) {
+  var c = s.primary;
+  for (var k = 1; k <= 10 && museContrast(c, bg) < ratio; k++) {
+    c = Color.lerp(s.primary, s.onSurface, k / 10)!;
+  }
+  return c;
+}
+
+/// 1.19.2: 未连接 / 连接中时起点的中性色。
+Color museRouteIdleColor(ColorScheme s) => s.onSurfaceVariant;
+
+
 /// 1.19.1 A1: [child] no taller than [maxHeight] (centred, keeping its aspect ratio); null = as is.
-Widget museCapHeight(double? maxHeight, Widget child) =>
-    maxHeight == null ? child : Center(child: ConstrainedBox(constraints: BoxConstraints(maxHeight: maxHeight), child: child));
+Widget museCapHeight(double? maxHeight, Widget child) => maxHeight == null
+    ? child
+    : Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: child,
+        ),
+      );
 
 /// 1.19.1 A2: the dot grid's colour — onSurface at 32 % on a light card, 24 % on a dark one (16 %
 /// before, which nearly vanished on a light screen).
@@ -448,48 +538,80 @@ class _ArcPainter extends CustomPainter {
     required this.fade,
     required this.color,
     required this.homeColor,
+    this.view = MuseMapView.full,
     this.shares = const [],
     this.shareColors = const {},
-  }) : super(repaint: Listenable.merge([state._arc, state._dot, state._slide]));
+  }) : super(repaint: Listenable.merge([state._arc, state._dot, state._slide, state._tint]));
 
   final MuseRouteMapState state;
   final MuseGeoPoint home;
   final bool shown;
   final bool fade;
+
+  /// 1.19.2: the 已连接 colour (arc, both ends while connected)
   final Color color;
+
+  /// 1.19.2: the 本机 dot while not connected (neutral)
   final Color homeColor;
+  final MuseMapView view;
   final List<(MuseRouteKind, double)> shares;
   final Map<MuseRouteKind, Color> shareColors;
 
+  Offset _p(MuseGeoPoint g, Size size, {bool wrap = false}) => museProject(g.lat, g.lon, size, wrap: wrap, view: view);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final h = museProject(home.lat, home.lon, size);
-    canvas.drawCircle(h, 3, Paint()..color = homeColor.withValues(alpha: 0.7));
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    final h = _p(home, size, wrap: true);
+    // 1.19.2: neutral → 已连接 colour in one short step when the connection comes up (and back)
+    final t = state._tint.value;
+    canvas.drawCircle(h, 3.5, Paint()..color = Color.lerp(homeColor.withValues(alpha: 0.8), color, t)!);
     final end = state._current();
-    if (!shown || end == null) return;
+    if (!shown || end == null) {
+      canvas.restore();
+      return;
+    }
     final arcV = state._arc.value;
-    if (arcV <= 0) return;
+    if (arcV <= 0) {
+      canvas.restore();
+      return;
+    }
     final pts = museGreatCircle(home, end);
     final path = Path();
     for (var i = 0; i < pts.length; i++) {
-      final o = museProject(pts[i].lat, pts[i].lon, size, wrap: false);
+      final o = _p(pts[i], size);
       i == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
     }
     final metric = path.computeMetrics().firstOrNull;
-    if (metric == null) return;
+    if (metric == null) {
+      canvas.restore();
+      return;
+    }
     final progress = fade ? 1.0 : MuseMotion.curve.transform(arcV);
     final alpha = fade ? arcV : 1.0;
     final line = Paint()
-      ..color = color.withValues(alpha: 0.85 * alpha)
+      ..color = color.withValues(alpha: 0.9 * alpha)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
-    canvas.drawPath(metric.extractPath(0, metric.length * progress), line);
+    final drawn = metric.extractPath(0, metric.length * progress);
+    // 1.19.2: an arc that runs past the map's east / west edge comes back in on the other side
+    for (final dx in [-size.width, 0.0, size.width]) {
+      canvas.drawPath(dx == 0 ? drawn : drawn.shift(Offset(dx, 0)), line);
+    }
     // 1.19.1：分类线与终点随弧线尾段淡入（精简档整体已在淡入，不再叠加）
     final tail = fade ? alpha : alpha * museRouteTailAlpha(arcV);
-    if (tail > 0 && shares.isNotEmpty) _paintShares(canvas, size, pts, tail);
+    if (tail > 0 && shares.isNotEmpty) {
+      for (final dx in [-size.width, 0.0, size.width]) {
+        canvas.save();
+        canvas.translate(dx, 0);
+        _paintShares(canvas, size, pts, tail);
+        canvas.restore();
+      }
+    }
     if (tail > 0) {
-      final e = museProject(pts.last.lat, pts.last.lon, size, wrap: false);
+      final e = _p(pts.last, size, wrap: true);
       canvas.drawCircle(e, 7, Paint()..color = color.withValues(alpha: 0.18 * tail));
       canvas.drawCircle(e, 3.5, Paint()..color = color.withValues(alpha: tail));
     }
@@ -498,15 +620,18 @@ class _ArcPainter extends CustomPainter {
       final lapT = (d.value * MuseRouteMotion.laps) % 1.0;
       final tan = metric.getTangentForOffset(metric.length * lapT);
       if (tan != null) {
-        canvas.drawCircle(tan.position, 5, Paint()..color = color.withValues(alpha: 0.25));
-        canvas.drawCircle(tan.position, 2.5, Paint()..color = Colors.white);
+        final x = tan.position.dx % size.width;
+        final pos = Offset(x < 0 ? x + size.width : x, tan.position.dy);
+        canvas.drawCircle(pos, 5, Paint()..color = color.withValues(alpha: 0.25));
+        canvas.drawCircle(pos, 2.5, Paint()..color = Colors.white);
       }
     }
+    canvas.restore();
   }
 
   /// 分类线：走代理的类别画成主弧线两侧微微鼓起的细弧，直连画成本机周围的一圈；线宽随占比。
   void _paintShares(Canvas canvas, Size size, List<MuseGeoPoint> pts, double alpha) {
-    final screen = [for (final p in pts) museProject(p.lat, p.lon, size, wrap: false)];
+    final screen = [for (final p in pts) _p(p, size)];
     final h = screen.first;
     var side = 0;
     for (final (kind, share) in shares) {
@@ -546,6 +671,7 @@ class _ArcPainter extends CustomPainter {
       old.shown != shown ||
       old.home != home ||
       old.fade != fade ||
+      old.view != view ||
       old.color != color ||
       old.homeColor != homeColor;
 }

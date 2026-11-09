@@ -345,9 +345,11 @@ void main() {
       expect(n.state.nodes[MuseRouteKind.ai], '🇺🇸 洛杉矶 01');
     });
 
-    testWidgets('首页路由卡：无数据显示简短提示；有数据显示一句话', (tester) async {
+    // 1.19.2：无分类数据时不再显示提示（用户反馈：多余），断言由「有提示」改为「什么都不显示」
+    testWidgets('首页路由卡：无数据不显示任何提示；有数据显示一句话', (tester) async {
       final c = await _pumpHome(tester);
-      expect(find.text('有流量后显示各类流量走哪里'), findsOneWidget);
+      expect(find.text('有流量后显示各类流量走哪里'), findsNothing);
+      expect(find.byKey(const ValueKey('home_route_sentence')), findsNothing);
       c.read(museRouteShareProvider.notifier).frame([
         _conn('a', 'api.x.ai', 600),
         _conn('b', 'video.x.com', 300, chains: const ['🇭🇰 香港 01']),

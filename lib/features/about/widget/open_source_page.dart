@@ -85,6 +85,15 @@ class OpenSourcePage extends ConsumerWidget {
                 chevron: true,
                 onTap: () => open('https://github.com/rsms/inter'),
               ),
+              // 1.19.2: the bundled Chinese face (subset, renamed MuseHei in the app)
+              MuseTile(
+                key: const ValueKey('about_credit_font_cjk'),
+                leading: const Icon(Icons.translate_outlined),
+                title: '中文字体 思源黑体',
+                subtitle: 'Adobe / Google · SIL 开放字体许可 1.1（已精简为常用汉字与应用内用字）',
+                chevron: true,
+                onTap: () => open('https://github.com/notofonts/noto-cjk'),
+              ),
             ],
           ),
         ],

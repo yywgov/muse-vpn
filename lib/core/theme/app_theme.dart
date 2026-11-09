@@ -30,7 +30,17 @@ SystemUiOverlayStyle museSystemOverlayStyle(Brightness themeBrightness) {
 const museLightScrim = Color(0x52000000);
 
 class AppTheme {
-  AppTheme(this.mode, this.fontFamily, {this.blackWhenSystemDark = false, this.style = MuseThemeStyle.auto});
+  AppTheme(
+    this.mode,
+    this.fontFamily, {
+    this.blackWhenSystemDark = false,
+    this.style = MuseThemeStyle.auto,
+    this.fontFallback,
+  });
+
+  /// 1.19.2: families tried after [fontFamily] glyph by glyph (Windows: the bundled Emoji face for
+  /// flags, which the system font draws as letters)
+  final List<String>? fontFallback;
 
   /// 1.19.0 P5 外观 › 主题（默认 = 按深浅色）
   final MuseThemeStyle style;
@@ -64,7 +74,8 @@ class AppTheme {
       style: MuseColorStyle.fromKey(MusePalette.colorStyle),
       pureBlack:
           style == MuseThemeStyle.black ||
-          (style == MuseThemeStyle.auto && museUsePureBlack(mode, blackWhenSystemDark: blackWhenSystemDark, brightness: brightness)),
+          (style == MuseThemeStyle.auto &&
+              museUsePureBlack(mode, blackWhenSystemDark: blackWhenSystemDark, brightness: brightness)),
     );
   }
 
@@ -76,12 +87,12 @@ class AppTheme {
   /// (or switching back to a style used before) does not rebuild the theme. The schemes
   /// themselves are cached by museSeededScheme; the few combinations (seeds × styles ×
   /// brightness × 纯黑) keep this small.
-  static final _themes = <(ColorScheme, String), ThemeData>{};
+  static final _themes = <(ColorScheme, String, String?), ThemeData>{};
 
   /// How many ThemeData were actually built (tests).
   static int debugThemeBuilds = 0;
 
-  ThemeData _cached(ColorScheme s) => _themes.putIfAbsent((s, fontFamily), () {
+  ThemeData _cached(ColorScheme s) => _themes.putIfAbsent((s, fontFamily, fontFallback?.join(',')), () {
     debugThemeBuilds++;
     return _theme(s);
   });
@@ -121,8 +132,20 @@ class AppTheme {
         iconColor: s.onSurfaceVariant,
         minTileHeight: MuseSize.rowMin,
         contentPadding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
-        titleTextStyle: TextStyle(fontFamily: _family, fontSize: 16, height: 1.3, color: s.onSurface),
-        subtitleTextStyle: TextStyle(fontFamily: _family, fontSize: 13, height: 1.35, color: s.onSurfaceVariant),
+        titleTextStyle: TextStyle(
+          fontFamily: _family,
+          fontFamilyFallback: fontFallback,
+          fontSize: 16,
+          height: 1.3,
+          color: s.onSurface,
+        ),
+        subtitleTextStyle: TextStyle(
+          fontFamily: _family,
+          fontFamilyFallback: fontFallback,
+          fontSize: 13,
+          height: 1.35,
+          color: s.onSurfaceVariant,
+        ),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
@@ -171,6 +194,7 @@ class AppTheme {
       navigationRailTheme: _rail(s),
       dividerTheme: DividerThemeData(color: s.outlineVariant, thickness: MuseSize.hairline, space: MuseSize.hairline),
       fontFamily: fontFamily,
+      fontFamilyFallback: fontFallback,
       pageTransitionsTheme: _transitions,
       extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
     );
@@ -196,6 +220,7 @@ class AppTheme {
     labelTextStyle: WidgetStateProperty.resolveWith(
       (st) => TextStyle(
         fontFamily: _family,
+        fontFamilyFallback: fontFallback,
         fontSize: 12,
         fontWeight: st.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
         color: st.contains(WidgetState.selected) ? s.onSurface : s.onSurfaceVariant,
@@ -209,8 +234,20 @@ class AppTheme {
     indicatorShape: MuseShape.full,
     selectedIconTheme: IconThemeData(size: MuseIconSize.regular, color: s.onSecondaryContainer),
     unselectedIconTheme: IconThemeData(size: MuseIconSize.regular, color: s.onSurfaceVariant),
-    selectedLabelTextStyle: TextStyle(fontFamily: _family, fontSize: 12, fontWeight: FontWeight.w600, color: s.onSurface),
-    unselectedLabelTextStyle: TextStyle(fontFamily: _family, fontSize: 12, fontWeight: FontWeight.w500, color: s.onSurfaceVariant),
+    selectedLabelTextStyle: TextStyle(
+      fontFamily: _family,
+      fontFamilyFallback: fontFallback,
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      color: s.onSurface,
+    ),
+    unselectedLabelTextStyle: TextStyle(
+      fontFamily: _family,
+      fontFamilyFallback: fontFallback,
+      fontSize: 12,
+      fontWeight: FontWeight.w500,
+      color: s.onSurfaceVariant,
+    ),
   );
 
   CupertinoThemeData cupertinoThemeData(bool sysDark, ColorScheme? lightColorScheme, ColorScheme? darkColorScheme) {

@@ -118,7 +118,13 @@ class MuseHomePage extends HookConsumerWidget {
       final shownBefore = ref.read(Preferences.museChangelogShown);
       Future.microtask(() {
         if (context.mounted) {
-          return museMaybeShowFirstGuide(context, ref, hasProfile: hasProfile, changelogShown: shownBefore, qr: museFirstRunQr());
+          return museMaybeShowFirstGuide(
+            context,
+            ref,
+            hasProfile: hasProfile,
+            changelogShown: shownBefore,
+            qr: museFirstRunQr(),
+          );
         }
       });
       return null;
@@ -132,40 +138,44 @@ class MuseHomePage extends HookConsumerWidget {
 
     // 1.3.0: a subscription link on the clipboard puts a dot on 添加 (no banner)
     useMuseClipboardWatcher(ref);
-    // 1.19.1 A4 / A6: a computer window ≥ 900 wide gets the desk layout (no big 「穿云」 title — the
-    // window's own title bar already says it — but a tool row); narrower keeps 1.19.0 exactly.
+    // 1.19.1 A4 / A6: a computer window gets the desk layout. 1.19.2: no big 「穿云」 title on any
+    // window or phone (the side bar's brand row and the window's title bar already say it) — the top
+    // is one 48 high tool row (subscription · nodes, and 编辑首页) in its place.
     final desk = museDeskWide(context) && hasProfile == true;
+    final Widget body;
+    if (desk) {
+      body = const MuseDeskHome();
+    } else {
+      final list = LayoutBuilder(
+        builder: (context, constraints) {
+          final dashboard = _Dashboard(hasProfile: hasProfile);
+          if (constraints.maxWidth < museHomeSideListWidth || hasProfile != true) return dashboard;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: dashboard),
+              SizedBox(width: MuseSize.sideColumn, child: _sideNodes(context)),
+              const SizedBox(width: MuseSpace.s8),
+            ],
+          );
+        },
+      );
+      body = hasProfile == true
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const MuseDeskToolRow(speedTest: false),
+                Expanded(child: list),
+              ],
+            )
+          : list;
+    }
     return MuseScaffold(
       large: true,
       title: Constants.appName,
-      showAppBar: !desk,
-      // 1.6.3: a visible way into the tile editor (long-press on a tile still works)
-      actions: [
-        if (hasProfile == true)
-          IconButton(
-            key: const ValueKey('home_edit_button'),
-            tooltip: '编辑首页',
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () => showMuseTileEditor(context),
-          ),
-        SizedBox(width: MuseSpace.page(context) - MuseSpace.s8),
-      ],
-      body: desk
-          ? const MuseDeskHome()
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final dashboard = _Dashboard(hasProfile: hasProfile);
-                if (constraints.maxWidth < museHomeSideListWidth || hasProfile != true) return dashboard;
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: dashboard),
-                    SizedBox(width: MuseSize.sideColumn, child: _sideNodes(context)),
-                    const SizedBox(width: MuseSpace.s8),
-                  ],
-                );
-              },
-            ),
+      showAppBar: false,
+      // no app bar: the page itself keeps clear of the status bar
+      body: SafeArea(bottom: false, left: false, right: false, child: body),
     );
   }
 }
@@ -254,16 +264,23 @@ class MuseDeskHome extends ConsumerWidget {
       children: [
         const MuseDeskToolRow(),
         Expanded(
-          child: three
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: scroll),
-                    SizedBox(width: MuseDesk.nodeColumn, child: _sideNodes(context)),
-                    const SizedBox(width: MuseSpace.s8),
-                  ],
-                )
-              : scroll,
+          // 1.19.2: two columns only when the page itself (window minus the side bar) has room for
+          // them; a narrower one gets the single column under the same tool row
+          child: LayoutBuilder(
+            builder: (context, c) {
+              if (c.maxWidth < MuseDesk.twoColumnContent) return const _Dashboard(hasProfile: true);
+              return three
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: scroll),
+                        SizedBox(width: MuseDesk.nodeColumn, child: _sideNodes(context)),
+                        const SizedBox(width: MuseSpace.s8),
+                      ],
+                    )
+                  : scroll;
+            },
+          ),
         ),
       ],
     );
@@ -273,7 +290,10 @@ class MuseDeskHome extends ConsumerWidget {
 /// 1.19.1 A6: the desk 首页's top row in place of the big 「穿云」 title: 「订阅名 · 38 个节点」 on the
 /// left, 测速 and 编辑首页 on the right (48 high).
 class MuseDeskToolRow extends ConsumerWidget {
-  const MuseDeskToolRow({super.key});
+  const MuseDeskToolRow({super.key, this.speedTest = true});
+
+  /// 1.19.2: the row also tops a phone's 首页 (in place of the 「穿云」 title), without 测速 there
+  final bool speedTest;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -283,10 +303,7 @@ class MuseDeskToolRow extends ConsumerWidget {
     final nodes = group?.items.where((e) => !e.isGroup).length;
     final running = ref.watch(museRunningProvider);
     final testing = ref.watch(museNodeTestStartedProvider) != null;
-    final summary = [
-      if (name != null && name.isNotEmpty) name,
-      if (nodes != null) '$nodes 个节点',
-    ].join(' · ');
+    final summary = [if (name != null && name.isNotEmpty) name, if (nodes != null) '$nodes 个节点'].join(' · ');
     final margin = MuseSpace.page(context);
     return SizedBox(
       key: const ValueKey('home_desk_toolbar'),
@@ -309,15 +326,15 @@ class MuseDeskToolRow extends ConsumerWidget {
             ),
             const SizedBox(width: MuseSpace.s8),
             // ≥ 1280 the node column beside has its own 测速
-            if (MediaQuery.sizeOf(context).width < MuseDesk.threeColumn)
+            if (speedTest && MediaQuery.sizeOf(context).width < MuseDesk.threeColumn)
               TextButton.icon(
-              key: const ValueKey('home_desk_speedtest'),
-              style: TextButton.styleFrom(foregroundColor: museBrandOf(context), shape: MuseShape.full),
-              // 测速 needs a running core (the same rule as on 节点)
-              onPressed: running && !testing ? () => museRunNodeTest(ref) : null,
-              icon: const Icon(Icons.speed_outlined, size: MuseIconSize.small),
-              label: Text(testing ? '测速中' : '测速'),
-            ),
+                key: const ValueKey('home_desk_speedtest'),
+                style: TextButton.styleFrom(foregroundColor: museBrandOf(context), shape: MuseShape.full),
+                // 测速 needs a running core (the same rule as on 节点)
+                onPressed: running && !testing ? () => museRunNodeTest(ref) : null,
+                icon: const Icon(Icons.speed_outlined, size: MuseIconSize.small),
+                label: Text(testing ? '测速中' : '测速'),
+              ),
             IconButton(
               key: const ValueKey('home_edit_button'),
               tooltip: '编辑首页',
@@ -485,9 +502,7 @@ class MuseHeroCard extends HookConsumerWidget {
                 label,
                 key: ValueKey(label),
                 maxLines: 1,
-                style: MuseType.largeTitle(
-                  context,
-                ).copyWith(color: failed ? MusePalette.red : fg),
+                style: MuseType.largeTitle(context).copyWith(color: failed ? MusePalette.red : fg),
               ),
             ),
           ),
@@ -515,36 +530,38 @@ class MuseHeroCard extends HookConsumerWidget {
       ],
     );
     final statusParts = <Widget>[
-        // 1.5.0: 准备配置 → 启动核心 → 测试连通
-        if (stage != null && !connected)
-          AnimatedSwitcher(
-            duration: museMotion(context),
-            child: Text(
-              '${stage.title}…',
-              key: ValueKey('home_stage_${stage.name}'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: MuseType.body(context).copyWith(color: fg2),
-            ),
-          )
-        else if (since != null) ...[
-          MuseUptimeText(
-            since: since,
-            style: MuseType.body(
-              context,
-            ).copyWith(color: fg2, fontFeatures: MuseType.tabular),
-          ),
-          Text('·', key: const ValueKey('home_status_dot'), style: MuseType.caption(context).copyWith(color: fg2)),
-        ],
-        if (stage == null || connected) _ModePill(mode: mode, onBrand: onBrand),
-        if (stage == MuseConnectStage.testing && connected)
-          Text(
-            '${stage!.title}…',
-            key: const ValueKey('home_stage_testing'),
+      // 1.5.0: 准备配置 → 启动核心 → 测试连通
+      if (stage != null && !connected)
+        AnimatedSwitcher(
+          duration: museMotion(context),
+          child: Text(
+            '${stage.title}…',
+            key: ValueKey('home_stage_${stage.name}'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: MuseType.caption(context).copyWith(color: fg2),
+            style: MuseType.body(context).copyWith(color: fg2),
           ),
+        )
+      else if (since != null) ...[
+        MuseUptimeText(
+          since: since,
+          style: MuseType.body(context).copyWith(color: fg2, fontFeatures: MuseType.tabular),
+        ),
+        Text(
+          '·',
+          key: const ValueKey('home_status_dot'),
+          style: MuseType.caption(context).copyWith(color: fg2),
+        ),
+      ],
+      if (stage == null || connected) _ModePill(mode: mode, onBrand: onBrand),
+      if (stage == MuseConnectStage.testing && connected)
+        Text(
+          '${stage!.title}…',
+          key: const ValueKey('home_stage_testing'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: MuseType.caption(context).copyWith(color: fg2),
+        ),
     ];
     final statusInfo = Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -613,17 +630,21 @@ class MuseHeroCard extends HookConsumerWidget {
                             )
                           else
                             Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [statusRow(), const SizedBox(height: MuseSpace.s8), statusInfo],
-                                      ),
-                                    ),
-                                    const SizedBox(width: MuseSpace.s12),
-                                    startButton,
-                                  ],
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      statusRow(),
+                                      const SizedBox(height: MuseSpace.s8),
+                                      statusInfo,
+                                    ],
+                                  ),
                                 ),
+                                const SizedBox(width: MuseSpace.s12),
+                                startButton,
+                              ],
+                            ),
                           SizedBox(height: heroPad),
                           Divider(
                             height: MuseSize.hairline,
@@ -853,7 +874,8 @@ class MuseStartButtonState extends State<MuseStartButton> {
 }
 
 /// 1.19.1: [child] with a hover tooltip of [message] (none when null).
-Widget museMaybeTooltip(String? message, Widget child) => message == null ? child : Tooltip(message: message, child: child);
+Widget museMaybeTooltip(String? message, Widget child) =>
+    message == null ? child : Tooltip(message: message, child: child);
 
 /// 1.18.0 P3: the node-name sweep stops after this even if the core never answers.
 const museSwitchSweepTimeout = Duration(seconds: 10);
@@ -938,29 +960,34 @@ class _HeroNodeRow extends ConsumerWidget {
                           key: const ValueKey('home_node_caption'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: large ? MuseTextLevel.footnote.style(context, color: fg2) : MuseType.caption(context).copyWith(color: fg2),
+                          style: large
+                              ? MuseTextLevel.footnote.style(context, color: fg2)
+                              : MuseType.caption(context).copyWith(color: fg2),
                         ),
                       // 1.18.0 P3: the name rolls when it changes and sweeps while switching
                       // 1.19.1 A5: the full name on hover when the desk row cuts it
-                      museMaybeTooltip(large ? text : null, MuseRoll(
-                        value: text,
-                        child: MuseSweep(
-                          active: switching != null,
-                          timeout: museSwitchSweepTimeout,
-                          child: Text(
-                            text,
-                            key: const ValueKey('home_node_name'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: (large ? MuseTextLevel.headline.style(context) : MuseType.body(context)).copyWith(
-                              color: fg,
-                              fontWeight: large ? FontWeight.w600 : FontWeight.w700,
-                              fontFamily: MuseFont.family,
-                              fontFeatures: MuseType.tabular,
+                      museMaybeTooltip(
+                        large ? text : null,
+                        MuseRoll(
+                          value: text,
+                          child: MuseSweep(
+                            active: switching != null,
+                            timeout: museSwitchSweepTimeout,
+                            child: Text(
+                              text,
+                              key: const ValueKey('home_node_name'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: (large ? MuseTextLevel.headline.style(context) : MuseType.body(context)).copyWith(
+                                color: fg,
+                                fontWeight: large ? FontWeight.w600 : FontWeight.w700,
+                                fontFamily: MuseFont.family,
+                                fontFeatures: MuseType.tabular,
+                              ),
                             ),
                           ),
                         ),
-                      )),
+                      ),
                     ],
                   ),
                 ),
@@ -971,22 +998,25 @@ class _HeroNodeRow extends ConsumerWidget {
                     value: delay,
                     alignment: AlignmentDirectional.centerEnd,
                     child: Text.rich(
-                    key: const ValueKey('home_node_delay'),
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '$delay',
-                          style: (large ? MuseTextLevel.title3.style(context) : MuseType.body(context)).copyWith(
-                            color: onBrand ? fg : MuseColors.delay(context, delay),
-                            fontWeight: FontWeight.w700,
-                            fontFamily: MuseFont.family,
-                            fontFeatures: MuseType.tabular,
+                      key: const ValueKey('home_node_delay'),
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '$delay',
+                            style: (large ? MuseTextLevel.title3.style(context) : MuseType.body(context)).copyWith(
+                              color: onBrand ? fg : MuseColors.delay(context, delay),
+                              fontWeight: FontWeight.w700,
+                              fontFamily: MuseFont.family,
+                              fontFeatures: MuseType.tabular,
+                            ),
                           ),
-                        ),
-                        TextSpan(text: ' ms', style: MuseType.caption(context).copyWith(color: fg2)),
-                      ],
+                          TextSpan(
+                            text: ' ms',
+                            style: MuseType.caption(context).copyWith(color: fg2),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   ),
                 Icon(Icons.chevron_right_outlined, size: MuseIconSize.small, color: fg2),
               ],
@@ -1214,7 +1244,8 @@ bool museSpeedIdle({required bool running, required List<int> history}) {
 }
 
 /// 1.11.0: today's ↑ / ↓ bytes from the traffic log.
-(int, int) museTodayTraffic(String rawLog, DateTime now) => MuseTrafficLog.parse(rawLog).days[museDayKey(now)] ?? (0, 0);
+(int, int) museTodayTraffic(String rawLog, DateTime now) =>
+    MuseTrafficLog.parse(rawLog).days[museDayKey(now)] ?? (0, 0);
 
 class _SpeedTile extends ConsumerWidget {
   const _SpeedTile({super.key});
@@ -1230,7 +1261,12 @@ class _SpeedTile extends ConsumerWidget {
         value: museBytes(up + down),
         bottom: Align(
           alignment: Alignment.bottomLeft,
-          child: Text('↑ ${museBytes(up)}   ↓ ${museBytes(down)}', key: const ValueKey('tile_speed_today'), maxLines: 1, style: MuseType.caption(context)),
+          child: Text(
+            '↑ ${museBytes(up)}   ↓ ${museBytes(down)}',
+            key: const ValueKey('tile_speed_today'),
+            maxLines: 1,
+            style: MuseType.caption(context),
+          ),
         ),
         onTap: () => _showSessionSheet(context),
       );
@@ -1239,9 +1275,7 @@ class _SpeedTile extends ConsumerWidget {
       title: '网速',
       titleTrailing: Text('↑ ${museSpeedText(stats.uplink.toInt())}', style: MuseType.caption(context)),
       value: '↓ ${museSpeedText(stats.downlink.toInt())}',
-      bottom: SizedBox.expand(
-        child: museSpeedChart(context, ref, history),
-      ),
+      bottom: SizedBox.expand(child: museSpeedChart(context, ref, history)),
       onTap: () => _showSessionSheet(context),
     );
   }
@@ -1264,10 +1298,7 @@ class _FlowTile extends ConsumerWidget {
       value: '↓ ${museSpeedText(stats.downlink.toInt())}',
       bottom: Row(
         children: [
-          Expanded(
-            flex: 2,
-            child: SizedBox.expand(child: museSpeedChart(context, ref, history)),
-          ),
+          Expanded(flex: 2, child: SizedBox.expand(child: museSpeedChart(context, ref, history))),
           const SizedBox(width: MuseSpace.s12),
           // 1.4.1: may shrink (ellipsis) in a narrow tile / large text instead of overflowing
           Flexible(
@@ -1329,7 +1360,13 @@ class MuseStackedBarsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final y0 = size.height - 1;
-    canvas.drawLine(Offset(0, y0), Offset(size.width, y0), Paint()..color = baseline..strokeWidth = 1);
+    canvas.drawLine(
+      Offset(0, y0),
+      Offset(size.width, y0),
+      Paint()
+        ..color = baseline
+        ..strokeWidth = 1,
+    );
     if (values.isEmpty) return;
     final maxV = math.max(values.reduce(math.max), 1);
     final slot = size.width / MuseSpeedHistory.length;
@@ -1776,15 +1813,20 @@ class _EmptyState extends ConsumerWidget {
                       child: action == MuseAddAction.paste
                           ? FilledButton.icon(
                               key: ValueKey(key),
-                              style: FilledButton.styleFrom(backgroundColor: museBrandOf(context), shape: MuseShape.full),
-                              onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(action: action),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: museBrandOf(context),
+                                shape: MuseShape.full,
+                              ),
+                              onPressed: () =>
+                                  ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(action: action),
                               icon: Icon(icon),
                               label: Text(label),
                             )
                           : OutlinedButton.icon(
                               key: ValueKey(key),
                               style: OutlinedButton.styleFrom(shape: MuseShape.full),
-                              onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(action: action),
+                              onPressed: () =>
+                                  ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(action: action),
                               icon: Icon(icon),
                               label: Text(label),
                             ),

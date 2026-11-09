@@ -1,7 +1,7 @@
 name: hiddify
 description: 穿云 - Android proxy client (fork of Hiddify, GPLv3).
 publish_to: "none"
-version: 1.19.1+210
+version: 1.19.2+211
 
 environment:
   sdk: ^3.10.4
@@ -139,6 +139,7 @@ flutter:
     # 穿云 1.9.0 #14: 兼容内核's default lists (.mrs), only those the default rules use
     - assets/rule-sets-compat/
     - assets/fonts/OFL-Inter.txt
+    - assets/fonts/OFL-NotoSansSC.txt
     # 穿云 1.19.0 P1: 路由弧线图点阵底图（Natural Earth 公有领域，tool/world_dots/gen_world_dots.py 生成）
     - assets/map/world_dots.bin
     - assets/images/logo.svg
@@ -173,6 +174,15 @@ flutter:
           weight: 600
         - asset: assets/fonts/MuseSans-Bold.ttf
           weight: 700
+    # 穿云 1.19.2: 思源黑体 / Noto Sans SC (SIL OFL 1.1, assets/fonts/OFL-NotoSansSC.txt), subset to
+    # GB2312 + every character in lib/ by tool/fonts/subset_cjk.py, renamed MuseHei (OFL: a modified
+    # version takes another name); 400 + 600 — 500 falls back to 400, 700 to 600
+    - family: MuseHei
+      fonts:
+        - asset: assets/fonts/MuseHei-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/MuseHei-SemiBold.ttf
+          weight: 600
 
 flutter_gen:
   output: lib/gen/

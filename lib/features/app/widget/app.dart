@@ -104,7 +104,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final themeStyle = MuseThemeStyle.fromKey(ref.watch(MusePrefs.themeStyle));
     if (themeStyle == MuseThemeStyle.black) museApplyPureBlack(true);
     if (themeStyle == MuseThemeStyle.light) museApplyPureBlack(false);
-    final theme = AppTheme(themeMode, locale.preferredFontFamily, blackWhenSystemDark: blackFollow, style: themeStyle);
+    final theme = AppTheme(themeMode, locale.preferredFontFamily, blackWhenSystemDark: blackFollow, style: themeStyle, fontFallback: locale.preferredFontFallback);
     final activeBreakpoint = Breakpoint(context).activeBreakpoint;
 
     ref.listen(foregroundProfilesUpdateNotifierProvider, (_, _) {});

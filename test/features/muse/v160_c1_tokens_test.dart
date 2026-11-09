@@ -6,7 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('breakpoints and radius scale', () {
     expect(MuseBreak.mobile, 600);
-    expect(MuseBreak.laptop, 840);
+    // 1.19.2：840 → 1080（1080 宽以内自动图标栏）
+    expect(MuseBreak.laptop, 1080);
     expect(MuseRadiusScale.fit(20, 28), 10);
     expect(MuseRadiusScale.fit(100, 28), 28);
   });

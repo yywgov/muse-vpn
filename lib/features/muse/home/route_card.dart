@@ -48,7 +48,8 @@ class MuseRouteCard extends ConsumerWidget {
         : null;
     return MuseCard(
       key: const ValueKey('home_route_card'),
-      padding: const EdgeInsets.fromLTRB(MuseSpace.s12, MuseSpace.s12, MuseSpace.s12, MuseSpace.s8),
+      // 1.19.2: the map runs edge to edge (the legend and the sentence keep the inset)
+      padding: const EdgeInsets.fromLTRB(0, MuseSpace.s12, 0, MuseSpace.s8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -63,40 +64,47 @@ class MuseRouteCard extends ConsumerWidget {
           ),
           if (shares.isNotEmpty) ...[
             const SizedBox(height: MuseSpace.s4),
-            Wrap(
-              key: const ValueKey('home_route_legend'),
-              alignment: WrapAlignment.center,
-              spacing: MuseSpace.s12,
-              runSpacing: MuseSpace.s4,
-              children: [
-                for (final (kind, share) in shares)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 10,
-                        height: museRouteShareWidth(share).clamp(2.0, 6.0),
-                        decoration: BoxDecoration(color: colors[kind], borderRadius: MuseRadius.fullAll),
-                      ),
-                      const SizedBox(width: MuseSpace.s4),
-                      Text(
-                        '${kind.label} ${(share * 100).round()}%',
-                        style: MuseType.caption(context).copyWith(fontFeatures: MuseType.tabular),
-                      ),
-                    ],
-                  ),
-              ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s12),
+              child: Wrap(
+                key: const ValueKey('home_route_legend'),
+                alignment: WrapAlignment.center,
+                spacing: MuseSpace.s12,
+                runSpacing: MuseSpace.s4,
+                children: [
+                  for (final (kind, share) in shares)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: museRouteShareWidth(share).clamp(2.0, 6.0),
+                          decoration: BoxDecoration(color: colors[kind], borderRadius: MuseRadius.fullAll),
+                        ),
+                        const SizedBox(width: MuseSpace.s4),
+                        Text(
+                          '${kind.label} ${(share * 100).round()}%',
+                          style: MuseType.caption(context).copyWith(fontFeatures: MuseType.tabular),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ),
           ],
-          if (connected) ...[
+          // 1.19.2: only when there is a sentence (no hint while nothing is classified yet)
+          if (connected && sentence != null) ...[
             const SizedBox(height: MuseSpace.s4),
-            Text(
-              sentence ?? '有流量后显示各类流量走哪里',
-              key: const ValueKey('home_route_sentence'),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: sentence == null ? MuseType.caption(context) : MuseType.body(context),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s12),
+              child: Text(
+                sentence,
+                key: const ValueKey('home_route_sentence'),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: MuseType.body(context),
+              ),
             ),
           ],
         ],

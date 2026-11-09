@@ -58,7 +58,9 @@ void main() {
     expect(museNavForm(600), MuseNavForm.dock);
     expect(museNavForm(700), MuseNavForm.rail);
     expect(museNavForm(840), MuseNavForm.rail);
-    expect(museNavForm(1000), MuseNavForm.sidebar);
+    // 1.19.2：图标栏到 1080（原 840），更宽才是可展开侧栏
+    expect(museNavForm(1000), MuseNavForm.rail);
+    expect(museNavForm(1200), MuseNavForm.sidebar);
   });
 
   // 1.8.0: 连接 / 日志 are tabs of 活动, the one sidebar entry
@@ -89,9 +91,10 @@ void main() {
     expect(find.byKey(const ValueKey('muse_nav_activity')), findsOneWidget);
   });
 
-  testWidgets('1000 wide: expanded sidebar with 活动, collapse is remembered', (t) async {
+  // 1.19.2：1000 → 1200（1000 宽现在是图标栏）
+  testWidgets('1200 wide: expanded sidebar with 活动, collapse is remembered', (t) async {
     final extras = <String>[];
-    final c = await _pump(t, size: const Size(1000, 800), extras: extras);
+    final c = await _pump(t, size: const Size(1200, 800), extras: extras);
     expect(find.byKey(const ValueKey('muse_sidebar_expanded')), findsOneWidget);
     expect(find.text('订阅'), findsOneWidget);
     expect(find.text('活动'), findsOneWidget);
