@@ -126,8 +126,19 @@ dev_dependencies:
   slang_build_runner: ^4.4.0
   flutter_gen_runner: ^5.4.0
   dart_mappable_builder: ^4.2.1
+  # 穿云 1.19.3: test/features/muse/v1193_grpc_cancel_test.dart drives the transport directly
+  http2: ^3.1.0
   # protoc_builder: ^0.4.1
   # google_protobuf: ^3.20.1;
+
+# 穿云 1.19.3: grpc (up to 5.2.0) still pins http2 ^2.3.1, whose client killed the whole gRPC
+# connection (PROTOCOL_ERROR, "Connection is being forcefully terminated. (errorCode: 1)") when
+# the core's HEADERS for a stream the app had just cancelled arrived (listenSingle re-arming the
+# log/status streams). 3.1.0 handles it (dart-lang/http #1799). That race made the start-up
+# restore-connect fail now and then (started_by_user -> false; Windows recovery smoke
+# restart-restores). Drop this override once grpc allows http2 ^3.1.0.
+dependency_overrides:
+  http2: ^3.1.0
 
 flutter:
   uses-material-design: true
