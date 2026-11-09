@@ -55,7 +55,7 @@ class MuseRouteCard extends ConsumerWidget {
                       Container(
                         width: 10,
                         height: museRouteShareWidth(share).clamp(2.0, 6.0),
-                        decoration: BoxDecoration(color: colors[kind], borderRadius: BorderRadius.circular(3)),
+                        decoration: BoxDecoration(color: colors[kind], borderRadius: MuseRadius.fullAll),
                       ),
                       const SizedBox(width: MuseSpace.s4),
                       Text(
