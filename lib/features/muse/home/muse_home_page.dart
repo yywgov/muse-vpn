@@ -560,7 +560,7 @@ class _ModePill extends ConsumerWidget {
 /// The hero card's start button (1.6.1: a filled squircle in the accent with ▶ / ❚❚).
 /// 1.18.0 P2: one shape morphing — a circle when off, a rounded square when on (a spring with a
 /// light bounce on arrival, none on the way back); the glyph cross-fades on its own.
-class MuseStartButton extends StatelessWidget {
+class MuseStartButton extends StatefulWidget {
   const MuseStartButton({
     super.key,
     required this.on,
@@ -579,11 +579,43 @@ class MuseStartButton extends StatelessWidget {
   static const radiusOn = 18.0;
 
   @override
+  State<MuseStartButton> createState() => MuseStartButtonState();
+}
+
+/// 1.19.1：按压反馈——按下缩到 [MuseMotion.pressScale]（100ms），松开/取消 160ms 回 1.0；
+/// 禁用（onTap == null）与关闭档不缩；精简档时长 ×0.6、平稳曲线。隐式动画，可从当前值重定向。
+class MuseStartButtonState extends State<MuseStartButton> {
+  bool _pressed = false;
+
+  /// 测试用：当前是否处于按下状态。
+  bool get pressed => _pressed;
+
+  void _press(bool v) {
+    if (_pressed == v) return;
+    setState(() => _pressed = v);
+  }
+
+  @override
+  void didUpdateWidget(MuseStartButton old) {
+    super.didUpdateWidget(old);
+    if (widget.onTap == null) _pressed = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final on = widget.on;
+    final onTap = widget.onTap;
+    final semanticLabel = widget.semanticLabel;
+    const radiusOn = MuseStartButton.radiusOn;
+    const radiusOff = MuseStartButton.radiusOff;
     final scheme = Theme.of(context).colorScheme;
     final level = museMotionLevel(context);
+    final canPress = onTap != null && level != MuseMotionLevel.off;
+    final scale = canPress && _pressed ? MuseMotion.pressScale : 1.0;
     final spring = on ? MuseMotion.arriveCurve : MuseMotion.smoothCurve;
-    final shapeDuration = level == MuseMotionLevel.standard ? spring.settleDuration : museScaleDuration(level, MuseMotion.fast);
+    final shapeDuration = level == MuseMotionLevel.standard
+        ? spring.settleDuration
+        : museScaleDuration(level, MuseMotion.fast);
     final color = onTap == null ? scheme.primary.withValues(alpha: 0.5) : scheme.primary;
     return Semantics(
       button: true,
@@ -593,34 +625,43 @@ class MuseStartButton extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: TweenAnimationBuilder<double>(
-          key: const ValueKey('home_connect_shape'),
-          tween: Tween(end: on ? radiusOn : radiusOff),
-          duration: shapeDuration,
-          curve: level == MuseMotionLevel.standard ? spring : MuseMotion.plainCurve,
-          builder: (context, r, child) => DecoratedBox(
-            decoration: ShapeDecoration(
-              color: color,
-              // the bounce may overshoot below radiusOn; never past a circle
-              shape: MuseShape.of(r.clamp(0.0, radiusOff)),
-            ),
-            child: child,
-          ),
-          child: SizedBox.square(
-            dimension: MuseSize.startButton,
-            child: AnimatedSwitcher(
-              duration: museDuration(context, MuseMotion.fast),
-              switchInCurve: MuseMotion.curve,
-              switchOutCurve: MuseMotion.exitCurve,
-              transitionBuilder: (child, a) => FadeTransition(
-                opacity: a,
-                child: ScaleTransition(scale: Tween(begin: 0.9, end: 1.0).animate(a), child: child),
+        onTapDown: canPress ? (_) => _press(true) : null,
+        onTapUp: canPress ? (_) => _press(false) : null,
+        onTapCancel: canPress ? () => _press(false) : null,
+        child: AnimatedScale(
+          key: const ValueKey('home_connect_press'),
+          scale: scale,
+          duration: museScaleDuration(level, _pressed ? MuseMotion.pressIn : MuseMotion.pressOut),
+          curve: museCurve(context),
+          child: TweenAnimationBuilder<double>(
+            key: const ValueKey('home_connect_shape'),
+            tween: Tween(end: on ? radiusOn : radiusOff),
+            duration: shapeDuration,
+            curve: level == MuseMotionLevel.standard ? spring : MuseMotion.plainCurve,
+            builder: (context, r, child) => DecoratedBox(
+              decoration: ShapeDecoration(
+                color: color,
+                // the bounce may overshoot below radiusOn; never past a circle
+                shape: MuseShape.of(r.clamp(0.0, radiusOff)),
               ),
-              child: Icon(
-                on ? Icons.pause_outlined : Icons.play_arrow_outlined,
-                key: ValueKey(on),
-                size: MuseIconSize.large,
-                color: scheme.onPrimary,
+              child: child,
+            ),
+            child: SizedBox.square(
+              dimension: MuseSize.startButton,
+              child: AnimatedSwitcher(
+                duration: museDuration(context, MuseMotion.fast),
+                switchInCurve: MuseMotion.curve,
+                switchOutCurve: MuseMotion.exitCurve,
+                transitionBuilder: (child, a) => FadeTransition(
+                  opacity: a,
+                  child: ScaleTransition(scale: Tween(begin: 0.9, end: 1.0).animate(a), child: child),
+                ),
+                child: Icon(
+                  on ? Icons.pause_outlined : Icons.play_arrow_outlined,
+                  key: ValueKey(on),
+                  size: MuseIconSize.large,
+                  color: scheme.onPrimary,
+                ),
               ),
             ),
           ),

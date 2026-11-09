@@ -5,8 +5,9 @@ import 'package:hiddify/utils/utils.dart';
 
 enum TransitionType { slide, fade }
 
-/// 穿云 1.18.0 P0: page transitions had no curve (linear, 150 / 100 ms). Now: enter 380 ms on the
-/// main curve, back 200 ms accelerating out; 精简 = a short fade only, 关闭 = no animation.
+/// 穿云 1.18.0 P0: page transitions had no curve (linear, 150 / 100 ms). Now: enter on the main
+/// curve (1.19.1: 300 ms, [MuseMotion.page]), back 200 ms starting fast (1.19.1); 精简 = a short fade
+/// only, 关闭 = no animation.
 Page<dynamic> customTransition(TransitionType transition, LocalKey pageKey, Widget child) {
   // On iOS, use CupertinoPage so pages get the native interactive (edge-swipe)
   // back gesture. CustomTransitionPage does not support that gesture.
@@ -16,7 +17,7 @@ Page<dynamic> customTransition(TransitionType transition, LocalKey pageKey, Widg
   return CustomTransitionPage<dynamic>(
     key: pageKey,
     child: child,
-    transitionDuration: MuseMotion.enter,
+    transitionDuration: MuseMotion.page,
     reverseTransitionDuration: MuseMotion.exit,
     transitionsBuilder: (context, animation, _, child) => museTransition(transition, museMotionLevel(context), animation, child, Directionality.of(context)),
   );
@@ -42,7 +43,7 @@ Widget museTransition(TransitionType transition, MuseMotionLevel level, Animatio
   };
 }
 
-/// enter on [MuseMotion.curve]; going back accelerates out ([MuseMotion.exitCurve], flipped because
-/// the animation runs 1 → 0).
+/// enter on [MuseMotion.curve]; going back (1.19.1) also starts fast ([MuseMotion.pageBackCurve], the
+/// main curve flipped because the animation runs 1 → 0) instead of the slow-starting exit curve.
 CurvedAnimation museTransitionCurve(Animation<double> animation) =>
-    CurvedAnimation(parent: animation, curve: MuseMotion.curve, reverseCurve: MuseMotion.exitCurve.flipped);
+    CurvedAnimation(parent: animation, curve: MuseMotion.curve, reverseCurve: MuseMotion.pageBackCurve);

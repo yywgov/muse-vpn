@@ -68,16 +68,18 @@ void main() {
     });
 
     test('数字滚动与扫光参数', () {
-      expect(MuseMotion.maskOut.inMilliseconds, 260);
-      expect(MuseMotion.maskIn.inMilliseconds, 420);
-      expect(MuseMotion.maskInDelay.inMilliseconds, 90);
+      // 1.19.1 动效审查：MuseRoll 总长 510 → 300ms（出 180、延迟 40、入 260）
+      expect(MuseMotion.maskOut.inMilliseconds, 180);
+      expect(MuseMotion.maskIn.inMilliseconds, 260);
+      expect(MuseMotion.maskInDelay.inMilliseconds, 40);
       expect(MuseMotion.sweep.inMilliseconds, 1100);
       expect(MuseMotion.sweepTimeout, lessThanOrEqualTo(const Duration(minutes: 1)));
     });
 
     test('页面转场不再是线性', () {
       final s = _src('lib/core/router/go_router/helper/custom_transition.dart');
-      expect(s, contains('transitionDuration: MuseMotion.enter'));
+      // 1.19.1 动效审查：页面进场改用页面令牌 MuseMotion.page（300ms）
+      expect(s, contains('transitionDuration: MuseMotion.page'));
       expect(s, contains('reverseTransitionDuration: MuseMotion.exit'));
       expect(s, isNot(contains('milliseconds: 150')));
       final a = AnimationController(vsync: const TestVSync(), duration: MuseMotion.enter);
@@ -289,7 +291,7 @@ void main() {
   });
 
   group('P3 数字遮罩滚动', () {
-    testWidgets('标准：旧字上滑出、新字延迟滑入，510ms 内结束', (tester) async {
+    testWidgets('标准：旧字上滑出、新字延迟滑入，300ms 内结束（1.19.1 起，原 510ms）', (tester) async {
       await tester.pumpWidget(_app(const _Roll()));
       expect(find.text('1 ms'), findsOneWidget);
       await tester.tap(find.byType(_Roll));
@@ -297,7 +299,7 @@ void main() {
       expect(MuseRoll.debugRolling, 1);
       expect(find.text('1 ms'), findsOneWidget); // the old one is still sliding out
       expect(find.text('2 ms'), findsOneWidget);
-      await tester.pump(const Duration(milliseconds: 80)); // new text has not started (90ms delay)
+      await tester.pump(const Duration(milliseconds: 30)); // new text has not started (40ms delay, 1.19.1)
       final inSlide = tester.widget<SlideTransition>(
         find.ancestor(of: find.text('2 ms'), matching: find.byType(SlideTransition)).first,
       );

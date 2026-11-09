@@ -100,6 +100,13 @@ abstract final class MuseMotion {
   /// 退场（返回）
   static const exit = Duration(milliseconds: 200);
 
+  /// 1.19.1：页面进场（设置等子页每天进出几十次，工具型 UI 控制在 300ms；[enter] 的其他用途不变）
+  static const page = Duration(milliseconds: 300);
+
+  /// 1.19.1：返回页面的反向曲线——快起（返回是高频动作，不用先慢后快的 [exitCurve]）。
+  /// 动画从 1 跑到 0，所以翻转主曲线。
+  static final pageBackCurve = curve.flipped;
+
   /// 操作反馈（按压、颜色）
   static const feedback = Duration(milliseconds: 150);
 
@@ -111,8 +118,17 @@ abstract final class MuseMotion {
   /// 1.6.0 C1
   static const mid = Duration(milliseconds: 200);
   static const common = Duration(milliseconds: 300);
-  static const tab = Duration(milliseconds: 220);
+  /// 1.19.1：底部 Tab 切换 220 → 160ms（全应用最高频的动作之一，大幅减弱）
+  static const tab = Duration(milliseconds: 160);
+
+  /// 1.19.1：Tab 切换的横移幅度（宽度的 3%，原 6%）
+  static const tabShift = 0.03;
   static const pressFeedback = feedback;
+
+  /// 1.19.1：按压反馈——按下缩到 0.96、100ms；松开 160ms 回 1.0（主曲线，快起）
+  static const pressScale = 0.96;
+  static const pressIn = Duration(milliseconds: 100);
+  static const pressOut = Duration(milliseconds: 160);
   static const tabCurve = curve;
   static const sheetDetents = [9 / 16, 0.9];
 
@@ -128,10 +144,10 @@ abstract final class MuseMotion {
   static final smoothCurve = MuseSpringCurve(springSmooth);
   static final arriveCurve = MuseSpringCurve(springArrive);
 
-  /// P3 数字遮罩滚动：旧字上滑出 260ms；新字延迟 90ms、420ms 滑入
-  static const maskOut = Duration(milliseconds: 260);
-  static const maskIn = Duration(milliseconds: 420);
-  static const maskInDelay = Duration(milliseconds: 90);
+  /// P3 数字遮罩滚动（1.19.1 缩短，总长 300ms）：旧字上滑出 180ms；新字延迟 40ms、260ms 滑入
+  static const maskOut = Duration(milliseconds: 180);
+  static const maskIn = Duration(milliseconds: 260);
+  static const maskInDelay = Duration(milliseconds: 40);
 
   /// 等待态文字扫光：一趟 1100ms；最长持续时间（超时后停在静态文字）
   static const sweep = Duration(milliseconds: 1100);

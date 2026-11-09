@@ -215,7 +215,7 @@ class _MuseTabTransitionState extends State<MuseTabTransition> with SingleTicker
     Widget out = FadeTransition(key: const ValueKey('muse_tab_fade'), opacity: _curve, child: widget.child);
     if (widget.slide) {
       out = SlideTransition(
-        position: _curve.drive(Tween(begin: Offset(0.06 * _dir, 0), end: Offset.zero)),
+        position: _curve.drive(Tween(begin: Offset(MuseMotion.tabShift * _dir, 0), end: Offset.zero)),
         child: out,
       );
     }

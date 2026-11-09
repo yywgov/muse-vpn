@@ -1,5 +1,6 @@
 // 穿云 1.19.0 P1 - 首页「路由弧线图」：点阵世界底图 + 本机到出口城市的大圆弧。
-// 连接成功时弧线 1100ms 画出，光点沿弧跑 2 趟后停；切节点终点 700ms 滑到新城市。
+// 连接成功时弧线 1100ms 画出，光点沿弧跑 1 趟后停（1.19.1 起，原 2 趟）；切节点终点 450ms 滑到新城市（原 700ms）。
+// 分类线与终点在弧线最后 15% 淡入（1.19.1）。
 // 动效档位：标准=完整；精简=弧线直接淡入、无光点；关闭=静态。所有动画一次性，结束后不再出帧；
 // 页面不可见（TickerMode 关）时 Ticker 静音即停；无循环、无轮询。底图只在尺寸/颜色变化时预渲染一次成 ui.Image。
 // 只借鉴公开思路，不含任何第三方代码或素材。
@@ -21,11 +22,20 @@ abstract final class MuseRouteMotion {
   /// 光点每跑一趟
   static const lap = Duration(milliseconds: 900);
 
-  /// 光点趟数（之后停）
-  static const laps = 2;
+  /// 光点趟数（之后停）。1.19.1：2 → 1（连接后动效总长约 2.9s → 2.0s）
+  static const laps = 1;
 
-  /// 切节点时终点滑动
-  static const slide = Duration(milliseconds: 700);
+  /// 切节点时终点滑动（1.19.1：700 → 450ms）
+  static const slide = Duration(milliseconds: 450);
+
+  /// 分类线与终点在弧线最后这段（按时间）淡入，不在画完那一帧跳出（1.19.1）
+  static const tailFade = 0.15;
+}
+
+/// 分类线与终点的透明度：弧线时间进度 [arcV] 的最后 [MuseRouteMotion.tailFade] 线性从 0 到 1。
+double museRouteTailAlpha(double arcV) {
+  const start = 1 - MuseRouteMotion.tailFade;
+  return ((arcV - start) / MuseRouteMotion.tailFade).clamp(0.0, 1.0);
 }
 
 const museWorldDotsAsset = 'assets/map/world_dots.bin';
@@ -356,11 +366,13 @@ class _ArcPainter extends CustomPainter {
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
     canvas.drawPath(metric.extractPath(0, metric.length * progress), line);
-    if (progress >= 1 && shares.isNotEmpty) _paintShares(canvas, size, pts, alpha);
-    if (progress >= 1) {
+    // 1.19.1：分类线与终点随弧线尾段淡入（精简档整体已在淡入，不再叠加）
+    final tail = fade ? alpha : alpha * museRouteTailAlpha(arcV);
+    if (tail > 0 && shares.isNotEmpty) _paintShares(canvas, size, pts, tail);
+    if (tail > 0) {
       final e = museProject(pts.last.lat, pts.last.lon, size, wrap: false);
-      canvas.drawCircle(e, 7, Paint()..color = color.withValues(alpha: 0.18 * alpha));
-      canvas.drawCircle(e, 3.5, Paint()..color = color.withValues(alpha: alpha));
+      canvas.drawCircle(e, 7, Paint()..color = color.withValues(alpha: 0.18 * tail));
+      canvas.drawCircle(e, 3.5, Paint()..color = color.withValues(alpha: tail));
     }
     final d = state._dot;
     if (d.isAnimating && d.value > 0 && d.value < 1) {

@@ -72,7 +72,8 @@ class MuseSkeleton extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reduce = museReduceMotion(context);
+    // 1.19.1：循环光带只在标准档；精简档与关闭档都是静态骨架
+    final reduce = !museMotionRich(context);
     final c = useAnimationController(duration: MuseMotion.skeletonPulse);
     useEffect(() {
       if (reduce) {

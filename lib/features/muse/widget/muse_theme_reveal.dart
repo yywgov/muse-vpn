@@ -127,6 +127,9 @@ class MuseRevealPainter extends CustomPainter {
     Offset(size.width, size.height),
   ].map((p) => (p - c).distance).reduce(math.max);
 
+  /// 进度 [t] 时圆洞的半径。1.19.1：快起曲线 [MuseMotion.curve]（原 easeInOutCubic 前 ~80ms 几乎看不见圆洞）。
+  static double radiusAt(Size size, Offset c, double t) => maxRadius(size, c) * MuseMotion.curve.transform(t.clamp(0.0, 1.0));
+
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
@@ -137,7 +140,7 @@ class MuseRevealPainter extends CustomPainter {
       canvas.drawImageRect(image, src, rect, paint);
       return;
     }
-    final r = maxRadius(size, center) * Curves.easeInOutCubic.transform(t.clamp(0.0, 1.0));
+    final r = radiusAt(size, center, t);
     canvas.save();
     canvas.clipPath(
       Path.combine(PathOperation.difference, Path()..addRect(rect), Path()..addOval(Rect.fromCircle(center: center, radius: r))),

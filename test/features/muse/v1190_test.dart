@@ -121,7 +121,7 @@ void main() {
       expect(_framePending(t), isFalse);
     });
 
-    testWidgets('切节点：终点 700ms 滑到新城市，结束后不再出帧', (t) async {
+    testWidgets('切节点：终点 450ms 滑到新城市（1.19.1 起，原 700ms），结束后不再出帧', (t) async {
       await t.pumpWidget(_app(MuseMotionLevel.standard, connected: true, exit: _tokyo));
       await t.pumpAndSettle();
       await t.pumpWidget(_app(MuseMotionLevel.standard, connected: true, exit: _la));
