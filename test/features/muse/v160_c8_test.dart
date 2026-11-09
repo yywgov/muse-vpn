@@ -587,7 +587,8 @@ There is 1 interface on the system:
       expect(win, contains('TitleBarStyle.hidden'));
       expect(win, contains('setAlwaysOnTop'));
       final smoke = File('tool/smoke/app_smoke.ps1').readAsStringSync();
-      expect(smoke, contains('(32 + 56 + 52 * 2 + 26)'));
+      // 1.19.1 A7: the sidebar header is the 48 high brand row (was 56); the click still aims at 订阅
+      expect(smoke, contains('(32 + 48 + 52 * 2 + 26)'));
       // the five tray words the smoke test checks are unchanged
       expect(
         smoke,

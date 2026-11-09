@@ -201,7 +201,8 @@ abstract final class MuseSize {
   static const captionButton = 46.0;
   static const pinIcon = 16.0;
   static const navRailCollapsed = 80.0;
-  static const navSidebarExpanded = 220.0;
+  /// 1.19.1 A7: 220 → 200 (1000 宽窗口时少占一点)
+  static const navSidebarExpanded = 200.0;
   static const dockHeight = 64.0;
 
   /// 1.6.1: the Material 3 bottom navigation bar
@@ -497,6 +498,67 @@ class MuseTheme {
   double get cardElevation => 0;
   Color get shadowColor => MusePalette.transparent;
 }
+
+/// 1.19.1 电脑版界面（A1–A10）的尺寸与比例。
+abstract final class MuseDesk {
+  /// A4：首页按**窗口**宽度分栏——≥ [twoColumn] 双栏（左连接卡 + 路由图、右卡片），
+  /// ≥ [threeColumn] 再加右侧节点栏；更窄保持 1.19.0 的单栏（手机布局）。
+  static const twoColumn = 900.0;
+  static const threeColumn = 1280.0;
+  static const leftShare = 0.58;
+  static const nodeColumn = 340.0;
+  static const columnGap = 16.0;
+
+  /// A1：路由图限高（≤ [mapMaxHeight] 且 ≤ 窗口高 × [mapWindowShare]，不低于 [mapMinHeight]）
+  static const mapMaxHeight = 260.0;
+  static const mapWindowShare = 0.32;
+  static const mapMinHeight = 160.0;
+
+  /// A2：点阵透明度（浅 / 深）与按逻辑像素算的点半径
+  static const dotAlphaLight = 0.32;
+  static const dotAlphaDark = 0.24;
+  static const dotRadiusShare = 0.32;
+  static const dotMinRadius = 1.1;
+  static const dotMaxRadius = 6.0;
+
+  /// A3：地图上城市名的描边宽度、与点的间距
+  static const mapLabelHalo = 3.0;
+  static const mapLabelGap = 6.0;
+
+  /// A6：桌面首页顶部工具行
+  static const toolRow = 48.0;
+
+  /// A5：桌面连接卡的状态字（28）与连接按钮（56）
+  static const heroStatus = 28.0;
+  static const startButton = 56.0;
+
+  /// A7：侧栏品牌行、选中项圆角、左侧指示条、各状态的底色透明度、焦点描边
+  static const sidebarBrand = 48.0;
+  static const brandIcon = 20.0;
+  static const navRadius = 6.0;
+  static const navIndicatorWidth = 3.0;
+  static const navIndicatorHeight = 16.0;
+  static const selectedAlpha = 0.10;
+  static const hoverAlpha = 0.06;
+  static const pressAlpha = 0.09;
+  static const focusRing = 2.0;
+
+  /// A8：标题栏应用图标、系统字形字号、失焦时文字透明度
+  static const titleIcon = 16.0;
+  static const captionGlyph = 10.0;
+  static const inactiveAlpha = 0.45;
+
+  /// A9：单栏页面最大宽度（标题与卡片同一列）
+  static const contentMax = 840.0;
+
+  /// A10：主题悬停色 / 可点卡片悬停时叠加的透明度
+  static const themeHoverAlpha = 0.05;
+  static const themeFocusAlpha = 0.12;
+  static const cardHoverAlpha = 0.04;
+}
+
+/// 1.19.1：窗口宽到桌面首页布局（双栏 / 三栏）了吗；更窄时一切保持 1.19.0。
+bool museDeskWide(BuildContext context) => MediaQuery.sizeOf(context).width >= MuseDesk.twoColumn;
 
 /// Four text levels. Numbers use tabular figures.
 /// 1.18.0 P7: the bundled Latin / digits face (Inter, SIL OFL 1.1, subset to Latin + digits +

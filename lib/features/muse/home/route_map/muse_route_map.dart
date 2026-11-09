@@ -6,13 +6,15 @@
 // 只借鉴公开思路，不含任何第三方代码或素材。
 // Part of 穿云 (GPLv3).
 
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hiddify/features/muse/home/route_map/route_geo.dart';
 import 'package:hiddify/features/muse/home/route_map/route_share.dart';
-import 'package:hiddify/features/muse/widget/muse_motion.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 
 /// 弧线图动效时长。
 abstract final class MuseRouteMotion {
@@ -67,10 +69,15 @@ ui.Image museDotMapImage(MuseWorldDots dots, Size size, double dpr, Color color)
   final canvas = Canvas(rec);
   final paint = Paint()..color = color;
   final px = Size(w.toDouble(), h.toDouble());
-  final cell = w / 360 * dots.step;
-  final r = (cell * 0.32).clamp(0.6, 6.0);
-  for (var row = 0; row < dots.height; row++) {
-    for (var col = 0; col < dots.width; col++) {
+  // 1.19.1 A2: the dot size in logical pixels (at least [MuseDesk.dotMinRadius]), then × dpr — it
+  // was clamped in physical pixels, so a 1.0 dpr window got ~1 px dots
+  final dprX = w / math.max(size.width, 1);
+  final cell = size.width / 360 * dots.step;
+  // a small map keeps every k-th dot instead of letting the minimum size run them together
+  final k = museDotStride(cell);
+  final r = (cell * k * MuseDesk.dotRadiusShare).clamp(MuseDesk.dotMinRadius, MuseDesk.dotMaxRadius) * dprX;
+  for (var row = 0; row < dots.height; row += k) {
+    for (var col = 0; col < dots.width; col += k) {
       if (!dots.isLand(row, col)) continue;
       final p = dots.cellCenter(row, col);
       if (p.lat > museMapNorth || p.lat < museMapSouth) continue;
@@ -85,6 +92,16 @@ ui.Image museDotMapImage(MuseWorldDots dots, Size size, double dpr, Color color)
 
 int museDotImageRenders = 0;
 
+/// 1.19.1 A2: every how-many-th dot to draw for a grid [cell] logical pixels apart, so that a dot
+/// of [MuseDesk.dotMinRadius] still has room around it (1 = all of them).
+int museDotStride(double cell) {
+  var k = 1;
+  while (k < 8 && cell * k * MuseDesk.dotRadiusShare < MuseDesk.dotMinRadius) {
+    k++;
+  }
+  return k;
+}
+
 /// 首页路由弧线图。
 class MuseRouteMap extends StatefulWidget {
   const MuseRouteMap({
@@ -96,7 +113,15 @@ class MuseRouteMap extends StatefulWidget {
     this.aspectRatio = 2.2,
     this.connecting = false,
     this.shares = const [],
+    this.maxHeight,
+    this.delayMs,
   });
+
+  /// 1.19.1 A1: the map's height cap (null = as wide as it is, the phone)
+  final double? maxHeight;
+
+  /// 1.19.1 A3: the current node's delay, shown in the caption (null / ≤ 0 = none)
+  final int? delayMs;
 
   /// 连接中（未连接时说明文字显示「连接中…」）
   final bool connecting;
@@ -245,10 +270,11 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
     final scheme = Theme.of(context).colorScheme;
     final exit = widget.exit;
     final shown = widget.connected && exit.known;
+    final delay = widget.delayMs ?? 0;
     final caption = !widget.connected
         ? (widget.connecting ? '连接中…' : '未连接')
         : exit.known
-        ? '${widget.home.name} → ${exit.city!.name} · ${exit.source.label}'
+        ? '${widget.home.name} → ${exit.city!.name} · ${exit.source.label}${delay > 0 ? ' · $delay ms' : ''}'
         : '出口位置未知';
     final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1.0;
     return Semantics(
@@ -259,38 +285,42 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AspectRatio(
-            aspectRatio: widget.aspectRatio,
-            child: LayoutBuilder(
-              builder: (context, c) {
-                final size = Size(c.maxWidth, c.maxHeight);
-                final dots = _dots;
-                final img = dots == null || size.isEmpty
-                    ? null
-                    : museDotMapImage(dots, size, dpr, scheme.onSurface.withValues(alpha: 0.16));
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (img != null)
-                      RepaintBoundary(
-                        child: CustomPaint(key: const ValueKey('muse_route_base'), painter: _ImagePainter(img)),
+          museCapHeight(
+            widget.maxHeight,
+            AspectRatio(
+              aspectRatio: widget.aspectRatio,
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final size = Size(c.maxWidth, c.maxHeight);
+                  final dots = _dots;
+                  final img = dots == null || size.isEmpty ? null : museDotMapImage(dots, size, dpr, museDotColor(scheme));
+                  return Stack(
+                    fit: StackFit.expand,
+                    clipBehavior: Clip.none,
+                    children: [
+                      if (img != null)
+                        RepaintBoundary(
+                          child: CustomPaint(key: const ValueKey('muse_route_base'), painter: _ImagePainter(img)),
+                        ),
+                      CustomPaint(
+                        key: const ValueKey('muse_route_arc'),
+                        painter: _ArcPainter(
+                          state: this,
+                          home: widget.home.point,
+                          shown: shown,
+                          fade: _level == MuseMotionLevel.reduced,
+                          color: scheme.primary,
+                          homeColor: scheme.onSurface,
+                          shares: widget.shares,
+                          shareColors: museRouteKindColors(scheme),
+                        ),
                       ),
-                    CustomPaint(
-                      key: const ValueKey('muse_route_arc'),
-                      painter: _ArcPainter(
-                        state: this,
-                        home: widget.home.point,
-                        shown: shown,
-                        fade: _level == MuseMotionLevel.reduced,
-                        color: scheme.primary,
-                        homeColor: scheme.onSurface,
-                        shares: widget.shares,
-                        shareColors: museRouteKindColors(scheme),
-                      ),
-                    ),
-                  ],
-                );
-              },
+                      // 1.19.1 A3: the two city names on the map (the exit fades in with the arc's tail)
+                      if (!size.isEmpty) ..._labels(context, size, shown),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
           const SizedBox(height: 6),
@@ -298,12 +328,98 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
             caption,
             key: const ValueKey('muse_route_caption'),
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            // 1.19.1 A3: 13 (was the 12 bodySmall)
+            style: MuseTextLevel.footnote.style(context, color: scheme.onSurfaceVariant),
           ),
         ],
       ),
     );
   }
+
+  /// 1.19.1 A3: 本机 and exit names beside their dots — 13 / w600 with a halo in the card's colour
+  /// so the dot grid never runs through the letters; the exit name in the accent. The names sit on
+  /// the far sides of the two dots (they are often close together).
+  List<Widget> _labels(BuildContext context, Size size, bool shown) {
+    final scheme = Theme.of(context).colorScheme;
+    final halo = MuseSurfaceScope.of(context).color(scheme);
+    final h = museProject(widget.home.point.lat, widget.home.point.lon, size);
+    Widget label(String text, Color color, Key key) {
+      final style = MuseTextLevel.footnote.style(context, color: color, weight: FontWeight.w600);
+      return Stack(
+        key: key,
+        children: [
+          Text(
+            text,
+            maxLines: 1,
+            style: style.copyWith(
+              foreground: Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = MuseDesk.mapLabelHalo
+                ..strokeJoin = StrokeJoin.round
+                ..color = halo,
+            ),
+          ),
+          Text(text, maxLines: 1, style: style),
+        ],
+      );
+    }
+
+    Widget place(Offset p, {required bool before, required bool above, required Widget child}) {
+      const gap = MuseDesk.mapLabelGap;
+      final top = above ? null : p.dy - gap;
+      final bottom = above ? size.height - p.dy + gap / 2 : null;
+      return before
+          ? Positioned(right: size.width - p.dx + gap, top: top, bottom: bottom, child: IgnorePointer(child: child))
+          : Positioned(left: p.dx + gap, top: top, bottom: bottom, child: IgnorePointer(child: child));
+    }
+
+    final exitName = widget.exit.city?.name;
+    return [
+      // the home name stays where its dot is (left of it unless the dot is at the left edge)
+      AnimatedBuilder(
+        animation: Listenable.merge([_arc, _slide]),
+        builder: (context, _) {
+          final end = shown ? _current() : null;
+          final e = end == null ? null : museProject(end.lat, end.lon, size, wrap: false);
+          // the home name on the side away from the exit
+          final before = e == null ? h.dx > size.width * 0.25 : e.dx >= h.dx;
+          return Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.none,
+            children: [
+              place(h, before: before && h.dx > size.width * 0.15, above: false, child: label(widget.home.name, scheme.onSurface, const ValueKey('muse_route_label_home'))),
+              if (e != null && exitName != null && _arc.value > 0)
+                place(
+                  e,
+                  before: e.dx < h.dx || e.dx > size.width * 0.85,
+                  above: true,
+                  child: Opacity(
+                    opacity: _level == MuseMotionLevel.reduced ? _arc.value : museRouteTailAlpha(_arc.value),
+                    child: label(exitName, scheme.primary, const ValueKey('muse_route_label_exit')),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    ];
+  }
+}
+
+/// 1.19.1 A1: [child] no taller than [maxHeight] (centred, keeping its aspect ratio); null = as is.
+Widget museCapHeight(double? maxHeight, Widget child) =>
+    maxHeight == null ? child : Center(child: ConstrainedBox(constraints: BoxConstraints(maxHeight: maxHeight), child: child));
+
+/// 1.19.1 A2: the dot grid's colour — onSurface at 32 % on a light card, 24 % on a dark one (16 %
+/// before, which nearly vanished on a light screen).
+Color museDotColor(ColorScheme s) =>
+    s.onSurface.withValues(alpha: s.brightness == Brightness.dark ? MuseDesk.dotAlphaDark : MuseDesk.dotAlphaLight);
+
+/// 1.19.1 A1: the map's height cap on a window of [window] — ≤ 260 and ≤ 32 % of the window's
+/// height, never under 160; null on a phone-sized window (unchanged there).
+double? museRouteMapMaxHeight(Size window) {
+  if (window.width <= MuseBreak.mobile) return null;
+  return math.max(MuseDesk.mapMinHeight, math.min(MuseDesk.mapMaxHeight, window.height * MuseDesk.mapWindowShare));
 }
 
 class _ImagePainter extends CustomPainter {

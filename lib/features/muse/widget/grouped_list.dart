@@ -56,6 +56,7 @@ class MuseScaffold extends StatelessWidget {
     required this.body,
     this.leading,
     this.large = false,
+    this.showAppBar = true,
   });
 
   final String? title;
@@ -65,25 +66,40 @@ class MuseScaffold extends StatelessWidget {
   final Widget body;
   final bool large;
 
+  /// 1.19.1 A6: the wide 首页 draws its own tool row instead of a top bar
+  final bool showAppBar;
+
+  /// 1.19.1 A9: a page title on a wide window — 24 / w600 on every page (was 28 bold on the large
+  /// pages, 22 regular on the rest).
+  static TextStyle deskTitle(BuildContext context) => MuseTextLevel.pageTitle.style(context, weight: FontWeight.w600);
+
   @override
   Widget build(BuildContext context) {
+    // 1.19.1 A9: on a wide window every page title is the same, and a top-level page's title starts
+    // at the page margin — the left edge of its cards. Narrower windows keep the 1.19.0 look.
+    final desk = museDeskWide(context);
+    final topLevel = leading == null && !(ModalRoute.of(context)?.impliesAppBarDismissal ?? false);
+    final style = desk ? deskTitle(context) : (large ? MuseType.largeTitle(context) : null);
     return MuseBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          scrolledUnderElevation: 0,
-          centerTitle: large ? false : null,
-          toolbarHeight: large ? 64 : null,
-          titleSpacing: large ? MuseSpace.page(context) : null,
-          // 1.2.1: never guess the status bar icons from the transparent background
-          systemOverlayStyle: museSystemOverlayStyle(Theme.of(context).brightness),
-          leading: leading,
-          title: titleWidget ??
-              (title == null ? null : Text(title!, style: large ? MuseType.largeTitle(context) : null)),
-          actions: actions,
-        ),
+        appBar: !showAppBar
+            ? null
+            : AppBar(
+                backgroundColor: Colors.transparent,
+                surfaceTintColor: Colors.transparent,
+                scrolledUnderElevation: 0,
+                centerTitle: large || desk ? false : null,
+                toolbarHeight: large || desk ? 64 : null,
+                titleSpacing: large || (desk && topLevel) ? MuseSpace.page(context) : null,
+                // 1.2.1: never guess the status bar icons from the transparent background
+                systemOverlayStyle: museSystemOverlayStyle(Theme.of(context).brightness),
+                leading: leading,
+                title: titleWidget ?? (title == null ? null : Text(title!, key: const ValueKey('muse_page_title'), style: style)),
+                actions: actions,
+                // 1.19.1 A9: a top-level page's actions end where its cards end
+                actionsPadding: desk && topLevel ? EdgeInsetsDirectional.only(end: MuseSpace.page(context) - MuseSpace.s8) : null,
+              ),
         body: body,
       ),
     );
@@ -101,7 +117,9 @@ class MuseGroupedBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
+        // 1.19.1 A9: as wide as the shell's page column (was 720 inside a 760 column, so the
+        // cards sat 20 in from the title)
+        constraints: const BoxConstraints(maxWidth: MuseDesk.contentMax),
         child: ListView(
           padding: museScrollPadding(context, padding ?? const EdgeInsets.only(top: MuseSpace.s4, bottom: MuseSpace.s32)),
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),

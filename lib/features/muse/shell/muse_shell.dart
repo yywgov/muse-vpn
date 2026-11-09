@@ -5,16 +5,19 @@
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
+import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// 穿云 desktop: widest the page column gets on a wide or maximized window.
-const desktopContentMaxWidth = 760.0;
+/// 1.19.1 A9: 760 → 840（[MuseDesk.contentMax]；标题与卡片同一列）
+const desktopContentMaxWidth = MuseDesk.contentMax;
 
 /// 穿云 1.3.0: 首页 gets more room.
 const desktopHomeMaxWidth = 1280.0;
@@ -368,83 +371,68 @@ class MuseSidebar extends StatelessWidget {
   final Widget Function(int i, Color color) icon;
 
   /// sidebar row geometry (tool/smoke/app_smoke.ps1 clicks by these)
-  static const headerHeight = MuseSize.rowMin;
+  /// 1.19.1 A7: the header is the 48 high brand row (was a 56 high toggle row)
+  static const headerHeight = MuseDesk.sidebarBrand;
   static const itemHeight = MuseSize.button + MuseSpace.s4;
+
+  /// 1.19.1 A7: the sidebar's own fill (a level apart from the page, with a hairline at its edge).
+  static Color fill(ColorScheme s) => s.surfaceContainerLow;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    Widget row({required bool selected, required Widget leading, required String label, required VoidCallback onTap, Key? key}) {
-      final color = selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant;
-      return SizedBox(
-        key: key,
-        height: itemHeight,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s12, vertical: MuseSpace.s4),
-          child: Semantics(
-            selected: selected,
-            button: true,
-            label: label,
-            child: Material(
-              color: selected ? scheme.secondaryContainer : MusePalette.transparent,
-              shape: MuseShape.full,
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: onTap,
-                child: Tooltip(
-                  message: expanded ? '' : label,
-                  child: Row(
-                    mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
-                    children: [
-                      if (expanded) const SizedBox(width: MuseSpace.s12),
-                      leading,
-                      if (expanded) ...[
-                        const SizedBox(width: MuseSpace.s12),
-                        Expanded(
-                          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseTextLevel.callout.style(context, color: color, weight: selected ? FontWeight.w600 : FontWeight.w500)),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
+    Widget row({required bool selected, required Widget leading, required String label, required VoidCallback onTap, Key? key}) =>
+        MuseNavItem(key: key, selected: selected, expanded: expanded, leading: leading, label: label, onTap: onTap);
 
+    final toggle = IconButton(
+      key: const ValueKey('muse_sidebar_toggle'),
+      tooltip: expanded ? '收起侧栏' : '展开侧栏',
+      icon: Icon(expanded ? Icons.menu_open_outlined : Icons.menu_outlined),
+      onPressed: onToggle,
+    );
+    final logo = Assets.images.logo.svg(width: MuseDesk.brandIcon, height: MuseDesk.brandIcon);
     return AnimatedContainer(
       key: ValueKey(expanded ? 'muse_sidebar_expanded' : 'muse_sidebar_collapsed'),
       duration: museMotion(context),
       curve: MuseMotion.curve,
       width: expanded ? MuseSize.navSidebarExpanded : MuseSize.navRailCollapsed,
-      color: MuseSurface.page.color(scheme),
+      decoration: BoxDecoration(
+        color: fill(scheme),
+        border: Border(right: BorderSide(color: scheme.outlineVariant, width: MuseSize.hairline)),
+      ),
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
+          // 1.19.1 A7: brand row — the app icon + 穿云, the collapse toggle at its end
           SizedBox(
+            key: const ValueKey('muse_sidebar_brand'),
             height: headerHeight,
-            child: canExpand
-                ? Align(
-                    alignment: expanded ? AlignmentDirectional.centerStart : Alignment.center,
-                    child: Padding(
-                      padding: EdgeInsetsDirectional.only(start: expanded ? MuseSpace.s12 : 0),
-                      child: IconButton(
-                        key: const ValueKey('muse_sidebar_toggle'),
-                        tooltip: expanded ? '收起侧栏' : '展开侧栏',
-                        icon: Icon(expanded ? Icons.menu_open_outlined : Icons.menu_outlined),
-                        onPressed: onToggle,
-                      ),
+            child: expanded
+                ? Padding(
+                    padding: const EdgeInsetsDirectional.only(start: MuseSpace.s24, end: MuseSpace.s4),
+                    child: Row(
+                      children: [
+                        ClipRSuperellipse(borderRadius: MuseRadius.smallAll, child: logo),
+                        const SizedBox(width: MuseSpace.s8),
+                        Expanded(
+                          child: Text(
+                            Constants.appName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: MuseTextLevel.subheadline.style(context, weight: FontWeight.w600),
+                          ),
+                        ),
+                        if (canExpand) toggle,
+                      ],
                     ),
                   )
-                : null,
+                : Center(child: canExpand ? toggle : ClipRSuperellipse(borderRadius: MuseRadius.smallAll, child: logo)),
           ),
           for (var i = 0; i < museShellActions.length; i++)
             row(
               key: ValueKey('muse_nav_$i'),
               selected: i == index,
-              leading: icon(i, i == index ? scheme.onSecondaryContainer : scheme.onSurfaceVariant),
+              leading: icon(i, i == index ? scheme.primary : scheme.onSurfaceVariant),
               label: museShellActions[i].title,
               onTap: () => onTap(i),
             ),
@@ -457,11 +445,127 @@ class MuseSidebar extends StatelessWidget {
             row(
               key: ValueKey('muse_nav_${e.route}'),
               selected: e == selectedExtra,
-              leading: Icon(e.icon, color: e == selectedExtra ? scheme.onSecondaryContainer : scheme.onSurfaceVariant),
+              leading: Icon(e.icon, color: e == selectedExtra ? scheme.primary : scheme.onSurfaceVariant),
               label: e.title,
               onTap: () => onExtra(e),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// 1.19.1 A7: one sidebar entry in the Windows 11 manner — a 6 rounded block; selected = the
+/// accent at 10 % with a 3×16 accent bar on its left; hover 6 % / pressed 9 % of onSurface;
+/// keyboard focus = a 2 px accent ring. Hover / press come from pointer events only (no timer).
+class MuseNavItem extends StatefulWidget {
+  const MuseNavItem({
+    super.key,
+    required this.selected,
+    required this.expanded,
+    required this.leading,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final bool expanded;
+  final Widget leading;
+  final String label;
+  final VoidCallback onTap;
+
+  /// the fill for a state (tests compare against it)
+  static Color fillFor(ColorScheme s, {required bool selected, bool hover = false, bool pressed = false}) {
+    if (selected) return s.primary.withValues(alpha: MuseDesk.selectedAlpha);
+    if (pressed) return s.onSurface.withValues(alpha: MuseDesk.pressAlpha);
+    if (hover) return s.onSurface.withValues(alpha: MuseDesk.hoverAlpha);
+    return MusePalette.transparent;
+  }
+
+  @override
+  State<MuseNavItem> createState() => _MuseNavItemState();
+}
+
+class _MuseNavItemState extends State<MuseNavItem> {
+  bool _hover = false;
+  bool _pressed = false;
+  bool _focus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final selected = widget.selected;
+    final expanded = widget.expanded;
+    final color = selected ? scheme.onSurface : scheme.onSurfaceVariant;
+    final fill = MuseNavItem.fillFor(scheme, selected: selected, hover: _hover, pressed: _pressed);
+    final shape = MuseShape.of(
+      MuseDesk.navRadius,
+      side: _focus ? BorderSide(color: scheme.primary, width: MuseDesk.focusRing) : BorderSide.none,
+    );
+    return SizedBox(
+      height: MuseSidebar.itemHeight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s12, vertical: MuseSpace.s4),
+        child: Semantics(
+          selected: selected,
+          button: true,
+          label: widget.label,
+          child: Material(
+            key: const ValueKey('muse_nav_fill'),
+            color: fill,
+            shape: shape,
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: widget.onTap,
+              onHover: (v) => setState(() => _hover = v),
+              onHighlightChanged: (v) => setState(() => _pressed = v),
+              onFocusChange: (v) => setState(() => _focus = v),
+              overlayColor: const WidgetStatePropertyAll(MusePalette.transparent),
+              splashFactory: NoSplash.splashFactory,
+              child: Tooltip(
+                message: expanded ? '' : widget.label,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Row(
+                        mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+                        children: [
+                          if (expanded) const SizedBox(width: MuseSpace.s12),
+                          widget.leading,
+                          if (expanded) ...[
+                            const SizedBox(width: MuseSpace.s12),
+                            Expanded(
+                              child: Text(
+                                widget.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: MuseTextLevel.callout.style(context, color: color, weight: selected ? FontWeight.w600 : FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (selected)
+                      PositionedDirectional(
+                        start: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: Center(
+                          child: Container(
+                            key: const ValueKey('muse_nav_indicator'),
+                            width: MuseDesk.navIndicatorWidth,
+                            height: MuseDesk.navIndicatorHeight,
+                            decoration: BoxDecoration(color: scheme.primary, borderRadius: MuseRadius.fullAll),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

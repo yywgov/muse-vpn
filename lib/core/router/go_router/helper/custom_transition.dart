@@ -17,6 +17,8 @@ Page<dynamic> customTransition(TransitionType transition, LocalKey pageKey, Widg
   return CustomTransitionPage<dynamic>(
     key: pageKey,
     child: child,
+    // MuseMotion.page happens to equal the 300 ms default; kept explicit so the token governs it
+    // ignore: avoid_redundant_argument_values
     transitionDuration: MuseMotion.page,
     reverseTransitionDuration: MuseMotion.exit,
     transitionsBuilder: (context, animation, _, child) => museTransition(transition, museMotionLevel(context), animation, child, Directionality.of(context)),

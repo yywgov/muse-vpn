@@ -10,7 +10,7 @@ import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 
 /// A flat card one surface level above the one it sits on. Selected cards keep their fill and
 /// show a [MuseSelectionBadge] instead of a coloured background.
-class MuseCard extends StatelessWidget {
+class MuseCard extends StatefulWidget {
   const MuseCard({
     super.key,
     required this.child,
@@ -32,18 +32,49 @@ class MuseCard extends StatelessWidget {
   final MuseSurface? level;
   final bool selected;
 
+  /// 1.19.1 A10: a tappable card under the mouse lifts its fill a step.
+  static Color hoverFill(ColorScheme s, Color base) => Color.alphaBlend(s.onSurface.withValues(alpha: MuseDesk.cardHoverAlpha), base);
+
+  @override
+  State<MuseCard> createState() => _MuseCardState();
+}
+
+class _MuseCardState extends State<MuseCard> {
+  bool _hover = false;
+  bool _focus = false;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final lvl = level ?? MuseSurfaceScope.of(context).above;
-    final shape = MuseShape.of(radius, side: selected ? BorderSide(color: scheme.primary, width: MuseSize.spinnerStroke) : BorderSide.none);
-    Widget body = Padding(padding: padding, child: child);
-    if (onTap != null || onLongPress != null) {
-      body = InkWell(customBorder: shape, onTap: onTap, onLongPress: onLongPress, child: body);
+    final lvl = widget.level ?? MuseSurfaceScope.of(context).above;
+    final tappable = widget.onTap != null || widget.onLongPress != null;
+    // 1.19.1 A10: keyboard focus = a 2 px accent ring (selected cards keep their own outline)
+    final side = widget.selected
+        ? BorderSide(color: scheme.primary, width: MuseSize.spinnerStroke)
+        : (tappable && _focus ? BorderSide(color: scheme.primary, width: MuseDesk.focusRing) : BorderSide.none);
+    final shape = MuseShape.of(widget.radius, side: side);
+    Widget body = Padding(padding: widget.padding, child: widget.child);
+    if (tappable) {
+      body = InkWell(
+        customBorder: shape,
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        onHover: (v) => setState(() => _hover = v),
+        onFocusChange: (v) => setState(() => _focus = v),
+        // the fill itself changes on hover (below); no second tint on top of it
+        hoverColor: MusePalette.transparent,
+        child: body,
+      );
     }
+    final base = lvl.color(scheme);
     return MuseSurfaceScope(
       level: lvl,
-      child: Material(color: lvl.color(scheme), shape: shape, clipBehavior: Clip.antiAlias, child: body),
+      child: Material(
+        color: tappable && _hover ? MuseCard.hoverFill(scheme, base) : base,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: body,
+      ),
     );
   }
 }

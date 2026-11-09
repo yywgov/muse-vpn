@@ -97,6 +97,10 @@ class AppTheme {
       colorScheme: s,
       scaffoldBackgroundColor: page,
       canvasColor: page,
+      // 1.19.1 A10: one hover / focus tint for every ink surface (rows, buttons, cards) — visible on
+      // the desktop, where the default was too faint to notice
+      hoverColor: s.onSurface.withValues(alpha: MuseDesk.themeHoverAlpha),
+      focusColor: s.primary.withValues(alpha: MuseDesk.themeFocusAlpha),
       appBarTheme: AppBarTheme(
         systemOverlayStyle: museSystemOverlayStyle(s.brightness),
         backgroundColor: page,

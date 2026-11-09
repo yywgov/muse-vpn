@@ -138,10 +138,12 @@ Ctl "/go?route=home" | Out-Null
 Start-Sleep -Seconds 2
 if ($w -ge 600 * $scale) {
   # sidebar (lib/features/muse/shell/muse_shell.dart): title bar 32 (1.6.0 C8: the app's own bar,
-  # lib/features/muse/desktop/title_bar.dart, MuseSize.titleBar), header row 56, items 52 tall;
-  # 订阅 is the third item. Best effort: the screenshot shows whether the click landed.
+  # lib/features/muse/desktop/title_bar.dart, MuseSize.titleBar), header row 48 (1.19.1 A7: the
+  # brand row, MuseSidebar.headerHeight = MuseDesk.sidebarBrand; was 56), items 52 tall
+  # (MuseSidebar.itemHeight); 订阅 is the third item. Best effort: the screenshot shows whether the
+  # click landed.
   $x = $r.L + [int](40 * $scale)
-  Click $x ($r.T + [int]((32 + 56 + 52 * 2 + 26) * $scale))
+  Click $x ($r.T + [int]((32 + 48 + 52 * 2 + 26) * $scale))
   Start-Sleep -Seconds 3
   Shot "2c-config-click"
   Ctl "/go?route=home" | Out-Null

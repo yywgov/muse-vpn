@@ -163,7 +163,8 @@ void main() {
         lessThan(tester.getTopLeft(find.byKey(const ValueKey('home_connect_section'))).dy),
       );
       // 出口 IP 检测实测 JP + 节点名东京 → 东京（实测）
-      expect(find.text('上海 → 东京 · 实测'), findsOneWidget);
+      // 1.19.1 A3：图注末尾加当前节点延迟（「 · 86 ms」），前半句不变
+      expect(find.textContaining(RegExp(r'^上海 → 东京 · 实测( · \d+ ms)?$')), findsOneWidget);
       _expectClassicCore();
       await _done(tester);
     });

@@ -26,7 +26,12 @@ class MuseRouteCard extends ConsumerWidget {
     final preparing = ref.watch(museConnectPreparingProvider);
     final link = museLinkStateOf(status, preparing: preparing && !connected);
     final connecting = link == MuseLinkState.connecting;
-    final nodeName = museRouteNodeName(ref.watch(museNodeGroupProvider).valueOrNull);
+    final group = ref.watch(museNodeGroupProvider).valueOrNull;
+    final nodeName = museRouteNodeName(group);
+    // 1.19.1 A3: the caption carries the current node's delay (the same number as the hero card)
+    final item = group?.items.where((e) => e.tag == group.selected).firstOrNull;
+    final since = ref.watch(museConnectedSinceProvider).valueOrNull;
+    final delay = item == null || !connected ? 0 : museFreshDelay(item, since);
     final measured = ref.watch(museExitProvider.select((r) => r?.info?.country));
     final exit = museResolveExitPlace(nodeName: nodeName, measuredRegion: measured);
     // 只在整数百分比变化时重建
@@ -47,7 +52,15 @@ class MuseRouteCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          MuseRouteMap(connected: connected, connecting: connecting, exit: exit, shares: shares),
+          MuseRouteMap(
+            connected: connected,
+            connecting: connecting,
+            exit: exit,
+            shares: shares,
+            // 1.19.1 A1: capped on a computer window (≤ 260, ≤ 32 % of its height)
+            maxHeight: museRouteMapMaxHeight(MediaQuery.sizeOf(context)),
+            delayMs: delay > 0 && ConnectionConst.isValidDelay(delay) ? delay : null,
+          ),
           if (shares.isNotEmpty) ...[
             const SizedBox(height: MuseSpace.s4),
             Wrap(
