@@ -205,8 +205,9 @@ void main() {
   });
 
   group('6 / 7 / 8 弧线图', () {
-    test('令牌：终点 450ms、光点 1 趟、尾段 15%', () {
-      expect(MuseRouteMotion.slide.inMilliseconds, 450);
+    // 1.20.1：终点滑动与取景、高亮同步，450 → 300ms（v1201_map_test 断言三者同一时长）
+    test('令牌：终点 300ms（1.20.1 起，原 450ms）、光点 1 趟、尾段 15%', () {
+      expect(MuseRouteMotion.slide.inMilliseconds, 300);
       expect(MuseRouteMotion.laps, 1);
       expect(MuseRouteMotion.tailFade, 0.15);
     });
@@ -239,8 +240,8 @@ void main() {
       expect(_framePending(t), isFalse);
     });
 
-    testWidgets('6 切节点：450ms 内滑完；精简档 ×0.6', (t) async {
-      for (final (level, ms) in [(MuseMotionLevel.standard, 450), (MuseMotionLevel.reduced, 270)]) {
+    testWidgets('6 切节点：300ms 内滑完（1.20.1 起，原 450ms）；精简档 ×0.6', (t) async {
+      for (final (level, ms) in [(MuseMotionLevel.standard, 300), (MuseMotionLevel.reduced, 180)]) {
         await t.pumpWidget(_map(level, connected: true, exit: _tokyo));
         await t.pumpAndSettle();
         await t.pumpWidget(_map(level, connected: true, exit: _la));

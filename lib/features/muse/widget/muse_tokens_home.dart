@@ -72,7 +72,8 @@ abstract final class MuseHomeA {
 
   /// 点半径占格距的比例（1.19 路由卡为 0.32）与细点的下限
   static const dotShare = 0.24;
-  static const dotMinRadius = 0.9;
+  /// 1.20.1：0.9 → 0.7（格距 ≥ 2.9 px 时不抽稀，新加坡、荷兰这类取景回到全密度）
+  static const dotMinRadius = 0.7;
 
   /// 节点所在国家的点比底图点大这么多倍（底图点下限之上）；且至少占格距的 [highlightShare]，德国、日本这类
   /// 小国在大跨度取景里也连成一片看得清
@@ -98,6 +99,14 @@ abstract final class MuseHomeA {
 
   /// 底图上没有独立国土的地区（香港、新加坡、澳门……）：高亮出口城市这么多度以内的陆地点
   static const nearCityDeg = 3.5;
+
+  /// 1.20.1：国家高亮在屏幕上至少要有这么多个点、外接框至少这么多像素，不够时点亮出口城市 [hlNearPx] 像素内的陆地点
+  static const hlMinDots = 5;
+  static const hlMinPx = 14.0;
+  static const hlNearPx = 7.0;
+
+  /// 1.20.1：小国改用 1:50m 细网格时点半径占细格距的比例
+  static const fineShare = 0.42;
 
   /// 地图顶部、底部点阵淡出（只压底图点阵，弧线与端点不受影响）
   static const maskStops = [0.0, 0.24, 0.78, 1.0];

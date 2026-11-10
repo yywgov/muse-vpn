@@ -40,7 +40,8 @@ class MuseHeroMap extends ConsumerWidget {
     final link = museLinkStateOf(status, preparing: preparing && !connected);
     final group = ref.watch(museNodeGroupProvider).valueOrNull;
     final nodeName = museRouteNodeName(group);
-    final measured = ref.watch(museExitProvider.select((r) => r?.info?.country));
+    // 1.20.1 M7: only a result measured for the node selected now (a new node frames at once by its name)
+    final measured = ref.watch(museExitProvider.select((r) => museExitRegionFor(r, group?.selected)));
     final exit = museResolveExitPlace(nodeName: nodeName, measuredRegion: measured);
     // 只在整数百分比变化时重建
     ref.watch(museRouteShareProvider.select((s) => s.signature));
@@ -87,7 +88,8 @@ class MuseHeroRouteNotes extends ConsumerWidget {
     if (!connected) return const SizedBox.shrink();
     final group = ref.watch(museNodeGroupProvider).valueOrNull;
     final nodeName = museRouteNodeName(group);
-    final measured = ref.watch(museExitProvider.select((r) => r?.info?.country));
+    // 1.20.1 M7: only a result measured for the node selected now (a new node frames at once by its name)
+    final measured = ref.watch(museExitProvider.select((r) => museExitRegionFor(r, group?.selected)));
     final exit = museResolveExitPlace(nodeName: nodeName, measuredRegion: measured);
     ref.watch(museRouteShareProvider.select((s) => s.signature));
     final shares = ref.read(museRouteShareProvider).shares();

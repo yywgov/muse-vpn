@@ -135,6 +135,54 @@ const museRegionCities = <String, MuseCity>{
   'ZA': MuseCity('约翰内斯堡', 'ZA', -26.20, 28.05),
   'EG': MuseCity('开罗', 'EG', 30.04, 31.24),
   'NG': MuseCity('拉各斯', 'NG', 6.52, 3.38),
+  // 1.20.1：补齐节点常见、之前没有代表城市的地区（否则有国旗也没有地图取景与高亮）
+  'QA': MuseCity('多哈', 'QA', 25.29, 51.53),
+  'BH': MuseCity('麦纳麦', 'BH', 26.23, 50.59),
+  'KW': MuseCity('科威特城', 'KW', 29.38, 47.98),
+  'OM': MuseCity('马斯喀特', 'OM', 23.59, 58.41),
+  'JO': MuseCity('安曼', 'JO', 31.95, 35.93),
+  'LB': MuseCity('贝鲁特', 'LB', 33.89, 35.50),
+  'CY': MuseCity('尼科西亚', 'CY', 35.19, 33.38),
+  'IR': MuseCity('德黑兰', 'IR', 35.69, 51.39),
+  'IQ': MuseCity('巴格达', 'IQ', 33.32, 44.37),
+  'GE': MuseCity('第比利斯', 'GE', 41.72, 44.79),
+  'AM': MuseCity('埃里温', 'AM', 40.18, 44.51),
+  'AZ': MuseCity('巴库', 'AZ', 40.41, 49.87),
+  'UZ': MuseCity('塔什干', 'UZ', 41.30, 69.24),
+  'KG': MuseCity('比什凯克', 'KG', 42.87, 74.59),
+  'LK': MuseCity('科伦坡', 'LK', 6.93, 79.86),
+  'NP': MuseCity('加德满都', 'NP', 27.72, 85.32),
+  'MM': MuseCity('仰光', 'MM', 16.87, 96.20),
+  'LA': MuseCity('万象', 'LA', 17.97, 102.63),
+  'BN': MuseCity('斯里巴加湾', 'BN', 4.94, 114.95),
+  'BY': MuseCity('明斯克', 'BY', 53.90, 27.56),
+  'MD': MuseCity('基希讷乌', 'MD', 47.01, 28.86),
+  'EE': MuseCity('塔林', 'EE', 59.44, 24.75),
+  'LV': MuseCity('里加', 'LV', 56.95, 24.11),
+  'LT': MuseCity('维尔纽斯', 'LT', 54.69, 25.28),
+  'SK': MuseCity('布拉迪斯拉发', 'SK', 48.15, 17.11),
+  'SI': MuseCity('卢布尔雅那', 'SI', 46.06, 14.51),
+  'HR': MuseCity('萨格勒布', 'HR', 45.81, 15.98),
+  'RS': MuseCity('贝尔格莱德', 'RS', 44.79, 20.45),
+  'BA': MuseCity('萨拉热窝', 'BA', 43.86, 18.41),
+  'ME': MuseCity('波德戈里察', 'ME', 42.44, 19.26),
+  'MK': MuseCity('斯科普里', 'MK', 41.99, 21.43),
+  'AL': MuseCity('地拉那', 'AL', 41.33, 19.82),
+  'GR': MuseCity('雅典', 'GR', 37.98, 23.73),
+  'BG': MuseCity('索非亚', 'BG', 42.70, 23.32),
+  'MT': MuseCity('瓦莱塔', 'MT', 35.90, 14.51),
+  'LI': MuseCity('瓦杜兹', 'LI', 47.14, 9.52),
+  'MC': MuseCity('摩纳哥', 'MC', 43.74, 7.42),
+  'PA': MuseCity('巴拿马城', 'PA', 8.98, -79.52),
+  'CR': MuseCity('圣何塞（哥斯达黎加）', 'CR', 9.93, -84.08),
+  'GT': MuseCity('危地马拉城', 'GT', 14.63, -90.51),
+  'PE': MuseCity('利马', 'PE', -12.05, -77.04),
+  'EC': MuseCity('基多', 'EC', -0.18, -78.47),
+  'UY': MuseCity('蒙得维的亚', 'UY', -34.90, -56.16),
+  'VE': MuseCity('加拉加斯', 'VE', 10.48, -66.90),
+  'KE': MuseCity('内罗毕', 'KE', -1.29, 36.82),
+  'MA': MuseCity('卡萨布兰卡', 'MA', 33.57, -7.59),
+  'TN': MuseCity('突尼斯', 'TN', 36.81, 10.18),
 };
 
 /// 节点名里的城市关键词 → 城市（比地区代表城市更准）。
@@ -320,7 +368,16 @@ List<MuseGeoPoint> museGreatCircle(MuseGeoPoint a, MuseGeoPoint b, {int n = 64})
   return out;
 }
 
-/// 两城市之间的位置插值（切节点时终点滑动用）：沿大圆弧取 t 处。
+/// 1.20.1：切节点时终点滑动——经纬度直线插值（经度走近的一侧）。沿大圆弧走时荷兰 → 日本会经过西伯利亚、滑出地图上沿；
+/// 直线插值始终在两座城市围成的经纬度框内。
+MuseGeoPoint museSlideLerp(MuseGeoPoint a, MuseGeoPoint b, double t) {
+  if (t <= 0) return a;
+  if (t >= 1) return b;
+  final bl = museWrapLon(b.lon, center: a.lon);
+  return MuseGeoPoint(a.lat + (b.lat - a.lat) * t, a.lon + (bl - a.lon) * t);
+}
+
+/// 两城市之间的位置插值：沿大圆弧取 t 处。
 MuseGeoPoint museGeoLerp(MuseGeoPoint a, MuseGeoPoint b, double t) {
   if (t <= 0) return a;
   if (t >= 1) return b;
@@ -414,15 +471,21 @@ MuseMapView museFitView(
   return MuseMapView(top, top - latSpan, (lo + hi) / 2, span);
 }
 
-/// 1.20.0：两个取景之间按 [t]（0–1）插值——中央经线走近的一侧，跨度按比例（缩放看起来匀速）。
+/// 两个取景之间按 [t]（0–1，已缓动）插值。1.20.1：跨度按对数插值（缩放匀速），中心按「绕不动点缩放」——
+/// 两次取景里屏幕位置相同的那一点在整个过渡中都不动，其余点单调地移向终点位置（中心 = a + (b − a) × (s − sa) / (sb − sa)）；
+/// 跨度几乎不变时退化为线性平移。纬度方向同理（按纬度跨度）。
 MuseMapView museViewLerp(MuseMapView a, MuseMapView b, double t) {
   if (t <= 0) return a;
   if (t >= 1) return b;
-  double lerp(double x, double y) => x + (y - x) * t;
   final bc = museWrapLon(b.center, center: a.center);
   final span = a.span * math.pow(b.span / a.span, t).toDouble();
-  // keep the aspect: the latitude span scales with the longitude span
-  final midLat = lerp((a.north + a.south) / 2, (b.north + b.south) / 2);
-  final latSpan = (a.north - a.south) * math.pow((b.north - b.south) / (a.north - a.south), t).toDouble();
-  return MuseMapView(midLat + latSpan / 2, midLat - latSpan / 2, lerp(a.center, bc), span);
+  final la = a.north - a.south;
+  final lb = b.north - b.south;
+  final latSpan = la * math.pow(lb / la, t).toDouble();
+  double w(double s, double sa, double sb) => (sb - sa).abs() < 1e-6 * sa ? t : (s - sa) / (sb - sa);
+  final wl = w(span, a.span, b.span);
+  final wy = w(latSpan, la, lb);
+  final center = a.center + (bc - a.center) * wl;
+  final north = a.north + (b.north - a.north) * wy;
+  return MuseMapView(north, north - latSpan, center, span);
 }

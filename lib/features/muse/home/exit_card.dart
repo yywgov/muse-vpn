@@ -26,7 +26,12 @@ class MuseExitResult {
     this.chatGpt = MuseServiceState.checking,
     this.netflix = MuseServiceState.checking,
     this.refreshing = false,
+    this.node,
   });
+
+  /// 1.20.1 M7：这条结果测的是哪个节点（选中的节点 tag；null = 未知，旧数据）。首页地图只采用当前节点的实测，
+  /// 换节点后约 2 秒内仍显示的旧结果不会让地图停在旧国家。
+  final String? node;
 
   final MuseExitInfo? info;
   final bool infoFailed;
@@ -52,7 +57,9 @@ class MuseExitResult {
     MuseServiceState? chatGpt,
     MuseServiceState? netflix,
     bool? refreshing,
+    String? node,
   }) => MuseExitResult(
+    node: node ?? this.node,
     info: clearInfo ? null : (info ?? this.info),
     infoFailed: infoFailed ?? this.infoFailed,
     google: google ?? this.google,
@@ -61,13 +68,24 @@ class MuseExitResult {
     refreshing: refreshing ?? this.refreshing,
   );
 
-  static MuseExitResult fromCached(MuseExitCached c, {bool refreshing = false}) => MuseExitResult(
+  static MuseExitResult fromCached(MuseExitCached c, {bool refreshing = false, String? node}) => MuseExitResult(
+    node: node,
     info: MuseExitInfo(ip: c.ip, country: c.country),
     google: c.google,
     chatGpt: c.chatGpt,
     netflix: c.netflix,
     refreshing: refreshing,
   );
+}
+
+/// 1.20.1 M7：地图该用的实测地区——结果测的就是当前选中的节点（[current]）才用，否则 null（按节点名取景）。
+/// 结果没记节点（旧数据、测试）时照用。
+String? museExitRegionFor(MuseExitResult? r, String? current) {
+  final country = r?.info?.country;
+  if (country == null || country.isEmpty) return null;
+  final n = r!.node;
+  if (n == null || n.isEmpty || current == null || current.isEmpty) return country;
+  return n == current ? country : null;
 }
 
 /// 1.5.3: 出口 results are kept per (subscription, node, route mode, network) and shown at once;
@@ -81,12 +99,14 @@ class MuseExitNotifier extends StateNotifier<MuseExitResult?> {
     String Function()? loadCache,
     void Function(String raw)? saveCache,
     DateTime Function()? now,
+    String Function()? nodeOf,
     Future<MuseExitResult> Function(MuseExitResult start, void Function(MuseExitResult Function(MuseExitResult)) set)? fetch,
   }) : _keyBase = keyBase ?? (() => ''),
        _network = network ?? museLocalNetwork,
        _loadCache = loadCache ?? (() => ''),
        _saveCache = saveCache ?? ((_) {}),
        _now = now ?? DateTime.now,
+       _nodeOf = nodeOf ?? (() => ''),
        _fetchOverride = fetch,
        super(null);
 
@@ -96,6 +116,7 @@ class MuseExitNotifier extends StateNotifier<MuseExitResult?> {
   final String Function() _loadCache;
   final void Function(String raw) _saveCache;
   final DateTime Function() _now;
+  final String Function() _nodeOf;
   final Future<MuseExitResult> Function(MuseExitResult start, void Function(MuseExitResult Function(MuseExitResult)) set)?
   _fetchOverride;
   int _run = 0;
@@ -123,7 +144,7 @@ class MuseExitNotifier extends StateNotifier<MuseExitResult?> {
   Future<void> showCached() async {
     final key = await _key();
     final c = MuseExitCache.parse(_loadCache()).of(key);
-    if (c != null && mounted && (state == null || !state!.refreshing)) state = MuseExitResult.fromCached(c);
+    if (c != null && mounted && (state == null || !state!.refreshing)) state = MuseExitResult.fromCached(c, node: _nodeOf());
   }
 
   /// Checks only when nothing fresh is saved for the current key ([force]: always).
@@ -132,7 +153,7 @@ class MuseExitNotifier extends StateNotifier<MuseExitResult?> {
     if (!mounted) return;
     final c = MuseExitCache.parse(_loadCache()).of(key);
     if (!force && c != null && c.freshAt(_now())) {
-      if (_inFlightKey != key) state = MuseExitResult.fromCached(c);
+      if (_inFlightKey != key) state = MuseExitResult.fromCached(c, node: _nodeOf());
       return;
     }
     if (_inFlight != null && _inFlightKey == key) return _inFlight;
@@ -154,8 +175,9 @@ class MuseExitNotifier extends StateNotifier<MuseExitResult?> {
 
   Future<void> _check(String key, MuseExitCached? cached) async {
     final run = ++_run;
+    final node = _nodeOf();
     // keep showing what we have (this key's saved result, else the last one on screen)
-    final shown = cached != null ? MuseExitResult.fromCached(cached) : state;
+    final shown = cached != null ? MuseExitResult.fromCached(cached, node: node) : state;
     state = shown == null || shown.info == null ? const MuseExitResult(refreshing: true) : shown.copyWith(refreshing: true, infoFailed: false);
     void set(MuseExitResult Function(MuseExitResult s) f) {
       final s = state;
@@ -170,7 +192,7 @@ class MuseExitNotifier extends StateNotifier<MuseExitResult?> {
       return;
     }
     if (run != _run || !mounted) return;
-    state = got.copyWith(refreshing: false);
+    state = got.copyWith(refreshing: false, node: node);
     final info = got.info;
     if (info != null && !got.infoFailed) {
       final next = MuseExitCache.parse(_loadCache()).put(
@@ -285,6 +307,7 @@ final museExitProvider = StateNotifierProvider<MuseExitNotifier, MuseExitResult?
       routeMode: '${ref.read(ConfigOptions.museRouteMode)}',
       network: '',
     ),
+    nodeOf: () => ref.read(proxiesOverviewNotifierProvider).valueOrNull?.selected ?? '',
     loadCache: () => ref.read(MusePrefs.exitCache),
     saveCache: (raw) => ref.read(MusePrefs.exitCache.notifier).update(raw),
   );

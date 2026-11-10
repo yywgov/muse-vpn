@@ -1,6 +1,6 @@
 // 穿云 1.20.0 首页方向 A（连接卡 + 地图融合）：中性连接卡、地图做卡底（未连接整幅世界全灰无弧线；已连接按本机 +
 // 节点所在国家取景、只有该国点阵变已连接色）、换节点取景一次性过渡 ≤ 300ms、关闭动效直接到位、无常驻动画、
-// 国家查表（Natural Earth 110m）与香港 / 新加坡回退、数字与单位分开、系统大字号不溢出、电脑版同一张卡。
+// 国家查表（1.20.1 起 Natural Earth 1:50m）与香港 / 新加坡回退、数字与单位分开、系统大字号不溢出、电脑版同一张卡。
 // Part of 穿云 (GPLv3).
 import 'dart:io';
 import 'dart:math' as math;
@@ -162,7 +162,7 @@ bool _inView(MuseMapView v, MuseGeoPoint p) {
 }
 
 void main() {
-  group('国家查表（Natural Earth 1:110m，公有领域）', () {
+  group('国家查表（Natural Earth 1:50m，公有领域；1.20.0 为 1:110m）', () {
     test('美国、日本、德国都有点；美国最多；中国保持中性不进高亮', () {
       final dots = _loadDots();
       final us = museRegionCells(dots, 'US');
@@ -184,23 +184,21 @@ void main() {
       expect(museDotCountryCells.length, greaterThan(150));
     });
 
-    test('香港、新加坡没有独立国土：回退到出口城市附近的陆地点', () {
+    // 1.20.1：数据换成 1:50m，香港、新加坡有了自己的底图格（原断言「表里没有 HK / SG」删去）；表里没有的地区仍回退到
+    // 出口城市附近的陆地点
+    test('香港、新加坡在 1:50m 表里有格；表里没有的地区回退到出口城市附近的陆地点', () {
       final dots = _loadDots();
-      expect(museDotCountryCells['HK'], isNull);
-      expect(museDotCountryCells['SG'], isNull);
-      for (final (node, region) in [('🇭🇰 香港 01', 'HK'), ('🇸🇬 新加坡 03', 'SG')]) {
-        final city = _place(node, region).city!;
-        final cells = museRegionCells(dots, region, near: city.point);
-        expect(cells, isNotEmpty, reason: region);
-        for (final i in cells) {
-          final p = dots.cellCenter(i ~/ dots.width, i % dots.width);
-          expect((p.lat - city.lat).abs(), lessThanOrEqualTo(MuseHomeA.nearCityDeg));
-        }
-        // the same answer again comes from the cache
-        expect(identical(museRegionCells(dots, region, near: city.point), cells), isTrue);
+      expect(museDotCountryCells['HK'], isNotEmpty);
+      expect(museDotCountryCells['SG'], isNotEmpty);
+      const city = MuseCity('测试', 'ZZ', 22.32, 114.17);
+      final cells = museRegionCells(dots, 'ZZ', near: city.point);
+      expect(cells, isNotEmpty);
+      for (final i in cells) {
+        final p = dots.cellCenter(i ~/ dots.width, i % dots.width);
+        expect((p.lat - city.lat).abs(), lessThanOrEqualTo(MuseHomeA.nearCityDeg));
       }
-      // without a city there is nothing to light
-      expect(museRegionCells(dots, 'HK'), isEmpty);
+      expect(identical(museRegionCells(dots, 'ZZ', near: city.point), cells), isTrue);
+      expect(museRegionCells(dots, 'ZZ'), isEmpty);
     });
 
     test('生成脚本与数据来源写明公有领域；关于页致谢 Natural Earth', () {
