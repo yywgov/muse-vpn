@@ -335,6 +335,9 @@ void main() {
     await _pump(tester, page: const MuseAppearancePage(), brightness: Brightness.light, size: phone, tab: 3);
     expect(find.text('首页的流量、IP 等数字打码'), findsNothing);
     // 1.6.0 C7: 文字缩放 has an ⓘ too; tap the 隐私模式 one
+    // 1.20.1: 外观 opens with the 首页风格 previews — bring the row on screen first
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('appearance_privacy')), 200, scrollable: find.byType(Scrollable).first);
+    await tester.pump();
     await tester.tap(find.descendant(of: find.byKey(const ValueKey('appearance_privacy')), matching: find.byKey(const ValueKey('row_info'))));
     await tester.pump();
     expect(find.text('首页的流量、IP 等数字打码'), findsOneWidget);

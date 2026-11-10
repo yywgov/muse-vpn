@@ -471,7 +471,13 @@ void main() {
     for (final android in [true, false]) {
       testWidgets('外观: 在最近任务中隐藏 ${android ? 'on Android, saved under exclude_from_recents' : 'not on Windows'}', (t) async {
         await _pump(t, phone, Brightness.light, 3, MuseAppearancePage(android: android, windows: !android));
-        final row = find.byKey(const ValueKey('settings_exclude_recents'), skipOffstage: false);
+        var row = find.byKey(const ValueKey('settings_exclude_recents'), skipOffstage: false);
+        // 1.20.1: 外观 now opens with the 首页风格 previews, so on a phone this row is built only once
+        // the list is scrolled down to it
+        if (android) {
+          await t.scrollUntilVisible(row, 200, scrollable: find.byType(Scrollable).first);
+          row = find.byKey(const ValueKey('settings_exclude_recents'), skipOffstage: false);
+        }
         if (!android) {
           expect(row, findsNothing);
           await _done(t);

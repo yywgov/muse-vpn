@@ -27,6 +27,8 @@ class MuseAppearancePage extends HookConsumerWidget {
       title: '外观',
       body: MuseGroupedBody(
         children: [
+          // 1.20.1: 首页风格 first — three small previews, a tap applies at once
+          const MuseSection(header: '首页风格', children: [MuseHomeLookPicker()]),
           MuseSection(
             children: [
               MuseTile(

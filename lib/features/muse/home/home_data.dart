@@ -15,6 +15,7 @@ import 'package:hiddify/features/muse/logic/latency_cache.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
 import 'package:hiddify/features/muse/logic/node_cache.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens_home.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
@@ -41,8 +42,13 @@ final museSubInfoProvider = Provider<SubscriptionInfo?>((ref) {
   return profile is RemoteProfileEntity ? profile.subInfo : null;
 });
 
+/// 1.20.1 外观 › 首页风格（留白 / 细线 / 数字）的设计令牌。
+final museHomeLookProvider = Provider<MuseHomeLook>((ref) => MuseHomeLook.fromKey(ref.watch(MusePrefs.homeLook)));
+
 final museStatsProvider = Provider<SystemInfo>(
-  (ref) => ref.watch(statsNotifierProvider).asData?.value ?? SystemInfo.create(),
+  // 1.20.1: valueOrNull — while the stream is reopened (or held closed in the background) the last
+  // reading stays, instead of a zero reading in between
+  (ref) => ref.watch(statsNotifierProvider).valueOrNull ?? SystemInfo.create(),
 );
 
 /// Last 30 download speed samples (bytes/s) of this connection, for the 网速 sparkline.

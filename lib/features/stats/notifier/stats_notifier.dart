@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/muse/logic/stats_pause.dart';
 import 'package:hiddify/features/stats/data/stats_data_providers.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
@@ -20,6 +21,14 @@ class StatsNotifier extends _$StatsNotifier with AppLogger {
     ref.disposeDelay(const Duration(seconds: 10));
     final serviceRunning = ref.watch(serviceRunningProvider);
     if (!serviceRunning) return Stream.value(SystemInfo.create());
+    // 1.20.1 后台省电: an Android app in the background closes the per-second stream and keeps the last
+    // reading (nothing is emitted until it comes back; the totals then catch up)
+    if (ref.watch(museStatsPausedProvider)) {
+      loggy.debug("app in the background: stats stream closed");
+      final held = StreamController<SystemInfo>();
+      ref.onDispose(held.close);
+      return held.stream;
+    }
     final repository = ref.watch(statsRepositoryProvider);
     var disposed = false;
     ref.onDispose(() => disposed = true);

@@ -89,6 +89,9 @@ abstract final class MuseIconSize {
 
 /// Fixed sizes of recurring layout parts (so screens never hand-write them).
 abstract final class MuseSize {
+  /// 1.20.1: Android 触控目标下限（细线风格 40 方钮的点击区域）
+  static const minTap = 48.0;
+
   /// width of a key column in a details sheet («延迟», «测速时间»)
   static const labelColumn = 72.0;
   static const labelColumnWide = 96.0;

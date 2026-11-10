@@ -433,11 +433,15 @@ void main() {
       expect(find.byKey(const ValueKey('settings_close_action')), findsOneWidget);
       expect(find.byKey(const ValueKey('settings_always_on_top')), findsNothing);
       await t.scrollUntilVisible(find.byKey(const ValueKey('window_advanced_fold')), 200, scrollable: _bodyScroll);
+      await t.ensureVisible(find.byKey(const ValueKey('window_advanced_fold')));
+      await t.pump();
       await t.tap(find.byKey(const ValueKey('window_advanced_fold')));
       await t.pump();
-      expect(find.byKey(const ValueKey('settings_always_on_top')), findsOneWidget);
-      expect(find.byKey(const ValueKey('settings_custom_title_bar')), findsOneWidget);
-      expect(find.byKey(const ValueKey('settings_hotkeys')), findsOneWidget);
+      // 1.20.1: 外观 opens with the 首页风格 previews, so the unfolded rows are built once scrolled to
+      for (final k in ['settings_always_on_top', 'settings_custom_title_bar', 'settings_hotkeys']) {
+        await t.scrollUntilVisible(find.byKey(ValueKey(k)), 200, scrollable: _bodyScroll);
+        expect(find.byKey(ValueKey(k)), findsOneWidget);
+      }
       await _done(t);
     });
 

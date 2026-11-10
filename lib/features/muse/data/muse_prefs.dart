@@ -47,6 +47,8 @@ abstract final class MusePrefs {
   static final motionLevel = PreferencesNotifier.create<String, String>("muse_motion_level", "auto");
   /// 1.19.0 外观 › 首页样式：new（新首页：路由弧线图）/ classic（经典首页，即 1.18 的首页）
   static final homeStyle = PreferencesNotifier.create<String, String>("muse_home_style", "new");
+  /// 1.20.1 外观 › 首页风格：airy（留白，1.20.0 的首页）/ line（细线）/ number（数字）
+  static final homeLook = PreferencesNotifier.create<String, String>("muse_home_look", "airy");
   /// 1.19.0 P5 外观 › 主题：auto（默认，按深浅色）/ light / black / terminal / paper
   static final themeStyle = PreferencesNotifier.create<String, String>("muse_theme_style", "auto");
   static final privacyMask = PreferencesNotifier.create<bool, bool>("muse_privacy_mask", false);
@@ -353,5 +355,6 @@ const museSyncedPrefKeys = [
   'muse_blocked_hosts',
   'muse_tab_animation',
   'muse_home_style',
+  'muse_home_look',
   'muse_theme_style',
 ];

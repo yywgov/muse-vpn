@@ -122,6 +122,19 @@ class MuseTrafficCounter {
     _lastDown = 0;
     _primed = false;
   }
+
+  /// 1.20.1: whether a reading has been taken since the last [reset].
+  bool get primed => _primed;
+
+  /// 1.20.1: true for an empty reading (both totals 0) after real ones — a stats stream being reopened
+  /// yields one; counting it would make the next real reading look like a new session (counted twice).
+  bool isGap(int up, int down) => _primed && up == 0 && down == 0 && (_lastUp > 0 || _lastDown > 0);
+
+  /// 1.20.1: an independent copy (same last totals).
+  MuseTrafficCounter copy() => MuseTrafficCounter()
+    .._lastUp = _lastUp
+    .._lastDown = _lastDown
+    .._primed = _primed;
 }
 
 /// Connect attempts and successes per day: `{"2026-10-22": [tries, ok]}`.

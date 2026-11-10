@@ -492,6 +492,17 @@ class HiddifyCoreService with InfraLogger {
     }
   }
 
+  /// 1.20.1: one reading of the core's totals (the per-second stream is closed while an Android app is
+  /// in the background; the connection ending then reads the last totals once). null = no answer.
+  Future<SystemInfo?> readStats({Duration timeout = const Duration(seconds: 2)}) async {
+    try {
+      return await core.bgClient.getSystemInfo(Empty(), options: CallOptions(timeout: timeout));
+    } catch (e) {
+      loggy.debug("reading stats once failed: $e");
+      return null;
+    }
+  }
+
   ResponseStream<SystemInfo> watchStats() {
     loggy.debug("watching stats");
     try {

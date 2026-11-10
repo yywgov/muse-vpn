@@ -42,6 +42,7 @@ import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/logic/sync_core.dart' show MuseSnapshot, museIsEncrypted;
 import 'package:hiddify/features/muse/nodes/node_list.dart' show museAskText, museNodeName;
 import 'package:hiddify/features/muse/settings/android_settings.dart';
+import 'package:hiddify/features/muse/settings/home_look_picker.dart';
 import 'package:hiddify/features/muse/settings/restore_preview.dart';
 import 'package:hiddify/features/muse/settings/theme_preview_page.dart';
 import 'package:hiddify/features/muse/settings/windows_settings.dart';
