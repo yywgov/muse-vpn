@@ -545,6 +545,16 @@ void main() {
           final more = find.byKey(const ValueKey('node_more_button'));
           final testBtn = t.getTopRight(find.byKey(const ValueKey('node_test_button'))).dx;
           expect(more.evaluate().isEmpty ? testBtn : t.getTopRight(more).dx, greaterThan(barRight - 56), reason: '按钮右对齐');
+          // 标题与按钮同一行（不再多一行空着的左侧），按钮点击区域 ≥ 48dp
+          final title = t.getRect(find.byKey(const ValueKey('muse_page_title')));
+          for (final k in ['node_search_button', 'node_test_button', 'node_more_button']) {
+            final f = find.byKey(ValueKey(k));
+            if (f.evaluate().isEmpty) continue;
+            final r = t.getRect(f);
+            expect(r.height, greaterThanOrEqualTo(48), reason: '$k 高 ${r.height}');
+            expect(r.width, greaterThanOrEqualTo(48), reason: '$k 宽 ${r.width}');
+            expect((r.center.dy - title.center.dy).abs(), lessThan(12), reason: '$k 与标题同一行');
+          }
           _clean(t);
           await _done(t);
         });

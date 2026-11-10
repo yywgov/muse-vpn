@@ -194,7 +194,11 @@ int museFreshDelay(OutboundInfo proxy, DateTime? since) {
 /// The node list. [embedded] = inside a sheet or side column (no pull-to-test, no outer padding
 /// for a page). [onPicked] runs after a node was tapped.
 class MuseNodeList extends HookConsumerWidget {
-  const MuseNodeList({super.key, this.controller, this.embedded = false, this.onPicked, this.listKey});
+  const MuseNodeList({super.key, this.controller, this.embedded = false, this.onPicked, this.listKey, this.title});
+
+  /// 1.20.1：节点页把页面标题画在工具行最左（与搜索 / 测速 / ⋯ 同一行），不再单独占一行标题栏 + 一行文字；
+  /// null = 不画标题（底部表单、电脑版侧栏里的列表）
+  final String? title;
 
   final ScrollController? controller;
   final bool embedded;
@@ -378,26 +382,43 @@ class MuseNodeList extends HookConsumerWidget {
         // 1.5.0 #25: 测速 progress (stop with the button next to it)
         ? '已测 ${progress.done} / ${progress.total}'
         : null;
+    final desk = museDeskWide(context);
+    final titled = title != null && !embedded;
+    // 1.20.1：按钮点击区域至少 48dp（原来是紧凑密度 40dp）
+    const tapDensity = VisualDensity.standard;
     final toolbar = Padding(
-      padding: EdgeInsets.fromLTRB(margin + MuseSpace.s4, 0, margin - MuseSpace.s8, MuseSpace.s4),
+      padding: titled
+          ? EdgeInsets.fromLTRB(margin, 0, margin - MuseSpace.s8, 0)
+          : EdgeInsets.fromLTRB(margin + MuseSpace.s4, 0, margin - MuseSpace.s8, MuseSpace.s4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          if (status != null)
+          if (titled) ...[
+            Text(
+              title!,
+              key: const ValueKey('muse_page_title'),
+              maxLines: 1,
+              style: desk ? MuseScaffold.deskTitle(context) : MuseType.largeTitle(context),
+            ),
+            const SizedBox(width: MuseSpace.s12),
+          ],
+          if (status != null || titled)
             Expanded(
-              child: Text(
-                status,
-                key: const ValueKey('node_count_label'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: MuseType.caption(context),
-              ),
+              child: status == null
+                  ? const SizedBox.shrink()
+                  : Text(
+                      status,
+                      key: const ValueKey('node_count_label'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: MuseType.caption(context),
+                    ),
             ),
           if (selecting.value)
             IconButton(
               key: const ValueKey('node_select_button'),
               tooltip: '完成',
-              visualDensity: VisualDensity.compact,
+              visualDensity: tapDensity,
               icon: const Icon(Icons.close_outlined, size: MuseIconSize.small),
               onPressed: () {
                 selecting.value = false;
@@ -409,7 +430,7 @@ class MuseNodeList extends HookConsumerWidget {
               IconButton(
                 key: const ValueKey('node_search_button'),
                 tooltip: searching.value ? '关闭搜索' : '搜索节点',
-                visualDensity: VisualDensity.compact,
+                visualDensity: tapDensity,
                 icon: Icon(searching.value ? Icons.search_off_outlined : Icons.search_outlined, size: MuseIconSize.small),
                 onPressed: () {
                   searching.value = !searching.value;
@@ -421,7 +442,7 @@ class MuseNodeList extends HookConsumerWidget {
               ),
             FilledButton.tonal(
               key: const ValueKey('node_test_button'),
-              style: FilledButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16)),
+              style: FilledButton.styleFrom(visualDensity: tapDensity, tapTargetSize: MaterialTapTargetSize.padded, padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16)),
               onPressed: group == null || !running ? null : () => testing ? museStopNodeTest(ref) : museRunNodeTest(ref),
               // 1.18.0 P3: 测速中 the label sweeps (标准档) instead of a spinner; 精简 / 关闭 show a
               // still hourglass
@@ -452,7 +473,7 @@ class MuseNodeList extends HookConsumerWidget {
                   backgroundColor: museBrandOf(context),
                   child: const Icon(Icons.more_horiz_outlined, size: MuseIconSize.small),
                 ),
-                style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                style: const ButtonStyle(visualDensity: tapDensity, tapTargetSize: MaterialTapTargetSize.padded),
                 onSelected: onMore,
                 itemBuilder: (context) => [
                   for (final (value, label) in moreItems)
@@ -880,7 +901,14 @@ class MuseNodeList extends HookConsumerWidget {
     );
     final framed = Column(
       children: [
-        toolbar,
+        if (titled)
+          SafeArea(
+            bottom: false,
+            // the same height as the other pages' title bars (64 phone / 56 computer window)
+            child: SizedBox(height: desk ? MuseDesk.titleBarHeight : 64, child: toolbar),
+          )
+        else
+          toolbar,
         ?searchField,
         Expanded(child: refresh),
       ],

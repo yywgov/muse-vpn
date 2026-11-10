@@ -13,11 +13,13 @@ class MuseNodesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 1.11.0: the A 双列卡片 layout uses the full width (more columns on a wide window)
+    // 1.20.1：标题「节点」与搜索 / 测速 / ⋯ 在同一行（由列表画；原来标题栏下面还有一行「订阅名 · N 个节点」）
     return const MuseScaffold(
       large: true,
+      showAppBar: false,
       title: '节点',
       // key kept for the e2e driver's scroll steps
-      body: MuseNodeList(listKey: ValueKey('home_node_list')),
+      body: MuseNodeList(listKey: ValueKey('home_node_list'), title: '节点'),
     );
   }
 }
