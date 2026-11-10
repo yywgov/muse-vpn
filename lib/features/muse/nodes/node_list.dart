@@ -386,34 +386,7 @@ class MuseNodeList extends HookConsumerWidget {
     final titled = title != null && !embedded;
     // 1.20.1：按钮点击区域至少 48dp（原来是紧凑密度 40dp）
     const tapDensity = VisualDensity.standard;
-    final toolbar = Padding(
-      padding: titled
-          ? EdgeInsets.fromLTRB(margin, 0, margin - MuseSpace.s8, 0)
-          : EdgeInsets.fromLTRB(margin + MuseSpace.s4, 0, margin - MuseSpace.s8, MuseSpace.s4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          if (titled) ...[
-            Text(
-              title!,
-              key: const ValueKey('muse_page_title'),
-              maxLines: 1,
-              style: desk ? MuseScaffold.deskTitle(context) : MuseType.largeTitle(context),
-            ),
-            const SizedBox(width: MuseSpace.s12),
-          ],
-          if (status != null || titled)
-            Expanded(
-              child: status == null
-                  ? const SizedBox.shrink()
-                  : Text(
-                      status,
-                      key: const ValueKey('node_count_label'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: MuseType.caption(context),
-                    ),
-            ),
+    final toolbarActions = <Widget>[
           if (selecting.value)
             IconButton(
               key: const ValueKey('node_select_button'),
@@ -481,9 +454,72 @@ class MuseNodeList extends HookConsumerWidget {
                 ],
               ),
           ],
-        ],
-      ),
+    ];
+    Widget statusText(String text) => Text(
+      text,
+      key: const ValueKey('node_count_label'),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: MuseType.caption(context),
     );
+    final Widget toolbar;
+    if (titled) {
+      // 1.20.1：标题与按钮同一行；窄屏 + 大字号放不下时按钮自动换到标题下一行（仍右对齐），不溢出、不截断标题
+      final titleStyle = desk ? MuseScaffold.deskTitle(context) : MuseType.largeTitle(context);
+      final titleText = Text(title!, key: const ValueKey('muse_page_title'), maxLines: 1, style: titleStyle);
+      toolbar = Padding(
+        padding: EdgeInsets.fromLTRB(margin, 0, margin - MuseSpace.s8, 0),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final scaler = MediaQuery.textScalerOf(context);
+            double textW(String t, TextStyle? st) {
+              final tp = TextPainter(text: TextSpan(text: t, style: st), textDirection: TextDirection.ltr, textScaler: scaler, maxLines: 1)
+                ..layout();
+              final w = tp.width;
+              tp.dispose();
+              return w;
+            }
+
+            // 按钮行宽度估算：图标按钮 48 + 测速按钮（文字 + 左右 16 + 图标）
+            final icons = toolbarActions.length - 1;
+            final buttonsW = icons * 48.0 + textW('测速', MuseType.body(context)) + MuseSpace.s32 + MuseIconSize.tiny + MuseSpace.s8 + 8;
+            final fits = textW(title!, titleStyle) + MuseSpace.s12 + buttonsW + (status == null ? 0 : textW(status, MuseType.caption(context))) <= c.maxWidth;
+            final actionsRow = Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (status != null) Expanded(child: statusText(status)) else const Spacer(),
+                ...toolbarActions,
+              ],
+            );
+            if (!fits) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [titleText, actionsRow],
+              );
+            }
+            return Row(
+              children: [
+                titleText,
+                const SizedBox(width: MuseSpace.s12),
+                Expanded(child: actionsRow),
+              ],
+            );
+          },
+        ),
+      );
+    } else {
+      toolbar = Padding(
+        padding: EdgeInsets.fromLTRB(margin + MuseSpace.s4, 0, margin - MuseSpace.s8, MuseSpace.s4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (status != null) Expanded(child: statusText(status)),
+            ...toolbarActions,
+          ],
+        ),
+      );
+    }
 
     // 1.10.2: on the 节点 page the toolbar (搜索 / 测速 / ⋯) and the search field stay above the list
     // instead of scrolling with it: the page opens scrolled to the node in use, which used to push
@@ -904,8 +940,12 @@ class MuseNodeList extends HookConsumerWidget {
         if (titled)
           SafeArea(
             bottom: false,
-            // the same height as the other pages' title bars (64 phone / 56 computer window)
-            child: SizedBox(height: desk ? MuseDesk.titleBarHeight : 64, child: toolbar),
+            // at least as tall as the other pages' title bars (64 phone / 56 computer window); taller only
+            // when a narrow window with large text puts the buttons under the title
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: desk ? MuseDesk.titleBarHeight : 64),
+              child: Align(alignment: Alignment.centerLeft, child: toolbar),
+            ),
           )
         else
           toolbar,
