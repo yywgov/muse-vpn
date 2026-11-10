@@ -251,7 +251,6 @@ class MuseNodeList extends HookConsumerWidget {
     final hasFavorites = favorites.isNotEmpty && (group?.items.any((e) => !e.isGroup && favorites.contains(e.tag)) ?? false);
     final nodeFilter = MuseNodeFilter.parse(ref.watch(MusePrefs.protocolFilter)).within(protocols: protocols, tags: nodeTags, hasFavorites: hasFavorites);
     final recent = museRecentFromRaw(ref.watch(MusePrefs.recentNodes));
-    final profileName = ref.watch(museActiveProfileNameProvider)?.trim() ?? '';
     // 1.6.0 C5: 列表 / 卡片 and 紧凑 / 标准 / 宽松 (the embedded lists stay a plain list)
     // 1.11.0: the 节点 page is always the A 双列卡片 layout; the sheet and the side column stay a list
     final cardsA = !embedded;
@@ -369,26 +368,31 @@ class MuseNodeList extends HookConsumerWidget {
       return null;
     }, [visible, selectedTag.isEmpty]);
 
+    // 1.20.1：去掉标题下「订阅名 · N 个节点」这行文字（用户觉得多余），搜索 / 测速 / ⋯ 右对齐在同一行；只在多选
+    // （已选 N 个）和测速中（已测 x / y）时左侧显示这条临时状态，平时左侧不占位
+    final status = group == null
+        ? null
+        : selecting.value
+        ? '已选 ${picked.value.length} 个'
+        : progress != null
+        // 1.5.0 #25: 测速 progress (stop with the button next to it)
+        ? '已测 ${progress.done} / ${progress.total}'
+        : null;
     final toolbar = Padding(
       padding: EdgeInsets.fromLTRB(margin + MuseSpace.s4, 0, margin - MuseSpace.s8, MuseSpace.s4),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Expanded(
-            child: Text(
-              group == null
-                  ? ''
-                  : selecting.value
-                  ? '已选 ${picked.value.length} 个'
-                  : progress != null
-                  // 1.5.0 #25: 测速 progress (stop with the button next to it)
-                  ? '已测 ${progress.done} / ${progress.total}'
-                  : '${profileName.isEmpty ? '' : '$profileName · '}$nodeTotal 个节点${nodeFilter.isNone ? '' : ' · 仅${nodeFilter.label}'}',
-              key: const ValueKey('node_count_label'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: MuseType.caption(context),
+          if (status != null)
+            Expanded(
+              child: Text(
+                status,
+                key: const ValueKey('node_count_label'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: MuseType.caption(context),
+              ),
             ),
-          ),
           if (selecting.value)
             IconButton(
               key: const ValueKey('node_select_button'),

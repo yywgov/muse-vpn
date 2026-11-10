@@ -717,8 +717,9 @@ class MuseNodeMode {
   final String? groupTag;
 }
 
-/// 1.11.0: the modes for the bar: 手动选择 first, then each group of [groups] (自动最快 with its
-/// delay, 负载均衡, …). Empty when there is no group to choose (the bar is hidden then).
+/// 1.11.0: the modes for the bar: 手动选择 first, then each group of [groups] (自动最快, 负载均衡, …).
+/// Empty when there is no group to choose (the bar is hidden then).
+/// 1.20.1：「自动最快」后面不再带延迟数字（用户觉得多余；节点卡片上已有各节点延迟）。[delayOf] 保留给调用方，不再用于文字。
 List<MuseNodeMode> museNodeModes(List<OutboundInfo> groups, {required int Function(OutboundInfo) delayOf}) {
   if (groups.isEmpty) return const [];
   return [
@@ -728,7 +729,7 @@ List<MuseNodeMode> museNodeModes(List<OutboundInfo> groups, {required int Functi
         key: g.tag,
         groupTag: g.tag,
         label: switch (museGroupIconKind(type: g.type, name: museNodeName(g).split(' → ').first.trim(), selectedDisplay: g.groupSelectedTagDisplay)) {
-          MuseGroupIcon.autoFastest => delayOf(g) > 0 ? '自动最快 ${delayOf(g)}' : '自动最快',
+          MuseGroupIcon.autoFastest => '自动最快',
           MuseGroupIcon.loadBalance => '负载均衡',
           _ => museGroupName(museNodeName(g).split(' → ').first.trim()),
         },
@@ -751,7 +752,7 @@ String? museManualPick({required List<String> recent, required List<OutboundInfo
   return tested.firstOrNull?.tag ?? nodes.firstOrNull?.tag;
 }
 
-/// 1.11.0 (A): 手动选择 / 自动最快 184 / 负载均衡 — the selected mode is a filled accent pill.
+/// 1.11.0 (A): 手动选择 / 自动最快 / 负载均衡（1.20.1 起不带延迟数字） — the selected mode is a filled accent pill.
 class MuseNodeModeBar extends StatelessWidget {
   const MuseNodeModeBar({super.key, required this.modes, required this.selected, required this.onChanged});
 

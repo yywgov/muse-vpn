@@ -99,7 +99,7 @@ class OpenSourcePage extends ConsumerWidget {
                 key: const ValueKey('about_credit_map'),
                 leading: const Icon(Icons.public_outlined),
                 title: '世界地图数据 Natural Earth',
-                subtitle: '公有领域（1:110m 国界，用于首页地图高亮节点所在国家）',
+                subtitle: '公有领域（1:50m 国界，用于首页地图高亮节点所在国家）',
                 chevron: true,
                 onTap: () => open('https://www.naturalearthdata.com/about/terms-of-use/'),
               ),

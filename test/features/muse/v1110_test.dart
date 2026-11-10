@@ -491,13 +491,15 @@ void main() {
 
   // ------------------------------------------------------------------ 节点页 A
   group('节点页 A 双列卡片', () {
-    test('modes: 手动选择 + groups (自动最快 with its delay, 负载均衡)', () {
+    // 1.20.1：原断言「自动最快 184」删去——用户要求「自动最快」后不再显示延迟数字
+    test('modes: 手动选择 + groups (自动最快 without a delay since 1.20.1, 负载均衡)', () {
       final groups = [
         OutboundInfo(tag: 'auto', tagDisplay: '自动选择', type: 'URLTest', isGroup: true, urlTestDelay: 184),
         OutboundInfo(tag: 'lb', tagDisplay: '负载均衡', type: 'balancer', isGroup: true),
       ];
       final modes = museNodeModes(groups, delayOf: (g) => g.urlTestDelay);
-      expect(modes.map((e) => e.label), ['手动选择', '自动最快 184', '负载均衡']);
+      expect(modes.map((e) => e.label), ['手动选择', '自动最快', '负载均衡']);
+      expect(modes.any((m) => RegExp(r'\d').hasMatch(m.label)), isFalse, reason: '分段控件里不再出现延迟数字');
       expect(museNodeModeOf(modes, 'auto'), 'auto');
       expect(museNodeModeOf(modes, 'some node'), 'manual');
       expect(museNodeModes(const [], delayOf: (_) => 0), isEmpty);
@@ -531,6 +533,18 @@ void main() {
           // the selected card: tick + accent fill
           expect(find.byKey(const ValueKey('node_card_tick')), findsOneWidget);
           expect(find.byKey(const ValueKey('node_test_button')), findsOneWidget);
+          // 1.20.1：标题下不再有「订阅名 · N 个节点」；搜索 / 测速 / ⋯ 右对齐，左侧不留文字；「自动最快」不带数字
+          expect(find.textContaining('个节点'), findsNothing);
+          expect(find.byKey(const ValueKey('node_count_label')), findsNothing);
+          final mode = find.descendant(of: find.byKey(const ValueKey('node_mode_bar')), matching: find.textContaining('自动最快'));
+          for (final e in mode.evaluate()) {
+            final text = (e.widget as Text).data ?? '';
+            expect(RegExp(r'\d').hasMatch(text), isFalse, reason: text);
+          }
+          final barRight = t.getTopRight(find.byKey(const ValueKey('node_mode_bar'))).dx;
+          final more = find.byKey(const ValueKey('node_more_button'));
+          final testBtn = t.getTopRight(find.byKey(const ValueKey('node_test_button'))).dx;
+          expect(more.evaluate().isEmpty ? testBtn : t.getTopRight(more).dx, greaterThan(barRight - 56), reason: '按钮右对齐');
           _clean(t);
           await _done(t);
         });
