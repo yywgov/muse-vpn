@@ -373,7 +373,7 @@ class MuseNodeList extends HookConsumerWidget {
     }, [visible, selectedTag.isEmpty]);
 
     // 1.20.1：去掉标题下「订阅名 · N 个节点」这行文字（用户觉得多余），搜索 / 测速 / ⋯ 右对齐在同一行；只在多选
-    // （已选 N 个）和测速中（已测 x / y）时左侧显示这条临时状态，平时左侧不占位
+    // （已选 N 个）、测速中（已测 x / y）和列表被筛选（仅收藏 / 仅某协议）时显示一小段状态，平时不占位
     final status = group == null
         ? null
         : selecting.value
@@ -381,7 +381,10 @@ class MuseNodeList extends HookConsumerWidget {
         : progress != null
         // 1.5.0 #25: 测速 progress (stop with the button next to it)
         ? '已测 ${progress.done} / ${progress.total}'
-        : null;
+        // 列表被筛选时仍提示（否则看不出为什么少了节点）
+        : nodeFilter.isNone
+        ? null
+        : '仅${nodeFilter.label}';
     final desk = museDeskWide(context);
     final titled = title != null && !embedded;
     // 1.20.1：按钮点击区域至少 48dp（原来是紧凑密度 40dp）
