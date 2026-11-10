@@ -312,7 +312,7 @@ void main() {
 
   group('版本 1.13.0', () {
     test('pubspec, changelog, CHANGELOG.md', () {
-      expect(_src('pubspec.yaml'), contains('version: 1.1')); // 1.13.0 or later
+      expect(_src('pubspec.yaml'), matches(RegExp(r'version: 1\.[1-9]\d\.'))); // 1.20.0: 1.1x and later (1.2x no longer contains 「1.1」) // 1.13.0 or later
       expect(museChangelog.keys, contains('1.13.0'));
       final lines = museChangelog['1.13.0']!.join();
       for (final w in ['上次异常', '一键诊断', '安全模式', '其他 VPN']) {

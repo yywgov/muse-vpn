@@ -217,8 +217,9 @@ void main() {
       }
       // 1.5.0: 去广告 is hidden by default
       expect(find.text('去广告'), findsNothing);
-      expect(find.text('45.76.*.*'), findsOneWidget);
-      expect(find.text('29 天'), findsOneWidget);
+      // 1.20.0 方向 A: tile numbers are rich text (number + a smaller unit after a no-break space)
+      expect(find.text('45.76.*.*', findRichText: true), findsOneWidget);
+      expect(find.text('29\u00A0天', findRichText: true), findsOneWidget);
       // the node list is not on 首页 any more
       expect(find.byKey(const ValueKey('home_node_list')), findsNothing);
       await _shot(tester, 'phone-$label-home');

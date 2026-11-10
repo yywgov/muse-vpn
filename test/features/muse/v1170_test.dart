@@ -372,7 +372,7 @@ void version() {
   group('版本 1.17.0', () {
     test('pubspec, changelog, CHANGELOG.md', () {
       // 1.17.1 and later: the 1.17.0 notes stay in the changelog
-      expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.1'));
+      expect(File('pubspec.yaml').readAsStringSync(), matches(RegExp(r'version: 1\.[1-9]\d\.'))); // 1.20.0: 1.1x and later (1.2x no longer contains 「1.1」)
       expect(museChangelog.containsKey('1.17.0'), isTrue);
       final lines = museChangelog['1.17.0']!.join();
       for (final w in ['校验', '重试', '快捷键', '收藏', '最近使用', '商店应用', '托盘']) {

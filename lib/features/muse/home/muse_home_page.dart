@@ -204,7 +204,6 @@ class MuseDeskHome extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.sizeOf(context).width;
     final three = width >= MuseDesk.threeColumn;
-    final classic = ref.watch(MusePrefs.homeStyle) == 'classic';
     final margin = MuseSpace.page(context);
     final scroll = RefreshIndicator(
       key: const ValueKey('home_pull_refresh'),
@@ -227,13 +226,12 @@ class MuseDeskHome extends ConsumerWidget {
                   key: const ValueKey('home_desk_left'),
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 1.19.1: 「能不能用、连到哪」 first on a computer; the map under it
+                    // 1.19.1: 「能不能用、连到哪」 first on a computer. 1.20.0: the map is inside the card
                     const MuseHeroCard(),
-                    if (!classic) ...[const SizedBox(height: MuseSpace.s12), const MuseRouteCard()],
                   ],
                 ),
               ),
-              const SizedBox(width: MuseDesk.columnGap),
+              const SizedBox(width: MuseHomeA.gap),
               Expanded(
                 flex: 100 - (MuseDesk.leftShare * 100).round(),
                 child: Column(
@@ -320,7 +318,8 @@ class MuseDeskToolRow extends ConsumerWidget {
                   key: const ValueKey('home_desk_summary'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: MuseTextLevel.subheadline.style(context, color: mt.text2, weight: FontWeight.w500),
+                  // 1.20.0 方向 A: 15 / w400 secondary — the card titles' weight, not a heading
+                  style: MuseTextLevel.subheadline.style(context, color: mt.text2),
                 ),
               ),
             ),
@@ -364,8 +363,8 @@ class _Dashboard extends ConsumerWidget {
       );
     }
     if (hasProfile == false) return const _EmptyState();
-    // 1.19.0: 新首页 = 顶部路由弧线图 + 经典首页的全部内容；经典首页 = 1.18 的首页原样
-    final classic = ref.watch(MusePrefs.homeStyle) == 'classic';
+    // 1.19.0: 新首页 = 路由弧线图 + 经典首页的全部内容；经典首页 = 1.18 的首页原样
+    // 1.20.0: the map is the connect card's middle now (MuseHeroCard reads the style itself)
     return RefreshIndicator(
       key: const ValueKey('home_pull_refresh'),
       onRefresh: () => museNodePull(ref),
@@ -378,9 +377,8 @@ class _Dashboard extends ConsumerWidget {
         children: [
           // 1.13.0: 安全模式 / 被其他 VPN 断开 / 上次异常 / 连接没有成功 (only when one applies)
           const MuseHealthBanner(),
-          if (!classic) ...[const MuseRouteCard(), const SizedBox(height: MuseSpace.s12)],
           const MuseHeroCard(),
-          const SizedBox(height: MuseSpace.s12),
+          const SizedBox(height: MuseHomeA.gap),
           const MuseTileGrid(),
           const SizedBox(height: MuseSpace.s8),
           // 1.6.3: the editor at the end of the tiles too
@@ -479,17 +477,16 @@ class MuseHeroCard extends HookConsumerWidget {
       await notifier.toggleConnection();
     }
 
-    final onBrand = state != _HeroState.idle;
-    // 1.4.0: roomier on the desktop
-    final heroPad = MediaQuery.sizeOf(context).width >= 720 ? MuseSpace.s24 : MuseSpace.s16;
-    // 1.6.1: connected = the scheme's primary container (flat), text on it in onPrimaryContainer
-    final fg = onBrand ? mt.onHero : mt.text1;
-    final fg2 = onBrand ? mt.onHero.withValues(alpha: 0.78) : mt.text2;
+    // 1.20.0 方向 A: the card stays neutral in every state — colour lives on the map only (the
+    // node's country), the ▶ glyph and the status lights
+    final fg = mt.text1;
+    final fg2 = mt.text2;
     final switchEnabled = action != MuseConnectAction.ignore;
-
     final desk = museDeskWide(context);
-    Widget statusRow({bool min = false}) => Row(
-      mainAxisSize: min ? MainAxisSize.min : MainAxisSize.max,
+    final pad = desk ? MuseHomeA.padDesk : MuseHomeA.pad;
+    final classic = ref.watch(MusePrefs.homeStyle) == 'classic';
+
+    final statusRow = Row(
       children: [
         Flexible(
           child: AnimatedSwitcher(
@@ -502,7 +499,12 @@ class MuseHeroCard extends HookConsumerWidget {
                 label,
                 key: ValueKey(label),
                 maxLines: 1,
-                style: MuseType.largeTitle(context).copyWith(color: failed ? MusePalette.red : fg),
+                overflow: TextOverflow.ellipsis,
+                style: MuseTextLevel.title1.style(
+                  context,
+                  color: failed ? MusePalette.red : fg,
+                  weight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -529,52 +531,43 @@ class MuseHeroCard extends HookConsumerWidget {
           ),
       ],
     );
-    final statusParts = <Widget>[
-      // 1.5.0: 准备配置 → 启动核心 → 测试连通
-      if (stage != null && !connected)
-        AnimatedSwitcher(
-          duration: museMotion(context),
-          child: Text(
-            '${stage.title}…',
-            key: ValueKey('home_stage_${stage.name}'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: MuseType.body(context).copyWith(color: fg2),
-          ),
-        )
-      else if (since != null) ...[
-        MuseUptimeText(
-          since: since,
-          style: MuseType.body(context).copyWith(color: fg2, fontFeatures: MuseType.tabular),
-        ),
-        Text(
-          '·',
-          key: const ValueKey('home_status_dot'),
-          style: MuseType.caption(context).copyWith(color: fg2),
-        ),
-      ],
-      if (stage == null || connected) _ModePill(mode: mode, onBrand: onBrand),
-      if (stage == MuseConnectStage.testing && connected)
-        Text(
-          '${stage!.title}…',
-          key: const ValueKey('home_stage_testing'),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: MuseType.caption(context).copyWith(color: fg2),
-        ),
-    ];
+    final second = MuseTextLevel.subheadline.style(context, color: fg2);
     final statusInfo = Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: MuseSpace.s8,
+      spacing: MuseSpace.s12,
       runSpacing: MuseSpace.s4,
-      children: statusParts,
+      children: [
+        // 1.5.0: 准备配置 → 启动核心 → 测试连通
+        if (stage != null && !connected)
+          AnimatedSwitcher(
+            duration: museMotion(context),
+            child: Text(
+              '${stage.title}…',
+              key: ValueKey('home_stage_${stage.name}'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: second,
+            ),
+          )
+        else if (since != null)
+          MuseUptimeText(
+            since: since,
+            style: second.copyWith(fontFamily: MuseFont.family, fontFamilyFallback: MuseFont.fallback),
+          ),
+        if (stage == null || connected) _ModePill(mode: mode),
+        if (stage == MuseConnectStage.testing && connected)
+          Text(
+            '${stage!.title}…',
+            key: const ValueKey('home_stage_testing'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: MuseTextLevel.footnote.style(context, color: fg2),
+          ),
+      ],
     );
     final startButton = MuseStartButton(
-      // 1.19.1 A5: 56 on the desk card (64 on a phone)
-      size: desk ? MuseDesk.startButton : MuseSize.startButton,
       key: const ValueKey('home_connect_switch'),
       on: connected || busy,
-      onBrand: onBrand,
       semanticLabel: switch (action) {
         MuseConnectAction.cancel => '取消连接',
         MuseConnectAction.disconnect => '断开',
@@ -582,83 +575,48 @@ class MuseHeroCard extends HookConsumerWidget {
       },
       onTap: switchEnabled ? toggle : null,
     );
-    // 1.19.1 A5: on a computer window the status, its time / mode and the button share one line,
-    // centred on each other (the phone keeps the two-line block beside the button)
-    final statusDesk = Wrap(
-      key: const ValueKey('home_status_desk'),
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: MuseSpace.s12,
-      runSpacing: MuseSpace.s4,
-      // the 「·」 would be left dangling at a line end when the row wraps; the gap separates them here
-      children: [statusRow(min: true), ...statusParts.where((w) => w.key != const ValueKey('home_status_dot'))],
+
+    final header = Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        // the whole top connects while disconnected
+        onTap: state == _HeroState.idle && action == MuseConnectAction.connect ? toggle : null,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(pad, pad, pad - MuseHomeA.padEndTrim, classic ? pad : 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  key: const ValueKey('home_status_block'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    statusRow,
+                    const SizedBox(height: MuseSpace.s8),
+                    statusInfo,
+                  ],
+                ),
+              ),
+              const SizedBox(width: MuseSpace.s12),
+              startButton,
+            ],
+          ),
+        ),
+      ),
     );
 
-    final card = AnimatedContainer(
-      duration: museMotion(context),
-      curve: MuseMotion.curve,
-      decoration: switch (state) {
-        _HeroState.idle => mt.cardDecoration(color: mt.heroIdle),
-        _HeroState.connecting => mt.cardDecoration(color: Color.lerp(mt.heroIdle, mt.heroGradient.colors.first, 0.6)),
-        _HeroState.connected => mt.cardDecoration(color: mt.heroGradient.colors.first),
-      },
+    final card = DecoratedBox(
+      key: const ValueKey('home_hero_card'),
+      decoration: mt.cardDecoration(radius: MuseHomeA.cardAll),
       child: ClipRSuperellipse(
-        borderRadius: MuseRadius.cardAll,
-        child: Stack(
+        borderRadius: MuseHomeA.cardAll,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1.18.0: the moving band across the card is gone; 连接中 sweeps its own label instead
-            // (标准档 only, stops after a timeout — see MuseSweep)
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Material(
-                  type: MaterialType.transparency,
-                  child: InkWell(
-                    // the whole card connects while disconnected
-                    onTap: state == _HeroState.idle && action == MuseConnectAction.connect ? toggle : null,
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(heroPad, heroPad, heroPad, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (desk)
-                            Row(
-                              children: [
-                                Expanded(child: statusDesk),
-                                const SizedBox(width: MuseSpace.s12),
-                                startButton,
-                              ],
-                            )
-                          else
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      statusRow(),
-                                      const SizedBox(height: MuseSpace.s8),
-                                      statusInfo,
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: MuseSpace.s12),
-                                startButton,
-                              ],
-                            ),
-                          SizedBox(height: heroPad),
-                          Divider(
-                            height: MuseSize.hairline,
-                            thickness: MuseSize.hairline,
-                            color: onBrand ? mt.onHero.withValues(alpha: 0.14) : mt.hairline,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                _HeroNodeRow(onBrand: onBrand, large: desk),
-              ],
-            ),
+            header,
+            // 1.20.0: the map is the card's middle (经典首页 keeps the 1.18 card without it)
+            if (!classic) ...[MuseHeroMap(surface: mt.card), MuseHeroRouteNotes(padding: pad)],
+            _HeroNodeRow(large: desk, pad: pad),
           ],
         ),
       ),
@@ -714,17 +672,15 @@ class MuseUptimeText extends HookWidget {
 }
 
 class _ModePill extends ConsumerWidget {
-  const _ModePill({required this.mode, required this.onBrand});
+  const _ModePill({required this.mode});
 
   final MuseRouteMode mode;
-  final bool onBrand;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mt = MuseTheme.of(context);
-    final fg = onBrand ? mt.onHero : mt.text1;
     return Material(
-      color: onBrand ? mt.onHero.withValues(alpha: 0.1) : mt.inner,
+      color: mt.inner,
       shape: MuseShape.full,
       child: InkWell(
         key: const ValueKey('home_mode_pill'),
@@ -732,22 +688,26 @@ class _ModePill extends ConsumerWidget {
         onTap: () => ref
             .read(ConfigOptions.museRouteMode.notifier)
             .update(mode == MuseRouteMode.rule ? MuseRouteMode.global : MuseRouteMode.rule),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s12, vertical: MuseSpace.s4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedSwitcher(
-                duration: museMotion(context),
-                child: Text(
-                  '${mode.title}模式',
-                  key: ValueKey(mode),
-                  style: MuseType.caption(context).copyWith(color: fg, fontWeight: FontWeight.w600),
+        // 1.20.0: 28 high at 1×, grows with the text (never clips at 2×)
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: MuseHomeA.pill),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s12, vertical: MuseSpace.s4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: museMotion(context),
+                  child: Text(
+                    '${mode.title}模式',
+                    key: ValueKey(mode),
+                    style: MuseTextLevel.footnote.style(context, color: mt.text1, weight: FontWeight.w600),
+                  ),
                 ),
-              ),
-              const SizedBox(width: MuseSpace.s4),
-              Icon(Icons.swap_horiz_outlined, size: MuseIconSize.tiny, color: fg.withValues(alpha: 0.8)),
-            ],
+                const SizedBox(width: MuseSpace.s4),
+                Icon(Icons.swap_horiz_outlined, size: MuseHomeA.pillIcon, color: mt.text2),
+              ],
+            ),
           ),
         ),
       ),
@@ -755,30 +715,24 @@ class _ModePill extends ConsumerWidget {
   }
 }
 
-/// The hero card's start button (1.6.1: a filled squircle in the accent with ▶ / ❚❚).
-/// 1.18.0 P2: one shape morphing — a circle when off, a rounded square when on (a spring with a
-/// light bounce on arrival, none on the way back); the glyph cross-fades on its own.
+/// The hero card's start button.
+/// 1.20.0 方向 A: a 56 neutral circle (the card's inner tone) — ▶ in the 已连接 colour (the one accent
+/// while disconnected), ❚❚ in the text colour; the glyph cross-fades. The 1.18 circle ↔ rounded-square
+/// morph is gone with the filled accent button (方向 A keeps one round shape).
 class MuseStartButton extends StatefulWidget {
   const MuseStartButton({
     super.key,
     required this.on,
-    required this.onBrand,
     required this.onTap,
     required this.semanticLabel,
-    this.size = MuseSize.startButton,
+    this.size = MuseHomeA.button,
   });
 
-  /// 1.19.1 A5: the button's side (56 on the desk card)
   final double size;
 
   final bool on;
-  final bool onBrand;
   final VoidCallback? onTap;
   final String semanticLabel;
-
-  /// corner radius off (a circle) / on (a rounded square)
-  static const radiusOff = MuseSize.startButton / 2;
-  static const radiusOn = 18.0;
 
   @override
   State<MuseStartButton> createState() => MuseStartButtonState();
@@ -807,23 +761,17 @@ class MuseStartButtonState extends State<MuseStartButton> {
   Widget build(BuildContext context) {
     final on = widget.on;
     final onTap = widget.onTap;
-    final semanticLabel = widget.semanticLabel;
-    const radiusOn = MuseStartButton.radiusOn;
-    final radiusOff = widget.size / 2;
+    final mt = MuseTheme.of(context);
     final scheme = Theme.of(context).colorScheme;
     final level = museMotionLevel(context);
     final canPress = onTap != null && level != MuseMotionLevel.off;
     final scale = canPress && _pressed ? MuseMotion.pressScale : 1.0;
-    final spring = on ? MuseMotion.arriveCurve : MuseMotion.smoothCurve;
-    final shapeDuration = level == MuseMotionLevel.standard
-        ? spring.settleDuration
-        : museScaleDuration(level, MuseMotion.fast);
-    final color = onTap == null ? scheme.primary.withValues(alpha: 0.5) : scheme.primary;
+    final glyph = on ? mt.text1 : museLinkedColor(scheme, mt.inner);
     return Semantics(
       button: true,
       toggled: on,
       enabled: onTap != null,
-      label: semanticLabel,
+      label: widget.semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
@@ -835,18 +783,11 @@ class MuseStartButtonState extends State<MuseStartButton> {
           scale: scale,
           duration: museScaleDuration(level, _pressed ? MuseMotion.pressIn : MuseMotion.pressOut),
           curve: museCurve(context),
-          child: TweenAnimationBuilder<double>(
+          child: DecoratedBox(
             key: const ValueKey('home_connect_shape'),
-            tween: Tween(end: on ? radiusOn : radiusOff),
-            duration: shapeDuration,
-            curve: level == MuseMotionLevel.standard ? spring : MuseMotion.plainCurve,
-            builder: (context, r, child) => DecoratedBox(
-              decoration: ShapeDecoration(
-                color: color,
-                // the bounce may overshoot below radiusOn; never past a circle
-                shape: MuseShape.of(r.clamp(0.0, radiusOff)),
-              ),
-              child: child,
+            decoration: ShapeDecoration(
+              color: onTap == null ? mt.inner.withValues(alpha: 0.5) : mt.inner,
+              shape: const CircleBorder(),
             ),
             child: SizedBox.square(
               dimension: widget.size,
@@ -861,8 +802,8 @@ class MuseStartButtonState extends State<MuseStartButton> {
                 child: Icon(
                   on ? Icons.pause_outlined : Icons.play_arrow_outlined,
                   key: ValueKey(on),
-                  size: MuseIconSize.large,
-                  color: scheme.onPrimary,
+                  size: MuseHomeA.buttonGlyph,
+                  color: onTap == null ? glyph.withValues(alpha: 0.5) : glyph,
                 ),
               ),
             ),
@@ -881,13 +822,15 @@ Widget museMaybeTooltip(String? message, Widget child) =>
 const museSwitchSweepTimeout = Duration(seconds: 10);
 
 /// Bottom row of the hero card: flag | current node | latency ›  (opens the node picker).
+/// 1.20.0 方向 A: name 16 / w600 over 「地区 · 协议」 13, a status dot + the delay 15 with 「ms」 13 apart.
 class _HeroNodeRow extends ConsumerWidget {
-  const _HeroNodeRow({required this.onBrand, this.large = false});
+  const _HeroNodeRow({this.large = false, required this.pad});
 
-  final bool onBrand;
-
-  /// 1.19.1 A5: the desk card's bigger row (name 17 / w600, region 13, delay 20, card-edge padding)
+  /// 1.19.1 A5: the desk card's row (name 17, delay 17; the full name on hover)
   final bool large;
+
+  /// the card's side padding (the row lines up with the status above)
+  final double pad;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -897,8 +840,8 @@ class _HeroNodeRow extends ConsumerWidget {
     final item = group?.items.where((e) => e.tag == group.selected).firstOrNull;
     final shown = ref.watch(museShownPickProvider);
     final switching = ref.watch(museNodeSwitchingProvider);
-    final fg = onBrand ? mt.onHero : mt.text1;
-    final fg2 = onBrand ? mt.onHero.withValues(alpha: 0.78) : mt.text2;
+    final fg = mt.text1;
+    final fg2 = mt.text2;
     String text = '选择节点';
     String? flag;
     IconData icon = Icons.public_outlined;
@@ -934,6 +877,10 @@ class _HeroNodeRow extends ConsumerWidget {
         : item.isGroup
         ? '自动选择'
         : [if (regionCode != null) museCountryLabel(regionCode), if (protocol.isNotEmpty) protocol].join(' · ');
+    final digits = TextStyle(fontFamily: MuseFont.family, fontFamilyFallback: MuseFont.fallback);
+    final nameStyle = (large ? MuseTextLevel.headline : MuseTextLevel.callout)
+        .style(context, color: fg, weight: FontWeight.w600)
+        .merge(digits);
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
@@ -942,28 +889,21 @@ class _HeroNodeRow extends ConsumerWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: MuseSize.heroRow),
           child: Padding(
-            padding: large
-                ? const EdgeInsets.symmetric(horizontal: MuseSpace.s24, vertical: MuseSpace.s12)
-                : const EdgeInsets.symmetric(horizontal: MuseSpace.s16, vertical: MuseSpace.s8),
+            padding: EdgeInsets.fromLTRB(
+              pad,
+              MuseHomeA.nodeRowTop,
+              pad - MuseHomeA.nodeRowEndTrim,
+              MuseHomeA.nodeRowBottom,
+            ),
             child: Row(
               children: [
-                MuseFlagBox(flag: flag, icon: icon, onBrand: onBrand),
+                MuseFlagBox(flag: flag, icon: icon, circle: true),
                 const SizedBox(width: MuseSpace.s12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (caption.isNotEmpty)
-                        Text(
-                          caption,
-                          key: const ValueKey('home_node_caption'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: large
-                              ? MuseTextLevel.footnote.style(context, color: fg2)
-                              : MuseType.caption(context).copyWith(color: fg2),
-                        ),
                       // 1.18.0 P3: the name rolls when it changes and sweeps while switching
                       // 1.19.1 A5: the full name on hover when the desk row cuts it
                       museMaybeTooltip(
@@ -978,23 +918,32 @@ class _HeroNodeRow extends ConsumerWidget {
                               key: const ValueKey('home_node_name'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: (large ? MuseTextLevel.headline.style(context) : MuseType.body(context)).copyWith(
-                                color: fg,
-                                fontWeight: large ? FontWeight.w600 : FontWeight.w700,
-                                fontFamily: MuseFont.family,
-                                fontFamilyFallback: MuseFont.fallback,
-                                fontFeatures: MuseType.tabular,
-                              ),
+                              style: nameStyle,
                             ),
                           ),
                         ),
                       ),
+                      if (caption.isNotEmpty) ...[
+                        const SizedBox(height: MuseSpace.s4 / 2),
+                        Text(
+                          caption,
+                          key: const ValueKey('home_node_caption'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: MuseTextLevel.footnote.style(context, color: fg2).merge(digits),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                // 1.19.1 A5: a long name ellipsizes before the delay instead of touching it
-                if (showDelay && large) const SizedBox(width: MuseSpace.s8),
-                if (showDelay)
+                if (showDelay) ...[
+                  const SizedBox(width: MuseSpace.s8),
+                  Container(
+                    width: MuseHomeA.delayDot,
+                    height: MuseHomeA.delayDot,
+                    decoration: BoxDecoration(color: MuseColors.delay(context, delay), shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: MuseSpace.s4 + MuseSpace.s4 / 2),
                   MuseRoll(
                     value: delay,
                     alignment: AlignmentDirectional.centerEnd,
@@ -1004,23 +953,21 @@ class _HeroNodeRow extends ConsumerWidget {
                         children: [
                           TextSpan(
                             text: '$delay',
-                            style: (large ? MuseTextLevel.title3.style(context) : MuseType.body(context)).copyWith(
-                              color: onBrand ? fg : MuseColors.delay(context, delay),
-                              fontWeight: FontWeight.w700,
-                              fontFamily: MuseFont.family,
-                              fontFamilyFallback: MuseFont.fallback,
-                              fontFeatures: MuseType.tabular,
-                            ),
+                            style: (large ? MuseTextLevel.headline : MuseTextLevel.subheadline)
+                                .style(context, color: fg, weight: FontWeight.w500)
+                                .merge(digits),
                           ),
                           TextSpan(
-                            text: ' ms',
-                            style: MuseType.caption(context).copyWith(color: fg2),
+                            text: '\u00A0ms',
+                            style: MuseTextLevel.footnote.style(context, color: fg2).merge(digits),
                           ),
                         ],
                       ),
                     ),
                   ),
-                Icon(Icons.chevron_right_outlined, size: MuseIconSize.small, color: fg2),
+                ],
+                const SizedBox(width: MuseSpace.s4 / 2),
+                Icon(Icons.chevron_right_outlined, size: MuseIconSize.small, color: mt.text3),
               ],
             ),
           ),
@@ -1041,8 +988,8 @@ class MuseTileGrid extends ConsumerWidget {
   /// null = Windows only.
   final bool? mergeFlow;
 
-  static const tileHeight = 124.0;
-  static const tileHeightDesktop = 136.0;
+  static const tileHeight = MuseHomeA.tile;
+  static const tileHeightDesktop = MuseHomeA.tileDesk;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1077,7 +1024,7 @@ class MuseTileGrid extends ConsumerWidget {
         final height = math.max(base, museTileHeightFor(MediaQuery.textScalerOf(context), bottom: bottom));
         final rows = <Widget>[];
         for (final idx in museTileRows(tiles.length, columns)) {
-          if (rows.isNotEmpty) rows.add(const SizedBox(height: MuseSpace.s12));
+          if (rows.isNotEmpty) rows.add(const SizedBox(height: MuseHomeA.gap));
           rows.add(
             SizedBox(
               height: height,
@@ -1085,7 +1032,7 @@ class MuseTileGrid extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (var j = 0; j < idx.length; j++) ...[
-                    if (j > 0) const SizedBox(width: MuseSpace.s12),
+                    if (j > 0) const SizedBox(width: MuseHomeA.gap),
                     Expanded(child: RepaintBoundary(child: _tile(tiles[idx[j]]))),
                   ],
                 ],
@@ -1119,11 +1066,73 @@ class MuseTileGrid extends ConsumerWidget {
 /// (all scaled with the text) + a little slack.
 /// 1.5.1: [bottom] is the tallest bottom element in the grid ([MuseSize.segmented] with 去广告).
 /// 1.6.1: the title is a subheadline (15 / 20) now, not a caption.
-double museTileHeightFor(TextScaler scaler, {double bottom = MuseSize.tileBottom}) {
-  const caption = 20.0; // MuseTextLevel.subheadline line
-  const number = 24 * 1.2; // MuseType.number line
-  return MuseSpace.s16 * 2 + scaler.scale(caption + number + bottom) + MuseSpace.s8;
+/// 1.20.0 方向 A: padding 20, the title a footnote (13 / 18), the number 26 / 1.15 — the row grows with
+/// the system font size (1.3×, 2×) instead of a fixed height.
+double museTileHeightFor(TextScaler scaler, {double bottom = MuseSize.tileBottom}) =>
+    MuseHomeA.pad * 2 + scaler.scale(MuseHomeA.titleBox + MuseHomeA.valueBox + bottom) + MuseSpace.s8;
+
+/// 1.20.0 方向 A: 「↓ 2.0 KB/s」 → (lead 「↓」, number 「2.0」, unit 「KB/s」); 「28 天」 → (null, 「28」, 「天」);
+/// anything else (「已用完」「检测中」「—」「🇯🇵 东京 02」) is one value. The last space splits the unit off.
+(String?, String, String?) museSplitValue(String value) {
+  var v = value.trim();
+  String? lead;
+  for (final a in const ['↓', '↑']) {
+    if (v.startsWith(a)) {
+      lead = a;
+      v = v.substring(a.length).trimLeft();
+      break;
+    }
+  }
+  // only 「number unit」 splits (「🇯🇵 东京 02」 or 「192.168.1.23」 stay whole)
+  final i = v.lastIndexOf(' ');
+  if (i > 0) {
+    final n = v.substring(0, i);
+    final u = v.substring(i + 1);
+    if (RegExp(r'^[-+]?[\d.,]+$').hasMatch(n) && u.isNotEmpty && !RegExp('[0-9]').hasMatch(u)) return (lead, n, u);
+  }
+  return (lead, v, null);
 }
+
+/// 1.20.0 方向 A: a tile's number — digits 26 / w600 tabular, the unit 14 in the secondary colour
+/// after a no-break space, an arrow lead in the secondary colour; text values (「已用完」) 21 / w600.
+Widget museTileValue(BuildContext context, String value, {Color? color, Key? key}) {
+  final mt = MuseTheme.of(context);
+  final (lead, number, unit) = museSplitValue(value);
+  final digits = RegExp('[0-9]').hasMatch(number);
+  final base = TextStyle(
+    fontFamily: MuseFont.family,
+    fontFamilyFallback: MuseFont.fallback,
+    height: MuseHomeA.valueLine,
+    fontFeatures: MuseType.tabular,
+  );
+  final big = base.copyWith(
+    fontSize: digits ? MuseHomeA.value : MuseTextLevel.title3.size,
+    fontWeight: FontWeight.w600,
+    letterSpacing: digits ? MuseHomeA.valueTrack : 0,
+    color: color ?? mt.text1,
+  );
+  final small = base.copyWith(fontSize: MuseHomeA.unit, fontWeight: FontWeight.w500, color: mt.text2);
+  return Text.rich(
+    key: key,
+    TextSpan(
+      children: [
+        if (lead != null)
+          TextSpan(
+            text: '$lead\u00A0',
+            style: big.copyWith(color: mt.text2, fontWeight: FontWeight.w400),
+          ),
+        TextSpan(text: number, style: big),
+        if (unit != null) TextSpan(text: '\u00A0$unit', style: small),
+      ],
+    ),
+    maxLines: 1,
+  );
+}
+
+/// 1.20.0 方向 A: a tile's captions (title trailing, bottom line) — 13 secondary, tabular digits.
+/// (The app's own face: an exit tile's flag emoji falls back glyph by glyph as before.)
+TextStyle museTileCaption(BuildContext context) =>
+    MuseTextLevel.footnote.style(context, color: MuseTheme.of(context).text2);
 
 /// Max share of a tile row a trailing caption may take before it ellipsizes.
 const _trailingShare = 0.6;
@@ -1164,43 +1173,52 @@ class _Tile extends ConsumerWidget {
     // 1.4.0: 隐私模式 blurs the numbers (设置 › 外观)
     final masked = ref.watch(MusePrefs.privacyMask);
     return DecoratedBox(
-      decoration: mt.cardDecoration(),
+      decoration: mt.cardDecoration(radius: MuseHomeA.cardAll),
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
-          borderRadius: MuseRadius.cardAll,
+          borderRadius: MuseHomeA.cardAll,
           onTap: onTap,
           onLongPress: () => showMuseTileEditor(context),
           child: Padding(
-            padding: const EdgeInsets.all(MuseSpace.s16),
+            padding: const EdgeInsets.all(MuseHomeA.pad),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // 1.4.1: the trailing caption ellipsizes in a narrow tile / at large text
                 LayoutBuilder(
-                  builder: (context, c) => Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: MuseTextLevel.subheadline.style(context, weight: FontWeight.w600),
+                  builder: (context, c) {
+                    final titleStyle = MuseTextLevel.footnote.style(context, color: mt.text2);
+                    // 1.20.0: a short title (「网速」) leaves the rest of the row to the trailing caption,
+                    // so 「↑ 1.0 KB/s」 is not cut at 800 px; a long title still keeps its share
+                    final tp = TextPainter(
+                      text: TextSpan(text: title, style: titleStyle),
+                      textDirection: TextDirection.ltr,
+                      textScaler: MediaQuery.textScalerOf(context),
+                      maxLines: 1,
+                    )..layout();
+                    final trailingMax = math.max(c.maxWidth * _trailingShare, c.maxWidth - tp.width - MuseSpace.s8);
+                    tp.dispose();
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: titleStyle),
                         ),
-                      ),
-                      if (titleTrailing != null)
-                        ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: c.maxWidth * _trailingShare),
-                          child: DefaultTextStyle.merge(
-                            maxLines: 1,
-                            softWrap: false,
-                            overflow: TextOverflow.ellipsis,
-                            child: museMaybeMask(masked, titleTrailing!),
+                        if (titleTrailing != null)
+                          ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: trailingMax),
+                            child: DefaultTextStyle.merge(
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                              style: museTileCaption(context),
+                              child: museMaybeMask(masked, titleTrailing!),
+                            ),
                           ),
-                        ),
-                    ],
-                  ),
+                      ],
+                    );
+                  },
                 ),
                 AnimatedSwitcher(
                   duration: museMotion(context),
@@ -1214,7 +1232,7 @@ class _Tile extends ConsumerWidget {
                       key: ValueKey(value),
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
-                      child: Text(value, maxLines: 1, style: MuseType.number(context).copyWith(color: valueColor)),
+                      child: museTileValue(context, value, color: valueColor),
                     ),
                   ),
                 ),
@@ -1225,6 +1243,7 @@ class _Tile extends ConsumerWidget {
                     maxLines: 1,
                     softWrap: false,
                     overflow: TextOverflow.ellipsis,
+                    style: museTileCaption(context),
                     child: museMaybeMask(masked, bottom),
                   ),
                 ),
@@ -1267,7 +1286,7 @@ class _SpeedTile extends ConsumerWidget {
             '↑ ${museBytes(up)}   ↓ ${museBytes(down)}',
             key: const ValueKey('tile_speed_today'),
             maxLines: 1,
-            style: MuseType.caption(context),
+            style: museTileCaption(context),
           ),
         ),
         onTap: () => _showSessionSheet(context),
@@ -1275,7 +1294,7 @@ class _SpeedTile extends ConsumerWidget {
     }
     return _Tile(
       title: '网速',
-      titleTrailing: Text('↑ ${museSpeedText(stats.uplink.toInt())}', style: MuseType.caption(context)),
+      titleTrailing: Text('↑ ${museSpeedText(stats.uplink.toInt())}', style: museTileCaption(context)),
       value: '↓ ${museSpeedText(stats.downlink.toInt())}',
       bottom: SizedBox.expand(child: museSpeedChart(context, ref, history)),
       onTap: () => _showSessionSheet(context),
@@ -1296,7 +1315,7 @@ class _FlowTile extends ConsumerWidget {
     final down = stats.downlinkTotal.toInt();
     return _Tile(
       title: '流量',
-      titleTrailing: Text('↑ ${museSpeedText(stats.uplink.toInt())}', style: MuseType.caption(context)),
+      titleTrailing: Text('↑ ${museSpeedText(stats.uplink.toInt())}', style: museTileCaption(context)),
       value: '↓ ${museSpeedText(stats.downlink.toInt())}',
       bottom: Row(
         children: [
@@ -1311,7 +1330,7 @@ class _FlowTile extends ConsumerWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.end,
-              style: MuseType.caption(context).copyWith(fontFeatures: MuseType.tabular),
+              style: museTileCaption(context).copyWith(fontFeatures: MuseType.tabular),
             ),
           ),
         ],
@@ -1453,7 +1472,7 @@ class _TrafficTile extends ConsumerWidget {
       value: museBytes(up + down),
       bottom: Align(
         alignment: Alignment.bottomLeft,
-        child: Text('↑ ${museBytes(up)}   ↓ ${museBytes(down)}', maxLines: 1, style: MuseType.caption(context)),
+        child: Text('↑ ${museBytes(up)}   ↓ ${museBytes(down)}', maxLines: 1, style: museTileCaption(context)),
       ),
       onTap: () => _showSessionSheet(context),
     );
@@ -1501,7 +1520,7 @@ class _RemainingTile extends ConsumerWidget {
                 '共 ${museBytes(info.total)}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: MuseType.caption(context),
+                style: museTileCaption(context),
               ),
             ),
           ],
@@ -1528,7 +1547,7 @@ class _ExpiryTile extends ConsumerWidget {
       valueColor: expired ? MusePalette.red : (days < 7 ? MusePalette.orange : null),
       bottom: Align(
         alignment: Alignment.bottomLeft,
-        child: Text('${e.year}-${_two(e.month)}-${_two(e.day)}', style: MuseType.caption(context)),
+        child: Text('${e.year}-${_two(e.month)}-${_two(e.day)}', style: museTileCaption(context)),
       ),
       onTap: () => context.goNamed('config'),
     );
@@ -1551,7 +1570,7 @@ class _ExitTile extends ConsumerWidget {
     Widget bottom;
     if (!running) {
       value = '—';
-      bottom = Text('未连接', style: MuseType.caption(context));
+      bottom = Text('未连接', style: museTileCaption(context));
     } else if (info != null) {
       value = museMaskIp(info.ip);
       final flag = museCountryFlag(info.country);
@@ -1562,7 +1581,7 @@ class _ExitTile extends ConsumerWidget {
               reach == MuseReach.failed ? '无法访问外网' : '${flag ?? ''} ${museCountryLabel(info.country)}'.trim(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: MuseType.caption(context).copyWith(color: reach == MuseReach.failed ? MusePalette.orange : null),
+              style: museTileCaption(context).copyWith(color: reach == MuseReach.failed ? MusePalette.orange : null),
             ),
           ),
           // 1.5.3: re-checking in the background; the last result stays
@@ -1590,10 +1609,10 @@ class _ExitTile extends ConsumerWidget {
       );
     } else if (result?.infoFailed ?? false) {
       value = '—';
-      bottom = Text('获取失败', style: MuseType.caption(context).copyWith(color: MusePalette.orange));
+      bottom = Text('获取失败', style: museTileCaption(context).copyWith(color: MusePalette.orange));
     } else {
       value = '检测中';
-      bottom = Text(reach == MuseReach.failed ? '无法访问外网' : '…', style: MuseType.caption(context));
+      bottom = Text(reach == MuseReach.failed ? '无法访问外网' : '…', style: museTileCaption(context));
     }
     return _Tile(
       title: '出口 IP',

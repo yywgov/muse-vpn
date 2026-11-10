@@ -26,7 +26,7 @@ void main() {
   group('版本 1.17.1', () {
     test('pubspec, changelog, CHANGELOG.md', () {
       // 1.18.0 and later: the 1.17.1 notes stay in the changelog
-      expect(_src('pubspec.yaml'), contains('version: 1.1'));
+      expect(_src('pubspec.yaml'), matches(RegExp(r'version: 1\.[1-9]\d\.'))); // 1.20.0: 1.1x and later (1.2x no longer contains 「1.1」)
       expect(museChangelog.containsKey('1.17.1'), isTrue);
       expect(museChangelog['1.17.1']!.join(), contains('「最近」'));
       expect(_src('CHANGELOG.md'), contains('### 1.17.1'));

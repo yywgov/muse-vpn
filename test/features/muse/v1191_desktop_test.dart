@@ -209,14 +209,14 @@ void main() {
   });
 
   group('A3 城市名与图注', () {
-    testWidgets('已连接：地图上有本机与出口城市名；图注 13 号并带延迟', (t) async {
+    // 1.20.0 方向 A（断言随改）：连接卡上的地图只标本机；出口城市不标名（节点所在国家已高亮、节点行写着国家，
+    // 城市名会压住国家轮廓），图注行与节点行重复，去掉。1.19 路由卡的城市名 / 图注规则仍由 MuseRouteMap 默认参数保留。
+    testWidgets('已连接：地图上有本机名，出口国家高亮而不标城市名；没有图注行', (t) async {
       await _pumpHome(t, const Size(1000, 700));
       expect(find.byKey(const ValueKey('muse_route_label_home')), findsOneWidget);
-      expect(find.byKey(const ValueKey('muse_route_label_exit')), findsOneWidget);
-      expect(find.descendant(of: find.byKey(const ValueKey('muse_route_label_exit')), matching: find.text('东京')), findsNWidgets(2));
-      final caption = t.widget<Text>(find.byKey(const ValueKey('muse_route_caption')));
-      expect(caption.data, '上海 → 东京 · 实测 · 86 ms');
-      expect(caption.style!.fontSize, 13);
+      expect(find.byKey(const ValueKey('muse_route_label_exit')), findsNothing);
+      expect(t.widget<MuseRouteMap>(find.byType(MuseRouteMap)).highlightRegion, 'JP');
+      expect(find.byKey(const ValueKey('muse_route_caption')), findsNothing);
       await _done(t);
     });
 
@@ -229,16 +229,16 @@ void main() {
   });
 
   group('A4 首页按窗口宽度分栏', () {
-    testWidgets('1000 宽：双栏，左连接卡 + 路由图，右卡片；无节点栏', (t) async {
+    // 1.20.0: the map is inside the connect card (断言随改：左栏是融合后的连接卡)
+    testWidgets('1000 宽：双栏，左连接卡（含路由图），右卡片；无节点栏', (t) async {
       await _pumpHome(t, const Size(1000, 700));
       final left = t.getRect(find.byKey(const ValueKey('home_desk_left')));
       final right = t.getRect(find.byKey(const ValueKey('home_desk_right')));
       expect(right.left, greaterThan(left.right));
       expect(left.width / (left.width + right.width), closeTo(MuseDesk.leftShare, 0.02));
-      expect(find.descendant(of: find.byKey(const ValueKey('home_desk_left')), matching: find.byKey(const ValueKey('home_route_card'))), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('home_desk_left')), matching: find.byKey(const ValueKey('home_hero_map'))), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('home_connect_section')), matching: find.byKey(const ValueKey('home_hero_map'))), findsOneWidget);
       expect(find.descendant(of: find.byKey(const ValueKey('home_desk_right')), matching: find.byKey(const ValueKey('home_tiles'))), findsOneWidget);
-      // 连接卡在路由图上面
-      expect(t.getTopLeft(find.byKey(const ValueKey('home_connect_section'))).dy, lessThan(t.getTopLeft(find.byKey(const ValueKey('home_route_card'))).dy));
       expect(find.byKey(const ValueKey('home_side_nodes')), findsNothing);
       await _done(t);
     });
@@ -253,38 +253,38 @@ void main() {
     });
 
     // 1.19.2：电脑布局从 800（原 900）起；更窄的单栏也没有大标题「穿云」，顶部是同一行工具行（无测速）
-    testWidgets('799 宽：单栏（路由图在连接卡上面），无大标题、有工具行', (t) async {
+    // 1.20.0: 单栏里地图也在连接卡里（断言随改）
+    testWidgets('799 宽：单栏（路由图在连接卡里），无大标题、有工具行', (t) async {
       await _pumpHome(t, const Size(799, 700));
       expect(find.byKey(const ValueKey('home_desk_columns')), findsNothing);
       expect(find.byKey(const ValueKey('home_desk_toolbar')), findsOneWidget);
       expect(find.byKey(const ValueKey('home_desk_speedtest')), findsNothing);
       expect(find.byKey(const ValueKey('home_dashboard')), findsOneWidget);
-      expect(t.getTopLeft(find.byKey(const ValueKey('home_route_card'))).dy, lessThan(t.getTopLeft(find.byKey(const ValueKey('home_connect_section'))).dy));
+      expect(find.descendant(of: find.byKey(const ValueKey('home_connect_section')), matching: find.byKey(const ValueKey('home_hero_map'))), findsOneWidget);
       expect(find.text('穿云'), findsNothing);
       await _done(t);
     });
 
-    testWidgets('手机 390 宽：布局与 1.19.0 一致（无限高、无城市名以外的改动）', (t) async {
+    // 1.20.0 方向 A（断言随改）：手机上地图在连接卡里，高 = 卡宽 / 2.6（148–220）；连接钮 56 圆钮；没有图注行
+    testWidgets('手机 390 宽：单栏，地图在连接卡里、高度按卡宽，56 圆钮', (t) async {
       await _pumpHome(t, const Size(390, 844));
       expect(find.byKey(const ValueKey('home_desk_columns')), findsNothing);
       expect(find.byKey(const ValueKey('home_status_desk')), findsNothing);
-      // 地图按宽度 / 2.2，不限高
       final w = t.getSize(find.byKey(const ValueKey('muse_route_arc'))).width;
-      expect(_mapHeight(t), closeTo(w / 2.2, 0.5));
-      expect(t.getSize(find.byKey(const ValueKey('home_connect_press'))).width, MuseSize.startButton);
-      // 图注字号不变（12），手机布局高度与 1.19.0 一致
-      expect(t.widget<Text>(find.byKey(const ValueKey('muse_route_caption'))).style!.fontSize, 12);
+      expect(_mapHeight(t), closeTo(museHeroMapHeight(w), 0.5));
+      expect(t.getSize(find.byKey(const ValueKey('home_connect_press'))).width, MuseHomeA.button);
+      expect(find.byKey(const ValueKey('muse_route_caption')), findsNothing);
       await _done(t);
     });
   });
 
   group('A5 桌面连接卡', () {
-    testWidgets('按钮与状态同一行（中心 y 差 < 8）、按钮 56；节点名 ≥ 16 号', (t) async {
+    // 1.20.0 方向 A（断言随改）：电脑与手机同一张卡——状态 28 与时长 / 模式两行在左、56 圆钮在右并与这块垂直居中
+    testWidgets('按钮与状态块同一行（按钮居中于状态块，差 < 8）、按钮 56；节点名 ≥ 16 号', (t) async {
       await _pumpHome(t, const Size(1000, 700));
-      expect(find.byKey(const ValueKey('home_status_desk')), findsOneWidget);
       final button = t.getCenter(find.byKey(const ValueKey('home_connect_press')));
-      final label = t.getCenter(find.text('已连接'));
-      expect((button.dy - label.dy).abs(), lessThan(8));
+      final block = t.getCenter(find.byKey(const ValueKey('home_status_block')));
+      expect((button.dy - block.dy).abs(), lessThan(8));
       expect(t.getSize(find.byKey(const ValueKey('home_connect_press'))).width, MuseDesk.startButton);
       final name = t.widget<Text>(find.byKey(const ValueKey('home_node_name')));
       expect(name.style!.fontSize, greaterThanOrEqualTo(16));

@@ -434,7 +434,7 @@ void main() {
 
   group('版本 1.15.0', () {
     test('pubspec, changelog, CHANGELOG.md', () {
-      expect(_src('pubspec.yaml'), contains('version: 1.1')); // 1.15.0 or later
+      expect(_src('pubspec.yaml'), matches(RegExp(r'version: 1\.[1-9]\d\.'))); // 1.20.0: 1.1x and later (1.2x no longer contains 「1.1」) // 1.15.0 or later
       expect(museChangelog.containsKey('1.15.0'), isTrue);
       final lines = museChangelog['1.15.0']!.join();
       for (final w in ['为什么走这条', '应用', '通过另一个节点连接', '清空 DNS 缓存', 'DNS 泄漏检测', '按 Wi‑Fi 切换模式']) {

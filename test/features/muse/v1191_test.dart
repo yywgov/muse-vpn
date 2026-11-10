@@ -61,8 +61,9 @@ void main() {
     });
 
     testWidgets('标准档：按下 100ms 缩到 0.96，松开 160ms 回 1，结束后无帧', (t) async {
+      // 1.20.0: MuseStartButton no longer takes onBrand (the card is neutral in every state)
       var taps = 0;
-      await t.pumpWidget(_app(MuseStartButton(on: false, onBrand: false, onTap: () => taps++, semanticLabel: '连接')));
+      await t.pumpWidget(_app(MuseStartButton(on: false, onTap: () => taps++, semanticLabel: '连接')));
       final g = await t.startGesture(t.getCenter(find.byType(MuseStartButton)));
       await t.pump();
       expect(scale(t), MuseMotion.pressScale);
@@ -84,7 +85,7 @@ void main() {
     });
 
     testWidgets('取消（拖走）也回到 1', (t) async {
-      await t.pumpWidget(_app(MuseStartButton(on: false, onBrand: false, onTap: () {}, semanticLabel: '连接')));
+      await t.pumpWidget(_app(MuseStartButton(on: false, onTap: () {}, semanticLabel: '连接')));
       final g = await t.startGesture(t.getCenter(find.byType(MuseStartButton)));
       await t.pump();
       expect(t.state<MuseStartButtonState>(find.byType(MuseStartButton)).pressed, isTrue);
@@ -106,16 +107,16 @@ void main() {
         await t.pumpAndSettle();
       }
 
-      await check(_app(const MuseStartButton(on: false, onBrand: false, onTap: null, semanticLabel: '连接')));
+      await check(_app(const MuseStartButton(on: false, onTap: null, semanticLabel: '连接')));
       await check(
-        _app(MuseStartButton(on: false, onBrand: false, onTap: () {}, semanticLabel: '连接'), level: MuseMotionLevel.off),
+        _app(MuseStartButton(on: false, onTap: () {}, semanticLabel: '连接'), level: MuseMotionLevel.off),
       );
-      await check(_app(MuseStartButton(on: false, onBrand: false, onTap: () {}, semanticLabel: '连接'), systemOff: true));
+      await check(_app(MuseStartButton(on: false, onTap: () {}, semanticLabel: '连接'), systemOff: true));
     });
 
     testWidgets('精简档：保留 4% 缩放，时长 ×0.6、平稳曲线', (t) async {
       await t.pumpWidget(
-        _app(MuseStartButton(on: false, onBrand: false, onTap: () {}, semanticLabel: '连接'), level: MuseMotionLevel.reduced),
+        _app(MuseStartButton(on: false, onTap: () {}, semanticLabel: '连接'), level: MuseMotionLevel.reduced),
       );
       final g = await t.startGesture(t.getCenter(find.byType(MuseStartButton)));
       await t.pump();

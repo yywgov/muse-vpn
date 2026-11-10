@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 
 export 'package:hiddify/features/muse/widget/muse_motion.dart';
+export 'package:hiddify/features/muse/widget/muse_tokens_home.dart';
 
 /// Spacing scale (dp). Nothing else is used for gaps and paddings.
 abstract final class MuseSpace {

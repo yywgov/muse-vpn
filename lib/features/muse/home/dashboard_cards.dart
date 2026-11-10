@@ -168,7 +168,7 @@ class _ServicesTile extends HookConsumerWidget {
                   for (final sv in museServices.take(4))
                     '${sv.name} ${museServiceLabel(s.results[sv.key] ?? (s.checking ? MuseSvcState.checking : MuseSvcState.unknown), s.ms[sv.key], region: s.regions[sv.key])}',
                 ].join(' · '),
-          style: MuseType.caption(context),
+          style: museTileCaption(context),
         ),
       ),
       // 1.10.4: a tap checks again (unless a check is running) and shows the details
@@ -202,7 +202,7 @@ class _ServicesSheet extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s16),
             child: Row(
               children: [
-                Expanded(child: Text(running ? '经当前节点检测能否打开、所在地区与是否解锁，点「刷新」重新检测' : '连接后才能检测', style: MuseType.caption(context))),
+                Expanded(child: Text(running ? '经当前节点检测能否打开、所在地区与是否解锁，点「刷新」重新检测' : '连接后才能检测', style: museTileCaption(context))),
                 TextButton(
                   key: const ValueKey('services_refresh'),
                   onPressed: running && !s.checking
@@ -244,7 +244,7 @@ class _ServicesSheet extends ConsumerWidget {
                         museServiceLabel(st, s.ms[sv.key], region: s.regions[sv.key]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: MuseType.caption(context).copyWith(color: color),
+                        style: museTileCaption(context).copyWith(color: color),
                       ),
                     ),
                   ],
@@ -270,11 +270,11 @@ class _GroupsTile extends ConsumerWidget {
     final count = group?.items.length ?? 0;
     return _Tile(
       title: '代理组',
-      titleTrailing: group == null ? null : Text(museGroupTitle(group.tag), style: MuseType.caption(context)),
+      titleTrailing: group == null ? null : Text(museGroupTitle(group.tag), style: museTileCaption(context)),
       value: selected.isEmpty ? '—' : museNodeShortName(selected),
       bottom: Align(
         alignment: Alignment.bottomLeft,
-        child: Text(group == null ? '还没有节点' : '$count 个节点', style: MuseType.caption(context)),
+        child: Text(group == null ? '还没有节点' : '$count 个节点', style: museTileCaption(context)),
       ),
       onTap: () => context.goNamed('nodes'),
     );
@@ -307,7 +307,7 @@ class _ConnectionsTile extends ConsumerWidget {
       value: count == null ? '—' : '$count',
       bottom: Align(
         alignment: Alignment.bottomLeft,
-        child: Text(!running ? '未连接' : (error ?? '活动连接 · 最近请求 $requests'), style: MuseType.caption(context)),
+        child: Text(!running ? '未连接' : (error ?? '活动连接 · 最近请求 $requests'), style: museTileCaption(context)),
       ),
       onTap: () => context.go(museActivityLocation(MuseActivityTab.connections)),
     );
@@ -338,7 +338,7 @@ class _LanIpTile extends ConsumerWidget {
         alignment: Alignment.bottomLeft,
         child: Text(
           ips == null ? '' : (ips.length > 1 ? ips[1] : (first == null ? '没有局域网地址' : '点按复制')),
-          style: MuseType.caption(context),
+          style: museTileCaption(context),
         ),
       ),
       onTap: first == null
@@ -397,12 +397,12 @@ class _MemoryTile extends ConsumerWidget {
     final app = ProcessInfo.currentRss;
     return _Tile(
       title: '内存',
-      titleTrailing: Text('应用 ${museMemText(app)}', style: MuseType.caption(context)),
+      titleTrailing: Text('应用 ${museMemText(app)}', style: museTileCaption(context)),
       value: core > 0 ? museMemText(core) : '—',
       bottom: history.length < 2
           ? Align(
               alignment: Alignment.bottomLeft,
-              child: Text('内核', style: MuseType.caption(context)),
+              child: Text('内核', style: museTileCaption(context)),
             )
           : RepaintBoundary(
               child: SizedBox.expand(

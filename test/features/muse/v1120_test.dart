@@ -286,6 +286,8 @@ void main() {
       'WebSocket',
       // 1.18.0 P7: the bundled font and its licence (关于 › 开源许可与致谢)
       'Inter', 'SIL',
+      // 1.20.0: the map data credited on 关于 › 开源许可与致谢 (a proper name, public domain)
+      'Natural', 'Earth',
     };
     final ui = RegExp(
       r'''(?:\bText\(|\b(?:title|label|tooltip|hintText|labelText|helperText|subtitle|header|footer|message|hint|semanticsLabel)\s*:|\bshow(?:Success|Error|Info)Toast\(|\bmuseAskText\(\s*context\s*,)\s*(?:const\s+)?(?:Text\(\s*)?(['"])((?:\\.|(?!\1).)*?)\1''',
@@ -328,7 +330,7 @@ void main() {
 
   group('版本 1.12.0', () {
     test('pubspec and changelog', () {
-      expect(_src('pubspec.yaml'), contains('version: 1.1')); // 1.12.x or later
+      expect(_src('pubspec.yaml'), matches(RegExp(r'version: 1\.[1-9]\d\.'))); // 1.20.0: 1.1x and later (1.2x no longer contains 「1.1」) // 1.12.x or later
       final lines = museChangelog['1.12.0']!;
       expect(museChangelog.keys, contains('1.12.0'));
       expect(lines.join(), contains('解锁'));

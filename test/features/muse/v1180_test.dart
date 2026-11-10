@@ -14,7 +14,7 @@ import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart' show MuseStartButton, museSwitchSweepTimeout;
 import 'package:hiddify/features/muse/widget/muse_motion.dart';
 import 'package:hiddify/features/muse/widget/muse_motion_widgets.dart';
-import 'package:hiddify/features/muse/widget/muse_tokens.dart' show MuseFont, MuseSize;
+import 'package:hiddify/features/muse/widget/muse_tokens.dart' show MuseFont, MuseHomeA;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -236,32 +236,27 @@ void main() {
     });
   });
 
-  group('P2 连接按钮形变', () {
-    double radius(WidgetTester tester) {
-      final box = tester.widget<DecoratedBox>(
-        find.descendant(of: find.byKey(const ValueKey('home_connect_shape')), matching: find.byType(DecoratedBox)).first,
-      );
-      final shape = (box.decoration as ShapeDecoration).shape as RoundedSuperellipseBorder;
-      return (shape.borderRadius as BorderRadius).topLeft.x;
-    }
+  // 1.20.0 方向 A：连接钮改为 56 圆形中性钮，1.18 的圆 ↔ 圆角方形形变随实心主色按钮一起去掉（断言随改）：
+  // 各状态都是圆，只剩 ▶ / ❚❚ 交叉淡入；一次性、结束后无帧，关闭档直接终态。
+  group('P2 连接按钮（1.20.0：始终圆形）', () {
+    ShapeBorder shape(WidgetTester tester) =>
+        (tester.widget<DecoratedBox>(find.byKey(const ValueKey('home_connect_shape'))).decoration as ShapeDecoration)
+            .shape;
 
     Widget button(bool on, MuseMotionLevel level) =>
-        _app(MuseStartButton(key: const ValueKey('b'), on: on, onBrand: false, onTap: () {}, semanticLabel: '连接'), level: level);
+        _app(MuseStartButton(key: const ValueKey('b'), on: on, onTap: () {}, semanticLabel: '连接'), level: level);
 
-    testWidgets('标准：圆 → 圆角方形，弹簧一次性完成，内容独立交叉淡入', (tester) async {
+    testWidgets('标准：开 / 关都是圆，内容独立交叉淡入，结束后无帧', (tester) async {
       await tester.pumpWidget(button(false, MuseMotionLevel.standard));
-      expect(radius(tester), MuseStartButton.radiusOff);
-      expect(MuseStartButton.radiusOff, MuseSize.startButton / 2);
+      expect(shape(tester), isA<CircleBorder>());
+      expect(tester.getSize(find.byKey(const ValueKey('home_connect_shape'))), const Size.square(MuseHomeA.button));
       await tester.pumpWidget(button(true, MuseMotionLevel.standard));
       await tester.pump(const Duration(milliseconds: 60));
-      final mid = radius(tester);
-      expect(mid, lessThan(MuseStartButton.radiusOff));
-      expect(mid, greaterThan(MuseStartButton.radiusOn));
+      expect(shape(tester), isA<CircleBorder>());
       // the glyph cross-fades on its own (both icons present mid-way)
       expect(find.byIcon(Icons.pause_outlined), findsOneWidget);
       expect(find.byIcon(Icons.play_arrow_outlined), findsOneWidget);
       await tester.pumpAndSettle();
-      expect(radius(tester), closeTo(MuseStartButton.radiusOn, 0.01));
       expect(tester.binding.hasScheduledFrame, isFalse);
       expect(find.byIcon(Icons.play_arrow_outlined), findsNothing);
     });
@@ -270,22 +265,8 @@ void main() {
       await tester.pumpWidget(button(false, MuseMotionLevel.off));
       await tester.pumpWidget(button(true, MuseMotionLevel.off));
       await tester.pump();
-      expect(radius(tester), MuseStartButton.radiusOn);
+      expect(shape(tester), isA<CircleBorder>());
       expect(find.byIcon(Icons.play_arrow_outlined), findsNothing);
-      expect(tester.binding.hasScheduledFrame, isFalse);
-    });
-
-    testWidgets('精简档：无回弹、时长缩短', (tester) async {
-      await tester.pumpWidget(button(false, MuseMotionLevel.reduced));
-      await tester.pumpWidget(button(true, MuseMotionLevel.reduced));
-      var min = 100.0;
-      for (var i = 0; i < 20; i++) {
-        await tester.pump(const Duration(milliseconds: 10));
-        final r = radius(tester);
-        if (r < min) min = r;
-      }
-      expect(min, greaterThanOrEqualTo(MuseStartButton.radiusOn - 0.01)); // never past the target
-      await tester.pump(const Duration(milliseconds: 200));
       expect(tester.binding.hasScheduledFrame, isFalse);
     });
   });
@@ -429,14 +410,15 @@ void main() {
       // glyphs outside the subset (Chinese) use the bundled Chinese face, not the system font
       expect(MuseFont.fallback.first, MuseFont.cjk);
       expect('fontFamily: MuseFont.family'.allMatches(_src('lib/features/muse/nodes/node_rows.dart')).length, 4);
-      expect('fontFamily: MuseFont.family'.allMatches(_src('lib/features/muse/home/muse_home_page.dart')).length, 2);
+      // 1.20.0 方向 A: 3 on 首页 — the uptime, the node row's digits and the tiles' numbers (`museTileValue`)
+      expect('fontFamily: MuseFont.family'.allMatches(_src('lib/features/muse/home/muse_home_page.dart')).length, 3);
     });
   });
 
   group('版本 1.18.0', () {
     test('pubspec, changelog, CHANGELOG.md', () {
       // 1.19.0 and later: the 1.18.0 notes stay in the changelog, the version only moves forward
-      expect(_src('pubspec.yaml'), contains('version: 1.1'));
+      expect(_src('pubspec.yaml'), matches(RegExp(r'version: 1\.[1-9]\d\.'))); // 1.20.0: 1.1x and later (1.2x no longer contains 「1.1」)
       expect(museChangelog.keys, contains('1.18.0'));
       expect(museChangelog.keys.toList().indexOf('1.18.0'), lessThan(museChangelog.keys.toList().indexOf('1.17.1')));
       expect(museChangelog['1.18.0']!.join(), contains('动效'));

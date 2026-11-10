@@ -459,7 +459,17 @@ class MuseProtocolTag extends StatelessWidget {
 
 /// 32 dp rounded square with a flag emoji (or an icon for groups).
 class MuseFlagBox extends StatelessWidget {
-  const MuseFlagBox({super.key, this.flag, this.icon = Icons.public_outlined, this.onBrand = false, this.neutral = false});
+  const MuseFlagBox({
+    super.key,
+    this.flag,
+    this.icon = Icons.public_outlined,
+    this.onBrand = false,
+    this.neutral = false,
+    this.circle = false,
+  });
+
+  /// 1.20.0 首页连接卡：36 圆框（[MuseHomeA.flagBox]）
+  final bool circle;
 
   final String? flag;
   final IconData icon;
@@ -473,16 +483,17 @@ class MuseFlagBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mt = MuseTheme.of(context);
+    final side = circle ? MuseHomeA.flagBox : MuseSize.flagBox;
     return Container(
-      width: MuseSize.flagBox,
-      height: MuseSize.flagBox,
+      width: side,
+      height: side,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: onBrand ? mt.onHero.withValues(alpha: 0.1) : mt.inner,
-        borderRadius: MuseRadius.smallAll,
+        borderRadius: circle ? MuseRadius.fullAll : MuseRadius.smallAll,
       ),
       child: flag != null
-          ? Text(flag!, style: const TextStyle(fontSize: MuseIconSize.flag, height: 1.1))
+          ? Text(flag!, style: TextStyle(fontSize: circle ? MuseHomeA.flag : MuseIconSize.flag, height: 1.1))
           : Icon(
               icon,
               key: neutral ? const ValueKey('flag_box_neutral') : null,

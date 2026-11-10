@@ -208,7 +208,16 @@ double museWrapLon(double lon, {double center = museMapCenterLon}) {
 
 /// 1.19.2 地图取景：经度始终 360° 铺满宽度，纬度只取 [north]–[south] 这一段。
 class MuseMapView {
-  const MuseMapView(this.north, this.south);
+  const MuseMapView(this.north, this.south, [this.center = museMapCenterLon, this.span = 360]);
+
+  /// 1.20.0：中央经线（默认 [museMapCenterLon]）
+  final double center;
+
+  /// 1.20.0：宽度方向显示的经度跨度（默认 360°，整圈）
+  final double span;
+
+  /// 1.20.0：同一纬度取景、换中央经线
+  MuseMapView centered(double c) => MuseMapView(north, south, c, span);
 
   /// 1.19 的整幅（北 84° 到南 60°）
   static const full = MuseMapView(museMapNorth, museMapSouth);
@@ -217,13 +226,13 @@ class MuseMapView {
   final double south;
 
   @override
-  bool operator ==(Object other) => other is MuseMapView && other.north == north && other.south == south;
+  bool operator ==(Object other) => other is MuseMapView && other.north == north && other.south == south && other.center == center && other.span == span;
 
   @override
-  int get hashCode => Object.hash(north, south);
+  int get hashCode => Object.hash(north, south, center, span);
 
   @override
-  String toString() => 'MuseMapView($north, $south)';
+  String toString() => 'MuseMapView($north, $south, $center, $span)';
 }
 
 /// 取景时纬度跨度的下限（北纬 ~62° 到南纬 ~38°：伦敦、莫斯科、悉尼、圣保罗、开普敦都在内）与中心纬度。
@@ -242,8 +251,8 @@ MuseMapView museMapView(Size size) {
 /// 经纬度 → 画布坐标。[lon] 不再取模（大圆弧采样已展开成连续经度时用 [wrap] = false）。
 /// 1.19.2：[view] 是纬度取景（默认整幅）。
 Offset museProject(double lat, double lon, Size size, {bool wrap = true, MuseMapView view = MuseMapView.full}) {
-  final l = wrap ? museWrapLon(lon) : lon;
-  final x = (l - (museMapCenterLon - 180)) / 360 * size.width;
+  final l = wrap ? museWrapLon(lon, center: view.center) : lon;
+  final x = (l - (view.center - view.span / 2)) / view.span * size.width;
   final y = (view.north - lat) / (view.north - view.south) * size.height;
   return Offset(x, y);
 }
@@ -368,4 +377,52 @@ class MuseWorldDots {
 
   /// 第 (row, col) 格中心的经纬度。
   MuseGeoPoint cellCenter(int row, int col) => MuseGeoPoint(north - (row + 0.5) * step, -180 + (col + 0.5) * step);
+}
+
+
+/// 1.20.0：连接卡的取景——把本机 [home] 与目的地 [targets]（节点所在国家的点阵格中心与整条弧）一起框进 [size]：
+/// 经度跨度 = 两者跨度 × 1.3，至少 [minSpan]°、最多 360°；纬度按同一比例尺，内容的最北端放在地图高度 [topShare]
+/// 处（上面留给状态文字），内容纬度跨度不超过地图高度的 [fill]。
+MuseMapView museFitView(
+  Size size,
+  MuseGeoPoint home,
+  List<MuseGeoPoint> targets, {
+  double minSpan = 100,
+  double topShare = 0.24,
+  double fill = 0.48,
+}) {
+  if (size.isEmpty || targets.isEmpty) return MuseMapView.full;
+  // 经度按「离本机近的那一侧」展开
+  double rel(double lon) => museWrapLon(lon, center: home.lon);
+  var lo = home.lon;
+  var hi = home.lon;
+  var south = home.lat;
+  var north = home.lat;
+  for (final p in targets) {
+    final l = rel(p.lon);
+    lo = math.min(lo, l);
+    hi = math.max(hi, l);
+    south = math.min(south, p.lat);
+    north = math.max(north, p.lat);
+  }
+  final aspect = size.height / size.width;
+  var span = math.max(minSpan, (hi - lo) * 1.3);
+  final needLat = (north - south) / fill;
+  span = math.max(span, needLat / aspect).clamp(minSpan, 360.0);
+  final latSpan = span * aspect;
+  final top = north + topShare * latSpan;
+  return MuseMapView(top, top - latSpan, (lo + hi) / 2, span);
+}
+
+/// 1.20.0：两个取景之间按 [t]（0–1）插值——中央经线走近的一侧，跨度按比例（缩放看起来匀速）。
+MuseMapView museViewLerp(MuseMapView a, MuseMapView b, double t) {
+  if (t <= 0) return a;
+  if (t >= 1) return b;
+  double lerp(double x, double y) => x + (y - x) * t;
+  final bc = museWrapLon(b.center, center: a.center);
+  final span = a.span * math.pow(b.span / a.span, t).toDouble();
+  // keep the aspect: the latitude span scales with the longitude span
+  final midLat = lerp((a.north + a.south) / 2, (b.north + b.south) / 2);
+  final latSpan = (a.north - a.south) * math.pow((b.north - b.south) / (a.north - a.south), t).toDouble();
+  return MuseMapView(midLat + latSpan / 2, midLat - latSpan / 2, lerp(a.center, bc), span);
 }

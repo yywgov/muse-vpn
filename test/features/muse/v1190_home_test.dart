@@ -152,48 +152,52 @@ void _expectClassicCore() {
 
 void main() {
   group('首页样式开关', () {
-    testWidgets('默认新首页：顶部路由图 + 经典首页的全部功能', (tester) async {
+    // 1.20.0 方向 A：路由图并入连接卡（地图做卡底），不再是连接卡上方的单独卡片；图注行与节点行重复，去掉
+    // ——断言随改：地图在连接卡里，出口判断（实测 JP + 节点名东京 → 东京）改看地图的出口与高亮国家
+    testWidgets('默认新首页：路由图在连接卡里 + 经典首页的全部功能', (tester) async {
       final c = await _pumpHome(tester);
       expect(c.read(MusePrefs.homeStyle), 'new');
-      expect(find.byKey(const ValueKey('home_route_card')), findsOneWidget);
-      expect(find.byType(MuseRouteMap), findsOneWidget);
-      // 路由图在连接卡上方
+      expect(find.byKey(const ValueKey('home_route_card')), findsNothing);
       expect(
-        tester.getTopLeft(find.byKey(const ValueKey('home_route_card'))).dy,
-        lessThan(tester.getTopLeft(find.byKey(const ValueKey('home_connect_section'))).dy),
+        find.descendant(of: find.byKey(const ValueKey('home_connect_section')), matching: find.byType(MuseRouteMap)),
+        findsOneWidget,
       );
-      // 出口 IP 检测实测 JP + 节点名东京 → 东京（实测）
-      // 1.19.1 A3：图注末尾加当前节点延迟（「 · 86 ms」），前半句不变
-      expect(find.textContaining(RegExp(r'^上海 → 东京 · 实测( · \d+ ms)?$')), findsOneWidget);
+      final map = tester.widget<MuseRouteMap>(find.byType(MuseRouteMap));
+      expect(map.exit.city?.name, '东京');
+      expect(map.exit.source, MuseExitSource.measured);
+      expect(map.highlightRegion, 'JP');
+      expect(find.byKey(const ValueKey('muse_route_caption')), findsNothing);
       _expectClassicCore();
       await _done(tester);
     });
 
     testWidgets('经典首页：没有路由图，1.18 首页的关键元素都在', (tester) async {
       await _pumpHome(tester, prefs: {'muse_home_style': 'classic'});
-      expect(find.byKey(const ValueKey('home_route_card')), findsNothing);
+      expect(find.byKey(const ValueKey('home_hero_map')), findsNothing);
       expect(find.byType(MuseRouteMap), findsNothing);
       _expectClassicCore();
       await _done(tester);
     });
 
     testWidgets('切换后两种首页都能渲染', (tester) async {
+      // 1.20.0: the map is inside the connect card (key home_hero_map), not a route card of its own
       final c = await _pumpHome(tester);
-      expect(find.byKey(const ValueKey('home_route_card')), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_hero_map')), findsOneWidget);
       await c.read(MusePrefs.homeStyle.notifier).update('classic');
       await tester.pump(const Duration(milliseconds: 500));
-      expect(find.byKey(const ValueKey('home_route_card')), findsNothing);
+      expect(find.byKey(const ValueKey('home_hero_map')), findsNothing);
       _expectClassicCore();
       await c.read(MusePrefs.homeStyle.notifier).update('new');
       await tester.pump(const Duration(seconds: 3));
-      expect(find.byKey(const ValueKey('home_route_card')), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_hero_map')), findsOneWidget);
       _expectClassicCore();
       await _done(tester);
     });
 
     testWidgets('未连接：路由图显示「未连接」，不画弧线', (tester) async {
       await _pumpHome(tester, connected: false);
-      expect(find.byKey(const ValueKey('home_route_card')), findsOneWidget);
+      // 1.20.0: the map in the connect card (whose status says 未连接; the map's own caption is gone)
+      expect(find.byKey(const ValueKey('home_hero_map')), findsOneWidget);
       expect(find.text('未连接'), findsWidgets);
       expect(find.byKey(const ValueKey('home_route_legend')), findsNothing);
       await _done(tester);

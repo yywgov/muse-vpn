@@ -299,9 +299,10 @@ void main() {
       }
       // 网络接管 only on Windows (the test host is not)
       expect(find.byKey(const ValueKey('tile_takeover')), findsNothing);
-      expect(find.text('🇯🇵 东京 02'), findsOneWidget);
-      expect(find.text('192.168.1.23'), findsOneWidget);
-      expect(find.text('64.0 MB'), findsOneWidget);
+      // 1.20.0 方向 A: tile values are rich text (a number and its smaller unit, a no-break space between)
+      expect(find.text('🇯🇵 东京 02', findRichText: true), findsOneWidget);
+      expect(find.text('192.168.1.23', findRichText: true), findsOneWidget);
+      expect(find.text('64.0\u00A0MB', findRichText: true), findsOneWidget);
       expect(find.text('点按检测'), findsOneWidget, reason: '1.12.0: 服务状态 checks only when tapped');
       final a = tester.getSize(find.byKey(const ValueKey('tile_speed')));
       expect(a.width, lessThan(390 / 2));

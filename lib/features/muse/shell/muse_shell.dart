@@ -266,12 +266,13 @@ class MuseDock extends StatelessWidget {
         ),
       );
     }
+    // 1.20.0 方向 A: the bar lines up with the cards above (the page margin, the cards' 20 corners)
     return Padding(
-      padding: EdgeInsets.fromLTRB(MuseSpace.s12, 0, MuseSpace.s12, bottom + MuseSpace.s8),
+      padding: EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, bottom + MuseSpace.s8),
       child: Material(
         key: const ValueKey('muse_dock_floating'),
         color: MuseSurface.card.color(scheme),
-        shape: MuseShape.xxl,
+        shape: MuseShape.of(MuseHomeA.radiusCard),
         clipBehavior: Clip.antiAlias,
         child: Padding(
           padding: const EdgeInsets.all(MuseSpace.s4),
@@ -304,7 +305,8 @@ class _DockItem extends StatelessWidget {
       style: MuseTextLevel.caption1.style(
         context,
         color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
-        weight: selected ? FontWeight.w600 : FontWeight.w500,
+        // 1.20.0: the two weights the Chinese face has (600 / 400)
+        weight: selected ? FontWeight.w600 : FontWeight.w400,
       ),
     );
     final Widget content = block
@@ -312,7 +314,8 @@ class _DockItem extends StatelessWidget {
             key: const ValueKey('muse_dock_indicator'),
             duration: museMotion(context),
             margin: const EdgeInsets.symmetric(horizontal: MuseSpace.s4),
-            decoration: ShapeDecoration(color: fill, shape: MuseShape.xl),
+            // concentric with the bar's 20 corners (4 inside)
+            decoration: ShapeDecoration(color: fill, shape: MuseShape.of(MuseHomeA.radiusCard - MuseSpace.s4)),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [icon, const SizedBox(height: MuseSpace.s4), text],
