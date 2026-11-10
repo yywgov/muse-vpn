@@ -10,7 +10,8 @@ String _src(String p) => File(p).readAsStringSync();
 void main() {
   group('1.17.1 节点页去掉「最近」行', () {
     test('node list no longer builds the recent chip row, still records recent nodes', () {
-      final s = _src('lib/features/muse/nodes/node_list.dart');
+      // 1.20.1：节点工具函数（含 musePickNode）移到 node_actions.dart（同一库的 part），两处一起读
+      final s = _src('lib/features/muse/nodes/node_list.dart') + _src('lib/features/muse/nodes/node_actions.dart');
       expect(s, isNot(contains("ValueKey('node_recent_row')")));
       expect(s, isNot(contains('node_recent_\$')));
       expect(s, isNot(contains('museRecentToOffer(')));
