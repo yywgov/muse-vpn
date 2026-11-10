@@ -28,7 +28,8 @@ Rule _r(String name, {Outbound o = Outbound.proxy, int order = 0, bool enabled =
 void main() {
   group('#7 IPv6 policy', () {
     test('关闭 keeps the saved values; 优先 v4 / v6 set the tunnel and DNS', () {
-      expect(museIpv6Options(MuseIpv6Policy.off), isNull);
+      // 1.20.1：关闭时 DNS 策略 ipv4_only（原断言「关闭 = null，沿用 AsIS」删去）
+      expect(museIpv6Options(MuseIpv6Policy.off), (mode: IPv6Mode.disable, strategy: DomainStrategy.ipv4Only));
       expect(museIpv6Options(MuseIpv6Policy.preferV4), (mode: IPv6Mode.enable, strategy: DomainStrategy.preferIpv4));
       expect(museIpv6Options(MuseIpv6Policy.preferV6), (mode: IPv6Mode.prefer, strategy: DomainStrategy.preferIpv6));
       expect(MuseIpv6Policy.fromKey('nonsense'), MuseIpv6Policy.off);

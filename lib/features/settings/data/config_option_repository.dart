@@ -636,9 +636,11 @@ class ConfigOptionRepository with ExceptionHandler, InfraLogger {
       );
 }
 
-/// 1.5.0 #7: what an IPv6 choice sets; null = 关闭 (the saved ipv6-mode / DNS strategies as before).
+/// 1.5.0 #7: what an IPv6 choice sets.
+/// 1.20.1：关闭（默认）时远程 / 直连 DNS 策略为 ipv4_only（原来沿用 AsIS，仍会查 AAAA；系统代理模式下每个新境外域名
+/// 首访多等一个经节点的往返）。sing-box 在 ipv4_only 下对 AAAA 直接回空，是标准行为。
 ({IPv6Mode mode, DomainStrategy strategy})? museIpv6Options(MuseIpv6Policy policy) => switch (policy) {
-  MuseIpv6Policy.off => null,
+  MuseIpv6Policy.off => (mode: IPv6Mode.disable, strategy: DomainStrategy.ipv4Only),
   MuseIpv6Policy.preferV4 => (mode: IPv6Mode.enable, strategy: DomainStrategy.preferIpv4),
   MuseIpv6Policy.preferV6 => (mode: IPv6Mode.prefer, strategy: DomainStrategy.preferIpv6),
 };
