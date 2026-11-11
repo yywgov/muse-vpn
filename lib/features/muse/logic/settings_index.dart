@@ -11,7 +11,8 @@ enum MuseSettingPage {
   advanced('设置 › 网络 › 高级'),
   appearance('设置 › 外观'),
   nodes('节点 › ⋯ › 节点设置'),
-  routing('订阅 › 规则 › 分流'),
+  // 1.20.2：订阅页并入节点页，分流规则搬到设置「网络」下面
+  routing('设置 › 分流规则'),
   network('设置 › 网络'),
   // 1.11.0: 备份与同步 is gone; what is left (导出 / 导入配置) is on 关于
   sync('设置 › 关于 › 导出 / 导入配置'),
@@ -28,9 +29,11 @@ enum MuseSettingPage {
   // 1.9.0
   autoConnect('设置 › 自动连接'),
   // 1.9.0 #17
-  overrides('订阅 › 规则 › 订阅覆写'),
+  // 1.20.2：单个订阅在 节点 › 订阅名 ▾ › ⋮ › 订阅覆写；搜索打开全部订阅的覆写一览
+  overrides('节点 › 订阅名 ▾ › ⋮ › 订阅覆写'),
   // 1.10.0
-  subscriptions('订阅 › ⋯'),
+  // 1.20.2：订阅弹层（节点页标题「订阅名 ▾」）
+  subscriptions('节点 › 订阅名 ▾ › ⋯'),
   openSource('设置 › 关于 › 开源许可与致谢'),
   // 1.11.0: rows folded into 「高级」 on their page
   nodesAdvanced('节点 › ⋯ › 节点设置 › 高级'),
@@ -73,6 +76,8 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('隐藏通知', MuseSettingPage.appearance, keywords: ['通知', '隐私'], androidOnly: true),
   MuseSettingEntry('去广告', MuseSettingPage.routing, keywords: ['广告', '拦截', '温和', '强力']),
   MuseSettingEntry('订阅自动更新', MuseSettingPage.subscriptions, keywords: ['更新间隔', '订阅']),
+  // 1.20.2：订阅页没有了，搜索「订阅」打开订阅弹层
+  MuseSettingEntry('订阅列表', MuseSettingPage.subscriptions, keywords: ['订阅', '切换订阅', '添加订阅', '全部更新']),
   MuseSettingEntry('分应用代理', MuseSettingPage.perApp, keywords: ['应用', 'App', '绕过'], androidOnly: true),
   // 1.10.0: 设置 › 节点 is 节点 › ⋯ › 节点设置 now
   MuseSettingEntry('节点', MuseSettingPage.nodes, keywords: ['节点设置', '订阅 UA', '测速记录']),
@@ -84,7 +89,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('订阅更新方式', MuseSettingPage.nodes, keywords: ['走代理', '直连', '订阅下载']),
   MuseSettingEntry('清除测速记录', MuseSettingPage.nodes, keywords: ['延迟', '缓存']),
   MuseSettingEntry('订阅覆写', MuseSettingPage.overrides, keywords: ['覆写', '覆写脚本', '追加节点', '代理组', '自定义规则', 'override']),
-  MuseSettingEntry('规则', MuseSettingPage.routing, keywords: ['路由规则', '分流', '自定义规则列表']),
+  MuseSettingEntry('分流规则', MuseSettingPage.routing, keywords: ['规则', '路由规则', '分流', '自定义规则列表']),
   MuseSettingEntry('分流预设', MuseSettingPage.routing, keywords: ['规则', 'ChatGPT', 'Netflix', 'Telegram', '国内直连']),
   MuseSettingEntry('指定节点', MuseSettingPage.routing, keywords: ['网站走某个节点', '应用走某个节点']),
   MuseSettingEntry('远程规则集', MuseSettingPage.routing, keywords: ['规则订阅', 'rule-set']),

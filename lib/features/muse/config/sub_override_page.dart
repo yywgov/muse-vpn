@@ -52,6 +52,18 @@ class MuseSubOverridePage extends HookConsumerWidget {
 
     return MuseScaffold(
       title: '覆写 · $profileName',
+      // 1.20.2：编辑覆写 JSON（原在 规则 › ⋯）——这个订阅自己的
+      actions: [
+        PopupMenuButton<String>(
+          key: const ValueKey('override_more'),
+          tooltip: '更多',
+          icon: const Icon(Icons.more_horiz_outlined),
+          onSelected: (_) => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => MuseOverrideJsonPage(profileId: profileId, profileName: profileName)),
+          ),
+          itemBuilder: (_) => const [PopupMenuItem(key: ValueKey('override_more_json'), value: 'json', child: Text('编辑覆写 JSON'))],
+        ),
+      ],
       body: MuseGroupedBody(
         children: [
           MuseSection(

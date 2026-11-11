@@ -20,6 +20,7 @@ import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/muse/activity/activity_page.dart';
 import 'package:hiddify/features/muse/config/rules_page.dart';
+import 'package:hiddify/features/muse/nodes/subs_sheet.dart' show museOpenSubscriptions;
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/logic/core_kind.dart';
@@ -41,6 +42,8 @@ List<String> museSettingsHomeRows({required bool android, required bool develope
   '自动连接',
   if (android) '分应用代理',
   '网络',
+  // 1.20.2：订阅页并入节点页，分流规则搬到「网络」下面
+  '分流规则',
   '活动',
   '内核与资源',
   '关于',
@@ -88,7 +91,7 @@ class SettingsPage extends HookConsumerWidget {
         case MuseSettingPage.overrides:
           museOpenRules(context, tab: MuseRulesTab.overrides);
         case MuseSettingPage.subscriptions:
-          context.goNamed('config');
+          museOpenSubscriptions(context, ref);
         case MuseSettingPage.stats:
           context.go(museActivityLocation(MuseActivityTab.stats));
         case MuseSettingPage.diagnose:
@@ -160,6 +163,14 @@ class SettingsPage extends HookConsumerWidget {
                 title: '网络',
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseNetworkPage()),
+              ),
+              // 1.20.2：订阅页并入节点页后，分流是全局设置，放在「网络」下面
+              MuseTile(
+                key: const ValueKey('settings_rules'),
+                leading: const Icon(Icons.rule_outlined),
+                title: '分流规则',
+                chevron: true,
+                onTap: () => museOpenRules(context),
               ),
               // 1.8.0; 1.10.0: + 统计 / 诊断 tabs
               MuseTile(

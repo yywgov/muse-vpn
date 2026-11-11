@@ -12,6 +12,7 @@
 //   /log?n=<lines>              1.19.0: the last lines of this run's in-memory log (diagnostics)
 //   /go?route=<name>            1.6.0: opens a page by route name (config, settings, about, connections…)
 //   /sheet?name=add-profile     1.6.0: opens the 添加订阅 sheet
+//   /subs                       1.20.2: whether the 订阅 sheet / panel is open (/go?route=config opens it)
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'dart:async';
@@ -26,6 +27,7 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
 import 'package:hiddify/features/muse/desktop/connection_keeper.dart';
+import 'package:hiddify/features/muse/nodes/subs_sheet.dart' show museSubsSheetOpen;
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
@@ -123,6 +125,8 @@ abstract final class MuseSmokeControl {
         if (uri.queryParameters['name'] != 'add-profile') return {'ok': false};
         unawaited(c.read(bottomSheetsNotifierProvider.notifier).showAddProfile());
         return {'ok': true};
+      case '/subs':
+        return {'ok': true, 'open': museSubsSheetOpen};
       case '/log':
         final n = int.tryParse(uri.queryParameters['n'] ?? '') ?? 400;
         final all = logRing.records.map(formatRecord).toList();

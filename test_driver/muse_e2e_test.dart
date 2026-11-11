@@ -212,7 +212,28 @@ Future<void> pages(String theme) async {
     await cmd('go:$page');
     // the installed-app list loads from the system first
     await shot('$theme-${(i + 3).toString().padLeft(2, '0')}-$page', settleMs: page == 'appList' ? 6000 : 1600);
+    // 1.20.2: config is no tab any more — the old route opens the 订阅 sheet on 节点, once; the next
+    // page closes it (it sits on the root navigator, above the tabs)
+    if (page == 'config') {
+      final open = await cmd('subs');
+      if (open != 'open:1') failures.add('$theme: go:config did not open the 订阅 sheet exactly once ($open)');
+    } else if (page == 'settings') {
+      final open = await cmd('subs');
+      if (open != 'open:0') failures.add('$theme: the 订阅 sheet stayed open on 设置 ($open)');
+    }
   }
+  // 1.20.2: the 节点 title (订阅名 ▾) found by its key, not by a position on screen
+  await cmd('go:nodes');
+  try {
+    await driver.tap(find.byValueKey('nodes_sub_switcher'), timeout: const Duration(seconds: 10));
+    await shot('$theme-13b-subs-sheet');
+    final open = await cmd('subs');
+    if (open != 'open:1') failures.add('$theme: tapping 订阅名 ▾ did not open the 订阅 sheet ($open)');
+  } catch (e) {
+    failures.add('$theme: 订阅名 ▾ not found on 节点: $e');
+  }
+  await cmd('back');
+  await sleep(600);
   await cmd('go:home');
   await sleep(800);
   await cmd('sheet');

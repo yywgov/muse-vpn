@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
+import 'package:hiddify/features/muse/nodes/subs_sheet.dart' show museCloseSubsSheet;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 export 'package:hiddify/features/muse/shell/muse_shell.dart';
@@ -55,6 +56,11 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         HardwareKeyboard.instance.removeHandler(handler);
       };
     }, [isMobileBreakpoint, showProfilesAction, navigationShell.currentIndex]);
+    // 1.20.2：地址变了（托盘、快捷方式、深链跳到别的页面）就关掉还开着的订阅弹层（它在根导航上，不会随分支切走）
+    useEffect(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) => museCloseSubsSheet());
+      return null;
+    }, [location]);
     // Owns the system back press for the whole shell.
     //
     // It has to sit here, on the visible shell, and nowhere else. A PopScope

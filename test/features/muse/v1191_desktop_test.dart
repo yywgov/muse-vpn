@@ -306,11 +306,13 @@ void main() {
   });
 
   group('A6 桌面首页工具行', () {
-    testWidgets('宽屏：没有大标题「穿云」，换成「订阅名 · N 个节点」+ 测速 + 编辑首页', (t) async {
+    testWidgets('宽屏：没有大标题「穿云」，换成「订阅名 ▾」+ 测速 + 编辑首页', (t) async {
       await _pumpHome(t, const Size(1000, 700));
       expect(find.byKey(const ValueKey('muse_page_title')), findsNothing);
       expect(find.text('穿云'), findsNothing);
-      expect(find.text('机场订阅 · 3 个节点'), findsOneWidget);
+      // 1.20.2：只留订阅名（可点「订阅名 ▾」打开订阅弹层），节点数去掉
+      expect(find.text('机场订阅'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_sub_switcher')), findsOneWidget);
       expect(find.byKey(const ValueKey('home_desk_speedtest')), findsOneWidget);
       expect(find.byKey(const ValueKey('home_edit_button')), findsOneWidget);
       expect(t.getSize(find.byKey(const ValueKey('home_desk_toolbar'))).height, MuseDesk.toolRow);
@@ -370,7 +372,8 @@ void main() {
       final ps = File('tool/smoke/app_smoke.ps1').readAsStringSync();
       final h = MuseSidebar.headerHeight.toInt();
       final i = MuseSidebar.itemHeight.toInt();
-      expect(ps.contains('(32 + $h + $i * 2 + ${i ~/ 2})'), isTrue, reason: 'header $h, item $i');
+      // 1.20.2：三栏，点第 2 项「节点」（原来点第 3 项「订阅」）
+      expect(ps.contains('(32 + $h + $i * 1 + ${i ~/ 2})'), isTrue, reason: 'header $h, item $i');
       expect(MuseSize.titleBar, 32);
     });
   });
@@ -452,7 +455,7 @@ void main() {
 
     for (final large in [true, false]) {
       testWidgets('1600 宽（${large ? '大标题页' : '普通页'}）：标题 24 / w600，与卡片左边缘对齐；内容宽 840', (t) async {
-        await _pumpShell(t, const Size(1600, 1000), index: 3, child: page(large: large));
+        await _pumpShell(t, const Size(1600, 1000), index: 2, /* 1.20.2：三栏，设置是第 3 项 */ child: page(large: large));
         final title = t.widget<Text>(find.byKey(const ValueKey('muse_page_title')));
         expect(title.style!.fontSize, 24);
         expect(title.style!.fontWeight, FontWeight.w600);

@@ -48,14 +48,21 @@ Future<(ProviderContainer, SharedPreferences)> _pump(WidgetTester t, {MuseRulesT
 }
 
 void main() {
-  testWidgets('两个标签：分流（含自定义规则列表入口）与订阅覆写', (t) async {
+  // 1.20.2：两个标签拆成两页——「分流规则」（设置 › 网络 下面）与「订阅覆写」一览（设置搜索）
+  testWidgets('分流规则（含自定义规则列表入口）与订阅覆写一览', (t) async {
     await _pump(t);
-    expect(find.byKey(const ValueKey('rules_tab_routing')), findsOneWidget);
-    expect(find.byKey(const ValueKey('rules_tab_overrides')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rules_routing_page')), findsOneWidget);
+    expect(find.text('分流规则'), findsOneWidget);
+    expect(find.byKey(const ValueKey('rules_tabs')), findsNothing);
     expect(find.byKey(const ValueKey('routing_presets')), findsOneWidget);
     expect(find.byKey(const ValueKey('routing_rule_list')), findsOneWidget);
-    await t.tap(find.byKey(const ValueKey('rules_tab_overrides')));
     await t.pumpAndSettle();
+  });
+
+  testWidgets('订阅覆写一览（设置搜索「订阅覆写」）', (t) async {
+    await _pump(t, tab: MuseRulesTab.overrides);
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('rules_overrides_page')), findsOneWidget);
     expect(find.byKey(const ValueKey('override_profile_p0')), findsOneWidget);
     expect(find.text('未设置'), findsOneWidget);
     expect(find.text('规则 1'), findsOneWidget);
@@ -107,18 +114,21 @@ void main() {
     expect(museParseOverrides(sp.getString('muse_sub_overrides')!)['p0']!.rules.single.value, 'example.com');
   });
 
-  test('旧入口都打开「规则」：订阅页、设置、设置搜索', () {
+  // 1.20.2：订阅页不再是一个标签（并入节点页）；设置首页「分流规则」、设置搜索都打开新页
+  test('旧入口都打开「规则」：设置「分流规则」、设置搜索（订阅页并入节点页）', () {
     final config = File('lib/features/muse/config/muse_config_page.dart').readAsStringSync();
     expect(config, contains('profile_rules_entry'));
     expect(config, contains('museOpenRules(context)'));
     expect(config, isNot(contains("goNamed('routingOptions')")));
     expect(config, isNot(contains('profile_override_placeholder')));
     final settings = File('lib/features/settings/overview/settings_page.dart').readAsStringSync();
+    expect(settings, contains("ValueKey('settings_rules')"));
+    expect(settings, contains("title: '分流规则'"));
     expect(settings, contains('case MuseSettingPage.routing:\n          museOpenRules(context);'));
     expect(settings, contains('museOpenRules(context, tab: MuseRulesTab.overrides)'));
     expect(settings, isNot(contains('musePushPage(context, const MuseRoutingPage())')));
     expect(museSearchSettings('覆写', android: true, windows: false).first.page, MuseSettingPage.overrides);
     expect(museSearchSettings('路由规则', android: true, windows: false).map((e) => e.page), contains(MuseSettingPage.routing));
-    expect(MuseSettingPage.routing.path, '订阅 › 规则 › 分流'); // 1.10.0: the only entry is under 订阅
+    expect(MuseSettingPage.routing.path, '设置 › 分流规则'); // 1.20.2：在设置「网络」下面（1.10.0 起在 订阅 › 规则）
   });
 }

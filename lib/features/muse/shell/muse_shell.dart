@@ -22,13 +22,15 @@ const desktopContentMaxWidth = MuseDesk.contentMax;
 /// 穿云 1.3.0: 首页 gets more room.
 const desktopHomeMaxWidth = 1280.0;
 
-/// 首页 / 节点 / 订阅 / 设置 (icon + label).
+/// 首页 / 节点 / 设置 (icon + label). 1.20.2：「订阅」并入节点页（标题「订阅名 ▾」与订阅弹层），底栏 4→3。
 final museShellActions = [
   ShellRouteAction(Icons.home_outlined, '首页'),
   ShellRouteAction(Icons.language_outlined, '节点'),
-  ShellRouteAction(Icons.link_outlined, '订阅'),
   ShellRouteAction(Icons.settings_outlined, '设置'),
 ];
+
+/// 剪贴板里有订阅链接时带小圆点的栏位：1.20.2 起是「节点」（添加订阅的地方）。
+const museOfferTabIndex = 1;
 
 /// Extra sidebar entries on a wide window (pages under 设置, opened by route name).
 class MuseShellExtra {
@@ -89,7 +91,7 @@ class MuseShellFrame extends ConsumerWidget {
       final ic = Icon(museShellActions[i].icon, color: color);
       // 1.10.0: no unread dot on 设置 (关于 has no 更新内容 row any more; a feature release still
       // shows its notes once by itself)
-      return i == 2 && offer ? Badge(smallSize: MuseSize.dot, backgroundColor: scheme.primary, child: ic) : ic;
+      return i == museOfferTabIndex && offer ? Badge(smallSize: MuseSize.dot, backgroundColor: scheme.primary, child: ic) : ic;
     }
 
     final index = currentIndex < museShellActions.length ? currentIndex : 0;

@@ -19,10 +19,11 @@ void main() {
   // 1.11.0: 备份与同步 removed (导出 / 导入配置 on 关于) — seven rows
   group('#7 设置首页 8 项', () {
     test('Android: 外观, 自动连接, 分应用代理, 网络, 活动, 内核与资源, 关于', () {
-      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '自动连接', '分应用代理', '网络', '活动', '内核与资源', '关于']);
+      // 1.20.2：「网络」下面加「分流规则」（订阅页并入节点页）
+      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '自动连接', '分应用代理', '网络', '分流规则', '活动', '内核与资源', '关于']);
     });
     test('Windows has no 分应用代理; 开发者选项 only once turned on', () {
-      expect(museSettingsHomeRows(android: false, developer: false), hasLength(6));
+      expect(museSettingsHomeRows(android: false, developer: false), hasLength(7)); // 1.20.2：+ 分流规则
       expect(museSettingsHomeRows(android: false, developer: false), isNot(contains('分应用代理')));
       expect(museSettingsHomeRows(android: true, developer: true).last, '开发者选项');
     });
@@ -96,8 +97,9 @@ void main() {
   group('#5 规则入口只留「订阅 › 规则」', () {
     test('分流 / 订阅覆写 search lands on the 规则 page under 订阅', () {
       expect(_first('分流'), MuseSettingPage.routing);
-      expect(MuseSettingPage.routing.path, '订阅 › 规则 › 分流');
-      expect(MuseSettingPage.overrides.path, '订阅 › 规则 › 订阅覆写');
+      // 1.20.2：订阅页并入节点页——分流规则在设置「网络」下面，订阅覆写跟着订阅的 ⋮
+      expect(MuseSettingPage.routing.path, '设置 › 分流规则');
+      expect(MuseSettingPage.overrides.path, '节点 › 订阅名 ▾ › ⋮ › 订阅覆写');
     });
     test('覆写 JSON is in 规则 › ⋯, not in 设置', () {
       expect(_src('lib/features/muse/config/rules_page.dart'), contains("ValueKey('rules_more_override_json')"));

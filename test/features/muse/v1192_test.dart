@@ -534,7 +534,8 @@ void main() {
       final smoke = File('tool/smoke/app_smoke.ps1').readAsStringSync();
       expect(smoke, contains(r'$x = $r.L + [int](32 * $scale)'));
       expect(32, lessThan(MuseSize.navRailCollapsed));
-      expect(smoke, contains('(32 + 48 + 52 * 2 + 26)'));
+      // 1.20.2：三栏，点第 2 项「节点」
+      expect(smoke, contains('(32 + 48 + 52 * 1 + 26)'));
     });
   });
 }

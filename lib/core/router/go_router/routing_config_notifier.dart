@@ -13,12 +13,12 @@ import 'package:hiddify/features/about/widget/about_page.dart';
 import 'package:hiddify/features/about/widget/open_source_page.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
 import 'package:hiddify/features/muse/activity/activity_page.dart';
-import 'package:hiddify/features/muse/config/muse_config_page.dart';
 import 'package:hiddify/features/muse/desktop/launch_control.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/nodes/muse_nodes_page.dart';
+import 'package:hiddify/features/muse/nodes/subs_sheet.dart' show museRequestSubsSheet, museSubsSheetPendingProvider;
 import 'package:hiddify/features/muse/settings/per_app_proxy_page.dart';
 import 'package:hiddify/features/profile/details/profile_details_page.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_notifier.dart';
@@ -37,7 +37,6 @@ part 'routing_config_notifier.g.dart';
 final branchesScope = <String, FocusScopeNode>{
   'home': FocusScopeNode(),
   'nodes': FocusScopeNode(),
-  'config': FocusScopeNode(),
   'settings': FocusScopeNode(),
 };
 
@@ -47,7 +46,9 @@ final loadingConfig = RoutingConfig(
 );
 
 // 穿云 1.3.0: four tabs, 首页 / 节点 / 订阅 / 设置, on every form factor.
-const mobileBranches = ['home', 'nodes', 'config', 'settings'];
+// 1.20.2：三栏 首页 / 节点 / 设置——订阅并入节点页（标题「订阅名 ▾」打开订阅弹层），订阅子页挂在 /nodes 下，
+// 旧地址 /config（快捷方式、托盘、冒烟脚本、旧深链）重定向到 /nodes 并打开弹层（只开一次）。
+const mobileBranches = ['home', 'nodes', 'settings'];
 
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => mobileBranches[index];
 
@@ -67,80 +68,8 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
   RoutingConfig build() {
     final isMobileBreakpoint = ref.watch(isMobileBreakpointProvider);
     if (isMobileBreakpoint == null) return loadingConfig;
-    return RoutingConfig(
-      redirect: (context, state) {
-        // fix path-parameters for deep link
-        String? url;
-        if (LinkParser.protocols.contains(state.uri.scheme)) {
-          // Android & iOS deep link
-          url = state.uri.toString();
-        } else if (PlatformUtils.isDesktop && newUrlFromAppLink.isNotEmpty) {
-          // Desktops deep link
-          url = newUrlFromAppLink;
-          newUrlFromAppLink = '';
-        } else if (state.uri.queryParameters['url'] != null) {
-          url = state.uri.queryParameters['url'];
-        }
-
-        // 穿云 1.4.1: chuanyun://connect[?node=] / chuanyun://disconnect
-        final control = url == null ? null : museParseDeepLink(url);
-        if (control != null && (control.connect || control.disconnect)) {
-          unawaited(museApplyLaunchControl(ref, MuseCliArgs(connect: control.connect, disconnect: control.disconnect, node: control.node)));
-          return '/home';
-        }
-        // 穿云 1.12.0: launcher shortcuts
-        final quick = control?.quick;
-        if (quick != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(museRunQuickAction(ref, quick)));
-          return quick == MuseQuickAction.speedtest ? '/nodes' : '/home';
-        }
-        if (url != null && Uri.parse(url).host == 'import') {
-          // Auto import profile from url
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(url: url, triggeredByDeepLink: true),
-          );
-          return '/home';
-        } else if (url != null) {
-          final uri = Uri.parse(url);
-          final path = uri.path + (uri.hasQuery ? "?${uri.query}" : "");
-          return path.isEmpty ? '/home' : path;
-        }
-        return null;
-      },
-      routes: <RouteBase>[
-        StatefulShellRoute.indexedStack(
-          builder: (_, state, navigationShell) => MyAdaptiveLayout(
-            navigationShell: navigationShell,
-            isMobileBreakpoint: isMobileBreakpoint,
-            showProfilesAction: false,
-            location: state.uri.path,
-          ),
-          branches: <StatefulShellBranch>[
-            StatefulShellBranch(
-              routes: <GoRoute>[
-                GoRoute(
-                  name: 'home',
-                  path: '/home',
-                  builder: (_, _) => FocusScope(node: branchesScope['home'], child: const MuseHomePage()),
-                ),
-              ],
-            ),
-            StatefulShellBranch(
-              routes: <GoRoute>[
-                GoRoute(
-                  name: 'nodes',
-                  path: '/nodes',
-                  builder: (_, _) => FocusScope(node: branchesScope['nodes'], child: const MuseNodesPage()),
-                ),
-              ],
-            ),
-            StatefulShellBranch(
-              routes: <GoRoute>[
-                GoRoute(
-                  name: 'config',
-                  path: '/config',
-                  builder: (_, _) => FocusScope(node: branchesScope['config'], child: const MuseConfigPage()),
-                  routes: <GoRoute>[
+    // 1.20.2：原订阅页的子页（订阅详情、路由选项…）挂在 /nodes 下，路由名不变
+    final configChildren = <GoRoute>[
                     _slide('profileDetails', 'profile-details/:id', (state) => ProfileDetailsPage(id: state.pathParameters['id']!)),
                     GoRoute(
                       name: 'routingOptions',
@@ -197,7 +126,82 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                         ),
                       ],
                     ),
-                  ],
+    ];
+    return RoutingConfig(
+      redirect: (context, state) {
+        // fix path-parameters for deep link
+        String? url;
+        if (LinkParser.protocols.contains(state.uri.scheme)) {
+          // Android & iOS deep link
+          url = state.uri.toString();
+        } else if (PlatformUtils.isDesktop && newUrlFromAppLink.isNotEmpty) {
+          // Desktops deep link
+          url = newUrlFromAppLink;
+          newUrlFromAppLink = '';
+        } else if (state.uri.queryParameters['url'] != null) {
+          url = state.uri.queryParameters['url'];
+        }
+
+        // 穿云 1.4.1: chuanyun://connect[?node=] / chuanyun://disconnect
+        final control = url == null ? null : museParseDeepLink(url);
+        if (control != null && (control.connect || control.disconnect)) {
+          unawaited(museApplyLaunchControl(ref, MuseCliArgs(connect: control.connect, disconnect: control.disconnect, node: control.node)));
+          return '/home';
+        }
+        // 穿云 1.12.0: launcher shortcuts
+        final quick = control?.quick;
+        if (quick != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(museRunQuickAction(ref, quick)));
+          return quick == MuseQuickAction.speedtest ? '/nodes' : '/home';
+        }
+        if (url != null && Uri.parse(url).host == 'import') {
+          // Auto import profile from url
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(url: url, triggeredByDeepLink: true),
+          );
+          return '/home';
+        } else if (url != null) {
+          final uri = Uri.parse(url);
+          final path = uri.path + (uri.hasQuery ? "?${uri.query}" : "");
+          return path.isEmpty ? '/home' : path;
+        }
+        return null;
+      },
+      routes: <RouteBase>[
+        // 1.20.2：旧订阅地址打开节点页上的订阅弹层（首页卡片、快捷方式、托盘、冒烟脚本）。重定向在同一次导航里
+        // 可能被求值多次，这里只置一个「待打开」标记，节点页标题读到后清掉再开，所以弹层只开一次
+        GoRoute(
+          name: 'config',
+          path: '/config',
+          redirect: (_, _) {
+            museRequestSubsSheet(ref.read(museSubsSheetPendingProvider.notifier));
+            return '/nodes';
+          },
+        ),
+        StatefulShellRoute.indexedStack(
+          builder: (_, state, navigationShell) => MyAdaptiveLayout(
+            navigationShell: navigationShell,
+            isMobileBreakpoint: isMobileBreakpoint,
+            showProfilesAction: false,
+            location: state.uri.path,
+          ),
+          branches: <StatefulShellBranch>[
+            StatefulShellBranch(
+              routes: <GoRoute>[
+                GoRoute(
+                  name: 'home',
+                  path: '/home',
+                  builder: (_, _) => FocusScope(node: branchesScope['home'], child: const MuseHomePage()),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: <GoRoute>[
+                GoRoute(
+                  name: 'nodes',
+                  path: '/nodes',
+                  builder: (_, _) => FocusScope(node: branchesScope['nodes'], child: const MuseNodesPage()),
+                  routes: configChildren,
                 ),
               ],
             ),

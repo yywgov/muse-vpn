@@ -1,4 +1,6 @@
 import 'package:hiddify/features/muse/widget/muse_motion_widgets.dart';
+import 'package:hiddify/features/muse/config/sub_override_page.dart' show MuseSubOverridePage;
+import 'package:hiddify/features/profile/details/profile_details_page.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/muse/settings/sub_filter_dialog.dart';
 import 'package:hiddify/features/muse/settings/sub_headers_dialog.dart';
@@ -420,11 +422,18 @@ class ProfileActionsMenu extends HookConsumerWidget {
         title: '节点筛选',
         onTap: () => museEditSubFilter(context, ref, profile.id),
       ),
+      // 1.20.2：订阅覆写从 规则 › 订阅覆写 移到这里（这个订阅自己的规则 / 节点 / 分组）；压在订阅弹层上面，返回回到弹层
+      AdaptiveMenuItem(
+        leadingIcon: const Icon(Icons.tune_outlined),
+        title: '订阅覆写',
+        onTap: () => museOpenSubOverride(context, profile),
+      ),
       AdaptiveMenuItem(
         leadingIcon: const Icon(Icons.edit_outlined),
         title: '编辑',
         // MenuAnchor closes itself; popping here would pop the 配置 tab root and swallow the tap.
-        onTap: () => context.pushNamed('profileDetails', pathParameters: {'id': profile.id}),
+        // 1.20.2：从订阅弹层打开，页面压在弹层上面（根导航），返回键 / 预测性返回回到弹层
+        onTap: () => museOpenProfileEdit(context, profile.id),
       ),
       AdaptiveMenuItem(
         leadingIcon: const Icon(Icons.delete_outlined),
@@ -513,3 +522,16 @@ class RemainingTrafficIndicator extends StatelessWidget {
     return LinearProgressIndicator(value: ratio, borderRadius: MuseRadius.cardAll, minHeight: 6);
   }
 }
+
+/// 1.20.2：订阅的「编辑」页。订阅弹层在根导航上，编辑页也压在根导航上（弹层之上），返回键 / 预测性返回
+/// 先关编辑页、回到弹层；不走 go_router 页面栈（否则会压到节点分支里、被弹层盖住）。
+Future<void> museOpenProfileEdit(BuildContext context, String id) => Navigator.of(
+  context,
+  rootNavigator: true,
+).push(MaterialPageRoute<void>(builder: (_) => ProfileDetailsPage(id: id)));
+
+/// 1.20.2：单个订阅的「订阅覆写」页（同上，压在订阅弹层之上）。
+Future<void> museOpenSubOverride(BuildContext context, ProfileEntity profile) => Navigator.of(
+  context,
+  rootNavigator: true,
+).push(MaterialPageRoute<void>(builder: (_) => MuseSubOverridePage(profileId: profile.id, profileName: profile.name)));

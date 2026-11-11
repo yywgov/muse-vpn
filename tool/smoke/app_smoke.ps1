@@ -133,6 +133,13 @@ foreach ($t in @(@{ n = "2-config"; r = "config" }, @{ n = "3-settings"; r = "se
   Rec "go-$($t.r)" "control port opens $($t.r)" ($null -ne $res -and $res.ok) "$($res | ConvertTo-Json -Compress)" $true
   Start-Sleep -Seconds 3
   Shot $t.n
+  # 1.20.2: config is no page of its own any more: it opens the subscriptions panel on the nodes
+  # page (only when a subscription exists; without one the nodes page itself offers to add one),
+  # and the next /go closes it
+  if ($t.r -eq "config") {
+    $subs = Ctl "/subs"
+    Rec "subs-panel" "/go config opens the subscriptions panel on the nodes page" ($null -ne $subs -and $subs.open) "$($subs | ConvertTo-Json -Compress)" $true
+  }
 }
 Ctl "/go?route=home" | Out-Null
 Start-Sleep -Seconds 2
@@ -140,13 +147,16 @@ if ($w -ge 600 * $scale) {
   # sidebar (lib/features/muse/shell/muse_shell.dart): title bar 32 (1.6.0 C8: the app's own bar,
   # lib/features/muse/desktop/title_bar.dart, MuseSize.titleBar), header row 48 (1.19.1 A7: the
   # brand row, MuseSidebar.headerHeight = MuseDesk.sidebarBrand; was 56), items 52 tall
-  # (MuseSidebar.itemHeight); 订阅 is the third item. Best effort: the screenshot shows whether the
+  # (MuseSidebar.itemHeight). Best effort: the screenshot shows whether the
   # click landed. 1.19.2: up to 1080 wide the side bar is the 64 wide icon rail (MuseSize.navRailCollapsed,
   # was 80), above that 184 (was 200); x = 32 is inside both, the rows' heights are unchanged.
+  # 1.20.2: three items home / nodes / settings (subscriptions are part of the nodes page): the
+  # click goes to nodes, the second item (was subscriptions, the third); the screenshot shows the
+  # subscription-name title.
   $x = $r.L + [int](32 * $scale)
-  Click $x ($r.T + [int]((32 + 48 + 52 * 2 + 26) * $scale))
+  Click $x ($r.T + [int]((32 + 48 + 52 * 1 + 26) * $scale))
   Start-Sleep -Seconds 3
-  Shot "2c-config-click"
+  Shot "2c-nodes-click"
   Ctl "/go?route=home" | Out-Null
   Start-Sleep -Seconds 2
 }

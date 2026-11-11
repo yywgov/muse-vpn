@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/model/failures.dart';
@@ -72,7 +71,8 @@ class ProfileDetailsPage extends HookConsumerWidget with PresLogger {
                                 ref
                                     .read(inAppNotificationControllerProvider)
                                     .showSuccessToast(t.pages.profiles.msg.save.success);
-                                if (success && context.mounted) context.pop();
+                                // 1.20.2：也会从订阅弹层用根导航打开（不是 go_router 页面），用 Navigator 关闭两种都对
+                                if (success && context.mounted) Navigator.of(context).pop();
                               });
                             }
                           },

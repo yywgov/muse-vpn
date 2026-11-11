@@ -337,7 +337,8 @@ void main() {
   // ------------------------------------------------------------------ 精简
   group('精简：设置', () {
     test('设置首页 has seven rows (备份与同步 gone)', () {
-      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '自动连接', '分应用代理', '网络', '活动', '内核与资源', '关于']);
+      // 1.20.2：「网络」下面加「分流规则」
+      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '自动连接', '分应用代理', '网络', '分流规则', '活动', '内核与资源', '关于']);
     });
 
     test('removed settings are not found by search; moved ones point at 高级', () {

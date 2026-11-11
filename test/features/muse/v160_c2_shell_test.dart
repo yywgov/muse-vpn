@@ -73,11 +73,13 @@ void main() {
     final taps = <int>[];
     await _pump(t, size: const Size(390, 800), taps: taps);
     expect(find.byKey(const ValueKey('muse_dock_floating')), findsOneWidget);
-    for (final l in ['首页', '节点', '订阅', '设置']) {
+    // 1.20.2：三栏 首页 / 节点 / 设置（订阅并入节点页）
+    for (final l in ['首页', '节点', '设置']) {
       expect(find.text(l), findsOneWidget);
     }
+    expect(find.text('订阅'), findsNothing);
     expect(find.text('活动'), findsNothing);
-    await t.tap(find.text('订阅'));
+    await t.tap(find.text('设置'));
     expect(taps, [2]);
     await _pump(t, size: const Size(390, 800), prefs: {'muse_dock_style': 'docked'});
     expect(find.byKey(const ValueKey('muse_dock_docked')), findsOneWidget);
@@ -87,7 +89,7 @@ void main() {
     await _pump(t, size: const Size(700, 800));
     expect(find.byKey(const ValueKey('muse_sidebar_collapsed')), findsOneWidget);
     expect(find.byKey(const ValueKey('muse_sidebar_toggle')), findsNothing);
-    expect(find.text('订阅'), findsNothing); // tooltip only
+    expect(find.text('节点'), findsNothing); // tooltip only (1.20.2：订阅 is no tab any more)
     expect(find.byKey(const ValueKey('muse_nav_activity')), findsOneWidget);
   });
 
@@ -96,7 +98,7 @@ void main() {
     final extras = <String>[];
     final c = await _pump(t, size: const Size(1200, 800), extras: extras);
     expect(find.byKey(const ValueKey('muse_sidebar_expanded')), findsOneWidget);
-    expect(find.text('订阅'), findsOneWidget);
+    expect(find.text('节点'), findsOneWidget); // 1.20.2：三栏，原来查「订阅」
     expect(find.text('活动'), findsOneWidget);
     expect(find.text('日志'), findsNothing);
     await t.tap(find.text('活动'));
@@ -108,7 +110,7 @@ void main() {
   });
 
   testWidgets('sidebar marks 活动 selected on its page (日志 has no entry of its own)', (t) async {
-    await _pump(t, size: const Size(1000, 800), index: 3, location: '/settings/activity?tab=logs', prefs: {'muse_log_capture': true});
+    await _pump(t, size: const Size(1000, 800), index: 2 /* 1.20.2：三栏 */, location: '/settings/activity?tab=logs', prefs: {'muse_log_capture': true});
     expect(find.text('日志'), findsNothing);
     final sem = t.getSemantics(find.byKey(const ValueKey('muse_nav_activity')));
     expect(sem, containsSemantics(isSelected: true));

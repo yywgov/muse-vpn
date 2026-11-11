@@ -41,6 +41,7 @@ import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hiddify/features/muse/widget/muse_skeleton.dart';
 import 'package:hiddify/features/muse/nodes/node_form_dialog.dart';
+import 'package:hiddify/features/muse/nodes/subs_sheet.dart' show MuseSubSwitcher;
 import 'package:hiddify/features/muse/widget/qr_view.dart';
 import 'package:hiddify/features/muse/data/speed_test.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart' show MuseNodeSettingsPage, musePushPage;
@@ -60,12 +61,14 @@ part 'node_dialogs.dart';
 /// The node list. [embedded] = inside a sheet or side column (no pull-to-test, no outer padding
 /// for a page). [onPicked] runs after a node was tapped.
 class MuseNodeList extends HookConsumerWidget {
-  const MuseNodeList({super.key, this.controller, this.embedded = false, this.onPicked, this.listKey, this.title});
+  const MuseNodeList({super.key, this.controller, this.embedded = false, this.onPicked, this.listKey, this.title, this.subSwitcher = false});
 
   /// 1.20.1：节点页把页面标题画在工具行最左（与搜索 / 测速 / ⋯ 同一行），不再单独占一行标题栏 + 一行文字；
   /// null = 不画标题（底部表单、电脑版侧栏里的列表）
   final String? title;
 
+  /// 1.20.2：节点页标题就是当前订阅（「订阅名 ▾」，点开订阅弹层）；[title] 仍是无订阅名时的文字
+  final bool subSwitcher;
   final ScrollController? controller;
   final bool embedded;
   final VoidCallback? onPicked;
@@ -334,10 +337,16 @@ class MuseNodeList extends HookConsumerWidget {
     final Widget toolbar;
     if (titled) {
       // 1.20.1：标题与按钮同一行；窄屏 + 大字号放不下时按钮自动换到标题下一行（仍右对齐），不溢出、不截断标题
-      final titleStyle = desk ? MuseScaffold.deskTitle(context) : MuseType.largeTitle(context);
-      final titleText = Text(title!, key: const ValueKey('muse_page_title'), maxLines: 1, style: titleStyle);
+      // 1.20.2：标题是当前订阅「订阅名 ▾」（22/600，电脑 24/600），整块一个 ≥48 高的按钮，点开订阅弹层
+      final titleStyle = subSwitcher
+          ? MuseSubSwitcher.defaultStyle(context)
+          : (desk ? MuseScaffold.deskTitle(context) : MuseType.largeTitle(context));
+      final subName = subSwitcher ? (ref.watch(museActiveProfileNameProvider)?.trim() ?? '') : '';
+      final shownTitle = subSwitcher ? (subName.isEmpty ? '订阅' : subName) : title!;
+      final titleChrome = subSwitcher ? MuseSubSwitcher.chromeWidth : 0.0;
       toolbar = Padding(
-        padding: EdgeInsets.fromLTRB(margin, 0, margin - MuseSpace.s8, 0),
+        // 订阅名按钮自带 4 的内边距：左缘让出来，文字仍与卡片左缘对齐
+        padding: EdgeInsets.fromLTRB(subSwitcher ? margin - MuseSpace.s4 : margin, 0, margin - MuseSpace.s8, 0),
         child: LayoutBuilder(
           builder: (context, c) {
             final scaler = MediaQuery.textScalerOf(context);
@@ -352,7 +361,10 @@ class MuseNodeList extends HookConsumerWidget {
             // 按钮行宽度估算：图标按钮 48 + 测速按钮（文字 + 左右 16 + 图标）
             final icons = toolbarActions.length - 1;
             final buttonsW = icons * 48.0 + textW('测速', MuseType.body(context)) + MuseSpace.s32 + MuseIconSize.tiny + MuseSpace.s8 + 8;
-            final fits = textW(title!, titleStyle) + MuseSpace.s12 + buttonsW + (status == null ? 0 : textW(status, MuseType.caption(context))) <= c.maxWidth;
+            final Widget titleText = subSwitcher
+                ? ConstrainedBox(constraints: BoxConstraints(maxWidth: c.maxWidth), child: MuseSubSwitcher(style: titleStyle))
+                : Text(title!, key: const ValueKey('muse_page_title'), maxLines: 1, style: titleStyle);
+            final fits = textW(shownTitle, titleStyle) + titleChrome + MuseSpace.s12 + buttonsW + (status == null ? 0 : textW(status, MuseType.caption(context))) <= c.maxWidth;
             final actionsRow = Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [

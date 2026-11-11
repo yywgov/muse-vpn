@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_driver/driver_extension.dart';
+import 'package:hiddify/features/muse/nodes/subs_sheet.dart' show MuseSubsPanel;
 import 'package:hiddify/bootstrap.dart';
 import 'package:hiddify/core/model/environment.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -204,6 +205,16 @@ Future<String> _handler(String? message) async {
         }
         final flags = await _c().read(AppListProvider(mode).future);
         return 'ok:${flags.length}';
+      case 'subs':
+        // 1.20.2: how many 订阅 sheets are open (0 / 1)
+        var n = 0;
+        void count(Element e) {
+          if (e.widget is MuseSubsPanel) n++;
+          e.visitChildElements(count);
+        }
+
+        WidgetsBinding.instance.rootElement?.visitChildElements(count);
+        return 'open:$n';
       case 'sheet':
         unawaited(_c().read(bottomSheetsNotifierProvider.notifier).showAddProfile());
         return 'ok';

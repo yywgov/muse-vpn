@@ -11,6 +11,7 @@ import 'package:hiddify/features/muse/logic/keep_alive.dart';
 import 'package:hiddify/features/muse/logic/node_cache.dart';
 import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart';
+import 'package:hiddify/features/muse/shell/muse_shell.dart' show museShellActions;
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 
 void main() {
@@ -192,11 +193,13 @@ void main() {
       expect(AppThemeMode.dark.trueBlack, isFalse);
       expect(AppThemeMode.black.trueBlack, isTrue);
     });
-    test('四个标签 首页 / 节点 / 订阅 / 设置 (1.6.0: the shell lives in muse/shell)', () {
+    // 1.20.2：订阅并入节点页，底栏改为三个标签 首页 / 节点 / 设置
+    test('三个标签 首页 / 节点 / 设置 (1.6.0: the shell lives in muse/shell; 1.20.2: 订阅 is part of 节点)', () {
       final layout = File('lib/features/muse/shell/muse_shell.dart').readAsStringSync();
-      for (final t in ["'首页'", "'节点'", "'订阅'", "'设置'"]) {
+      for (final t in ["'首页'", "'节点'", "'设置'"]) {
         expect(layout, contains(t));
       }
+      expect(museShellActions.map((a) => a.title), ['首页', '节点', '设置']);
       expect(layout, isNot(contains("'配置'")));
     });
     test('「订阅」 everywhere, no 订阅/配置 mix', () {

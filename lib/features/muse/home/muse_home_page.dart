@@ -32,6 +32,7 @@ import 'package:hiddify/features/muse/home/exit_card.dart';
 import 'package:hiddify/features/muse/home/first_guide.dart';
 import 'package:hiddify/features/muse/home/health_banner.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
+import 'package:hiddify/features/muse/nodes/subs_sheet.dart' show museOpenSubscriptions, museShowSubsSheet;
 import 'package:hiddify/features/muse/home/keep_alive_guide.dart';
 import 'package:hiddify/features/muse/home/node_failover.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
@@ -297,11 +298,10 @@ class MuseDeskToolRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final mt = MuseTheme.of(context);
     final name = ref.watch(museActiveProfileNameProvider)?.trim();
-    final group = ref.watch(museNodeGroupProvider).valueOrNull;
-    final nodes = group?.items.where((e) => !e.isGroup).length;
     final running = ref.watch(museRunningProvider);
     final testing = ref.watch(museNodeTestStartedProvider) != null;
-    final summary = [if (name != null && name.isNotEmpty) name, if (nodes != null) '$nodes 个节点'].join(' · ');
+    // 1.20.2：只留订阅名，可点（▾ 打开与节点页标题同一个订阅弹层，就地、不切页）；节点数去掉
+    final summary = name ?? '';
     final margin = MuseSpace.page(context);
     return SizedBox(
       key: const ValueKey('home_desk_toolbar'),
@@ -311,16 +311,45 @@ class MuseDeskToolRow extends ConsumerWidget {
         child: Row(
           children: [
             Expanded(
-              child: Tooltip(
-                message: summary,
-                child: Text(
-                  summary,
-                  key: const ValueKey('home_desk_summary'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  // 1.20.0 方向 A: 15 / w400 secondary — the card titles' weight, not a heading
-                  style: MuseTextLevel.subheadline.style(context, color: mt.text2),
-                ),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: summary.isEmpty
+                    ? const SizedBox.shrink()
+                    : Semantics(
+                        button: true,
+                        label: '切换订阅，当前 $summary',
+                        excludeSemantics: true,
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: InkWell(
+                            key: const ValueKey('home_sub_switcher'),
+                            borderRadius: MuseRadius.smallAll,
+                            onTap: () => museShowSubsSheet(context),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: MuseSize.button),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s4),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        summary,
+                                        key: const ValueKey('home_desk_summary'),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        // 1.20.0 方向 A: 15 / w400 secondary — the card titles' weight, not a heading
+                                        style: MuseTextLevel.subheadline.style(context, color: mt.text2),
+                                      ),
+                                    ),
+                                    Icon(Icons.expand_more_outlined, size: MuseIconSize.small, color: mt.text2),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
               ),
             ),
             const SizedBox(width: MuseSpace.s8),
@@ -1786,7 +1815,7 @@ class _RemainingTile extends ConsumerWidget {
           ],
         ),
       ),
-      onTap: () => context.goNamed('config'),
+      onTap: () => museOpenSubscriptions(context, ref),
     );
   }
 }
@@ -1809,7 +1838,7 @@ class _ExpiryTile extends ConsumerWidget {
         alignment: Alignment.bottomLeft,
         child: Text('${e.year}-${_two(e.month)}-${_two(e.day)}', style: museTileCaption(context)),
       ),
-      onTap: () => context.goNamed('config'),
+      onTap: () => museOpenSubscriptions(context, ref),
     );
   }
 
