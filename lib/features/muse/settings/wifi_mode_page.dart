@@ -206,7 +206,7 @@ const museWifiRulesTitle = 'Wi‑Fi 规则';
 const museWifiRulesFooter = '连上名单里的 Wi‑Fi 时按所选动作处理，离开后恢复：暂停的连接自动重新连上，切换的模式改回原来的。你手动点了连接 / 断开或改了模式，以你的操作为准。';
 
 /// 「按需运行」开关下的一行：它只管「暂停连接」这个动作（切换模式不受它影响，和以前一样）。
-const museWifiRulesSwitchSubtitle = '关着时「暂停连接」不生效，切换模式照常';
+const museWifiRulesSwitchSubtitle = '关着时「暂停连接」不生效';
 
 class MuseWifiRulesPage extends HookConsumerWidget {
   const MuseWifiRulesPage({super.key});
