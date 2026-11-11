@@ -124,7 +124,8 @@ Future<void> _pump(
           upload: 3 * 1024 * 1024 * 1024,
           download: 30 * 1024 * 1024 * 1024 + 800 * 1024 * 1024,
           total: 120 * 1024 * 1024 * 1024,
-          expire: DateTime.now().add(const Duration(days: 29, hours: 2)),
+          // 1.20.2: whole days, so the calendar-day count is 29 whatever the hour the test runs
+          expire: DateTime.now().add(const Duration(days: 29)),
         ),
       ),
       museStatsProvider.overrideWithValue(

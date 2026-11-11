@@ -1781,7 +1781,8 @@ class _RemainingTile extends ConsumerWidget {
     final low = share < 0.1;
     return _Tile(
       title: '剩余流量',
-      value: remaining <= 0 ? '已用完' : museBytes(remaining),
+      // 与「共 …」同单位、同小数位（「87 GB」配「共 120 GB」）
+      value: remaining <= 0 ? '已用完' : museBytesOf(remaining, info.total).split(' / ').first,
       valueColor: remaining <= 0 ? MusePalette.red : null,
       bottom: LayoutBuilder(
         builder: (context, c) => Row(
@@ -1806,7 +1807,7 @@ class _RemainingTile extends ConsumerWidget {
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: c.maxWidth * _trailingShare),
               child: Text(
-                '共 ${museBytes(info.total)}',
+                '共 ${museBytesOf(remaining, info.total).split(' / ').last}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: museTileCaption(context),
@@ -1832,7 +1833,8 @@ class _ExpiryTile extends ConsumerWidget {
     final e = info.expire;
     return _Tile(
       title: '到期',
-      value: expired ? '已到期' : '$days 天',
+      // 天数与订阅弹层「N 天后到期」同一算法（不满一天算一天）
+      value: expired ? '已到期' : '${museDaysShown(info.expire)} 天',
       valueColor: expired ? MusePalette.red : (days < 7 ? MusePalette.orange : null),
       bottom: Align(
         alignment: Alignment.bottomLeft,

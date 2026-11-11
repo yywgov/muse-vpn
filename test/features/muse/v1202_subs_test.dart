@@ -17,6 +17,9 @@ import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
+import 'package:hiddify/features/muse/logic/home_tiles.dart' show museDaysShown;
+import 'package:hiddify/features/muse/logic/node_order.dart' show museBytesOf;
+import 'package:hiddify/features/muse/logic/subscription_bar.dart' show museSubscriptionBars;
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/nodes/muse_nodes_page.dart';
 import 'package:hiddify/features/muse/nodes/node_list.dart' show museActiveConfigProvider;
@@ -187,6 +190,38 @@ Future<void> _predictiveBack(WidgetTester t) async {
 }
 
 void main() {
+  group('订阅余量文字', () {
+    const g = 1024 * 1024 * 1024;
+    const m = 1024 * 1024;
+    test('两边同单位、同小数位', () {
+      expect(museBytesOf(87 * g, 120 * g), '87 GB / 120 GB');
+      expect(museBytesOf((87.4 * g).round(), 120 * g), '87 GB / 120 GB');
+      expect(museBytesOf((12.5 * g).round(), 50 * g), '12.5 GB / 50.0 GB');
+      expect(museBytesOf(12 * g, 50 * g), '12 GB / 50 GB');
+      expect(museBytesOf(300 * m, 500 * m), '300 MB / 500 MB');
+    });
+    test('不到 1 个单位时用自己的单位，不写 0 GB', () {
+      expect(museBytesOf(500 * m, 120 * g), '500 MB / 120 GB');
+      expect(museBytesOf(0, 120 * g), '0 GB / 120 GB');
+    });
+    test('首页「到期」与弹层同一天数（按日历日，和下面显示的日期一致）', () {
+      final now = DateTime(2026, 11, 11, 12, 56);
+      expect(museDaysShown(DateTime(2026, 12, 10, 15), now: now), 29);
+      expect(museDaysShown(DateTime(2026, 12, 10, 9), now: now), 29);
+      expect(museDaysShown(DateTime(2026, 11, 11, 20), now: now), 0);
+      expect(museDaysShown(DateTime(2026, 11, 1), now: now), 0);
+      for (final e in [DateTime(2026, 12, 10, 9), DateTime(2026, 12, 10, 15), DateTime(2026, 11, 20, 23, 59)]) {
+        final bar = museSubscriptionBars(SubscriptionInfo(upload: 0, download: 0, total: 0, expire: e), now: now).single;
+        expect(bar.trailing, '剩 ${museDaysShown(e, now: now)} 天');
+      }
+    });
+    test('到期：一天内给日期时不重复「到期」', () {
+      expect(museExpiryMeta('剩 29 天'), '29 天后到期');
+      expect(museExpiryMeta('11月12日到期'), '11月12日到期');
+      expect(museExpiryMeta('已到期'), '已到期');
+    });
+  });
+
   group('结构', () {
     test('底栏三栏：首页 / 节点 / 设置；分支同序；剪贴板圆点在「节点」', () {
       expect(museShellActions.map((a) => a.title), ['首页', '节点', '设置']);
@@ -271,8 +306,8 @@ void main() {
       expect(_panel, findsOneWidget);
       expect(find.byKey(const ValueKey('subs_row_p1')), findsOneWidget);
       expect(find.byKey(const ValueKey('subs_row_p2')), findsOneWidget);
-      // 「剩 87 GB / 120 GB」（数字与单位之间是不换行空格）
-      expect(find.byWidgetPredicate((w) => w is Text && RegExp(r'^剩 87(\.0)?\s?GB / 120\s?GB$').hasMatch(w.data ?? '')), findsOneWidget);
+      // 「剩 87 GB / 120 GB」：两边同单位、同小数位
+      expect(find.text('剩 87 GB / 120 GB'), findsOneWidget);
       expect(find.textContaining('后到期'), findsOneWidget);
       expect(find.byKey(const ValueKey('subs_add')), findsOneWidget);
       expect(find.byKey(const ValueKey('subs_update_all')), findsOneWidget);

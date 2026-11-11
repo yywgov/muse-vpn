@@ -301,6 +301,13 @@ class MuseSubsPanel extends ConsumerWidget {
   }
 }
 
+/// The 到期 part of a row's second line when the bar shows traffic: 「29 天后到期」, 「已到期」, or the
+/// date as the bar gives it within a day (「11月12日到期」, not 「11月12日到期后到期」).
+String museExpiryMeta(String trailing) {
+  if (trailing == '已到期' || trailing.endsWith('到期')) return trailing;
+  return '${trailing.replaceFirst('剩 ', '')}后到期';
+}
+
 /// One subscription: ◉ name / bar + what is left / 到期 · 更新时间 / ⋮.
 class _SubRow extends ConsumerWidget {
   const _SubRow({super.key, required this.profile});
@@ -321,10 +328,10 @@ class _SubRow extends ConsumerWidget {
     final expiry = bars.where((b) => b.kind == 'expiry').firstOrNull;
     final bar = traffic ?? expiry;
     // 「剩 87 GB / 120 GB」 next to the bar; 「29 天后到期 · 3 小时前更新」 below
-    final left = info == null ? '' : museBytes((info.total - info.upload - info.download).clamp(0, info.total));
-    final barText = traffic != null && info != null ? '剩 $left / ${museBytes(info.total)}' : (bar?.trailing ?? '');
+    final left = info == null ? 0 : (info.total - info.upload - info.download).clamp(0, info.total);
+    final barText = traffic != null && info != null ? (left <= 0 ? '已用完' : '剩 ${museBytesOf(left, info.total)}') : (bar?.trailing ?? '');
     final meta = [
-      if (expiry != null && traffic != null) expiry.trailing == '已到期' ? '已到期' : '${expiry.trailing.replaceFirst('剩 ', '')}后到期',
+      if (expiry != null && traffic != null) museExpiryMeta(expiry.trailing),
       if (remote != null) updating ? '正在更新…' : museUpdatedAgo(remote.lastUpdate, now: now),
       if (remote == null) '本地配置',
     ].join(' · ');

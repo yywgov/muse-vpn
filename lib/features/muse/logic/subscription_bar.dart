@@ -1,6 +1,7 @@
 // 穿云 1.2 - subscription traffic / expiry bar on 配置 tiles (pure logic, unit-tested).
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
+import 'package:hiddify/features/muse/logic/home_tiles.dart' show museDaysShown;
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 
 /// What the bar shows: the remaining share (traffic when the plan has a cap, otherwise the time
@@ -44,7 +45,7 @@ List<MuseSubBar> museSubscriptionBars(SubscriptionInfo info, {DateTime? now}) {
   final year = info.expire.year;
   if (year > 1971 && year < 2100) {
     final left = info.expire.difference(at);
-    final days = left.isNegative ? 0 : (left.inHours / 24).ceil();
+    final days = museDaysShown(info.expire, now: at);
     bars.add((
       kind: 'expiry',
       label: '到期',

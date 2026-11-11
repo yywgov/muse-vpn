@@ -196,6 +196,18 @@ String museSpeedText(int bytesPerSecond) {
   return '$n ${units[i]}';
 }
 
+/// 1.20.2: the day count the UI shows for an expiry, the same on 首页「到期」 and in the 订阅 sheet:
+/// calendar days from today to the expiry date (the date shown under it), 0 on the day itself and
+/// once expired. Before, 首页 floored hours (28) while the sheet rounded up (29) for the same plan.
+/// Use [museDaysLeft] for thresholds.
+int museDaysShown(DateTime expire, {DateTime? now}) {
+  final at = now ?? DateTime.now();
+  if (!expire.isAfter(at)) return 0;
+  final e = expire.toLocal();
+  final n = at.toLocal();
+  return DateTime.utc(e.year, e.month, e.day).difference(DateTime.utc(n.year, n.month, n.day)).inDays;
+}
+
 /// Days left until [expire] (0 on the last day, negative once expired).
 int museDaysLeft(DateTime expire, {DateTime? now}) {
   final at = now ?? DateTime.now();

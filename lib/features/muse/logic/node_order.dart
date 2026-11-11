@@ -111,6 +111,24 @@ String museBytes(int value) {
   return '${gb >= 100 ? gb.toStringAsFixed(0) : gb.toStringAsFixed(1)} GB';
 }
 
+/// 1.20.2: 「x / y」 with both sides in the total's unit and the same number of decimals
+/// (「87 GB / 120 GB」「12.5 GB / 50.0 GB」, never 「87.4 GB / 120 GB」). Whole numbers on both sides
+/// (or a total of 100+ in its unit) drop the decimal. A part under 1 of that unit keeps its own unit
+/// (「500 MB / 120 GB」), so a nearly used-up plan never reads 「0 GB」.
+String museBytesOf(int part, int total) {
+  final p = part < 0 ? 0 : part;
+  const k = 1024;
+  if (total < k * k) return '${museBytes(p)} / ${museBytes(total)}';
+  final (unit, div) = total < k * k * k ? ('MB', k * k) : ('GB', k * k * k);
+  final pv = p / div;
+  final tv = total / div;
+  if (p > 0 && pv < 1) return '${museBytes(p)} / ${museBytes(total)}';
+  String one(double v) => v.toStringAsFixed(1);
+  final whole = one(pv).endsWith('.0') && one(tv).endsWith('.0');
+  final digits = tv >= 100 || whole ? 0 : 1;
+  return '${pv.toStringAsFixed(digits)} $unit / ${tv.toStringAsFixed(digits)} $unit';
+}
+
 /// The one-line summary under a subscription's bar on 配置 (Clash Verge Rev style):
 /// 「已用 12.3 GB / 100 GB · 剩 23 天 · 3 小时前更新」. Parts the subscription doesn't report are left
 /// out; a cap above 10 TB counts as unlimited, an expiry more than 10 years away as none.
