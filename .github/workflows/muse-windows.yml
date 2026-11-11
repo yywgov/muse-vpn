@@ -30,7 +30,9 @@ jobs:
   # dependencies.properties (muse.compat.ref, branch rel-1.7.0) — cross-built with MinGW like the
   # core repository's own CI. No core release is involved.
   compat-core:
-    runs-on: ubuntu-latest
+    # 穿云 1.20.3: pinned — the ubuntu-latest image (26.04) could not resolve the Ubuntu archive
+    # hosts three runs in a row and the job never got MinGW
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
         with:
@@ -57,14 +59,39 @@ jobs:
           cache-dependency-path: core/mihomo/go.sum
           check-latest: false
 
+      # 穿云 1.20.3: apt with retries first (MinGW-w64 GCC, as before); when the Ubuntu archive stays
+      # unreachable, fall back to a pinned llvm-mingw release from GitHub (sha256-checked), which
+      # provides the same x86_64-w64-mingw32-gcc / -objdump command names. The step summary says
+      # which toolchain built the DLL.
       - name: Setup MinGW
-        timeout-minutes: 15
+        timeout-minutes: 20
+        env:
+          LLVM_MINGW: llvm-mingw-20261104-msvcrt-ubuntu-22.04-x86_64
+          LLVM_MINGW_URL: https://github.com/mstorsjo/llvm-mingw/releases/download/20261104/llvm-mingw-20261104-msvcrt-ubuntu-22.04-x86_64.tar.xz
+          LLVM_MINGW_SHA256: 6e3342e2e0dfa56e9178f3c34b198f278bd5e603db4a759455d1439cc2230630
         run: |
+          apt_opts="-o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30"
+          ok=
           for i in 1 2 3; do
-            sudo timeout 300 apt-get update -q && sudo timeout 400 apt-get install -y -q gcc-mingw-w64-x86-64 && break
-            echo "::warning::mingw install attempt $i failed"; sleep 10
+            if sudo timeout 180 apt-get $apt_opts update -q && \
+               sudo timeout 300 apt-get $apt_opts install -y -q --no-install-recommends gcc-mingw-w64-x86-64; then
+              ok=1; break
+            fi
+            echo "::warning::apt mingw install attempt $i failed"; sleep 15
           done
+          if [ -n "$ok" ]; then
+            echo "### MinGW: apt gcc-mingw-w64-x86-64" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::apt unreachable, using $LLVM_MINGW"
+            curl -fsSL --retry 5 --retry-all-errors -o /tmp/llvm-mingw.tar.xz "$LLVM_MINGW_URL"
+            echo "$LLVM_MINGW_SHA256  /tmp/llvm-mingw.tar.xz" | sha256sum -c -
+            sudo tar -xJf /tmp/llvm-mingw.tar.xz -C /opt
+            echo "/opt/$LLVM_MINGW/bin" >> "$GITHUB_PATH"
+            export PATH="/opt/$LLVM_MINGW/bin:$PATH"
+            echo "### MinGW: fallback $LLVM_MINGW (apt unreachable)" >> "$GITHUB_STEP_SUMMARY"
+          fi
           x86_64-w64-mingw32-gcc --version
+          x86_64-w64-mingw32-objdump --version | sed -n 1p
 
       - name: Build muse-compat.dll
         working-directory: core/mihomo
@@ -92,6 +119,8 @@ jobs:
           rm -f muse-compat.h
           x86_64-w64-mingw32-objdump -p muse-compat.dll | tr -d '\r' > /tmp/pe.txt
           sed -n '/Ordinal\/Name Pointer/,/^$/p' /tmp/pe.txt > /tmp/exports.txt
+          # llvm-mingw fallback (llvm-objdump) prints an "Export Table:" section instead
+          [ -s /tmp/exports.txt ] || sed -n '/^Export Table:/,$p' /tmp/pe.txt > /tmp/exports.txt
           for f in setup start stop restart freeString cleanup closeGrpc; do
             grep -qw -- "$f" /tmp/exports.txt || { echo "::error::muse-compat.dll does not export $f"; exit 1; }
           done
