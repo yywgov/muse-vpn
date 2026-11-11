@@ -200,7 +200,8 @@ class MuseWindowsWindowSection extends ConsumerWidget {
           key: const ValueKey('settings_custom_title_bar'),
           leading: const Icon(Icons.web_asset_outlined),
           title: '穿云标题栏',
-          info: '窗口顶部用穿云自己的标题栏（含置顶按钮）；关闭后改用 Windows 自带标题栏',
+          // 1.20.3: 外观页不再有 ⓘ（原说明：含置顶按钮；关闭后改用系统自带标题栏）
+          subtitle: '关闭后用系统自带标题栏',
           value: ref.watch(MusePrefs.customTitleBar),
           onChanged: (v) => ref.read(windowNotifierProvider.notifier).setCustomTitleBar(v),
         ),

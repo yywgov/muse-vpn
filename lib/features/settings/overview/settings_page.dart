@@ -13,10 +13,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/core/theme/app_theme_mode.dart';
-import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/muse/activity/activity_page.dart';
 import 'package:hiddify/features/muse/config/rules_page.dart';
@@ -27,6 +24,7 @@ import 'package:hiddify/features/muse/logic/core_kind.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
+import 'package:hiddify/features/muse/settings/color_choice_picker.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/settings/resources_page.dart';
 import 'package:hiddify/features/muse/settings/settings_search.dart';
@@ -39,6 +37,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// (导出 / 导入配置 are on 关于).
 List<String> museSettingsHomeRows({required bool android, required bool developer}) => [
   '外观',
+  // 1.20.3：隐私模式、敏感页禁止截屏、导入后清空剪贴板从外观页搬到这里
+  '隐私',
   '自动连接',
   if (android) '分应用代理',
   '网络',
@@ -55,11 +55,10 @@ class SettingsPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
     final android = PlatformUtils.isAndroid;
     final perAppOn = ref.watch(Preferences.perAppProxyModeInUse) != null;
-    final themeMode = ref.watch(themePreferencesProvider);
-    final shownTheme = themeMode == AppThemeMode.black ? AppThemeMode.dark : themeMode;
+    // 1.20.3: 外观一行显示当前配色（原来显示深浅色，选了终端绿等主题时会对不上）
+    final colors = ref.watch(museColorChoiceProvider);
     final devMode = ref.watch(MusePrefs.devMode);
     // 1.9.0 #5
     final autoSummary = museAutoConnectSummary(
@@ -80,6 +79,8 @@ class SettingsPage extends HookConsumerWidget {
           musePushPage(context, const MuseNetworkPage());
         case MuseSettingPage.appearance:
           musePushPage(context, const MuseAppearancePage());
+        case MuseSettingPage.privacy:
+          musePushPage(context, const MusePrivacyPage());
         case MuseSettingPage.windowAdvanced:
           musePushPage(context, const MuseAppearancePage(windowAdvancedOpen: true));
         case MuseSettingPage.nodes:
@@ -135,9 +136,17 @@ class SettingsPage extends HookConsumerWidget {
                 key: const ValueKey('theme_mode'),
                 leading: const Icon(Icons.palette_outlined),
                 title: '外观',
-                trailing: Text(shownTheme.present(t)),
+                trailing: Text(colors.title),
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseAppearancePage()),
+              ),
+              // 1.20.3
+              MuseTile(
+                key: const ValueKey('settings_privacy_home'),
+                leading: const Icon(Icons.shield_outlined),
+                title: '隐私',
+                chevron: true,
+                onTap: () => musePushPage(context, const MusePrivacyPage()),
               ),
               // 1.9.0 #5: 自动运行 / 按需运行 / 定时 / 开机自启; 1.10.0: + 智能保持连接
               MuseTile(

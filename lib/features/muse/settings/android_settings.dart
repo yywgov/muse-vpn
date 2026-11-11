@@ -42,12 +42,13 @@ class MuseAndroidAppearanceSection extends ConsumerWidget {
     return MuseSection(
       key: const ValueKey('appearance_android'),
       header: '通知与图标',
-      footer: '「通知栏断开按钮」从下次连接起生效。',
+      // 1.20.3: 外观页不再有 ⓘ，原 footer 改成这一行的副标题
       children: [
         MuseSwitchTile(
           key: const ValueKey('settings_notify_stop'),
           leading: const Icon(Icons.notifications_outlined),
           title: '通知栏断开按钮',
+          subtitle: '从下次连接起生效',
           value: stopButton,
           onChanged: (v) => ref.read(MusePrefs.notifyStopButton.notifier).update(v),
         ),

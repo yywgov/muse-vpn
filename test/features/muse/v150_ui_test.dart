@@ -332,7 +332,8 @@ void main() {
   });
 
   testWidgets('ⓘ on a row: 隐私模式 explanation folded', (tester) async {
-    await _pump(tester, page: const MuseAppearancePage(), brightness: Brightness.light, size: phone, tab: 3);
+    // 1.20.3: 隐私模式 moved to 设置 › 隐私 (the ⓘ stays there)
+    await _pump(tester, page: const MusePrivacyPage(), brightness: Brightness.light, size: phone, tab: 3);
     expect(find.text('首页的流量、IP 等数字打码'), findsNothing);
     // 1.6.0 C7: 文字缩放 has an ⓘ too; tap the 隐私模式 one
     // 1.20.1: 外观 opens with the 首页风格 previews — bring the row on screen first

@@ -278,7 +278,7 @@ final _pages = <(String, int, Widget, _Opts)>[
   ('内核与资源', 3, const MuseResourcesPage(), const _Opts()),
   ('开发者选项', 3, const MuseDeveloperPage(), const _Opts(prefs: {'muse_dev_mode': true})),
   ('关于', 3, const AboutPage(), const _Opts()),
-  ('开源许可与致谢', 3, const OpenSourcePage(), const _Opts()),
+  ('开源许可', 3, const OpenSourcePage(), const _Opts()), // 1.20.3: was 开源许可与致谢
   ('订阅', 2, const MuseConfigPage(), const _Opts()),
   ('订阅 空', 2, const MuseConfigPage(), const _Opts(hasProfile: false, noGroup: true)),
   ('规则 分流', 2, const MuseRulesPage(), const _Opts()),

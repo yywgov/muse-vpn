@@ -1,11 +1,24 @@
-// 穿云 - 设置 › 外观 (深浅色、主题色、隐私模式; 1.11.0: 配色风格 (fixed to 忠实) and 文字缩放 (follows the
-// system font size) are gone; 1.10.0: 导入后清空剪贴板, Android 通知与图标,
-// Windows 窗口). Split out of more_settings.dart in 1.9.0 (same library, behaviour unchanged).
+// 穿云 - 设置 › 外观. 1.20.3 整理：首页风格（四张预览，含经典）→ 配色（六张预览，取代「深浅色 + 纯黑开关」
+// 与「主题」两行，映射见 logic/color_choice.dart）→ 主题色（自带配色的终端绿 / 暖纸时隐藏）→ 动效；
+// 去掉所有 ⓘ；隐私模式、敏感页禁止截屏、导入后清空剪贴板搬到 设置 › 隐私（privacy_settings_page.dart，键不变）。
+// 1.11.0: 配色风格 (fixed to 忠实) and 文字缩放 (follows the system font size) are gone; 1.10.0: Android 通知与图标,
+// Windows 窗口. Split out of more_settings.dart in 1.9.0 (same library, behaviour unchanged).
 // Part of 穿云 (GPLv3).
 
 part of 'more_settings.dart';
 
 // ======================================================================= 外观
+
+/// 1.20.3: 外观页（以及隐私页）列表末尾的留白：底栏高度 + 系统导航条 inset + 32。底栏外的页面（电脑、
+/// 平板）只多系统 inset。页面原本已在底栏上沿结束时多出的只是一段空白，宁多勿少，最后一行永远不被压住。
+EdgeInsets museSettingsPagePadding(BuildContext context) {
+  final view = View.maybeOf(context);
+  final system = view == null ? 0.0 : view.viewPadding.bottom / view.devicePixelRatio;
+  // museScrollPadding already adds what MediaQuery still reports; only add the part the shell removed
+  final inset = (system - MediaQuery.paddingOf(context).bottom).clamp(0.0, system);
+  final dock = MediaQuery.sizeOf(context).width <= MuseBreak.mobile ? MuseSize.dockHeight : 0.0;
+  return EdgeInsets.only(top: MuseSpace.s4, bottom: MuseSpace.s32 + dock + inset);
+}
 
 class MuseAppearancePage extends HookConsumerWidget {
   const MuseAppearancePage({super.key, this.android, this.windows, this.windowAdvancedOpen = false});
@@ -19,169 +32,25 @@ class MuseAppearancePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    final themeMode = ref.watch(themePreferencesProvider);
-    final shownTheme = themeMode == AppThemeMode.black ? AppThemeMode.dark : themeMode;
-    final themeStyle = MuseThemeStyle.fromKey(ref.watch(MusePrefs.themeStyle));
+    final colors = ref.watch(museColorChoiceProvider);
     return MuseScaffold(
       title: '外观',
       body: MuseGroupedBody(
+        padding: museSettingsPagePadding(context),
         children: [
-          // 1.20.1: 首页风格 first — three small previews, a tap applies at once
+          // 1.20.1 首页风格; 1.20.3: + 经典（原「首页样式」一行），无说明句、无勾
           const MuseSection(header: '首页风格', children: [MuseHomeLookPicker()]),
-          MuseSection(
-            children: [
-              MuseTile(
-                key: const ValueKey('appearance_theme'),
-                leading: const Icon(Icons.dark_mode_outlined),
-                title: '深浅色',
-                // 1.19.0 P5: 选了固定深浅的主题时，深浅色设置暂不生效（主题选回「默认」即恢复）
-                subtitle: themeStyle == MuseThemeStyle.auto ? null : '主题为「${themeStyle.title}」时不生效',
-                trailing: Text(shownTheme.present(t)),
-                chevron: true,
-                onTap: () async {
-                  final picked = await musePick<AppThemeMode>(
-                    context,
-                    '深浅色',
-                    [for (final m in AppThemeMode.choices) (m, m.present(t))],
-                    shownTheme,
-                  );
-                  if (picked == null || picked == shownTheme) return; // 深色 again keeps 纯黑
-                  await ref.read(themePreferencesProvider.notifier).changeThemeMode(picked);
-                },
-              ),
-              // 1.6.0 C7: 纯黑 only under 深色 (stored as the theme mode, so it never applies to 浅色)
-              if (shownTheme == AppThemeMode.dark)
-                MuseSwitchTile(
-                  key: const ValueKey('appearance_pure_black'),
-                  leading: const Icon(Icons.contrast_outlined),
-                  title: '纯黑',
-                  info: '深色背景改为纯黑，OLED 屏幕更省电',
-                  value: themeMode == AppThemeMode.black,
-                  onChanged: (v) => ref
-                      .read(themePreferencesProvider.notifier)
-                      .changeThemeMode(v ? AppThemeMode.black : AppThemeMode.dark),
-                ),
-              // 1.16.0 B9: 跟随系统也能选纯黑（系统切到深色时才生效，浅色不变）
-              if (shownTheme == AppThemeMode.system)
-                MuseSwitchTile(
-                  key: const ValueKey('appearance_pure_black_follow'),
-                  leading: const Icon(Icons.contrast_outlined),
-                  title: '纯黑',
-                  info: '系统切到深色时背景用纯黑，有机发光屏幕更省电；浅色不变',
-                  value: ref.watch(MusePrefs.pureBlackFollowSystem),
-                  onChanged: (v) => ref.read(MusePrefs.pureBlackFollowSystem.notifier).update(v),
-                ),
-              // 1.19.0 P5: 主题（默认 / 浅色 / 纯黑 / 终端绿 / 暖纸），切换时圆形揭开
-              const MuseThemeStyleTile(),
-              // 1.18.0 P6: 动效三档；跟随系统 = 移除动画 → 关闭，省电模式 → 精简
-              const MuseMotionTile(),
-              // 1.19.0: 首页样式（新首页 / 经典首页）
-              const MuseHomeStyleTile(),
-            ],
-          ),
-          MuseSection(
-            header: '主题色',
-            children: [
-              const MuseAccentPicker(),
-            ],
-          ),
-          MuseSection(
-            children: [
-              MuseSwitchTile(
-                key: const ValueKey('appearance_privacy'),
-                leading: const Icon(Icons.blur_on_outlined),
-                title: '隐私模式',
-                info: '首页的流量、IP 等数字打码',
-                value: ref.watch(MusePrefs.privacyMask),
-                onChanged: (v) => ref.read(MusePrefs.privacyMask.notifier).update(v),
-              ),
-              // 1.16.0 B8: 敏感页禁截屏 (Android only: the window flag)
-              if (android ?? PlatformUtils.isAndroid)
-                MuseSwitchTile(
-                  key: const ValueKey('appearance_secure_sensitive'),
-                  leading: const Icon(Icons.screenshot_monitor_outlined),
-                  title: '敏感页禁止截屏',
-                  info: '节点详情、订阅详情、二维码、导出配置打开时禁止截屏和录屏，在最近任务里也只显示空白',
-                  value: ref.watch(MusePrefs.secureSensitive),
-                  onChanged: (v) => ref.read(MusePrefs.secureSensitive.notifier).update(v),
-                ),
-              // 1.10.0: from the removed 帮助与隐私 page (same preference)
-              MuseSwitchTile(
-                key: const ValueKey('clear_clipboard_switch'),
-                leading: const Icon(Icons.content_paste_off_outlined),
-                title: '导入后清空剪贴板',
-                info: '从剪贴板导入订阅链接后，立即清空剪贴板（链接里带有密钥）',
-                value: ref.watch(MusePrefs.clearClipboardAfterImport),
-                onChanged: (v) => ref.read(MusePrefs.clearClipboardAfterImport.notifier).update(v),
-              ),
-              // 1.9.0 #9: 主题预览 moved to 开发者选项 (debug builds only)
-            ],
-          ),
+          // 1.20.3 配色：跟随系统 / 浅色 / 深色 / 纯黑 / 终端绿 / 暖纸
+          const MuseSection(header: '配色', children: [MuseColorChoicePicker()]),
+          // 主题色紧跟配色；终端绿、暖纸用自带配色，主题色不生效，整块不显示
+          if (!colors.ownPalette) const MuseSection(key: ValueKey('appearance_accent'), header: '主题色', children: [MuseAccentPicker()]),
+          // 1.18.0 P6: 动效三档；跟随系统 = 移除动画 → 关闭，省电模式 → 精简
+          const MuseSection(children: [MuseMotionTile()]),
           // 1.10.0: the platform rows that used to be groups on the 设置 home page
           if (android ?? PlatformUtils.isAndroid) const MuseAndroidAppearanceSection(),
           if (windows ?? PlatformUtils.isWindows) MuseWindowsWindowSection(advancedOpen: windowAdvancedOpen),
         ],
       ),
-    );
-  }
-}
-
-/// 1.19.0 P5 外观 › 主题。切换时从点按位置圆形揭开（动效档位决定：标准揭开、精简淡入、关闭直接切换）。
-class MuseThemeStyleTile extends ConsumerWidget {
-  const MuseThemeStyleTile({super.key});
-
-  /// 最近一次按下的位置（全局坐标），揭开从这里开始
-  static Offset? _lastDown;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final style = MuseThemeStyle.fromKey(ref.watch(MusePrefs.themeStyle));
-    return Listener(
-      onPointerDown: (e) => _lastDown = e.position,
-      child: MuseTile(
-        key: const ValueKey('appearance_theme_style'),
-        leading: const Icon(Icons.palette_outlined),
-        title: '主题',
-        subtitle: style.describe,
-        info: '默认按「深浅色」设置；浅色、纯黑固定深浅；终端绿、暖纸使用自带配色（主题色不生效）。所有主题的文字都满足对比度要求',
-        trailing: Text(style.title),
-        chevron: true,
-        onTap: () async {
-          final at = _lastDown;
-          final picked = await musePick<MuseThemeStyle>(context, '主题', [for (final s in MuseThemeStyle.values) (s, s.title)], style);
-          if (picked == null || picked == style || !context.mounted) return;
-          await MuseThemeReveal.run(context, at, () => ref.read(MusePrefs.themeStyle.notifier).update(picked.key));
-        },
-      ),
-    );
-  }
-}
-
-/// 1.19.0 外观 › 首页样式：新首页（路由弧线图在顶部）/ 经典首页（1.18 的首页）。
-class MuseHomeStyleTile extends ConsumerWidget {
-  const MuseHomeStyleTile({super.key});
-
-  static const choices = [('new', '新首页'), ('classic', '经典首页')];
-
-  static String titleOf(String key) => key == 'classic' ? '经典首页' : '新首页';
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final style = ref.watch(MusePrefs.homeStyle) == 'classic' ? 'classic' : 'new';
-    return MuseTile(
-      key: const ValueKey('appearance_home_style'),
-      leading: const Icon(Icons.public_outlined),
-      title: '首页样式',
-      subtitle: style == 'classic' ? '1.18 及以前的首页' : '顶部显示本机到出口的路由图',
-      info: '新首页在顶部显示从本机到出口城市的路由图；经典首页保持原来的样子。两种首页的连接、节点、网速等功能相同',
-      trailing: Text(titleOf(style)),
-      chevron: true,
-      onTap: () async {
-        final picked = await musePick<String>(context, '首页样式', choices, style);
-        if (picked == null || picked == style) return;
-        await ref.read(MusePrefs.homeStyle.notifier).update(picked);
-      },
     );
   }
 }
@@ -212,7 +81,6 @@ class MuseMotionTile extends ConsumerWidget {
       leading: const Icon(Icons.animation_outlined),
       title: '动效',
       subtitle: '${describe(level)}$why',
-      info: '跟随系统：系统「移除动画」时关闭，安卓省电模式时精简；也可以手动选择。所有动画只播放一次，不会常驻耗电',
       trailing: Text(choice.title),
       chevron: true,
       onTap: () async {
@@ -285,7 +153,9 @@ class MuseAccentPicker extends ConsumerWidget {
           ),
         );
 
-    return Padding(
+    // 1.20.3: full width (the group used to be narrower than the others)
+    return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(MuseSpace.s16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

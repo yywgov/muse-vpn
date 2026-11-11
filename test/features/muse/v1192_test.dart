@@ -504,11 +504,12 @@ void main() {
       }
     });
 
-    testWidgets('关于 › 开源致谢里有思源黑体一行', (t) async {
+    // 1.20.3: the 致谢 group (思源黑体 row included) is gone from 关于 › 开源许可; the font's licence file stays bundled
+    testWidgets('关于 › 开源许可没有致谢行；思源黑体的许可文件仍随应用打包', (t) async {
       final src = File('lib/features/about/widget/open_source_page.dart').readAsStringSync();
-      expect(src, contains('about_credit_font_cjk'));
-      expect(src, contains('思源黑体'));
-      expect(src, contains('SIL 开放字体许可 1.1'));
+      expect(src, isNot(contains('about_credit_font_cjk')));
+      expect(src, isNot(contains('思源黑体')));
+      expect(File('assets/fonts/OFL-NotoSansSC.txt').existsSync(), isTrue);
     });
   });
 

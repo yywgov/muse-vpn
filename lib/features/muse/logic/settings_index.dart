@@ -10,6 +10,8 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 enum MuseSettingPage {
   advanced('设置 › 网络 › 高级'),
   appearance('设置 › 外观'),
+  // 1.20.3：隐私模式、敏感页禁止截屏、导入后清空剪贴板
+  privacy('设置 › 隐私'),
   nodes('节点 › ⋯ › 节点设置'),
   // 1.20.2：订阅页并入节点页，分流规则搬到设置「网络」下面
   routing('设置 › 分流规则'),
@@ -34,7 +36,8 @@ enum MuseSettingPage {
   // 1.10.0
   // 1.20.2：订阅弹层（节点页标题「订阅名 ▾」）
   subscriptions('节点 › 订阅名 ▾ › ⋯'),
-  openSource('设置 › 关于 › 开源许可与致谢'),
+  // 1.20.3：开源许可与致谢 → 开源许可（致谢分组已删）
+  openSource('设置 › 关于 › 开源许可'),
   // 1.11.0: rows folded into 「高级」 on their page
   nodesAdvanced('节点 › ⋯ › 节点设置 › 高级'),
   windowAdvanced('设置 › 外观 › 窗口 › 高级');
@@ -59,17 +62,23 @@ class MuseSettingEntry {
 
 const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('外观', MuseSettingPage.appearance, keywords: ['主题', '深色', '浅色', '夜间']),
-  MuseSettingEntry('深浅色', MuseSettingPage.appearance, keywords: ['深色模式', '浅色模式', '跟随系统', '主题']),
-  MuseSettingEntry('纯黑', MuseSettingPage.appearance, keywords: ['黑色', 'OLED', '省电', '深色模式', 'AMOLED']),
+  MuseSettingEntry('深浅色', MuseSettingPage.appearance, keywords: ['深色模式', '浅色模式', '跟随系统', '配色']),
+  MuseSettingEntry('纯黑', MuseSettingPage.appearance, keywords: ['黑色', 'OLED', '省电', '深色模式', 'AMOLED', '配色']),
   // 1.18.0 P6
   // 1.19.0 P5
   MuseSettingEntry('主题', MuseSettingPage.appearance, keywords: ['浅色', '纯黑', '终端绿', '暖纸', '配色', '皮肤', '黑底绿字', '米色', '纸']),
-  MuseSettingEntry('首页风格', MuseSettingPage.appearance, keywords: ['留白', '细线', '数字', '风格', '首页外观', '密度', '大字时长']),
-  MuseSettingEntry('首页样式', MuseSettingPage.appearance, keywords: ['新首页', '经典首页', '旧首页', '路由图', '弧线图', '地图', '首页']),
+  // 1.20.3：深浅色、纯黑、主题合成「配色」一组；旧名字的条目放在前面，搜旧名先出旧名
+  MuseSettingEntry('配色', MuseSettingPage.appearance, keywords: ['深浅色', '深色模式', '浅色模式', '跟随系统', '纯黑', '黑色', 'OLED', '省电', 'AMOLED', '主题', '终端绿', '暖纸', '皮肤', '黑底绿字', '米色', '纸']),
+  // 1.20.3：首页样式（新首页 / 经典首页）并入首页风格，「经典」是第四张
+  MuseSettingEntry('首页风格', MuseSettingPage.appearance, keywords: ['留白', '细线', '数字', '经典', '风格', '首页外观', '密度', '大字时长', '首页样式', '经典首页', '旧首页']),
+  MuseSettingEntry('首页样式', MuseSettingPage.appearance, keywords: ['新首页', '经典首页', '旧首页', '路由图', '弧线图', '地图', '首页', '首页风格']),
   MuseSettingEntry('动效', MuseSettingPage.appearance, keywords: ['动画', '移除动画', '减少动画', '省电模式', '精简']),
   MuseSettingEntry('主题色', MuseSettingPage.appearance, keywords: ['颜色', '强调色', '中国传统色', '传统色', '景泰蓝', '宝蓝', '竹青', '松花', '胭脂', '枣红', '藤黄', '青碧', '丁香', '赭石', '蓝', '绿', '紫', '青', '红', '黄', '灰', '棕']),
   MuseSettingEntry('自定义主题色', MuseSettingPage.appearance, keywords: ['十六进制', 'hex', '#', '自定义颜色', '取色']),
-  MuseSettingEntry('隐私模式', MuseSettingPage.appearance, keywords: ['模糊', '截图']),
+  // 1.20.3：搬到 设置 › 隐私
+  MuseSettingEntry('隐私', MuseSettingPage.privacy, keywords: ['隐私模式', '截屏', '剪贴板', '安全']),
+  MuseSettingEntry('隐私模式', MuseSettingPage.privacy, keywords: ['模糊', '截图', '打码']),
+  MuseSettingEntry('敏感页禁止截屏', MuseSettingPage.privacy, keywords: ['截屏', '截图', '录屏', '防截屏', '安全', '隐私'], androidOnly: true),
   MuseSettingEntry('智能保持连接', MuseSettingPage.autoConnect, keywords: ['断线', '重连', '重启内核']),
   // 1.11.0
   MuseSettingEntry('节点失效自动切换', MuseSettingPage.nodes, keywords: ['自动切换', '故障转移', '失效', '同地区', '换节点']),
@@ -118,7 +127,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('切换节点时关闭旧连接', MuseSettingPage.advanced, keywords: ['关闭连接', '断开旧连接']),
   MuseSettingEntry('测速并发数 / 超时', MuseSettingPage.developer, keywords: ['测速', '并发', '超时']),
   // 1.9.0
-  MuseSettingEntry('导入后清空剪贴板', MuseSettingPage.appearance, keywords: ['剪贴板', '订阅链接', '密钥', '隐私']),
+  MuseSettingEntry('导入后清空剪贴板', MuseSettingPage.privacy, keywords: ['剪贴板', '订阅链接', '密钥', '隐私']),
   MuseSettingEntry('导出为 sing-box 格式', MuseSettingPage.routing, keywords: ['规则', '导出']),
   MuseSettingEntry('恢复推荐 DNS', MuseSettingPage.network, keywords: ['默认', 'DNS', '还原']),
   MuseSettingEntry('诊断', MuseSettingPage.diagnose, keywords: ['日志', '连不上', '排查', '反馈', '崩溃']),
@@ -150,7 +159,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('内核版本', MuseSettingPage.resources, keywords: ['内核', '版本号', '内核与资源']),
   MuseSettingEntry('版本与构建号', MuseSettingPage.about, keywords: ['构建号', '版本号']),
   // 1.10.0: license, source and the credits on one page under 关于
-  MuseSettingEntry('开源许可与致谢', MuseSettingPage.openSource, keywords: ['开源许可', '源代码', '致谢', 'GPL', '许可证']),
+  MuseSettingEntry('开源许可', MuseSettingPage.openSource, keywords: ['开源许可', '源代码', 'GPL', '许可证']),
   MuseSettingEntry('恢复范围 / 恢复策略', MuseSettingPage.sync, keywords: ['仅订阅', '仅设置', '合并', '覆盖', '预览', '恢复']),
   MuseSettingEntry('调试日志', MuseSettingPage.developer, keywords: ['debug', '日志级别']),
   MuseSettingEntry('清除缓存', MuseSettingPage.developer, keywords: ['缓存', '临时文件']),

@@ -168,7 +168,8 @@ void main() {
       final page = _src('lib/features/muse/settings/appearance_page.dart');
       final first = page.indexOf('MuseSection(');
       expect(page.indexOf('MuseHomeLookPicker()'), greaterThan(first));
-      expect(page.indexOf('MuseHomeLookPicker()'), lessThan(page.indexOf("ValueKey('appearance_theme')")));
+      // 1.20.3: 「深浅色」一行没有了，首页风格在「配色」之前
+      expect(page.indexOf('MuseHomeLookPicker()'), lessThan(page.indexOf('MuseColorChoicePicker()')));
       final e = museSettingEntries.where((e) => e.title == '首页风格').single;
       expect(e.page, MuseSettingPage.appearance);
       expect(e.keywords, containsAll(['留白', '细线', '数字']));
@@ -309,12 +310,13 @@ void main() {
   });
 
   group('B 首页风格：设置', () {
-    testWidgets('外观第一块「首页风格」三张预览，点一下立即保存并生效；读屏有名字与选中状态', (tester) async {
+    // 1.20.3: 四张（+ 经典），没有说明句；首页风格之后是「配色」
+    testWidgets('外观第一块「首页风格」四张预览，点一下立即保存并生效；读屏有名字与选中状态', (tester) async {
       final c = await _pump(tester, page: const MuseAppearancePage(android: false, windows: false), size: const Size(412, 1200));
       expect(find.byType(MuseHomeLookPicker), findsOneWidget);
-      expect(find.byType(MuseHomeLookPreview), findsNWidgets(3));
+      expect(find.byType(MuseHomeLookPreview), findsNWidgets(4));
       final picker = tester.getRect(find.byKey(const ValueKey('appearance_home_look')));
-      final theme = tester.getRect(find.byKey(const ValueKey('appearance_theme')));
+      final theme = tester.getRect(find.byKey(const ValueKey('appearance_color_choice')));
       expect(picker.bottom, lessThan(theme.top));
       final sem = tester.widget<Semantics>(
         find.ancestor(of: find.byKey(const ValueKey('home_look_airy')), matching: find.byType(Semantics)).first,
@@ -326,7 +328,7 @@ void main() {
       await tester.pump();
       expect(c.read(MusePrefs.homeLook), 'number');
       expect(c.read(museHomeLookProvider), same(MuseHomeLook.number));
-      expect(find.textContaining('数字：'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_look_describe')), findsNothing); // 1.20.3: 说明句去掉
       await _done(tester);
     });
 

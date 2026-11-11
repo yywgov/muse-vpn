@@ -91,9 +91,9 @@ String museCoreShort([String release = museCoreRelease]) {
   return i < 0 || i == release.length - 1 ? release : release.substring(i + 1);
 }
 
-/// 1.10.0: the one small line under the name on 关于: 「1.10.0（193）· 内核 muse.20」.
-String museAboutVersionLine({required String version, required String build, String release = museCoreRelease}) =>
-    '$version${build.isEmpty ? '' : '（$build）'} · 内核 ${museCoreShort(release)}';
+/// 1.10.0: the one small line under the name on 关于. 1.20.3: just 「1.20.2（215）」 — the 「 · 内核 muse.xx」
+/// part is gone (the core version stays on 设置 › 内核与资源 › 内核版本, Windows and Android).
+String museAboutVersionLine({required String version, required String build}) => '$version${build.isEmpty ? '' : '（$build）'}';
 
 // ---------------------------------------------------------------- 关于 › 图标 ×7 (#127; 1.10.0: the icon, the version line checks for updates)
 

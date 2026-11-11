@@ -203,10 +203,11 @@ void main() {
       await _done(tester);
     });
 
-    test('外观里有「首页样式」，默认新首页，可在设置搜索里找到', () {
-      final page = _src('lib/features/muse/settings/appearance_page.dart');
-      expect(page, contains("ValueKey('appearance_home_style')"));
-      expect(page, contains("('new', '新首页'), ('classic', '经典首页')"));
+    // 1.20.3: 「首页样式」一行并入首页风格（第四张「经典」），搜索旧名仍能找到
+    test('外观里能选经典首页，默认新首页，可在设置搜索里找到', () {
+      final picker = _src('lib/features/muse/settings/home_look_picker.dart');
+      expect(picker, contains("classic('classic', '经典')"));
+      expect(picker, contains("classic => ('classic', MuseHomeLookKind.airy.key)"));
       expect(_src('lib/features/muse/data/muse_prefs.dart'), contains('"muse_home_style", "new"'));
       final e = museSettingEntries.where((e) => e.title == '首页样式').single;
       expect(e.page, MuseSettingPage.appearance);

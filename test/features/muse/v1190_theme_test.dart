@@ -91,12 +91,13 @@ void main() {
       expect(MuseThemeStyle.fromKey('nope'), MuseThemeStyle.auto);
     });
 
-    test('外观页：主题一行在，原有深浅色、纯黑、跟随系统纯黑都保留', () {
+    // 1.20.3: 深浅色 + 纯黑开关 + 主题 三行合成「配色」一组六张卡片（同样的键，映射见 color_choice.dart）
+    test('外观页：配色一组取代主题、深浅色、纯黑三行（1.20.3）', () {
       final page = _src('lib/features/muse/settings/appearance_page.dart');
-      expect(page, contains("ValueKey('appearance_theme_style')"));
-      expect(page, contains("ValueKey('appearance_theme')"));
-      expect(page, contains("ValueKey('appearance_pure_black')"));
-      expect(page, contains("ValueKey('appearance_pure_black_follow')"));
+      expect(page, contains('MuseColorChoicePicker()'));
+      for (final gone in ["ValueKey('appearance_theme_style')", "ValueKey('appearance_theme')", "ValueKey('appearance_pure_black')", "ValueKey('appearance_pure_black_follow')"]) {
+        expect(page, isNot(contains(gone)));
+      }
       expect([for (final s in MuseThemeStyle.values) s.title], ['默认', '浅色', '纯黑', '终端绿', '暖纸']);
       expect(_src('lib/features/app/widget/app.dart'), contains('MuseThemeReveal(child: child)'));
     });

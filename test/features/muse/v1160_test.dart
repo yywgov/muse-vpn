@@ -86,10 +86,12 @@ void main() {
       expect(AppTheme(AppThemeMode.system, '').scheme(Brightness.dark).surface, isNot(const Color(0xFF000000)));
     });
 
-    test('外观 shows 纯黑 under 跟随系统; app applies the saved switch', () {
+    // 1.20.3: the 纯黑 switch is gone from 外观 (配色 has one 纯黑 card); a saved 跟随系统 + 纯黑 keeps
+    // working (read as 跟随系统) until another 配色 is picked
+    test('跟随系统 + 纯黑 still applies; 外观 no longer has the switch (1.20.3)', () {
       final page = _src('lib/features/muse/settings/appearance_page.dart');
-      expect(page, contains("ValueKey('appearance_pure_black_follow')"));
-      expect(page, contains('if (shownTheme == AppThemeMode.system)'));
+      expect(page, isNot(contains("ValueKey('appearance_pure_black_follow')")));
+      expect(_src('lib/features/muse/settings/color_choice_picker.dart'), contains('pureBlackFollowSystem.notifier).update(false)'));
       final app = _src('lib/features/app/widget/app.dart');
       expect(app, contains('blackWhenSystemDark: blackFollow'));
       expect(_src('lib/features/muse/data/muse_prefs.dart'), contains('"muse_pure_black_follow", false'));
@@ -307,7 +309,8 @@ void main() {
       expect(kt, contains('"set_secure_screen"'));
       expect(kt, contains('addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)'));
       expect(kt, contains('clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)'));
-      expect(_src('lib/features/muse/settings/appearance_page.dart'), contains("ValueKey('appearance_secure_sensitive')"));
+      // 1.20.3: the switch moved to 设置 › 隐私
+      expect(_src('lib/features/muse/settings/privacy_settings_page.dart'), contains("ValueKey('appearance_secure_sensitive')"));
     });
   });
 

@@ -126,20 +126,17 @@ void main() {
       final src = File('lib/core/theme/theme_preferences.dart').readAsStringSync();
       expect(src, isNot(contains('changeThemeMode(AppThemeMode.dark)')));
     });
-    testWidgets('switch shows only under 深色 and toggles the mode', (tester) async {
-      var c = await _pump(tester, {'theme_mode': 'light'});
+    // 1.20.3: 纯黑 is a card of 外观 › 配色 (the switch under 深色 is gone); same stored value (theme_mode = black)
+    testWidgets('配色 › 纯黑 card stores the black theme mode (1.20.3)', (tester) async {
+      final c = await _pump(tester, {'theme_mode': 'dark'});
       expect(find.byKey(const ValueKey('appearance_pure_black')), findsNothing);
-      c = await _pump(tester, {'theme_mode': 'system'});
-      expect(find.byKey(const ValueKey('appearance_pure_black')), findsNothing);
-      c = await _pump(tester, {'theme_mode': 'dark'});
-      expect(find.byKey(const ValueKey('appearance_pure_black')), findsOneWidget);
-      await tester.tap(find.descendant(of: find.byKey(const ValueKey('appearance_pure_black')), matching: find.byType(Switch)));
+      await tester.ensureVisible(find.byKey(const ValueKey('color_choice_black')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('color_choice_black')));
       await tester.pump(const Duration(milliseconds: 300));
       expect(c.read(themePreferencesProvider), AppThemeMode.black);
-      // 深浅色 still reads 深色 (the switch stays on screen)
-      final t = c.read(translationsProvider).requireValue;
-      expect(find.descendant(of: find.byKey(const ValueKey('appearance_theme')), matching: find.text(AppThemeMode.dark.present(t))), findsOneWidget);
-      expect(find.byKey(const ValueKey('appearance_pure_black')), findsOneWidget);
+      final sem = tester.widget<Semantics>(find.ancestor(of: find.byKey(const ValueKey('color_choice_black')), matching: find.byType(Semantics)).first);
+      expect(sem.properties.selected, isTrue);
       // the theme the app builds for 纯黑 paints the page true black
       expect(AppTheme(c.read(themePreferencesProvider), '').darkTheme(null).scaffoldBackgroundColor.toARGB32(), 0xFF000000);
     });
@@ -220,7 +217,7 @@ void main() {
       testWidgets('no overflow ${s.$1.width.toInt()} @${s.$2}×, dark + 纯黑 + 文字缩放 on', (tester) async {
         await _pump(tester, {'theme_mode': 'black', 'muse_text_scale_on': true, 'muse_custom_accents': '#123456,#FFEB3B'}, size: s.$1, textScale: s.$2);
         expect(tester.takeException(), isNull);
-        expect(find.byKey(const ValueKey('appearance_pure_black')), findsOneWidget);
+        expect(find.byKey(const ValueKey('color_choice_black')), findsOneWidget); // 1.20.3: the 纯黑 card
       });
     }
   });

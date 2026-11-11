@@ -338,7 +338,8 @@ void main() {
   group('精简：设置', () {
     test('设置首页 has seven rows (备份与同步 gone)', () {
       // 1.20.2：「网络」下面加「分流规则」
-      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '自动连接', '分应用代理', '网络', '分流规则', '活动', '内核与资源', '关于']);
+      // 1.20.3：+ 隐私
+      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '隐私', '自动连接', '分应用代理', '网络', '分流规则', '活动', '内核与资源', '关于']);
     });
 
     test('removed settings are not found by search; moved ones point at 高级', () {
@@ -480,11 +481,12 @@ void main() {
       await _done(t);
     });
 
-    testWidgets('关于: 导出配置 / 导入配置 / 开源许可与致谢 at the bottom', (t) async {
+    testWidgets('关于: 导出配置 / 导入配置 / 开源许可 at the bottom (1.20.3: renamed)', (t) async {
       await _pump(t, _screens[0], Brightness.light, 3, const AboutPage());
       expect(find.text('导出配置'), findsOneWidget);
       expect(find.text('导入配置'), findsOneWidget);
       expect(find.byKey(const ValueKey('about_open_source')), findsOneWidget);
+      expect(find.text('开源许可'), findsOneWidget); // 1.20.3
       await t.tap(find.byKey(const ValueKey('about_export_config')));
       await t.pump();
       expect(find.byType(MuseExportBackupDialog), findsOneWidget);

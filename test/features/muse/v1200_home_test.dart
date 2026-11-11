@@ -201,15 +201,14 @@ void main() {
       expect(museRegionCells(dots, 'ZZ'), isEmpty);
     });
 
-    test('生成脚本与数据来源写明公有领域；关于页致谢 Natural Earth', () {
+    // 1.20.3: 关于 › 开源许可 no longer has the 致谢 group; the data source stays written in the table and the script
+    test('生成脚本与数据来源写明公有领域（1.20.3：关于页不再致谢）', () {
       expect(_src('tool/world_dots/gen_dot_countries.py'), contains('Public Domain'));
       final table = _src('lib/features/muse/home/route_map/route_countries.dart');
       expect(table, contains('Natural Earth'));
       expect(table, contains('公有领域'));
       final about = _src('lib/features/about/widget/open_source_page.dart');
-      expect(about, contains("ValueKey('about_credit_map')"));
-      expect(about, contains('Natural Earth'));
-      expect(about, contains('公有领域'));
+      expect(about, isNot(contains("ValueKey('about_credit_map')")));
     });
   });
 

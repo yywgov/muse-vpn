@@ -284,10 +284,8 @@ void main() {
       'VPN',
       // 1.14.0 R21: transport name in 手动添加节点 (no common Chinese word)
       'WebSocket',
-      // 1.18.0 P7: the bundled font and its licence (关于 › 开源许可与致谢)
-      'Inter', 'SIL',
-      // 1.20.0: the map data credited on 关于 › 开源许可与致谢 (a proper name, public domain)
-      'Natural', 'Earth',
+      // 1.20.3: 'Inter', 'SIL', 'Natural', 'Earth' removed — they were only for the 致谢 group of 关于 › 开源许可,
+      // which is gone
     };
     final ui = RegExp(
       r'''(?:\bText\(|\b(?:title|label|tooltip|hintText|labelText|helperText|subtitle|header|footer|message|hint|semanticsLabel)\s*:|\bshow(?:Success|Error|Info)Toast\(|\bmuseAskText\(\s*context\s*,)\s*(?:const\s+)?(?:Text\(\s*)?(['"])((?:\\.|(?!\1).)*?)\1''',

@@ -342,25 +342,33 @@ void main() {
   });
 
   group('C10 关于', () {
-    testWidgets('1.10.0 only icon, name and one version line; credits on 开源许可与致谢', (tester) async {
+    testWidgets('1.10.0 only icon, name and one version line; 开源许可 link (1.20.3: was 开源许可与致谢)', (tester) async {
       await _pump(tester, const AboutPage(), engine: '1.12.3');
       await tester.pump();
-      expect(find.text('1.6.0（160） · 内核 ${museCoreShort()}'), findsOneWidget);
+      expect(find.text('1.6.0（160）'), findsOneWidget); // 1.20.3: no 「 · 内核 muse.xx」
       expect(find.byKey(const ValueKey('about_open_source')), findsOneWidget);
       expect(find.text('界面设计参考 FlClash'), findsNothing);
       expect(find.byType(ListTile), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('开源许可与致谢: license, source and the GPL credits', (tester) async {
+    // 1.20.3: 开源许可与致谢 → 开源许可; the 致谢 group is gone, the upstream stays named and linked
+    // (Hiddify licence, additional term 3): the note on top + 「上游项目 Hiddify」 in 许可与源代码
+    testWidgets('开源许可: license, source and the upstream link; no 致谢 (1.20.3)', (tester) async {
       await _pump(tester, const OpenSourcePage());
       await tester.pump();
+      expect(find.text('开源许可'), findsOneWidget);
       expect(find.byKey(const ValueKey('open_source_code')), findsOneWidget);
       expect(find.byKey(const ValueKey('open_source_license')), findsOneWidget);
-      await tester.scrollUntilVisible(find.byKey(const ValueKey('about_credit_base')), 300);
-      expect(find.text('界面设计参考 FlClash'), findsOneWidget);
-      expect(find.text('chen08209 · GPL-3.0'), findsOneWidget);
-      expect(find.text('基于 Hiddify 开发'), findsOneWidget);
+      expect(find.byKey(const ValueKey('open_source_upstream')), findsOneWidget);
+      expect(find.text('上游项目 Hiddify'), findsOneWidget);
+      expect(find.textContaining('穿云基于开源项目 Hiddify'), findsOneWidget);
+      expect(find.textContaining('感谢'), findsNothing);
+      for (final gone in ['about_credit_ui', 'about_credit_base', 'about_credit_font', 'about_credit_font_cjk', 'about_credit_map']) {
+        expect(find.byKey(ValueKey(gone)), findsNothing, reason: gone);
+      }
+      expect(find.text('致谢'), findsNothing);
+      expect(File('lib/features/about/widget/open_source_page.dart').readAsStringSync(), contains("open('https://github.com/hiddify/hiddify-app')"));
       expect(tester.takeException(), isNull);
     });
 
@@ -370,10 +378,12 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('disconnected: the bundled core release in the version line', (tester) async {
+    // 1.20.3: the version line no longer names the core (it is on 设置 › 内核与资源 › 内核版本)
+    testWidgets('disconnected: the version line has no core release (1.20.3)', (tester) async {
       await _pump(tester, const AboutPage());
       await tester.pump();
-      expect(find.textContaining('内核 ${museCoreShort(museCoreRelease)}'), findsOneWidget);
+      expect(find.textContaining('内核 ${museCoreShort(museCoreRelease)}'), findsNothing);
+      expect(find.text('1.6.0（160）'), findsOneWidget);
     });
 
     testWidgets('tapping the icon 7 times turns 开发者选项 on (1.10.0: the version line checks for updates)', (tester) async {
@@ -395,7 +405,7 @@ void main() {
       expect(find.text('点击检测更新'), findsOneWidget);
       expect(find.text('检查更新'), findsNothing);
       expect(find.text('更新内容'), findsNothing);
-      final version = find.text('1.6.0（160） · 内核 ${museCoreShort()}');
+      final version = find.text('1.6.0（160）'); // 1.20.3: no 「 · 内核 muse.xx」
       expect(version, findsOneWidget);
       // the version sits right below the update line, as small text
       expect(tester.getTopLeft(version).dy, greaterThan(tester.getTopLeft(find.text('点击检测更新')).dy));
@@ -441,7 +451,7 @@ void main() {
       expect(u.tap(t0.add(const Duration(seconds: 2))), museDevTapsNeeded - 1, reason: 'counts again from scratch');
     });
 
-    test('the GPL credits name the upstream projects only on 关于 › 开源许可与致谢', () {
+    test('the upstream project is named only on 关于 › 开源许可 (1.20.3: was 开源许可与致谢)', () {
       for (final p in [
         'lib/features/muse/logic/restore_plan.dart',
         'lib/features/muse/logic/resources.dart',
@@ -454,9 +464,10 @@ void main() {
           expect(s.contains(w), isFalse, reason: '$p: $w');
         }
       }
-      // 1.10.0: the credits sit on 关于 › 开源许可与致谢
+      // 1.20.3: the 致谢 group is gone; the upstream stays as 「上游项目 Hiddify」
       final credits = File('lib/features/about/widget/open_source_page.dart').readAsStringSync();
-      expect(credits, contains("'界面设计参考 FlClash'"));
+      expect(credits, isNot(contains('FlClash')));
+      expect(credits, contains("'上游项目 Hiddify'"));
     });
   });
 

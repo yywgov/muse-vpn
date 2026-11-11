@@ -3,15 +3,15 @@
 //
 // 1.1: 检查更新 downloads and installs the new version in the app.
 // 1.10.0: the whole page is the centred icon, the name and one small line
-// 「1.10.0（193）· 内核 muse.20」. Tapping that line checks for updates (a new version's notes are
+// 「1.10.0（193）」 (1.20.3: the 「· 内核 muse.xx」 part is gone; the core version is on 设置 › 内核与资源). Tapping that line checks for updates (a new version's notes are
 // in the dialog; 「已是最新版本」 otherwise) and the line itself shows 正在检查 / 下载进度. One small
-// link at the bottom opens 开源许可与致谢 (license, source, the GPL credits). Tapping the icon 7
+// link at the bottom opens 开源许可 (license, source, the upstream; 1.20.3: was 开源许可与致谢). Tapping the icon 7
 // times turns 开发者选项 on (#127).
 // 1.10.1: the tappable line now says 「点击检测更新」 (primary colour) while idle, 正在检查 / 下载进度
-// while busy; the version line 「1.10.1（194）· 内核 muse.20」 sits right below it as plain grey
+// while busy; the version line 「1.10.1（194）」 sits right below it as plain grey
 // caption text and is not tappable.
 // 1.11.0: 设置 › 备份与同步 is gone; 导出配置 / 导入配置 are two small links at the bottom, next to
-// 开源许可与致谢 (same backup file as before; old backups still import).
+// 开源许可 (same backup file as before; old backups still import).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -224,7 +224,7 @@ class AboutPage extends HookConsumerWidget {
                   for (final (key, label, onTap) in [
                     (const ValueKey('about_export_config'), museExportConfigTitle, () => museExportConfig(context, ref)),
                     (const ValueKey('about_import_config'), museImportConfigTitle, () => museImportConfig(context, ref)),
-                    (const ValueKey('about_open_source'), '开源许可与致谢', () => context.goNamed('openSource')),
+                    (const ValueKey('about_open_source'), '开源许可', () => context.goNamed('openSource')),
                   ])
                     TextButton(
                       key: key,

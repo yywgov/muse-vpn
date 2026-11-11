@@ -1,4 +1,5 @@
-// 穿云 1.20.1 外观 › 首页风格：留白 / 细线 / 数字，三张小预览图并排，点一下即时生效（首页直接换，
+// 穿云 1.20.1 外观 › 首页风格：留白 / 细线 / 数字，三张小预览图并排（1.20.3：加「经典」共四张，
+// 去掉说明长句和勾，选中只换边框；卡片 [MuseChoiceCard] 也用于「配色」），点一下即时生效（首页直接换，
 // 不重启、无动画循环）。预览图按当前主题的颜色与各风格的令牌（[MuseHomeLook]）现画，不是截图。
 // Part of 穿云 (GPLv3).
 
@@ -11,77 +12,145 @@ import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_shape.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// 外观页最上面的「首页风格」：三张预览并排（每张最宽 [MuseHomeLookPreview.maxWidth]），下面一行说明当前风格。
+/// 1.20.3 首页风格的四个选项：留白 / 细线 / 数字 = 新首页（muse_home_style = new）+ 对应 muse_home_look；
+/// 经典 = 1.18 的首页（muse_home_style = classic），原来单独一行「首页样式」并到这里。
+enum MuseHomeChoice {
+  airy('airy', '留白'),
+  line('line', '细线'),
+  number('number', '数字'),
+  classic('classic', '经典');
+
+  const MuseHomeChoice(this.key, this.title);
+
+  final String key;
+  final String title;
+
+  /// 从两个旧键读出当前选项（经典优先）
+  static MuseHomeChoice read({required String homeStyle, required String homeLook}) {
+    if (homeStyle == 'classic') return classic;
+    return switch (MuseHomeLookKind.fromKey(homeLook)) {
+      MuseHomeLookKind.airy => airy,
+      MuseHomeLookKind.line => line,
+      MuseHomeLookKind.number => number,
+    };
+  }
+
+  /// 选中后写的值：（muse_home_style, muse_home_look）。经典的风格令牌是留白（1.18 的首页本来就是留白的样子），
+  /// 所以经典也写 airy，预览和首页一致。
+  (String homeStyle, String homeLook) get target => switch (this) {
+    airy || line || number => ('new', key),
+    classic => ('classic', MuseHomeLookKind.airy.key),
+  };
+
+  MuseHomeLook get look => MuseHomeLook.of(this == classic ? MuseHomeLookKind.airy : MuseHomeLookKind.fromKey(key));
+}
+
+/// 外观页最上面的「首页风格」：四张预览并排（每张最宽 [MuseHomeLookPreview.maxWidth]），点一下即时生效。
 class MuseHomeLookPicker extends ConsumerWidget {
   const MuseHomeLookPicker({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mt = MuseTheme.of(context);
-    final current = MuseHomeLookKind.fromKey(ref.watch(MusePrefs.homeLook));
-    return Padding(
+    final current = MuseHomeChoice.read(homeStyle: ref.watch(MusePrefs.homeStyle), homeLook: ref.watch(MusePrefs.homeLook));
+    Future<void> pick(MuseHomeChoice c) async {
+      final (style, look) = c.target;
+      await ref.read(MusePrefs.homeLook.notifier).update(look);
+      await ref.read(MusePrefs.homeStyle.notifier).update(style);
+    }
+
+    // 1.20.3: full width, so the group is as wide as the others on a wide window
+    return Container(
       key: const ValueKey('appearance_home_look'),
+      width: double.infinity,
       padding: const EdgeInsets.all(MuseSpace.s16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: MuseChoiceRow(
+        maxWidth: MuseHomeLookPreview.maxWidth,
         children: [
-          LayoutBuilder(
-            builder: (context, c) {
-              final w = math.min((c.maxWidth - MuseSpace.s12 * 2) / 3, MuseHomeLookPreview.maxWidth);
-              return Row(
-                children: [
-                  for (final k in MuseHomeLookKind.values) ...[
-                    if (k != MuseHomeLookKind.values.first) const SizedBox(width: MuseSpace.s12),
-                    SizedBox(
-                      width: w,
-                      child: _Choice(
-                        kind: k,
-                        selected: k == current,
-                        onTap: () => ref.read(MusePrefs.homeLook.notifier).update(k.key),
-                      ),
-                    ),
-                  ],
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: MuseSpace.s12),
-          Text(
-            '${current.title}：${current.describe}。三种风格的内容和功能相同，切换后首页立即更新',
-            key: const ValueKey('home_look_describe'),
-            style: MuseTextLevel.footnote.style(context, color: mt.text2),
-          ),
+          for (final c in MuseHomeChoice.values)
+            MuseChoiceCard(
+              tapKey: ValueKey('home_look_${c.key}'),
+              label: c.title,
+              semantics: '首页风格 ${c.title}',
+              selected: c == current,
+              aspect: MuseHomeLookPreview.aspect,
+              onTap: (_) => pick(c),
+              child: MuseHomeLookPreview(look: c.look, map: c != MuseHomeChoice.classic),
+            ),
         ],
       ),
     );
   }
 }
 
-class _Choice extends StatelessWidget {
-  const _Choice({required this.kind, required this.selected, required this.onTap});
+/// 一行等宽的选项卡片（每张最宽 [maxWidth]，间距 12），放不下就折成多行、每行列数相同。
+class MuseChoiceRow extends StatelessWidget {
+  const MuseChoiceRow({super.key, required this.children, required this.maxWidth, this.columns});
 
-  final MuseHomeLookKind kind;
+  final List<Widget> children;
+  final double maxWidth;
+
+  /// 每行几张；null = 一行放下全部
+  final int Function(double width)? columns;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, c) {
+      const gap = MuseSpace.s12;
+      final n = columns?.call(c.maxWidth) ?? children.length;
+      final w = math.min((c.maxWidth - gap * (n - 1)) / n, maxWidth);
+      return Wrap(
+        spacing: gap,
+        runSpacing: MuseSpace.s16,
+        children: [for (final child in children) SizedBox(width: w, child: child)],
+      );
+    },
+  );
+}
+
+/// 外观页的选项卡片：一张现画的预览图，选中时只换边框（主题强调色、加粗），名字在下面。
+/// [onTap] 带按下位置（全局坐标），配色切换的揭开从那里开始。
+class MuseChoiceCard extends StatelessWidget {
+  const MuseChoiceCard({
+    super.key,
+    this.tapKey,
+    required this.label,
+    required this.semantics,
+    required this.selected,
+    required this.aspect,
+    required this.onTap,
+    required this.child,
+  });
+
+  /// key of the tappable part (inside the card's Semantics, as the 1.20.1 cards had it)
+  final Key? tapKey;
+  final String label;
+  final String semantics;
   final bool selected;
-  final VoidCallback onTap;
+  final double aspect;
+  final void Function(Offset? at) onTap;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final mt = MuseTheme.of(context);
     final brand = museBrandOf(context);
+    const ring = MuseHomeLookPreview.ring;
     final frame = MuseShape.of(
       MuseRadiusScale.md,
-      side: BorderSide(color: selected ? brand : mt.hairline, width: selected ? MuseHomeLookPreview.ring : 1),
+      side: BorderSide(color: selected ? brand : mt.hairline, width: selected ? ring : 1),
     );
+    Offset? down;
     return Semantics(
       button: true,
       selected: selected,
-      label: '首页风格 ${kind.title}',
+      label: semantics,
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
-          key: ValueKey('home_look_${kind.key}'),
+          key: tapKey,
           customBorder: MuseShape.of(MuseRadiusScale.md),
-          onTap: onTap,
+          onTapDown: (d) => down = d.globalPosition,
+          onTap: () => onTap(down),
           child: ExcludeSemantics(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -89,37 +158,24 @@ class _Choice extends StatelessWidget {
                 DecoratedBox(
                   decoration: ShapeDecoration(shape: frame),
                   child: Padding(
-                    padding: const EdgeInsets.all(MuseHomeLookPreview.ring),
+                    // the same inset selected or not, so the preview never shifts
+                    padding: const EdgeInsets.all(ring),
                     child: ClipRSuperellipse(
-                      borderRadius: MuseShape.all(MuseRadiusScale.md - MuseHomeLookPreview.ring),
-                      child: AspectRatio(
-                        aspectRatio: MuseHomeLookPreview.aspect,
-                        child: MuseHomeLookPreview(look: MuseHomeLook.of(kind)),
-                      ),
+                      borderRadius: MuseShape.all(MuseRadiusScale.md - ring),
+                      child: AspectRatio(aspectRatio: aspect, child: child),
                     ),
                   ),
                 ),
                 const SizedBox(height: MuseSpace.s8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (selected) ...[
-                      Icon(Icons.check_circle_outlined, size: MuseIconSize.small, color: brand),
-                      const SizedBox(width: MuseSpace.s4),
-                    ],
-                    Flexible(
-                      child: Text(
-                        kind.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: MuseTextLevel.subheadline.style(
-                          context,
-                          color: selected ? mt.text1 : mt.text2,
-                          weight: selected ? FontWeight.w600 : FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: MuseTextLevel.subheadline.style(
+                    context,
+                    color: selected ? mt.text1 : mt.text2,
+                    weight: selected ? FontWeight.w600 : FontWeight.w400,
+                  ),
                 ),
               ],
             ),
@@ -133,9 +189,12 @@ class _Choice extends StatelessWidget {
 /// 一张首页风格的缩略图：页面底 + 已连接的连接卡（状态、连接钮、点阵地图、节点行）+ 下方 2 × 2 卡片，按
 /// [look] 的圆角、表面（底色 / 细线 / 投影）、连接钮形状与密度画出来，颜色取当前主题。
 class MuseHomeLookPreview extends StatelessWidget {
-  const MuseHomeLookPreview({super.key, required this.look});
+  const MuseHomeLookPreview({super.key, required this.look, this.map = true});
 
   final MuseHomeLook look;
+
+  /// 1.20.3: false = 经典首页（连接卡里没有路由图）
+  final bool map;
 
   /// 每张预览最宽
   static const maxWidth = 132.0;
@@ -153,6 +212,7 @@ class MuseHomeLookPreview extends StatelessWidget {
     return CustomPaint(
       painter: MuseHomeLookPainter(
         look: look,
+        map: map,
         page: mt.bgBottom,
         card: mt.card,
         inner: mt.inner,
@@ -170,6 +230,7 @@ class MuseHomeLookPreview extends StatelessWidget {
 class MuseHomeLookPainter extends CustomPainter {
   MuseHomeLookPainter({
     required this.look,
+    this.map = true,
     required this.page,
     required this.card,
     required this.inner,
@@ -181,6 +242,7 @@ class MuseHomeLookPainter extends CustomPainter {
   });
 
   final MuseHomeLook look;
+  final bool map;
   final Color page;
   final Color card;
   final Color inner;
@@ -236,7 +298,7 @@ class MuseHomeLookPainter extends CustomPainter {
         canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x, y, w, hh), Radius.circular(hh / 2)), Paint()..color = c);
 
     // ---- 连接卡
-    final heroH = number ? 124.0 : (lined ? 104.0 : 116.0);
+    final heroH = !map ? 66.0 : (number ? 124.0 : (lined ? 104.0 : 116.0));
     final hero = Rect.fromLTWH(m, m, unitsWide - m * 2, heroH);
     surface(hero, r);
     final p = look.pad * 0.5;
@@ -286,7 +348,13 @@ class MuseHomeLookPainter extends CustomPainter {
         bar(x1 - 19, hero.top + p + 20.5, 13, 5, ink2);
         mapTop = hero.top + p + 40;
     }
-    // 点阵地图（中间一块节点国家用已连接色）+ 一条弧线
+    // 点阵地图（中间一块节点国家用已连接色）+ 一条弧线；经典首页没有
+    if (map) _map(canvas, hero, mapTop, lined);
+    _rest(canvas, size, k, h, m, r, hero, x0, x1, ink1, ink2, lined, number, surface, bar);
+    canvas.restore();
+  }
+
+  void _map(Canvas canvas, Rect hero, double mapTop, bool lined) {
     final mapH = hero.bottom - mapTop - (lined ? 22 : 26);
     final dot = Paint()..color = text1.withValues(alpha: dark ? 0.22 : 0.2);
     final hi = Paint()..color = linked;
@@ -315,6 +383,25 @@ class MuseHomeLookPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = look.kind == MuseHomeLookKind.line ? 1.0 : 1.4,
     );
+  }
+
+  void _rest(
+    Canvas canvas,
+    Size size,
+    double k,
+    double h,
+    double m,
+    double r,
+    Rect hero,
+    double x0,
+    double x1,
+    Color ink1,
+    Color ink2,
+    bool lined,
+    bool number,
+    void Function(Rect, double) surface,
+    void Function(double, double, double, double, Color) bar,
+  ) {
     // 节点行
     final rowY = hero.bottom - (lined ? 11 : 13);
     if (lined) {
@@ -329,7 +416,9 @@ class MuseHomeLookPainter extends CustomPainter {
     // ---- 下方 2 × 2 卡片
     final top = hero.bottom + (lined ? 6 : 8);
     final gap = look.mergedGrid ? 0.0 : 6.0;
-    final tileH = math.max(24.0, math.min((h - top - m - gap) / 2, look.tile * 0.4));
+    // 经典首页连接卡矮，下面多画一排卡片
+    final rows = map ? 2 : 3;
+    final tileH = math.max(24.0, math.min((h - top - m - gap * (rows - 1)) / rows, look.tile * 0.4));
     final tileW = (hero.width - gap) / 2;
     if (look.mergedGrid) {
       surface(Rect.fromLTWH(hero.left, top, hero.width, tileH * 2), r);
@@ -339,7 +428,7 @@ class MuseHomeLookPainter extends CustomPainter {
       canvas.drawLine(Offset(hero.left, top + tileH), Offset(hero.right, top + tileH), rule);
       canvas.drawLine(Offset(hero.left + tileW, top), Offset(hero.left + tileW, top + tileH * 2), rule);
     }
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < rows * 2; i++) {
       final rect = Rect.fromLTWH(hero.left + (i % 2) * (tileW + gap), top + (i ~/ 2) * (tileH + gap), tileW, tileH);
       if (!look.mergedGrid) surface(rect, r);
       final tp = look.tilePadH * 0.5;
@@ -365,7 +454,6 @@ class MuseHomeLookPainter extends CustomPainter {
         }
       }
     }
-    canvas.restore();
   }
 
   void _pause(Canvas canvas, Offset c, double s, Color color) {
@@ -377,6 +465,7 @@ class MuseHomeLookPainter extends CustomPainter {
   @override
   bool shouldRepaint(MuseHomeLookPainter old) =>
       old.look != look ||
+      old.map != map ||
       old.page != page ||
       old.card != card ||
       old.inner != inner ||

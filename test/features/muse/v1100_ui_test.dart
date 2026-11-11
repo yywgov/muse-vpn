@@ -20,10 +20,11 @@ void main() {
   group('#7 设置首页 8 项', () {
     test('Android: 外观, 自动连接, 分应用代理, 网络, 活动, 内核与资源, 关于', () {
       // 1.20.2：「网络」下面加「分流规则」（订阅页并入节点页）
-      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '自动连接', '分应用代理', '网络', '分流规则', '活动', '内核与资源', '关于']);
+      // 1.20.3：+ 隐私（外观页的隐私三项搬来）
+      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '隐私', '自动连接', '分应用代理', '网络', '分流规则', '活动', '内核与资源', '关于']);
     });
     test('Windows has no 分应用代理; 开发者选项 only once turned on', () {
-      expect(museSettingsHomeRows(android: false, developer: false), hasLength(7)); // 1.20.2：+ 分流规则
+      expect(museSettingsHomeRows(android: false, developer: false), hasLength(8)); // 1.20.2：+ 分流规则；1.20.3：+ 隐私
       expect(museSettingsHomeRows(android: false, developer: false), isNot(contains('分应用代理')));
       expect(museSettingsHomeRows(android: true, developer: true).last, '开发者选项');
     });
@@ -49,8 +50,8 @@ void main() {
         '统计': MuseSettingPage.stats,
         '诊断': MuseSettingPage.diagnose,
         '通知栏断开按钮': MuseSettingPage.appearance,
-        '导入后清空剪贴板': MuseSettingPage.appearance,
-        '致谢': MuseSettingPage.openSource,
+        // 1.20.3: 导入后清空剪贴板 moved to 设置 › 隐私; 致谢 is gone (no keyword any more)
+        '导入后清空剪贴板': MuseSettingPage.privacy,
         '开源许可': MuseSettingPage.openSource,
       };
       moved.forEach((q, page) => expect(_first(q), page, reason: q));
@@ -116,13 +117,14 @@ void main() {
   });
 
   group('#1 关于', () {
-    test('one version line: 1.10.0（193）· 内核 muse.20', () {
+    // 1.20.3: the version line drops 「 · 内核 muse.xx」 (断言随改)
+    test('one version line: 1.10.0（193）', () {
       expect(museCoreShort('5.0.0-muse.20'), 'muse.20');
       expect(museCoreShort('muse.20'), 'muse.20');
-      expect(museAboutVersionLine(version: '1.10.0', build: '193', release: '5.0.0-muse.20'), '1.10.0（193） · 内核 muse.20');
-      expect(museAboutVersionLine(version: '1.10.0', build: '', release: '5.0.0-muse.20'), '1.10.0 · 内核 muse.20');
+      expect(museAboutVersionLine(version: '1.10.0', build: '193'), '1.10.0（193）');
+      expect(museAboutVersionLine(version: '1.10.0', build: ''), '1.10.0');
     });
-    test('no list cards: icon, name, 点击检测更新 + version line below, one 开源许可与致谢 link', () {
+    test('no list cards: icon, name, 点击检测更新 + version line below, one 开源许可 link (1.20.3: was 开源许可与致谢)', () {
       final s = _src('lib/features/about/widget/about_page.dart');
       expect(s, contains("ValueKey('about_check_update')"));
       expect(s, contains("ValueKey('about_version_text')"));

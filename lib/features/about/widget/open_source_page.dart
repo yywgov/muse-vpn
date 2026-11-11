@@ -1,5 +1,7 @@
-// 穿云 - 关于 › 开源许可与致谢: the license, where the source is and the GPL credits.
-// 1.10.0: the credits moved here from 关于 (the only place in the app the upstream projects are named).
+// 穿云 - 关于 › 开源许可: the license, where the source is and the upstream project.
+// 1.10.0: the credits moved here from 关于. 1.20.3: the 致谢 group is gone; Hiddify's licence
+// (additional term 3) still wants the upstream named and linked, so the note on top stays and
+// 「上游项目 Hiddify」 sits in 许可与源代码. The font licence files (assets/fonts/OFL-*.txt) stay bundled.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
 import 'package:flutter/material.dart';
@@ -15,7 +17,7 @@ class OpenSourcePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     void open(String url) => UriUtils.tryLaunch(Uri.parse(url));
     return MuseScaffold(
-      title: '开源许可与致谢',
+      title: '开源许可',
       body: MuseGroupedBody(
         children: [
           const MuseSection(
@@ -24,8 +26,7 @@ class OpenSourcePage extends ConsumerWidget {
                 padding: EdgeInsets.all(MuseSpace.s16),
                 child: Text(
                   '穿云基于开源项目 Hiddify（hiddify-app / hiddify-core，内核为 sing-box）修改，'
-                  '以 GNU 通用公共许可证第 3 版（GPLv3）发布，仅供学习交流，不得用于商业用途。\n\n'
-                  '感谢 Hiddify 与 sing-box 的作者和贡献者。',
+                  '以 GNU 通用公共许可证第 3 版（GPLv3）发布，仅供学习交流，不得用于商业用途。',
                 ),
               ),
             ],
@@ -53,55 +54,13 @@ class OpenSourcePage extends ConsumerWidget {
                 chevron: true,
                 onTap: () => open(Constants.licenseUrl),
               ),
-            ],
-          ),
-          // the GPL credits — the only place in the app the upstream projects are named
-          MuseSection(
-            header: '致谢',
-            footer: '穿云以 GPL-3.0 协议开源',
-            children: [
+              // 1.20.3: the upstream project, named and linked (Hiddify licence, additional term 3)
               MuseTile(
-                key: const ValueKey('about_credit_ui'),
-                leading: const Icon(Icons.design_services_outlined),
-                title: '界面设计参考 FlClash',
-                subtitle: 'chen08209 · GPL-3.0',
-                chevron: true,
-                onTap: () => open('https://github.com/chen08209/FlClash'),
-              ),
-              MuseTile(
-                key: const ValueKey('about_credit_base'),
+                key: const ValueKey('open_source_upstream'),
                 leading: const Icon(Icons.account_tree_outlined),
-                title: '基于 Hiddify 开发',
-                subtitle: 'GPL-3.0',
+                title: '上游项目 Hiddify',
                 chevron: true,
                 onTap: () => open('https://github.com/hiddify/hiddify-app'),
-              ),
-              // 1.18.0 P7: the bundled Latin / digits face (subset, renamed MuseSans in the app)
-              MuseTile(
-                key: const ValueKey('about_credit_font'),
-                leading: const Icon(Icons.font_download_outlined),
-                title: '数字与西文字体 Inter',
-                subtitle: 'Inter 项目作者 · SIL 开放字体许可 1.1（已精简为西文、数字和常用符号）',
-                chevron: true,
-                onTap: () => open('https://github.com/rsms/inter'),
-              ),
-              // 1.19.2: the bundled Chinese face (subset, renamed MuseHei in the app)
-              MuseTile(
-                key: const ValueKey('about_credit_font_cjk'),
-                leading: const Icon(Icons.translate_outlined),
-                title: '中文字体 思源黑体',
-                subtitle: '思源黑体项目作者 · SIL 开放字体许可 1.1（已精简为常用汉字与应用内用字）',
-                chevron: true,
-                onTap: () => open('https://github.com/notofonts/noto-cjk'),
-              ),
-              // 1.20.0: the country outlines behind the 首页 map's lit country (route_countries.dart)
-              MuseTile(
-                key: const ValueKey('about_credit_map'),
-                leading: const Icon(Icons.public_outlined),
-                title: '世界地图数据 Natural Earth',
-                subtitle: '公有领域（1:50m 国界，用于首页地图高亮节点所在国家）',
-                chevron: true,
-                onTap: () => open('https://www.naturalearthdata.com/about/terms-of-use/'),
               ),
             ],
           ),

@@ -72,10 +72,11 @@ void main() {
     }
     expect(titles, isNot(contains('帮助与隐私')));
     expect(MuseSettingPage.values.map((e) => e.name), isNot(contains('help')));
-    expect(museSettingEntries.singleWhere((e) => e.title == '导入后清空剪贴板').page, MuseSettingPage.appearance);
+    // 1.20.3: the switch moved from 外观 to 设置 › 隐私
+    expect(museSettingEntries.singleWhere((e) => e.title == '导入后清空剪贴板').page, MuseSettingPage.privacy);
     // the old words lead to the switch's new place
     final hits = museSearchSettings('剪贴板', android: true, windows: false);
-    expect(hits.map((e) => e.page), contains(MuseSettingPage.appearance));
+    expect(hits.map((e) => e.page), contains(MuseSettingPage.privacy)); // 1.20.3
   });
 
   group('clipboard switch on 设置 › 外观 (moved from 帮助与隐私)', () {
@@ -91,7 +92,7 @@ void main() {
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const MaterialApp(home: MuseAppearancePage(android: false, windows: false)),
+          child: const MaterialApp(home: MusePrivacyPage(android: false)), // 1.20.3: moved from 外观 to 设置 › 隐私
         ),
       );
       await tester.pump();

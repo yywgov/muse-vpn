@@ -213,7 +213,7 @@ void main() {
 
     test('外观 › 动效 与设置搜索', () {
       final page = _src('lib/features/muse/settings/appearance_page.dart');
-      expect(page, contains('const MuseMotionTile()'));
+      expect(page, contains('MuseMotionTile()')); // 1.20.3: inside a const MuseSection of its own
       expect(page, contains("ValueKey('appearance_motion')"));
       expect(page, contains('MusePrefs.motionLevel.notifier'));
       expect(_src('lib/features/muse/logic/settings_index.dart'), contains("MuseSettingEntry('动效'"));
@@ -395,7 +395,8 @@ void main() {
       expect(ofl, contains('The Inter Project Authors'));
       expect(pub, contains('- assets/fonts/OFL-Inter.txt'));
       expect(_src('THIRD_PARTY_NOTICES.md'), contains('SIL Open Font License 1.1'));
-      expect(_src('lib/features/about/widget/open_source_page.dart'), contains("ValueKey('about_credit_font')"));
+      // 1.20.3: the 致谢 group of 关于 › 开源许可 is gone; the licence file and THIRD_PARTY_NOTICES stay
+      expect(_src('lib/features/about/widget/open_source_page.dart'), isNot(contains("ValueKey('about_credit_font')")));
       // no OPPO Sans anywhere in the assets
       for (final f in Directory('assets/fonts').listSync()) {
         expect(f.path.toLowerCase(), isNot(contains('oppo')));
