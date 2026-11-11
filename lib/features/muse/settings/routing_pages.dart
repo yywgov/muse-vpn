@@ -31,7 +31,7 @@ List<Rule> museEffectiveRules(WidgetRef ref) {
 }
 
 /// 1.20.3：分流规则页顶的一行，按 config_option_repository 里实际拼接的顺序写（局域网始终第一，不列）。
-const museRoutingOrderText = '生效顺序：订阅覆写 → 已屏蔽 → 来自连接 → 自定义规则 → 预设 → 远程规则集 → 其余走代理。指定节点在规则、全局模式下都生效。';
+const museRoutingOrderText = '生效顺序：订阅覆写 → 已屏蔽 → 来自连接 → 自定义规则 → 预设 → 远程规则集 → 内置规则 → 其余走代理。指定节点在规则、全局模式下都生效。';
 
 /// 1.20.3：分流规则页「我的规则」组里那一行的标题（打开的页面标题是「我的规则」）。
 const museMyRulesTitle = '我的规则';
@@ -104,6 +104,25 @@ class MuseRoutingPage extends HookConsumerWidget {
           MuseSection(
             header: museMyRulesTitle,
             children: [
+              // 1.20.3 第 2 轮：行顺序和页顶生效顺序一致（已屏蔽 → 来自连接 → 自定义规则）；指定节点不在这条链里，放最后
+              // 1.20.3：在「活动 › 连接」里屏蔽的网站，原来只能靠 toast 撤销
+              MuseTile(
+                key: const ValueKey('routing_blocked_hosts'),
+                leading: const Icon(Icons.do_not_disturb_on_outlined),
+                title: '已屏蔽的网站',
+                trailing: Text(blocked.isEmpty ? '无' : '${blocked.length} 个'),
+                chevron: true,
+                onTap: () => showMuseBlockedHostsSheet(context),
+              ),
+              // 1.12.0: 在「活动 › 连接」里加的 直连 / 走代理；1.20.3：没有时也显示，写「无」
+              MuseTile(
+                key: const ValueKey('routing_quick_rules'),
+                leading: const Icon(Icons.bolt_outlined),
+                title: '来自连接的规则',
+                trailing: Text(quickRules.isEmpty ? '无' : '${quickRules.length} 条'),
+                chevron: true,
+                onTap: () => showMuseQuickRulesSheet(context),
+              ),
               // 1.9.0 #17: the custom rule list; 1.20.3：挂在 /settings 下，页标题「我的规则」
               MuseTile(
                 key: const ValueKey('routing_rule_list'),
@@ -119,24 +138,6 @@ class MuseRoutingPage extends HookConsumerWidget {
                 trailing: Text(nodeRules.isEmpty ? '无' : '${nodeRules.length} 条'),
                 chevron: true,
                 onTap: () => musePushPage(context, const MuseNodeRulesPage()),
-              ),
-              // 1.12.0: 在「活动 › 连接」里加的 直连 / 走代理；1.20.3：没有时也显示，写「无」
-              MuseTile(
-                key: const ValueKey('routing_quick_rules'),
-                leading: const Icon(Icons.bolt_outlined),
-                title: '来自连接的规则',
-                trailing: Text(quickRules.isEmpty ? '无' : '${quickRules.length} 条'),
-                chevron: true,
-                onTap: () => showMuseQuickRulesSheet(context),
-              ),
-              // 1.20.3：在「活动 › 连接」里屏蔽的网站，原来只能靠 toast 撤销
-              MuseTile(
-                key: const ValueKey('routing_blocked_hosts'),
-                leading: const Icon(Icons.do_not_disturb_on_outlined),
-                title: '已屏蔽的网站',
-                trailing: Text(blocked.isEmpty ? '无' : '${blocked.length} 个'),
-                chevron: true,
-                onTap: () => showMuseBlockedHostsSheet(context),
               ),
             ],
           ),
@@ -164,7 +165,7 @@ class MuseRoutingPage extends HookConsumerWidget {
                 key: const ValueKey('routing_presets'),
                 leading: const Icon(Icons.playlist_add_check_outlined),
                 title: '预设',
-                trailing: Text(choice.isEmpty ? '未开启' : '已开启 ${choice.length} 个'),
+                trailing: Text(choice.isEmpty ? '关' : '${choice.length} 个'),
                 chevron: true,
                 onTap: () => musePushPage(context, const MusePresetsPage()),
               ),

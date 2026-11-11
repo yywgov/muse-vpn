@@ -114,7 +114,7 @@ void main() {
       expect(r(MuseMotionChoice.reduced), MuseMotionLevel.reduced);
       expect(r(MuseMotionChoice.off), MuseMotionLevel.off);
       expect(MuseMotionChoice.fromKey('?'), MuseMotionChoice.auto);
-      expect([for (final c in MuseMotionChoice.values) c.title], ['跟随系统', '标准', '精简', '关闭']);
+      expect([for (final c in MuseMotionChoice.values) c.title], ['跟随系统', '标准', '精简', '关']);
     });
 
     test('时长：关闭为 0，精简 ×0.6', () {

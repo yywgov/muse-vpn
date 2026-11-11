@@ -135,7 +135,7 @@ void main() {
       expect(museEffectiveUpdateInterval(const Duration(hours: 48), hours: 24), const Duration(hours: 24));
       expect(museEffectiveUpdateInterval(const Duration(hours: 2), hours: 0), isNull);
       expect(museAutoUpdateChoices, contains(12));
-      expect(museAutoUpdateLabel(0), '关闭');
+      expect(museAutoUpdateLabel(0), '关');
       expect(museAutoUpdateLabel(12), '每 12 小时');
     });
   });

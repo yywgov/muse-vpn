@@ -225,7 +225,7 @@ void main() {
       final router = _src('lib/core/router/go_router/routing_config_notifier.dart');
       expect(router, contains('...rulesChildren,'));
       expect(router, contains("name: 'routingOptions',"));
-      expect(_src('lib/features/settings/overview/sections/routing_options_page.dart'), contains("title: const Text('我的规则')"));
+      expect(_src('lib/features/settings/overview/sections/routing_options_page.dart'), contains("title: '我的规则'"));
     });
   });
 

@@ -297,7 +297,7 @@ void main() {
         await tester.ensureVisible(find.byKey(const ValueKey('fake_ip')));
         await tester.pump(const Duration(milliseconds: 300));
         expect(find.byKey(const ValueKey('ipv6_policy')), findsOneWidget);
-        expect(find.descendant(of: find.byKey(const ValueKey('ipv6_policy')), matching: find.text('关闭')), findsOneWidget);
+        expect(find.descendant(of: find.byKey(const ValueKey('ipv6_policy')), matching: find.text('关')), findsOneWidget);
         final fake = tester.widget<Switch>(find.descendant(of: find.byKey(const ValueKey('fake_ip')), matching: find.byType(Switch)));
         expect(fake.value, isFalse);
         // switch rows line up with the other rows

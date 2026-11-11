@@ -68,7 +68,7 @@ class MuseNodeSettingsPage extends HookConsumerWidget {
                 key: const ValueKey('node_dedup_mode'),
                 leading: const Icon(Icons.rule_outlined),
                 title: '重复判断',
-                subtitle: hideDup ? null : '开启「隐藏重复节点」后生效',
+                subtitle: hideDup ? null : '隐藏重复节点时生效',
                 trailing: Text(museDedupModes[ref.watch(MusePrefs.dedupMode)] ?? museDedupModes['protocol']!, overflow: TextOverflow.ellipsis),
                 chevron: true,
                 onTap: () async {

@@ -164,7 +164,7 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
         name: cur == null ? null : (cur.tagDisplay.isNotEmpty ? cur.tagDisplay : cur.tag),
       ),
     );
-    // 系统代理 / VPN
+    // 代理方式（系统代理 / VPN）
     final tun = !Platform.isAndroid && ref.read(ConfigOptions.serviceMode) == ServiceMode.tun;
     bool? ours;
     if (connected && Platform.isWindows && !tun) ours = await WindowsProxyGuard.pointsAtUsNow();

@@ -142,7 +142,7 @@ int museScheduleSlot(MuseSchedule s, DateTime now, MuseWifiAction action) {
   return museEpochMinute(DateTime(now.year, now.month, now.day, at ~/ 60, at % 60));
 }
 
-String museMinuteLabel(int m) => m < 0 ? '关闭' : '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
+String museMinuteLabel(int m) => m < 0 ? '关' : '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
 
 // ---------------------------------------------------------------- quality watch
 
@@ -349,7 +349,7 @@ abstract final class HttpDateParse {
 /// #7: IPv6 — 关闭 keeps the tunnel IPv4-only (the default, as before); 优先 IPv4 / 优先 IPv6 give
 /// the tunnel an IPv6 address and make DNS prefer that family.
 enum MuseIpv6Policy {
-  off('off', '关闭'),
+  off('off', '关'),
   preferV4('prefer_v4', '优先 IPv4'),
   preferV6('prefer_v6', '优先 IPv6');
 

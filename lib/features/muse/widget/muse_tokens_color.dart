@@ -190,6 +190,14 @@ double museContrast(Color a, Color b) {
 Color museOnExact(Color c) =>
     museContrast(c, const Color(0xFFFFFFFF)) >= museContrast(c, const Color(0xFF000000)) ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
 
+/// 1.20.3 第 2 轮：开关打开时滑块的颜色。浅主题色（青碧、藤黄…）的 onPrimary 是纯黑，滑块成了一个黑点；
+/// 这时改用同色相的深色（色调 20），对比度仍够，看起来属于这套配色。onPrimary 是白色时照旧。
+Color museSwitchThumbOn(Color primary, Color onPrimary) {
+  if (onPrimary.computeLuminance() > 0.5) return onPrimary;
+  final h = Hct.fromInt(primary.toARGB32());
+  return Color(Hct.from(h.hue, min(h.chroma, 36), 20).toInt());
+}
+
 /// 1.7.1: primary / onPrimary for a style that keeps the picked colour: [seed] exactly (light
 /// theme, and dark theme when it already reads on [darkPage]); in the dark theme a colour too dark
 /// for [darkPage] (contrast < [MuseTone.darkPrimaryContrast]) is lifted in tone, same hue and

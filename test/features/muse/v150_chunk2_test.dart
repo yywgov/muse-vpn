@@ -33,7 +33,7 @@ void main() {
       expect(museIpv6Options(MuseIpv6Policy.preferV4), (mode: IPv6Mode.enable, strategy: DomainStrategy.preferIpv4));
       expect(museIpv6Options(MuseIpv6Policy.preferV6), (mode: IPv6Mode.prefer, strategy: DomainStrategy.preferIpv6));
       expect(MuseIpv6Policy.fromKey('nonsense'), MuseIpv6Policy.off);
-      expect([for (final p in MuseIpv6Policy.values) p.title], ['关闭', '优先 IPv4', '优先 IPv6']);
+      expect([for (final p in MuseIpv6Policy.values) p.title], ['关', '优先 IPv4', '优先 IPv6']);
     });
   });
 

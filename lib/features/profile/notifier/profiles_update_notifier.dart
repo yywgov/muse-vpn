@@ -28,7 +28,7 @@ const museSubscriptionUpdateInterval = Duration(hours: 12);
 /// Choices offered in 设置 (0 = 关闭).
 const museAutoUpdateChoices = [0, 6, 12, 24];
 
-String museAutoUpdateLabel(int hours) => hours <= 0 ? '关闭' : '每 $hours 小时';
+String museAutoUpdateLabel(int hours) => hours <= 0 ? '关' : '每 $hours 小时';
 
 /// How often a subscription updates on its own; null when the user switched it off.
 Duration? museEffectiveUpdateInterval(Duration? fromProvider, {int hours = 12}) {

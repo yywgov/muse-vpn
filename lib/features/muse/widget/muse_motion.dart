@@ -24,7 +24,7 @@ enum MuseMotionChoice {
   auto('auto', '跟随系统'),
   standard('standard', '标准'),
   reduced('reduced', '精简'),
-  off('off', '关闭');
+  off('off', '关');
 
   const MuseMotionChoice(this.key, this.title);
 

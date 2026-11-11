@@ -34,10 +34,13 @@ MuseDiagItem museDiagNode({required bool connected, required int delay, String? 
   return MuseDiagItem('节点', MuseDiagLevel.fail, '$who 测速超时，建议换一个节点');
 }
 
+/// 1.20.3 第 2 轮：「系统代理 / VPN」那一行的标签（原名在 96 宽的标签列里折成两行）。
+const museDiagRoutingTitle = '代理方式';
+
 /// 系统代理 / VPN: is the traffic actually handed to 穿云?
 /// [systemProxyOurs] null = not applicable (Android / TUN) or unreadable.
 MuseDiagItem museDiagRouting({required bool connected, required bool android, required bool tun, bool? systemProxyOurs}) {
-  const title = '系统代理 / VPN';
+  const title = museDiagRoutingTitle;
   if (!connected) return const MuseDiagItem(title, MuseDiagLevel.skip, '未连接');
   if (android) return const MuseDiagItem(title, MuseDiagLevel.ok, 'VPN 已开启');
   if (tun) return const MuseDiagItem(title, MuseDiagLevel.ok, 'TUN 模式已开启');
@@ -56,11 +59,18 @@ MuseDiagItem museDiagInternet({required bool connected, required bool ok}) {
       : const MuseDiagItem('外网', MuseDiagLevel.fail, '已连接但无法访问外网，建议换节点');
 }
 
-/// One-line conclusion for the whole run.
+/// 1.20.3 第 2 轮：没连接时节点、代理方式、外网都跳过了，不能说「一切正常」。
+const museDiagNotConnectedConclusion = '未连接，连上后再检查节点和外网';
+
+/// One-line conclusion for the whole run. 「一切正常」只在每一项都查过且通过时才说；
+/// 有项目跳过（没连接、无法核对时间）时说清楚没查的部分。
 String museDiagConclusion(List<MuseDiagItem> items) {
   final failed = items.where((e) => e.level == MuseDiagLevel.fail).toList();
   if (failed.isNotEmpty) return '发现问题：${failed.first.text}';
   if (items.any((e) => e.level == MuseDiagLevel.warn)) return '基本正常，有需要留意的地方';
+  const needConnection = {'节点', museDiagRoutingTitle, '外网'};
+  if (items.any((e) => e.level == MuseDiagLevel.skip && needConnection.contains(e.title))) return museDiagNotConnectedConclusion;
+  if (items.any((e) => e.level == MuseDiagLevel.skip)) return '没发现问题，有的项目没能检查';
   return '一切正常';
 }
 
@@ -109,7 +119,7 @@ List<MuseDiagAction> museDiagActions(List<MuseDiagItem> items, {required bool co
   }
   final node = level('节点');
   final internet = level('外网');
-  final routing = level('系统代理 / VPN');
+  final routing = level(museDiagRoutingTitle);
   if (routing == MuseDiagLevel.fail) out.add(MuseDiagAction.reconnect);
   if (node == MuseDiagLevel.fail || internet == MuseDiagLevel.fail) {
     out.add(MuseDiagAction.switchNode);

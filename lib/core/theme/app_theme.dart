@@ -149,7 +149,7 @@ class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-          (st) => st.contains(WidgetState.selected) ? s.onPrimary : s.outline,
+          (st) => st.contains(WidgetState.selected) ? museSwitchThumbOn(s.primary, s.onPrimary) : s.outline,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (st) => st.contains(WidgetState.selected) ? s.primary : s.surfaceContainerHighest,
