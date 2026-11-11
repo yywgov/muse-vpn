@@ -2,6 +2,7 @@
 // 与页顶生效顺序一致；开关关闭统一写「关」；重复判断说明缩短；诊断没连接时不说「一切正常」、代理方式标签不折行；
 // 浅主题色下开关滑块不再是纯黑。
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -12,7 +13,16 @@ import 'package:hiddify/core/model/directories.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
+import 'package:hiddify/features/muse/data/wifi_ssid.dart';
+import 'package:hiddify/features/muse/desktop/on_demand.dart';
+import 'package:hiddify/features/muse/desktop/wifi_mode.dart';
 import 'package:hiddify/features/muse/logic/diagnosis.dart';
+import 'package:hiddify/features/muse/logic/settings_index.dart';
+import 'package:hiddify/features/muse/logic/wifi_actions.dart';
+import 'package:hiddify/features/muse/model/route_mode.dart';
+import 'package:hiddify/features/muse/settings/wifi_mode_page.dart';
+import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/widget/muse_motion.dart';
@@ -128,12 +138,7 @@ void main() {
     });
 
     test('连上且全部通过才说「一切正常」；有项目没查时如实说', () {
-      final ok = [
-        museDiagNetwork(directOk: true),
-        museDiagNode(connected: true, delay: 80),
-        museDiagRouting(connected: true, android: true, tun: false),
-        museDiagInternet(connected: true, ok: true),
-      ];
+      final ok = [museDiagNetwork(directOk: true), museDiagNode(connected: true, delay: 80), museDiagRouting(connected: true, android: true, tun: false), museDiagInternet(connected: true, ok: true)];
       expect(museDiagConclusion(ok), '一切正常');
       expect(museDiagConclusion([...ok, museDiagClock(null)]), '没发现问题，有的项目没能检查');
     });
@@ -162,6 +167,163 @@ void main() {
     test('onPrimary 为白时照旧', () {
       const deep = Color(0xFF1F4E9A);
       expect(museSwitchThumbOn(deep, museOnExact(deep)), const Color(0xFFFFFFFF));
+    });
+  });
+
+  group('Wi‑Fi 规则：每个 Wi‑Fi 一个动作', () {
+    const rules = '{"家":"disconnect","公司":"disconnect","x":"connect"}';
+    const modes = '{"公司":"global","咖啡店":"rule"}';
+
+    test('合并旧两份名单：不丢条目；冲突时按需运行开着 → 暂停连接，关着 → 切换模式', () {
+      final on = museWifiActions(rulesRaw: rules, modesRaw: modes, onDemandOn: true);
+      expect(on, {'家': MuseWifiAct.pause, '公司': MuseWifiAct.pause, '咖啡店': MuseWifiAct.rule});
+      expect(on.keys.toList(), ['家', '公司', '咖啡店']);
+      final off = museWifiActions(rulesRaw: rules, modesRaw: modes, onDemandOn: false);
+      expect(off, {'家': MuseWifiAct.pause, '公司': MuseWifiAct.global, '咖啡店': MuseWifiAct.rule});
+      expect(museWifiActionsConflict(rulesRaw: rules, modesRaw: modes), isTrue);
+      expect(museWifiActionsConflict(rulesRaw: rules, modesRaw: '{"咖啡店":"rule"}'), isFalse);
+      expect(museWifiActions(rulesRaw: '', modesRaw: '', onDemandOn: true), isEmpty);
+    });
+
+    test('写回旧键：两边不重复，muse_wifi_rules 里其他类型的条目保留（旧版仍读得懂）', () {
+      final raw = museWifiActionsToRaw({'家': MuseWifiAct.pause, '公司': MuseWifiAct.global, '咖啡店': MuseWifiAct.rule}, rulesRaw: rules);
+      expect(museOnDemandSsids(raw.rulesRaw), ['家']);
+      expect(raw.rulesRaw, contains('"x":"connect"'));
+      expect(museParseWifiModes(raw.modesRaw), {'公司': MuseRouteMode.global, '咖啡店': MuseRouteMode.rule});
+      expect(museWifiActionsConflict(rulesRaw: raw.rulesRaw, modesRaw: raw.modesRaw), isFalse);
+    });
+
+    test('摘要：同一个 Wi‑Fi 只算一次；按需运行关着时暂停不算', () {
+      final acts = {'家': MuseWifiAct.pause, '公司': MuseWifiAct.global};
+      expect(museWifiActionsSummary(acts, onDemandOn: true), '暂停 1 个，切换模式 1 个');
+      expect(museWifiActionsSummary(acts, onDemandOn: false), '切换模式 1 个');
+      expect(museWifiActionsSummary(const {}, onDemandOn: true), '关');
+    });
+
+    ProviderContainer container(SharedPreferences sp, MuseSsidRead Function() ssid, Stream<Object?> events) {
+      final c = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWith((ref) async => sp),
+          museOnDemandForceProvider.overrideWithValue(true),
+          museSsidReaderProvider.overrideWithValue(() async => ssid()),
+          museWifiEventsProvider.overrideWithValue(events),
+        ],
+      );
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    for (final on in [true, false]) {
+      testWidgets('旧数据冲突迁移一次（按需运行${on ? '开' : '关'}）：写回后两边不重复、条目都在', (t) async {
+        SharedPreferences.setMockInitialValues({'muse_wifi_rules': rules, 'muse_wifi_modes': modes, 'muse_on_demand': on});
+        final sp = await SharedPreferences.getInstance();
+        final events = StreamController<Object?>.broadcast();
+        final c = container(sp, () => const MuseSsidRead.ok('别处'), events.stream);
+        await t.runAsync(() => c.read(sharedPreferencesProvider.future));
+        c.listen(museWifiModeProvider, (_, _) {});
+        await t.pump(museWifiModeSettle + const Duration(milliseconds: 100));
+        await t.pump();
+        final r = c.read(MusePrefs.wifiRules);
+        final m = c.read(MusePrefs.wifiModes);
+        expect(museWifiActionsConflict(rulesRaw: r, modesRaw: m), isFalse);
+        expect(museWifiActions(rulesRaw: r, modesRaw: m, onDemandOn: on), museWifiActions(rulesRaw: rules, modesRaw: modes, onDemandOn: on));
+        expect(on ? museOnDemandSsids(r) : museParseWifiModes(m).keys, contains('公司'));
+        await events.close();
+      });
+    }
+
+    testWidgets('切到全局模式：连上该 Wi‑Fi 切全局，离开恢复', (t) async {
+      SharedPreferences.setMockInitialValues({'muse_wifi_modes': '{"公司":"global"}'});
+      final sp = await SharedPreferences.getInstance();
+      final events = StreamController<Object?>.broadcast();
+      var ssid = const MuseSsidRead.ok('公司');
+      final c = container(sp, () => ssid, events.stream);
+      await t.runAsync(() => c.read(sharedPreferencesProvider.future));
+      c.listen(museWifiModeProvider, (_, _) {});
+      await t.pump(museWifiModeSettle + const Duration(milliseconds: 100));
+      await t.pump();
+      expect(c.read(ConfigOptions.museRouteMode), MuseRouteMode.global);
+      ssid = const MuseSsidRead.ok('别处');
+      events.add('wifi_off');
+      await t.pump(museWifiModeSettle + const Duration(milliseconds: 100));
+      await t.pump();
+      expect(c.read(ConfigOptions.museRouteMode), MuseRouteMode.rule);
+      await events.close();
+    });
+
+    testWidgets('切到规则模式：在全局时连上该 Wi‑Fi 切回规则', (t) async {
+      SharedPreferences.setMockInitialValues({'muse_wifi_modes': '{"家":"rule"}', 'muse-route-mode': 'global'});
+      final sp = await SharedPreferences.getInstance();
+      final events = StreamController<Object?>.broadcast();
+      final c = container(sp, () => const MuseSsidRead.ok('家'), events.stream);
+      await t.runAsync(() => c.read(sharedPreferencesProvider.future));
+      c.listen(museWifiModeProvider, (_, _) {});
+      await t.pump(museWifiModeSettle + const Duration(milliseconds: 100));
+      await t.pump();
+      expect(c.read(ConfigOptions.museRouteMode), MuseRouteMode.rule);
+      await events.close();
+    });
+
+    testWidgets('暂停连接：交给按需运行（写进它读的名单），模式切换不再动这个 Wi‑Fi', (t) async {
+      SharedPreferences.setMockInitialValues({'muse_on_demand': true, 'muse_wifi_rules': '{"家":"disconnect"}', 'muse_wifi_modes': '{"家":"global"}'});
+      final sp = await SharedPreferences.getInstance();
+      final events = StreamController<Object?>.broadcast();
+      final c = container(sp, () => const MuseSsidRead.ok('家'), events.stream);
+      await t.runAsync(() => c.read(sharedPreferencesProvider.future));
+      c.listen(museWifiModeProvider, (_, _) {});
+      await t.pump(museWifiModeSettle + const Duration(milliseconds: 100));
+      await t.pump();
+      // 以前两边都列时模式也会被切成全局；现在只暂停连接（按需运行的状态机见 v160_c8 / v160_c9）
+      expect(c.read(ConfigOptions.museRouteMode), MuseRouteMode.rule);
+      expect(museOnDemandSsids(c.read(MusePrefs.wifiRules)), ['家']);
+      expect(museParseWifiModes(c.read(MusePrefs.wifiModes)), isEmpty);
+      await events.close();
+    });
+
+    testWidgets('页面：一行一个 Wi‑Fi 与它的动作；改动作、添加（先选动作）、移除，存回旧键且不重复', (t) async {
+      final c = await _pump(t, const MuseWifiRulesPage(), {'muse_on_demand': true, 'muse_wifi_rules': '{"家":"disconnect"}', 'muse_wifi_modes': '{"咖啡店":"rule"}'});
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('on_demand_switch')), findsOneWidget);
+      expect(t.widget<Text>(find.byKey(const ValueKey('wifi_rule_act_家'))).data, '暂停连接');
+      expect(t.widget<Text>(find.byKey(const ValueKey('wifi_rule_act_咖啡店'))).data, '切到规则模式');
+      // 改动作：家 → 切到全局模式
+      await t.tap(find.byKey(const ValueKey('wifi_rule_家')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('pick_切到全局模式')));
+      await t.pumpAndSettle();
+      expect(museOnDemandSsids(c.read(MusePrefs.wifiRules)), isEmpty);
+      expect(museParseWifiModes(c.read(MusePrefs.wifiModes)), {'家': MuseRouteMode.global, '咖啡店': MuseRouteMode.rule});
+      // 添加：先选动作
+      await t.enterText(find.byKey(const ValueKey('wifi_rule_input')), '公司');
+      await t.tap(find.byKey(const ValueKey('wifi_rule_add')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('pick_暂停连接')));
+      await t.pumpAndSettle();
+      expect(museOnDemandSsids(c.read(MusePrefs.wifiRules)), ['公司']);
+      // 同名不能再加
+      await t.enterText(find.byKey(const ValueKey('wifi_rule_input')), '公司');
+      await t.tap(find.byKey(const ValueKey('wifi_rule_add')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pick_暂停连接')), findsNothing);
+      // 移除
+      await t.tap(find.byKey(const ValueKey('wifi_rule_remove_咖啡店')));
+      await t.pumpAndSettle();
+      expect(museParseWifiModes(c.read(MusePrefs.wifiModes)), {'家': MuseRouteMode.global});
+      expect(museWifiActionsConflict(rulesRaw: c.read(MusePrefs.wifiRules), modesRaw: c.read(MusePrefs.wifiModes)), isFalse);
+      expect(t.takeException(), isNull);
+    });
+
+    testWidgets('按需运行关着：暂停连接的行写明暂不生效', (t) async {
+      await _pump(t, const MuseWifiRulesPage(), {'muse_wifi_rules': '{"家":"disconnect"}'});
+      await t.pumpAndSettle();
+      expect(find.text('按需运行关着，暂不生效'), findsOneWidget);
+    });
+
+    test('设置搜索：暂停连接 / 切到全局模式 / 切到规则模式 / 旧名都能找到 Wi‑Fi 规则', () {
+      for (final q in ['暂停连接', '切到全局模式', '切到规则模式', '按需运行', '按 Wi‑Fi 切换模式', 'Wi‑Fi 规则']) {
+        final hits = museSearchSettings(q, android: true, windows: false);
+        expect(hits.any((e) => e.page == MuseSettingPage.wifiRules), isTrue, reason: q);
+      }
     });
   });
 }

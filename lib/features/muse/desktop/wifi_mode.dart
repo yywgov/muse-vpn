@@ -13,6 +13,7 @@ import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/desktop/on_demand.dart';
+import 'package:hiddify/features/muse/logic/wifi_actions.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -45,13 +46,7 @@ class MuseWifiModeStep {
 }
 
 /// 纯逻辑：[read] 读到的 Wi‑Fi、[current] 当前模式、[saved] 我们切换前用户的模式、[applied] 我们切到的模式。
-MuseWifiModeStep museWifiModeStep({
-  required Map<String, MuseRouteMode> modes,
-  required MuseSsidRead read,
-  required MuseRouteMode current,
-  required String saved,
-  required String applied,
-}) {
+MuseWifiModeStep museWifiModeStep({required Map<String, MuseRouteMode> modes, required MuseSsidRead read, required MuseRouteMode current, required String saved, required String applied}) {
   if (!read.ok) return MuseWifiModeStep(saved: saved, applied: applied); // 读不到：保持现状
   // 用户在我们切换后手动改了模式：以用户为准，不再恢复
   final userChanged = applied.isNotEmpty && current.key != applied;
@@ -81,7 +76,19 @@ const museWifiModeSettle = Duration(seconds: 2);
 
 final museWifiModeProvider = Provider<void>((ref) {
   if (!PlatformUtils.isWindows && !PlatformUtils.isAndroid && !ref.watch(museOnDemandForceProvider)) return;
-  final modes = museParseWifiModes(ref.watch(MusePrefs.wifiModes));
+  // 1.20.3 第 2 轮：每个 Wi‑Fi 一个动作。两份旧名单里有同一个 Wi‑Fi 时按以前实际生效的行为合并一次并写回
+  // （logic/wifi_actions.dart）；这里只用「切换模式」的条目，暂停连接的交给按需运行
+  final rulesRaw = ref.watch(MusePrefs.wifiRules);
+  final modesRaw = ref.watch(MusePrefs.wifiModes);
+  final onDemandOn = ref.watch(MusePrefs.onDemand);
+  final acts = museWifiActions(rulesRaw: rulesRaw, modesRaw: modesRaw, onDemandOn: onDemandOn);
+  if (museWifiActionsConflict(rulesRaw: rulesRaw, modesRaw: modesRaw)) {
+    Future.microtask(() => museSaveWifiActions(ref.read, acts));
+  }
+  final modes = <String, MuseRouteMode>{
+    for (final e in acts.entries)
+      if (e.value.mode case final m?) e.key: m,
+  };
   if (modes.isEmpty) {
     // 列表清空：把我们切过的模式还回去
     final saved = ref.read(MusePrefs.wifiModeSaved);
@@ -103,22 +110,14 @@ final museWifiModeProvider = Provider<void>((ref) {
     busy = true;
     try {
       final r = await read();
-      final step = museWifiModeStep(
-        modes: modes,
-        read: r,
-        current: ref.read(ConfigOptions.museRouteMode),
-        saved: ref.read(MusePrefs.wifiModeSaved),
-        applied: ref.read(MusePrefs.wifiModeApplied),
-      );
+      final step = museWifiModeStep(modes: modes, read: r, current: ref.read(ConfigOptions.museRouteMode), saved: ref.read(MusePrefs.wifiModeSaved), applied: ref.read(MusePrefs.wifiModeApplied));
       await ref.read(MusePrefs.wifiModeSaved.notifier).update(step.saved);
       await ref.read(MusePrefs.wifiModeApplied.notifier).update(step.applied);
       final to = step.setTo;
       if (to != null) {
         await ref.read(ConfigOptions.museRouteMode.notifier).update(to);
         try {
-          ref
-              .read(inAppNotificationControllerProvider)
-              .showInfoToast(r.ssid != null && modes.containsKey(r.ssid) ? '已连接 Wi‑Fi「${r.ssid}」，切换为${to.title}模式' : '已离开指定 Wi‑Fi，恢复为${to.title}模式');
+          ref.read(inAppNotificationControllerProvider).showInfoToast(r.ssid != null && modes.containsKey(r.ssid) ? '已连接 Wi‑Fi「${r.ssid}」，切换为${to.title}模式' : '已离开指定 Wi‑Fi，恢复为${to.title}模式');
         } catch (_) {}
       }
     } catch (_) {
@@ -146,3 +145,28 @@ final museWifiModeProvider = Provider<void>((ref) {
     lifecycle?.dispose();
   });
 });
+
+/// 1.20.3 第 2 轮：保存「每个 Wi‑Fi 一个动作」到两份旧键（两边不重复，旧版也读得懂）。先只做删除、再做添加，
+/// 两步之间任何时刻两份名单都没有同一个 Wi‑Fi（不会触发上面的合并去改用户刚选的动作）。
+Future<void> museSaveWifiActions(T Function<T>(ProviderListenable<T>) read, Map<String, MuseWifiAct> acts) async {
+  final rules = read(MusePrefs.wifiRules.notifier);
+  final modes = read(MusePrefs.wifiModes.notifier);
+  final curRules = read(MusePrefs.wifiRules);
+  final curModes = museParseWifiModes(read(MusePrefs.wifiModes));
+  await rules.update(
+    museOnDemandWithSsids(curRules, [
+      for (final s in museOnDemandSsids(curRules))
+        if (acts[s] == MuseWifiAct.pause) s,
+    ]),
+  );
+  await modes.update(
+    museWifiModesToRaw({
+      for (final e in curModes.entries)
+        if (acts[e.key]?.mode == e.value) e.key: e.value,
+    }),
+  );
+  // 不再读 provider（调用方是 provider 时，第一次写入后它的依赖已变）：其他类型的条目在第一步里没动过
+  final raw = museWifiActionsToRaw(acts, rulesRaw: curRules);
+  await modes.update(raw.modesRaw);
+  await rules.update(raw.rulesRaw);
+}

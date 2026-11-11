@@ -76,7 +76,7 @@ class MuseRoutingPage extends HookConsumerWidget {
                 key: const ValueKey('routing_mode'),
                 leading: const Icon(Icons.alt_route_outlined),
                 title: '模式',
-                subtitle: byWifi ? '由「按 Wi‑Fi 切换模式」设定，手动改了以你的为准' : null,
+                subtitle: byWifi ? '由「Wi‑Fi 规则」设定，手动改了以你的为准' : null,
                 subtitleMaxLines: 2,
                 trailing: SizedBox(
                   width: 128,

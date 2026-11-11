@@ -10,12 +10,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/muse/settings/wifi_mode_page.dart';
-import 'package:hiddify/features/muse/desktop/wifi_mode.dart' show museParseWifiModes;
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
-import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
+import 'package:hiddify/features/muse/logic/wifi_actions.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart' show museAndroidAutomationNote;
 import 'package:hiddify/features/muse/settings/more_settings.dart' show musePushPage, museAutoFailoverTitle;
 import 'package:hiddify/features/muse/settings/windows_settings.dart' show MuseWindowsSilentStartTile;
@@ -25,12 +24,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// One-line summary for the 设置 row: which automatic ways are on.
 String museAutoConnectSummary({required bool autoRun, required bool onDemand, required MuseSchedule schedule, required bool autoStart}) {
-  final on = [
-    if (autoRun) '打开即连接',
-    if (onDemand) '按需',
-    if (schedule.connectAt >= 0 || schedule.disconnectAt >= 0) '定时',
-    if (autoStart) '开机自启',
-  ];
+  final on = [if (autoRun) '打开即连接', if (onDemand) '按需', if (schedule.connectAt >= 0 || schedule.disconnectAt >= 0) '定时', if (autoStart) '开机自启'];
   return on.isEmpty ? '关' : on.join('、');
 }
 
@@ -40,12 +34,9 @@ const museStartupTitle = '启动与断线';
 /// 1.11.0–1.20.2 的「更多」里的行；1.20.3 起「更多」取消，各行直接分组显示（保留给旧调用方）。
 const museAutoConnectMoreRows = ['智能保持连接', '按需运行', '每天定时连接', '每天定时断开', '静默启动'];
 
-/// 1.20.3：「Wi‑Fi 规则」一行的摘要。
+/// 1.20.3：「Wi‑Fi 规则」一行的摘要（第 2 轮：每个 Wi‑Fi 一个动作，同一个 Wi‑Fi 不重复计数）。
 String museWifiRulesSummary({required bool onDemand, required int pauseCount, required int modeCount}) {
-  final parts = [
-    if (onDemand && pauseCount > 0) '暂停 $pauseCount 个',
-    if (modeCount > 0) '切换模式 $modeCount 个',
-  ];
+  final parts = [if (onDemand && pauseCount > 0) '暂停 $pauseCount 个', if (modeCount > 0) '切换模式 $modeCount 个'];
   return parts.isEmpty ? '关' : parts.join('，');
 }
 
@@ -65,10 +56,10 @@ class MuseAutoConnectPage extends HookConsumerWidget {
     final isAndroid = android ?? PlatformUtils.isAndroid;
     final isWindows = windows ?? PlatformUtils.isWindows;
     final schedule = MuseSchedule.parse(ref.watch(MusePrefs.schedule));
-    final wifiSummary = museWifiRulesSummary(
-      onDemand: ref.watch(MusePrefs.onDemand),
-      pauseCount: museOnDemandSsids(ref.watch(MusePrefs.wifiRules)).length,
-      modeCount: museParseWifiModes(ref.watch(MusePrefs.wifiModes)).length,
+    final onDemand = ref.watch(MusePrefs.onDemand);
+    final wifiSummary = museWifiActionsSummary(
+      museWifiActions(rulesRaw: ref.watch(MusePrefs.wifiRules), modesRaw: ref.watch(MusePrefs.wifiModes), onDemandOn: onDemand),
+      onDemandOn: onDemand,
     );
 
     Future<void> pickTime(bool connect) async {
@@ -80,9 +71,7 @@ class MuseAutoConnectPage extends HookConsumerWidget {
         cancelText: '关闭',
       );
       final m = picked == null ? -1 : picked.hour * 60 + picked.minute;
-      final next = connect
-          ? MuseSchedule(connectAt: m, disconnectAt: schedule.disconnectAt)
-          : MuseSchedule(connectAt: schedule.connectAt, disconnectAt: m);
+      final next = connect ? MuseSchedule(connectAt: m, disconnectAt: schedule.disconnectAt) : MuseSchedule(connectAt: schedule.connectAt, disconnectAt: m);
       await ref.read(MusePrefs.schedule.notifier).update(next.toRaw());
     }
 
@@ -207,5 +196,4 @@ class _WindowsStartSection extends ConsumerWidget {
 }
 
 /// 1.20.3：「开机自启时静默」的副标题；静默启动开着时它不起作用。
-String museAutostartSilentSubtitle({required bool silentStart}) =>
-    silentStart ? '已开「静默启动」，每次启动都不弹窗口，这项不起作用' : '开机自动启动时只在托盘运行；自己打开时照常显示窗口';
+String museAutostartSilentSubtitle({required bool silentStart}) => silentStart ? '已开「静默启动」，每次启动都不弹窗口，这项不起作用' : '开机自动启动时只在托盘运行；自己打开时照常显示窗口';

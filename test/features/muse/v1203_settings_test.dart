@@ -21,7 +21,7 @@ import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
 import 'package:hiddify/features/muse/settings/diagnose_sheet.dart' show museDiagnoseLocation, museDiagnosePath;
 import 'package:hiddify/features/muse/settings/more_settings.dart';
-import 'package:hiddify/features/muse/settings/wifi_mode_page.dart' show museWifiRulesPriorityText, museWifiRulesTitle;
+import 'package:hiddify/features/muse/settings/wifi_mode_page.dart' show museWifiRulesTitle;
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart' show museSettingsHomeRows;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -194,13 +194,13 @@ void main() {
       await tester.tap(find.descendant(of: find.byKey(const ValueKey('routing_mode_segmented')), matching: find.text('全局')));
       await tester.pump();
       expect(c.read(ConfigOptions.museRouteMode), MuseRouteMode.global);
-      expect(find.textContaining('由「按 Wi‑Fi 切换模式」设定'), findsNothing);
+      expect(find.textContaining('由「Wi‑Fi 规则」设定'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('被 Wi‑Fi 规则改成全局时，模式一行写明', (tester) async {
       await _pump(tester, const MuseRoutingPage(android: false), {'muse-route-mode': 'global', 'muse_wifi_mode_applied': 'global'});
-      expect(find.textContaining('由「按 Wi‑Fi 切换模式」设定'), findsOneWidget);
+      expect(find.textContaining('由「Wi‑Fi 规则」设定'), findsOneWidget);
       expect(find.byKey(const ValueKey('settings_per_app')), findsNothing); // 只在安卓
     });
 
@@ -249,7 +249,7 @@ void main() {
   });
 
   group('启动与断线', () {
-    test('保持连接两项同一组；Wi‑Fi 两个名单同一页并说明谁优先', () {
+    test('保持连接两项同一组；Wi‑Fi 规则一页（每个 Wi‑Fi 一个动作，见 v1203_settings2_test）', () {
       final page = _src('lib/features/muse/settings/auto_connect_page.dart');
       final keep = page.indexOf("ValueKey('keep_alive')");
       final failover = page.indexOf("ValueKey('node_auto_failover')");
@@ -258,7 +258,6 @@ void main() {
       expect(page.substring(keep, failover), isNot(contains('MuseSection(')));
       expect(_src('lib/features/muse/settings/node_settings_page.dart'), isNot(contains("ValueKey('node_auto_failover')")));
       expect(museWifiRulesTitle, 'Wi‑Fi 规则');
-      expect(museWifiRulesPriorityText, contains('「暂停连接」优先'));
       expect(museWifiRulesSummary(onDemand: true, pauseCount: 2, modeCount: 1), '暂停 2 个，切换模式 1 个');
       expect(museWifiRulesSummary(onDemand: false, pauseCount: 2, modeCount: 0), '关');
     });

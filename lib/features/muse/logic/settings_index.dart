@@ -178,7 +178,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('穿云标题栏', MuseSettingPage.windowAdvanced, keywords: ['标题栏', '系统标题栏', '窗口边框', '窗口'], windowsOnly: true),
   MuseSettingEntry('窗口置顶', MuseSettingPage.windowAdvanced, keywords: ['置顶', '最前面', '总在最前', '窗口'], windowsOnly: true),
   // 1.20.3：按需运行与按 Wi‑Fi 切换模式在同一页「Wi‑Fi 规则」
-  MuseSettingEntry('Wi‑Fi 规则', MuseSettingPage.wifiRules, keywords: ['Wi-Fi', 'WiFi', '无线', '按需运行', '暂停', '切换模式']),
+  MuseSettingEntry('Wi‑Fi 规则', MuseSettingPage.wifiRules, keywords: ['Wi-Fi', 'WiFi', '无线', '按需运行', '暂停', '暂停连接', '切换模式', '切到规则模式', '切到全局模式', '每个 Wi‑Fi 一个动作']),
   MuseSettingEntry('按需运行', MuseSettingPage.wifiRules, keywords: ['Wi-Fi', 'WiFi', '无线', '暂停', '家里', '公司']),
   MuseSettingEntry('按 Wi‑Fi 切换模式', MuseSettingPage.wifiRules, keywords: ['Wi-Fi', 'WiFi', '无线', '规则', '全局', '模式']),
   MuseSettingEntry('快捷键', MuseSettingPage.windowAdvanced, keywords: ['全局快捷键', '热键', '键盘'], windowsOnly: true),
