@@ -339,7 +339,7 @@ void main() {
       expect(museParseWifiModes('坏'), isEmpty);
       expect(museParseWifiModes('{"a":"direct","b":"rule"}'), {'b': MuseRouteMode.rule});
       expect(museWifiModesToRaw(const {}), '');
-      expect(museWifiModeSummary(''), '关');
+      // 1.20.3：museWifiModeSummary 随原「按 Wi‑Fi 切换模式」页删除（Wi‑Fi 规则页不再用一行摘要）
     });
 
     test('连上切换、离开恢复、读不到不动、手动改了以用户为准', () {
@@ -397,6 +397,7 @@ void main() {
       await events.close();
     });
 
+    // 1.20.3：原「按 Wi‑Fi 切换模式」页已删除，改测 设置 › 启动与断线 › Wi‑Fi 规则页（同样先说明再请求权限）
     testWidgets('页面：先说明再请求权限，拒绝时仍可手动输入', (t) async {
       SharedPreferences.setMockInitialValues({});
       final sp = await SharedPreferences.getInstance();
@@ -413,21 +414,23 @@ void main() {
       );
       addTearDown(c.dispose);
       await t.runAsync(() => c.read(sharedPreferencesProvider.future));
-      await t.pumpWidget(UncontrolledProviderScope(container: c, child: const MaterialApp(home: MuseWifiModePage())));
+      await t.pumpWidget(UncontrolledProviderScope(container: c, child: const MaterialApp(home: MuseWifiRulesPage())));
       await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('wifi_mode_add_current')));
+      await t.tap(find.byKey(const ValueKey('wifi_rule_add_current')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('wifi_mode_permission_explain')), findsOneWidget);
       expect(asked, 0); // 说明之前不请求
       await t.tap(find.byKey(const ValueKey('wifi_mode_permission_go')));
       await t.pumpAndSettle();
       expect(asked, 1);
-      expect(find.byKey(const ValueKey('wifi_mode_hint')), findsOneWidget);
-      await t.enterText(find.byKey(const ValueKey('wifi_mode_input')), '公司');
-      await t.tap(find.byKey(const ValueKey('wifi_mode_add')));
+      expect(find.byKey(const ValueKey('wifi_rule_hint')), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('wifi_rule_input')), '公司');
+      await t.tap(find.byKey(const ValueKey('wifi_rule_add')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('pick_切到全局模式')));
       await t.pumpAndSettle();
       expect(museParseWifiModes(c.read(MusePrefs.wifiModes)), {'公司': MuseRouteMode.global});
-      expect(find.byKey(const ValueKey('wifi_mode_ssid_公司')), findsOneWidget);
+      expect(find.byKey(const ValueKey('wifi_rule_公司')), findsOneWidget);
       expect(t.takeException(), isNull);
     });
   });

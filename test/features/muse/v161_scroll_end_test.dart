@@ -32,6 +32,7 @@ import 'package:hiddify/features/muse/nodes/muse_nodes_page.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
 import 'package:hiddify/features/muse/settings/resources_page.dart';
 import 'package:hiddify/features/muse/settings/theme_preview_page.dart';
+import 'package:hiddify/features/muse/settings/wifi_mode_page.dart';
 import 'package:hiddify/features/muse/settings/windows_extras.dart';
 import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
@@ -152,7 +153,7 @@ final _pages = <(String, int, Widget, Map<String, Object>, Future<void> Function
   ('网络', 3, const MuseNetworkPage(), {}, null),
   ('统计', 3, const MuseStatsPage(), {}, null),
   ('开发者选项', 3, const MuseDeveloperPage(), {'muse_dev_mode': true}, null),
-  ('按需运行', 3, const MuseOnDemandPage(), {}, null),
+  ('Wi‑Fi 规则', 3, const MuseWifiRulesPage(), {}, null), // 1.20.3：原「按需运行」页已删除
   ('快捷键', 3, const MuseHotkeysPage(), {}, null),
   ('资源', 3, const MuseResourcesPage(), {}, null),
   ('主题预览', 3, const MuseThemePreviewPage(), {}, null),

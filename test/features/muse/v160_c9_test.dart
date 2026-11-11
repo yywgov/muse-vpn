@@ -25,7 +25,7 @@ import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/per_app_tools.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart';
-import 'package:hiddify/features/muse/settings/windows_extras.dart';
+import 'package:hiddify/features/muse/settings/wifi_mode_page.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -391,6 +391,7 @@ void main() {
       );
     });
 
+    // 1.20.3：原「按需运行」页已删除，改测 Wi‑Fi 规则页；该页每次请求前先弹说明（wifi_mode_permission_explain），点「继续」才请求
     testWidgets('permission refused: explanation, switch stays off, no crash; 不再询问 offers the settings page', (
       t,
     ) async {
@@ -398,7 +399,7 @@ void main() {
       var asked = 0;
       final c = await _pump(
         t,
-        const MuseOnDemandPage(),
+        const MuseWifiRulesPage(),
         overrides: [
           museOnDemandAndroidProvider.overrideWithValue(true),
           museWifiPermissionRequestProvider.overrideWithValue(() async {
@@ -408,28 +409,37 @@ void main() {
           museSsidReaderProvider.overrideWithValue(() async => const MuseSsidRead.ok('Home')),
         ],
       );
+      Future<void> explainGo() async {
+        await t.pumpAndSettle();
+        expect(find.byKey(const ValueKey('wifi_mode_permission_explain')), findsOneWidget);
+        await t.tap(find.byKey(const ValueKey('wifi_mode_permission_go')));
+        await t.pumpAndSettle();
+      }
+
       await t.tap(find.byKey(const ValueKey('on_demand_switch')));
-      await t.pumpAndSettle();
+      await explainGo();
       expect(asked, 1);
       expect(c.read(MusePrefs.onDemand), isFalse);
-      expect(find.byKey(const ValueKey('on_demand_hint')), findsOneWidget);
+      expect(find.byKey(const ValueKey('wifi_rule_hint')), findsOneWidget);
       expect(find.text(museWifiPermissionHint), findsOneWidget);
-      expect(find.byKey(const ValueKey('on_demand_open_permission')), findsNothing);
+      expect(find.byKey(const ValueKey('wifi_rule_open_permission')), findsNothing);
       expect(t.takeException(), isNull);
 
       answer = 'blocked';
-      await t.tap(find.byKey(const ValueKey('on_demand_add_current')));
-      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('wifi_rule_add_current')));
+      await explainGo();
       expect(museOnDemandSsids(c.read(MusePrefs.wifiRules)), isEmpty);
-      expect(find.byKey(const ValueKey('on_demand_open_permission')), findsOneWidget);
+      expect(find.byKey(const ValueKey('wifi_rule_open_permission')), findsOneWidget);
 
       answer = 'granted';
-      await t.tap(find.byKey(const ValueKey('on_demand_add_current')));
+      await t.tap(find.byKey(const ValueKey('wifi_rule_add_current')));
+      await explainGo();
+      await t.tap(find.byKey(const ValueKey('pick_暂停连接')));
       await t.pumpAndSettle();
       expect(museOnDemandSsids(c.read(MusePrefs.wifiRules)), ['Home']);
-      expect(find.byKey(const ValueKey('on_demand_hint')), findsNothing);
+      expect(find.byKey(const ValueKey('wifi_rule_hint')), findsNothing);
       await t.tap(find.byKey(const ValueKey('on_demand_switch')));
-      await t.pumpAndSettle();
+      await explainGo();
       expect(c.read(MusePrefs.onDemand), isTrue);
     });
 
@@ -437,7 +447,7 @@ void main() {
       var asked = 0;
       final c = await _pump(
         t,
-        const MuseOnDemandPage(),
+        const MuseWifiRulesPage(),
         overrides: [
           museOnDemandAndroidProvider.overrideWithValue(false),
           museWifiPermissionRequestProvider.overrideWithValue(() async {

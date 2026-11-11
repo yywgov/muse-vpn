@@ -18,6 +18,7 @@ import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/proxy_env.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
+import 'package:hiddify/features/muse/settings/wifi_mode_page.dart';
 import 'package:hiddify/features/muse/settings/windows_extras.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
@@ -465,31 +466,29 @@ There is 1 interface on the system:
       expect(museOnDemandInterval, const Duration(seconds: 15));
     });
 
+    // 1.20.3：原「按需运行」页已删除，改测 Wi‑Fi 规则页（按需运行开关 + 名单里选「暂停连接」）
     testWidgets('page: add by name, add current (location hint), remove', (t) async {
       final c = await _pump(
         t,
-        const MuseOnDemandPage(),
+        const MuseWifiRulesPage(),
         overrides: [
           museSsidReaderProvider.overrideWithValue(() async => const MuseSsidRead.failed(museWifiLocationHint)),
         ],
       );
-      await t.enterText(find.byKey(const ValueKey('on_demand_input')), 'Home');
-      await t.tap(find.byKey(const ValueKey('on_demand_add')));
+      await t.enterText(find.byKey(const ValueKey('wifi_rule_input')), 'Home');
+      await t.tap(find.byKey(const ValueKey('wifi_rule_add')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('pick_暂停连接')));
       await t.pumpAndSettle();
       expect(museOnDemandSsids(c.read(MusePrefs.wifiRules)), ['Home']);
-      expect(find.byKey(const ValueKey('on_demand_ssid_Home')), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('on_demand_add_current')));
+      expect(find.byKey(const ValueKey('wifi_rule_Home')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('wifi_rule_add_current')));
       await t.pumpAndSettle();
       expect(find.text(museWifiLocationHint), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('on_demand_switch')));
       await t.pumpAndSettle();
       expect(c.read(MusePrefs.onDemand), isTrue);
-      await t.tap(
-        find.descendant(
-          of: find.byKey(const ValueKey('on_demand_ssid_Home')),
-          matching: find.byIcon(Icons.delete_outlined),
-        ),
-      );
+      await t.tap(find.byKey(const ValueKey('wifi_rule_remove_Home')));
       await t.pumpAndSettle();
       expect(museOnDemandSsids(c.read(MusePrefs.wifiRules)), isEmpty);
     });
