@@ -33,13 +33,14 @@ void main() {
       expect(s, contains('Preferences.excludeFromRecents.notifier).update(value)'));
       expect(s, contains('ChuanyunPlatform.setExcludeFromRecents(value)'));
       // only inside the Android section of 外观
-      expect(_src('lib/features/muse/settings/appearance_page.dart'), contains('if (android ?? PlatformUtils.isAndroid) const MuseAndroidAppearanceSection()'));
+      // 1.20.3：Android 通知一组搬到 设置 › 隐私与通知
+      expect(_src('lib/features/muse/settings/privacy_settings_page.dart'), contains('if (isAndroid) const MuseAndroidAppearanceSection()'));
     });
 
     test('search 「最近任务」 / 「隐藏」 finds it on 外观 (Android only)', () {
       final recents = museSearchSettings('最近任务', android: true, windows: false);
       expect(recents.first.title, '在最近任务中隐藏');
-      expect(recents.first.page, MuseSettingPage.appearance);
+      expect(recents.first.page, MuseSettingPage.privacy); // 1.20.3
       expect(museSearchSettings('隐藏', android: true, windows: false).map((e) => e.title), contains('在最近任务中隐藏'));
       expect(museSearchSettings('最近任务', android: false, windows: true).map((e) => e.title), isNot(contains('在最近任务中隐藏')));
     });

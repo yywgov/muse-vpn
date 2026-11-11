@@ -15,6 +15,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/features/muse/settings/diagnose_sheet.dart' show museDiagnoseLocation;
+import 'package:hiddify/features/muse/settings/more_settings.dart' show museRouteModeByWifi;
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -793,6 +795,7 @@ class _ModePill extends ConsumerWidget {
     final mt = MuseTheme.of(context);
     final outlined = look.kind == MuseHomeLookKind.line;
     final shape = outlined ? MuseShape.of(look.radiusControl, side: BorderSide(color: mt.hairline)) : MuseShape.full;
+    final byWifi = museRouteModeByWifi(applied: ref.watch(MusePrefs.wifiModeApplied), current: mode);
     return Material(
       color: outlined ? MusePalette.transparent : mt.inner,
       shape: shape,
@@ -822,6 +825,11 @@ class _ModePill extends ConsumerWidget {
                     ),
                   ),
                 ),
+                // 1.20.3：模式是「按 Wi‑Fi 切换模式」改的时，静态写一句（不加动画）
+                if (byWifi) ...[
+                  const SizedBox(width: MuseSpace.s4),
+                  Text('由 Wi‑Fi 设定', key: const ValueKey('home_mode_wifi_hint'), style: MuseTextLevel.footnote.style(context, color: mt.text2)),
+                ],
                 const SizedBox(width: MuseSpace.s4),
                 Icon(Icons.swap_horiz_outlined, size: MuseHomeA.pillIcon, color: mt.text2),
               ],

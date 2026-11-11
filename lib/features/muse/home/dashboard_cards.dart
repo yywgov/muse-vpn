@@ -253,6 +253,24 @@ class _ServicesSheet extends ConsumerWidget {
             }),
           ),
         ),
+        // 1.20.3：完整的出口与解锁在 设置 › 诊断（同一套数据）
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(MuseSpace.s8, 0, MuseSpace.s16, MuseSpace.s16),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                key: const ValueKey('services_open_diagnose'),
+                onPressed: () {
+                  final router = GoRouter.of(context);
+                  Navigator.of(context).pop();
+                  router.go(museDiagnoseLocation(section: 'exit'));
+                },
+                child: const Text('在诊断页查看'),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -429,7 +447,8 @@ class _TakeoverTile extends ConsumerWidget {
     final mode = ref.watch(ConfigOptions.serviceMode);
     final tun = mode == ServiceMode.tun;
     return _Tile(
-      title: '网络接管',
+      // 1.20.3：和 设置 › 网络 ›「运行模式」同一个设置，统一叫「运行模式」
+      title: '运行模式',
       value: tun ? 'TUN' : '系统代理',
       bottomHeight: MuseSize.segmented,
       bottom: MuseSegmented<ServiceMode>(

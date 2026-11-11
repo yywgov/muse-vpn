@@ -13,6 +13,7 @@ import 'package:hiddify/features/muse/desktop/on_demand.dart';
 import 'package:hiddify/features/muse/desktop/wifi_mode.dart';
 import 'package:hiddify/features/muse/model/route_mode.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
+import 'package:hiddify/features/muse/settings/windows_extras.dart' show MuseOnDemandPage;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// 请求权限前的说明。
@@ -27,7 +28,10 @@ String museWifiModeSummary(String raw) {
 }
 
 class MuseWifiModePage extends HookConsumerWidget {
-  const MuseWifiModePage({super.key});
+  const MuseWifiModePage({super.key, this.embedded = false});
+
+  /// 1.20.3：作为「Wi‑Fi 规则」页的下半部分（不带标题栏、不自带滚动）
+  final bool embedded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -102,13 +106,11 @@ class MuseWifiModePage extends HookConsumerWidget {
       await add(r.ssid!);
     }
 
-    return MuseScaffold(
-      title: '按 Wi‑Fi 切换模式',
-      body: MuseGroupedBody(
-        children: [
+    final children = <Widget>[
           MuseSection(
+            header: embedded ? '切换模式' : null,
             footer: '连上列表里的 Wi‑Fi 时自动切到所选模式，离开后恢复你原来的模式；你手动改了模式以你的为准。'
-                '只在 Wi‑Fi 变化和回到穿云时检查，不在后台反复读取。想在某个 Wi‑Fi 下完全不走代理，请用「按需运行」。',
+                '只在 Wi‑Fi 变化和回到穿云时检查，不在后台反复读取。',
             children: [
               for (final e in modes.entries)
                 MuseTile(
@@ -187,8 +189,35 @@ class MuseWifiModePage extends HookConsumerWidget {
                 ),
               ),
             ),
-        ],
-      ),
-    );
+    ];
+    if (embedded) return Column(key: const ValueKey('wifi_mode_embedded'), crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+    return MuseScaffold(title: '按 Wi‑Fi 切换模式', body: MuseGroupedBody(children: children));
   }
+}
+
+/// 1.20.3：设置 › 启动与断线 ›「Wi‑Fi 规则」——按需运行（暂停连接）与按 Wi‑Fi 切换模式在同一页。
+const museWifiRulesTitle = 'Wi‑Fi 规则';
+
+/// 同一个 Wi‑Fi 两边都列了时谁说了算：两个功能各自独立运行，暂停连接会断开连接，所以实际不走代理；
+/// 模式仍会切到这里设的值，手动连上后按它运行（desktop/on_demand.dart、desktop/wifi_mode.dart）。
+const museWifiRulesPriorityText = '同一个 Wi‑Fi 两边都有时，「暂停连接」优先：连上它就断开连接；模式仍会切到下面设的值，你手动连上后按它运行。';
+
+class MuseWifiRulesPage extends StatelessWidget {
+  const MuseWifiRulesPage({super.key});
+
+  @override
+  Widget build(BuildContext context) => MuseScaffold(
+    key: const ValueKey('wifi_rules_page'),
+    title: museWifiRulesTitle,
+    body: MuseGroupedBody(
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(MuseSpace.page(context) + MuseSpace.s16, MuseSpace.s4, MuseSpace.page(context) + MuseSpace.s16, MuseSpace.s4),
+          child: Text(museWifiRulesPriorityText, key: const ValueKey('wifi_rules_priority'), style: MuseType.caption(context).copyWith(color: MuseTheme.of(context).text2)),
+        ),
+        const MuseOnDemandPage(embedded: true),
+        const MuseWifiModePage(embedded: true),
+      ],
+    ),
+  );
 }

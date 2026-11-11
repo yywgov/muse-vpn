@@ -18,7 +18,8 @@ enum MuseHomeTile {
   lanIp('lanip', '内网 IP'),
   memory('memory', '内存'),
   // Windows: 系统代理 / TUN in one tap
-  takeover('takeover', '网络接管'),
+  // 1.20.3：原「网络接管」，与 设置 › 网络 ›「运行模式」统一
+  takeover('takeover', '运行模式'),
   // 穿云 1.4.0 (Windows only): 网速 + 本次流量 in one tile
   flow('flow', '流量');
 

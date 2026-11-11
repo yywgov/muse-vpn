@@ -18,7 +18,8 @@ void main() {
       final backup = museSearchSettings('备份', android: false, windows: true);
       expect(backup.first.page, MuseSettingPage.sync);
       // every word must match
-      expect(museSearchSettings('分流 hosts', android: true, windows: false).single.title, '自定义 hosts');
+      // 1.20.3：自定义 hosts 挪到 网络 › DNS
+      expect(museSearchSettings('网络 hosts', android: true, windows: false).single.title, '自定义 hosts');
       expect(museSearchSettings('   ', android: true, windows: true), isEmpty);
       expect(museSearchSettings('不存在的东西', android: true, windows: true), isEmpty);
     });

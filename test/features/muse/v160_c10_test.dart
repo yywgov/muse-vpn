@@ -325,11 +325,8 @@ void main() {
       expect(find.textContaining('r.example · ads.srs'), findsOneWidget);
       expect(find.byKey(const ValueKey('res_script_placeholder')), findsNothing);
       expect(find.text('数据库与脚本 · 双内核版本提供'), findsNothing);
-      await tester.scrollUntilVisible(find.byKey(const ValueKey('res_remote_manage')), -300);
-      await tester.tap(find.byKey(const ValueKey('res_remote_manage')));
-      await tester.pumpAndSettle();
-      expect(find.text('远程规则集'), findsWidgets);
-      expect(find.byKey(const ValueKey('remote_set_0')), findsOneWidget);
+      // 1.20.3：只读，管理只在 设置 › 分流规则 › 远程规则集
+      expect(find.byKey(const ValueKey('res_remote_manage')), findsNothing);
       expect(tester.takeException(), isNull);
     });
 

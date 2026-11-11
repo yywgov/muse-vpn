@@ -17,7 +17,6 @@ import 'package:hiddify/features/muse/logic/resources.dart';
 import 'package:hiddify/features/muse/logic/rules_tools.dart';
 import 'package:hiddify/features/muse/logic/sync_core.dart' show museShortDateTime;
 import 'package:hiddify/features/muse/settings/core_kind_section.dart';
-import 'package:hiddify/features/muse/settings/more_settings.dart' show MuseRemoteRuleSetsPage, musePushPage;
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -119,10 +118,13 @@ class MuseResourcesPage extends HookConsumerWidget {
               ),
             ],
           ),
+          // 1.20.3：只读——下载状态与来源；添加 / 删除只在 设置 › 分流规则 › 远程规则集
           MuseSection(
             header: '规则集',
-            footer: '你添加的远程规则集链接：首次连接时下载，之后每 $museRuleSetUpdateDays 天在后台更新',
+            footer: '你添加的远程规则集：首次连接时下载，之后每 $museRuleSetUpdateDays 天在后台更新',
             children: [
+              if (remote.isEmpty)
+                const MuseTile(key: ValueKey('res_remote_empty'), leading: Icon(Icons.cloud_off_outlined), title: '没有远程规则集'),
               for (var i = 0; i < remote.length; i++)
                 MuseTile(
                   key: ValueKey('res_remote_$i'),
@@ -130,14 +132,6 @@ class MuseResourcesPage extends HookConsumerWidget {
                   title: Uri.tryParse(remote[i].url)?.pathSegments.where((s) => s.isNotEmpty).lastOrNull ?? remote[i].url,
                   subtitle: '${museOutboundTitle(remote[i].outbound)} · ${museRemoteRuleSetSource(remote[i].url)}',
                 ),
-              MuseTile(
-                key: const ValueKey('res_remote_manage'),
-                leading: const Icon(Icons.edit_note_outlined),
-                title: remote.isEmpty ? '添加远程规则集' : '管理远程规则集',
-                subtitle: '设置 › 分流 › 远程规则集',
-                chevron: true,
-                onTap: () => musePushPage(context, const MuseRemoteRuleSetsPage()),
-              ),
             ],
           ),
         ],

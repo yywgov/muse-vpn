@@ -15,7 +15,8 @@ import 'package:hiddify/features/muse/home/exit_card.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
 import 'package:hiddify/features/muse/logic/exit_detail.dart';
-import 'package:hiddify/features/muse/settings/diagnose_sheet.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hiddify/features/muse/settings/diagnose_sheet.dart' show museDiagnoseLocation;
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_sheet.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
@@ -166,11 +167,13 @@ class MuseExitDetailBody extends HookConsumerWidget {
             Expanded(
               child: OutlinedButton(
                 key: const ValueKey('exit_detail_diagnose'),
+                // 1.20.3：只有一个诊断页（设置 › 诊断），打开到「出口与解锁」
                 onPressed: () {
+                  final router = GoRouter.of(context);
                   Navigator.pop(context);
-                  showMuseDiagnoseSheet(context);
+                  router.go(museDiagnoseLocation(section: 'exit'));
                 },
-                child: const Text('网络诊断'),
+                child: const Text('诊断'),
               ),
             ),
           ],

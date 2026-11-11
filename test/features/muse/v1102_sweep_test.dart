@@ -470,7 +470,8 @@ void main() {
 
     for (final android in [true, false]) {
       testWidgets('外观: 在最近任务中隐藏 ${android ? 'on Android, saved under exclude_from_recents' : 'not on Windows'}', (t) async {
-        await _pump(t, phone, Brightness.light, 3, MuseAppearancePage(android: android, windows: !android));
+        // 1.20.3：这一行搬到 设置 › 隐私与通知
+        await _pump(t, phone, Brightness.light, 3, MusePrivacyPage(android: android));
         var row = find.byKey(const ValueKey('settings_exclude_recents'), skipOffstage: false);
         // 1.20.1: 外观 now opens with the 首页风格 previews, so on a phone this row is built only once
         // the list is scrolled down to it

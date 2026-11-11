@@ -279,8 +279,10 @@ void main() {
     expect(sync, isNot(contains('MuseLanHost')));
     expect(File('lib/features/muse/data/lan_sync_service.dart').existsSync(), isFalse);
     final about = File('lib/features/about/widget/about_page.dart').readAsStringSync();
-    expect(about, contains("ValueKey('about_export_config')"));
-    expect(about, contains("ValueKey('about_import_config')"));
+    // 1.20.3：导出 / 导入配置搬到 设置 › 备份与恢复
+    expect(about, isNot(contains("ValueKey('about_export_config')")));
+    expect(sync, contains("ValueKey('backup_export')"));
+    expect(sync, contains("ValueKey('backup_import')"));
   });
 
   testWidgets('节点 多选: pick rows, the action bar counts them', (tester) async {

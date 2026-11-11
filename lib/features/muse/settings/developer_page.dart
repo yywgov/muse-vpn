@@ -60,16 +60,7 @@ class MuseDeveloperPage extends HookConsumerWidget {
                   _toast(ref, '已恢复默认');
                 },
               ),
-              MuseTile(
-                key: const ValueKey('dev_clear_latency'),
-                leading: const Icon(Icons.cleaning_services_outlined),
-                title: '清除测速记录',
-                onTap: () async {
-                  await ref.read(MusePrefs.latencyCache.notifier).update(MuseLatencyCache.empty.toRaw());
-                  await ref.read(MusePrefs.delayHistory.notifier).update('');
-                  _toast(ref, '已清除');
-                },
-              ),
+              // 1.20.3：「清除测速记录」与节点设置里的重复，只留节点设置那条
             ],
           ),
           MuseSection(

@@ -41,7 +41,8 @@ class MuseAndroidAppearanceSection extends ConsumerWidget {
     final excludeRecents = ref.watch(Preferences.excludeFromRecents);
     return MuseSection(
       key: const ValueKey('appearance_android'),
-      header: '通知与图标',
+      // 1.20.3：在 设置 › 隐私与通知 里，原 外观 › 通知与图标
+      header: '通知',
       // 1.20.3: 外观页不再有 ⓘ，原 footer 改成这一行的副标题
       children: [
         MuseSwitchTile(

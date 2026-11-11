@@ -47,7 +47,7 @@ class MuseAppearancePage extends HookConsumerWidget {
           // 1.18.0 P6: 动效三档；跟随系统 = 移除动画 → 关闭，省电模式 → 精简
           const MuseSection(children: [MuseMotionTile()]),
           // 1.10.0: the platform rows that used to be groups on the 设置 home page
-          if (android ?? PlatformUtils.isAndroid) const MuseAndroidAppearanceSection(),
+          // 1.20.3：Android「通知与图标」搬到 设置 › 隐私与通知
           if (windows ?? PlatformUtils.isWindows) MuseWindowsWindowSection(advancedOpen: windowAdvancedOpen),
         ],
       ),

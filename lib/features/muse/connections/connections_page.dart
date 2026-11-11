@@ -479,7 +479,7 @@ Future<void> museAddQuickRule(WidgetRef ref, String host, MuseQuickWay way, {boo
   final n = ref.read(MusePrefs.quickRules.notifier);
   final raw = ref.read(MusePrefs.quickRules);
   await n.update(museQuickRulesToRaw(museSetQuickRule(museParseQuickRules(raw), host, way)));
-  toast.showSuccessToast('已设置 $host ${way.title}，可在 规则 › 分流 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
+  toast.showSuccessToast('已设置 $host ${way.title}，可在 设置 › 分流规则 › 来自连接的规则 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
 }
 
 /// 1.12.0: [host] 走指定节点 — pick one of the subscription's nodes.
@@ -517,7 +517,7 @@ Future<void> museAddHostToNode(BuildContext context, WidgetRef ref, String host,
   final n = ref.read(MusePrefs.nodeRules.notifier);
   final raw = ref.read(MusePrefs.nodeRules);
   await n.update(museNodeRulesToRaw(museAddHostToNodeRule(museParseNodeRules(raw), node, host)));
-  toast.showSuccessToast('已设置 $host 走所选节点，可在 规则 › 分流 › 指定节点 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
+  toast.showSuccessToast('已设置 $host 走所选节点，可在 设置 › 分流规则 › 指定节点 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
 }
 
 

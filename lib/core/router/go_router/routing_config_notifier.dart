@@ -13,6 +13,7 @@ import 'package:hiddify/features/about/widget/about_page.dart';
 import 'package:hiddify/features/about/widget/open_source_page.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
 import 'package:hiddify/features/muse/activity/activity_page.dart';
+import 'package:hiddify/features/muse/settings/diagnose_sheet.dart' show MuseDiagnoseHubPage, museDiagnoseRoute, museDiagnosePath;
 import 'package:hiddify/features/muse/desktop/launch_control.dart';
 import 'package:hiddify/features/muse/home/muse_home_page.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
@@ -71,6 +72,24 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
     // 1.20.2：原订阅页的子页（订阅详情、路由选项…）挂在 /nodes 下，路由名不变
     final configChildren = <GoRoute>[
                     _slide('profileDetails', 'profile-details/:id', (state) => ProfileDetailsPage(id: state.pathParameters['id']!)),
+                    // 1.20.3：「我的规则」挂回 /settings；旧地址 /nodes/routing-options…（深链、旧书签）跳到新位置
+                    GoRoute(
+                      path: 'routing-options',
+                      redirect: (_, state) => museSettingsRulesLocation(state.uri),
+                      routes: <GoRoute>[
+                        GoRoute(
+                          path: 'rule/:orderId',
+                          redirect: (_, state) => museSettingsRulesLocation(state.uri),
+                          routes: <GoRoute>[
+                            GoRoute(path: 'generic-list/:ruleEnum', redirect: (_, state) => museSettingsRulesLocation(state.uri)),
+                            GoRoute(path: 'package-names', redirect: (_, state) => museSettingsRulesLocation(state.uri)),
+                          ],
+                        ),
+                      ],
+                    ),
+    ];
+    // 1.20.3：设置 › 分流规则 ›「我的规则」（原 Hiddify「路由」页）与它的子页，路由名不变
+    final rulesChildren = <GoRoute>[
                     GoRoute(
                       name: 'routingOptions',
                       path: 'routing-options',
@@ -221,9 +240,22 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                     // 1.2.2: 高级 (a page with this one row) is gone; TLS 分片 opens from 设置 directly
                     _slide('tlsTricks', 'tls-tricks', (_) => const TlsTricksPage()),
                     // 1.8.0: 活动 = 连接 / 日志 / DNS (?tab=); the old 连接 and 日志 locations open its tab
-                    _slide(museActivityRoute, 'activity', (state) => MuseActivityPage(initial: MuseActivityTab.fromKey(state.uri.queryParameters['tab']))),
+                    // 1.20.3：活动只剩 连接 / 日志 / DNS / 统计；旧的 ?tab=diagnose 跳到 设置 › 诊断
+                    GoRoute(
+                      name: museActivityRoute,
+                      path: 'activity',
+                      redirect: (_, state) => state.uri.queryParameters['tab'] == 'diagnose' ? museDiagnosePath : null,
+                      pageBuilder: (_, state) => customTransition(
+                        TransitionType.slide,
+                        state.pageKey,
+                        MuseActivityPage(initial: MuseActivityTab.fromKey(state.uri.queryParameters['tab'])),
+                      ),
+                    ),
                     GoRoute(name: 'connections', path: 'connections', redirect: (_, _) => museActivityLocation(MuseActivityTab.connections)),
                     GoRoute(name: 'logs', path: 'logs', redirect: (_, _) => museActivityLocation(MuseActivityTab.logs)),
+                    ...rulesChildren,
+                    // 1.20.3：诊断升为设置一级；首页健康横幅、出口详情、活动旧 tab 都跳到这里
+                    _slide(museDiagnoseRoute, 'diagnose', (state) => MuseDiagnoseHubPage(section: state.uri.queryParameters['section'])),
                     _slide(
                       'about',
                       'about',
@@ -239,4 +271,10 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
       ],
     );
   }
+}
+
+/// 1.20.3：旧的 /nodes/routing-options[/…][?routeRule=] → /settings/routing-options[/…]（查询参数保留）。
+String museSettingsRulesLocation(Uri old) {
+  final path = old.path.replaceFirst('/nodes/routing-options', '/settings/routing-options');
+  return old.hasQuery ? '$path?${old.query}' : path;
 }

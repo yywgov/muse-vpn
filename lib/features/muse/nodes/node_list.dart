@@ -35,6 +35,7 @@ import 'package:hiddify/features/muse/logic/node_prefs.dart';
 import 'package:hiddify/features/muse/logic/node_style.dart';
 import 'package:hiddify/features/muse/logic/node_share.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
+import 'package:hiddify/features/muse/logic/sub_tools.dart' show museParseSubFilters, museSubFiltersToRaw;
 import 'package:hiddify/features/muse/shell/muse_shell.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_common.dart';
@@ -682,6 +683,39 @@ class MuseNodeList extends HookConsumerWidget {
           ),
         );
       }
+      // 1.20.3：节点「不见了」时顶部一行说明是哪一层藏的，点开可逐层清除
+      final hiddenCounts = museNodeHiddenCounts<OutboundInfo>(
+        group.items.where((e) => !e.isGroup && e.tag != group.selected && !museIsInfoNode(museNodeName(e))),
+        duplicate: (e) => duplicates.contains(e.tag),
+        passesGlobal: (e) => museNodeNamePasses(museNodeName(e), include: includeRe, exclude: excludeRe),
+        passesSub: (e) => museNodeNamePasses(museNodeName(e), include: subFilter.include, exclude: subFilter.exclude),
+        passesView: (e) => nodeFilter.passes(protocolShort: museNodeProtocolShort(e), tags: metas.of(e.tag).tags, favorite: favorites.contains(e.tag)),
+        manual: userHidden.contains,
+      );
+      final hiddenNote = museNodeHiddenNote(hiddenCounts, viewLabel: nodeFilter.label);
+      if (hiddenNote != null && !selecting.value) {
+        children.add(
+          Padding(
+            padding: EdgeInsets.fromLTRB(margin, 0, margin, MuseSpace.s4),
+            child: InkWell(
+              key: const ValueKey('node_hidden_note'),
+              borderRadius: MuseRadius.smallAll,
+              onTap: () => _showMuseNodeHiddenLayers(context, ref, hiddenCounts, viewLabel: nodeFilter.label, metas: metas),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s4, vertical: MuseSpace.s8),
+                child: Row(
+                  children: [
+                    Icon(Icons.visibility_off_outlined, size: MuseIconSize.tiny, color: mt.text3),
+                    const SizedBox(width: MuseSpace.s8),
+                    Expanded(child: Text(hiddenNote, style: MuseType.caption(context).copyWith(color: mt.text2))),
+                    Text('清除', style: MuseType.caption(context).copyWith(color: museBrandOf(context), fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
       final groups = visible.where((e) => e.isGroup).toList();
       final nodes = visible.where((e) => !e.isGroup).toList();
       // 1.11.0 (A): the groups are the 手动选择 / 自动最快 / 负载均衡 bar above the cards
@@ -928,3 +962,5 @@ Future<T?> _museNodeChoice<T>(BuildContext context, String title, List<(String, 
         ],
       ),
     );
+
+

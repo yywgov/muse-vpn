@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/features/muse/data/per_app_bypass.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/route_rules/widget/setting_detail_chips.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -112,6 +113,13 @@ class RuleTile extends HookConsumerWidget {
                     : (value) async => await ref.read(rulesNotifierProvider.notifier).updateEnabled(value, rule.listOrder),
               ),
             ),
+            // 穿云 1.20.3：包名规则里有被分应用代理设为不走代理的应用时，说明它对这些应用不生效
+            if (museBypassedNote(museBypassedPackages(rule.packageNames, ref.watch(musePerAppStateProvider).valueOrNull ?? (mode: null, active: const <String>{}))) case final note?)
+              Padding(
+                key: const ValueKey('rule_bypassed_note'),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Text(note, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
+              ),
             SettingDetailChips<MapEntry>(
               values: detailChipsValue().entries.toList(),
               scrollController: scrollController,

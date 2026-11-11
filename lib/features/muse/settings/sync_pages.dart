@@ -2,15 +2,51 @@
 // WebDAV 同步, 局域网同步, 自动备份 and 每周本地快照: what is left is 设置 › 关于 › 导出配置 / 导入配置,
 // which write and read the same backup file as before (old backups, encrypted or not, still import;
 // the restore preview with 仅订阅 / 仅设置、合并 / 覆盖 is unchanged, subscriptions are only added).
+// 1.20.3：设置一级「备份与恢复」（MuseBackupPage）放这两项，关于页不再有；订阅弹层 ⋯ 里的快捷入口保留。
 // Part of 穿云 (GPLv3).
 
 part of 'more_settings.dart';
 
 // ======================================================================= 导出 / 导入配置
 
-/// 1.11.0: the two links on 关于.
+/// 1.11.0: the two links on 关于; 1.20.3: the rows of 设置 › 备份与恢复.
 const museExportConfigTitle = '导出配置';
 const museImportConfigTitle = '导入配置';
+
+/// 1.20.3：设置 › 备份与恢复。
+class MuseBackupPage extends ConsumerWidget {
+  const MuseBackupPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => MuseScaffold(
+    key: const ValueKey('backup_page'),
+    title: '备份与恢复',
+    body: MuseGroupedBody(
+      children: [
+        MuseSection(
+          children: [
+            MuseTile(
+              key: const ValueKey('backup_export'),
+              leading: const Icon(Icons.ios_share_outlined),
+              title: museExportConfigTitle,
+              subtitle: '订阅和各项设置写进一个文件，可选脱敏或加密',
+              subtitleMaxLines: 2,
+              onTap: () => museExportConfig(context, ref),
+            ),
+            MuseTile(
+              key: const ValueKey('backup_import'),
+              leading: const Icon(Icons.file_open_outlined),
+              title: museImportConfigTitle,
+              subtitle: '先预览，再选恢复范围（仅订阅 / 仅设置）和合并或覆盖',
+              subtitleMaxLines: 2,
+              onTap: () => museImportConfig(context, ref),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
 /// 1.11.0: 导出配置 — the dialog (脱敏 / password), then a save dialog for the file.
 /// 1.16.0 B8: no screenshots while 导出配置 (a password, subscription links) is on screen.

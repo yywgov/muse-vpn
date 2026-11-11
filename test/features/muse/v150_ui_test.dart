@@ -22,6 +22,7 @@ import 'package:hiddify/features/muse/home/muse_home_page.dart';
 import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
+import 'package:hiddify/features/muse/settings/auto_connect_page.dart' show MuseAutoConnectPage;
 import 'package:hiddify/features/muse/widget/muse_common.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
@@ -316,32 +317,29 @@ void main() {
     await _done(tester);
   });
 
+  // 1.20.3：节点设置不再有带说明的组（订阅 UA 搬到订阅设置并改成副标题），换用 启动与断线 ›「定时」的说明
   testWidgets('ⓘ: a section explanation is folded until tapped', (tester) async {
-    await _pump(tester, page: const MuseNodeSettingsPage(), brightness: Brightness.light, size: phone, tab: 3);
-    expect(find.textContaining('「自动」适合大多数订阅'), findsNothing);
-    // 1.11.0: 订阅 UA is in the folded 「高级」 section; open it first
-    await tester.tap(find.byKey(const ValueKey('node_advanced_fold')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('「自动」适合大多数订阅'), findsNothing);
+    await _pump(tester, page: const MuseAutoConnectPage(android: false, windows: false), brightness: Brightness.light, size: phone, tab: 3);
+    expect(find.textContaining('时间到时只执行一次'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('section_info')).first);
     await tester.pumpAndSettle();
-    expect(find.textContaining('「自动」适合大多数订阅'), findsOneWidget);
+    expect(find.textContaining('时间到时只执行一次'), findsOneWidget);
     // 测速 并发数 / 超时 moved to 开发者选项
     expect(find.byKey(const ValueKey('node_test_workers')), findsNothing);
     await _done(tester);
   });
 
+  // 1.20.3：隐私页的 ⓘ 改成副标题，换用 网络 › 高级 › Fake-IP 的 ⓘ
   testWidgets('ⓘ on a row: 隐私模式 explanation folded', (tester) async {
-    // 1.20.3: 隐私模式 moved to 设置 › 隐私 (the ⓘ stays there)
     await _pump(tester, page: const MusePrivacyPage(), brightness: Brightness.light, size: phone, tab: 3);
-    expect(find.text('首页的流量、IP 等数字打码'), findsNothing);
-    // 1.6.0 C7: 文字缩放 has an ⓘ too; tap the 隐私模式 one
-    // 1.20.1: 外观 opens with the 首页风格 previews — bring the row on screen first
-    await tester.scrollUntilVisible(find.byKey(const ValueKey('appearance_privacy')), 200, scrollable: find.byType(Scrollable).first);
-    await tester.pump();
-    await tester.tap(find.descendant(of: find.byKey(const ValueKey('appearance_privacy')), matching: find.byKey(const ValueKey('row_info'))));
-    await tester.pump();
     expect(find.text('首页的流量、IP 等数字打码'), findsOneWidget);
+    await _done(tester);
+    await _pump(tester, page: const MuseNetworkPage(windows: false, advancedOpen: true), brightness: Brightness.light, size: phone, tab: 3);
+    expect(find.textContaining('域名先拿到虚拟地址'), findsNothing);
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('fake_ip')), 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.descendant(of: find.byKey(const ValueKey('fake_ip')), matching: find.byKey(const ValueKey('row_info'))));
+    await tester.pump();
+    expect(find.textContaining('域名先拿到虚拟地址'), findsOneWidget);
     await _done(tester);
   });
 

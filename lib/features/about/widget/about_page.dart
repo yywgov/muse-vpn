@@ -25,7 +25,6 @@ import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/help_content.dart' show museFileSizeText;
 import 'package:hiddify/features/muse/logic/resources.dart';
-import 'package:hiddify/features/muse/settings/more_settings.dart' show museExportConfig, museImportConfig, museExportConfigTitle, museImportConfigTitle;
 import 'package:hiddify/features/muse/update/muse_updater.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/gen/assets.gen.dart';
@@ -222,8 +221,7 @@ class AboutPage extends HookConsumerWidget {
                 alignment: WrapAlignment.center,
                 children: [
                   for (final (key, label, onTap) in [
-                    (const ValueKey('about_export_config'), museExportConfigTitle, () => museExportConfig(context, ref)),
-                    (const ValueKey('about_import_config'), museImportConfigTitle, () => museImportConfig(context, ref)),
+                    // 1.20.3：导出 / 导入配置搬到 设置 › 备份与恢复（订阅弹层 ⋯ 里的快捷入口保留）
                     (const ValueKey('about_open_source'), '开源许可', () => context.goNamed('openSource')),
                   ])
                     TextButton(

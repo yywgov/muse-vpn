@@ -301,12 +301,15 @@ void main() {
       expect(h, contains('"release_core"'));
       expect(h, contains('ACTION_VPN_SETTINGS'));
       expect(_src('lib/features/muse/settings/diagnose_sheet.dart'), contains('showMuseConnectDoctor(context)'));
+      // 1.20.3：诊断页上「连不上」流程直接放在页顶
+      expect(_src('lib/features/muse/settings/diagnose_sheet.dart'), contains('MuseConnectDoctorView(embedded: true)'));
     });
 
     testWidgets('首页 offers 一键诊断 after a failed connect', (t) async {
       await _pumpBanner(t, MuseHealthState.none, const ConnectionStatus.disconnected(ConnectionFailure.unexpected('x')));
       expect(find.byKey(const ValueKey('home_connect_failed')), findsOneWidget);
-      expect(find.text('一键诊断'), findsOneWidget);
+      // 1.20.3：按钮叫「诊断」，跳到 设置 › 诊断
+      expect(find.text('诊断'), findsOneWidget);
     });
   });
 

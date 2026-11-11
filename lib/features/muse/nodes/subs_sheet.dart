@@ -8,7 +8,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
-import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/muse/config/muse_config_page.dart' show showMuseProfileOrder;
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
@@ -17,7 +16,8 @@ import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/node_order.dart';
 import 'package:hiddify/features/muse/logic/profile_tools.dart';
 import 'package:hiddify/features/muse/logic/subscription_bar.dart';
-import 'package:hiddify/features/muse/settings/more_settings.dart' show musePick, museExportConfig, museImportConfig, museExportConfigTitle, museImportConfigTitle;
+import 'package:hiddify/features/muse/config/rules_page.dart' show museOpenRules, MuseRulesTab;
+import 'package:hiddify/features/muse/settings/more_settings.dart' show musePushPage, museExportConfig, museImportConfig, museExportConfigTitle, museImportConfigTitle, MuseSubSettingsPage, museSubSettingsTitle;
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_home.dart';
@@ -209,12 +209,12 @@ class MuseSubsPanel extends ConsumerWidget {
       switch (v) {
         case 'order':
           await showMuseProfileOrder(context, ref, profiles);
-        case 'auto_update':
-          final hours = ref.read(Preferences.museAutoUpdateHours);
-          final picked = await musePick<int>(context, '订阅自动更新', [for (final h in museAutoUpdateChoices) (h, museAutoUpdateLabel(h))], hours);
-          if (picked != null) await ref.read(Preferences.museAutoUpdateHours.notifier).update(picked);
-        case 'test_new_nodes':
-          await ref.read(MusePrefs.testNewNodes.notifier).update(!ref.read(MusePrefs.testNewNodes));
+        // 1.20.3：订阅自动更新、更新后测速、更新方式、订阅 UA 收进一页
+        case 'sub_settings':
+          await musePushPage(context, const MuseSubSettingsPage());
+        // 1.20.3：所有订阅的覆写一览（原来只能靠设置搜索打开）
+        case 'overrides':
+          await museOpenRules(context, tab: MuseRulesTab.overrides);
         case 'export':
           await museExportConfig(context, ref);
         case 'import':
@@ -242,17 +242,8 @@ class MuseSubsPanel extends ConsumerWidget {
             onSelected: onMore,
             itemBuilder: (_) => [
               if (profiles.length > 1) const PopupMenuItem(key: ValueKey('subs_more_order'), value: 'order', child: Text('排序')),
-              PopupMenuItem(
-                key: const ValueKey('auto_update_hours'),
-                value: 'auto_update',
-                child: Text('订阅自动更新：${museAutoUpdateLabel(ref.read(Preferences.museAutoUpdateHours))}'),
-              ),
-              CheckedPopupMenuItem(
-                key: const ValueKey('test_new_nodes'),
-                value: 'test_new_nodes',
-                checked: ref.read(MusePrefs.testNewNodes),
-                child: const Text('更新后测速新增节点'),
-              ),
+              const PopupMenuItem(key: ValueKey('subs_more_settings'), value: 'sub_settings', child: Text(museSubSettingsTitle)),
+              if (profiles.isNotEmpty) const PopupMenuItem(key: ValueKey('subs_more_overrides'), value: 'overrides', child: Text('全部覆写')),
               const PopupMenuDivider(),
               const PopupMenuItem(key: ValueKey('subs_more_import'), value: 'import', child: Text(museImportConfigTitle)),
               const PopupMenuItem(key: ValueKey('subs_more_export'), value: 'export', child: Text(museExportConfigTitle)),

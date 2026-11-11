@@ -368,7 +368,7 @@ String museSubFetchError({int? status, String kind = '', String detail = ''}) {
   }
   final k = kind.toLowerCase();
   final d = detail.toLowerCase();
-  if (k.contains('timeout') || d.contains('timed out')) return '连接超时 · 订阅服务器响应太慢，可在 设置 › 节点 › 订阅更新方式 换成「走代理」或「直连」再试';
+  if (k.contains('timeout') || d.contains('timed out')) return '连接超时 · 订阅服务器响应太慢，可在 订阅 ⋯ › 订阅设置 › 订阅更新方式 换成「走代理」或「直连」再试';
   if (d.contains('handshake') || d.contains('certificate') || k.contains('badcertificate')) return '证书校验失败 · 网络可能被劫持，或订阅服务器证书有问题';
   if (d.contains('failed host lookup') || d.contains('no address associated')) return '域名解析失败 · 订阅域名可能被屏蔽，可连接后用「走代理」更新';
   if (d.contains('connection refused') || d.contains('connection reset') || d.contains('connection closed')) {

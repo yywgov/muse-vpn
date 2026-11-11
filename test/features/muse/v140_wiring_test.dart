@@ -32,7 +32,8 @@ void main() {
   test('rule names for people', () {
     expect(museRuleDisplayName('preset:ai'), startsWith('预设：AI'));
     expect(museRuleDisplayName('builtin:bypassLan'), '局域网直连');
-    expect(museRuleDisplayName('我的规则'), '我的规则');
+    // 1.20.3：自定义规则带上层名
+    expect(museRuleDisplayName('我的规则'), '自定义规则：我的规则');
   });
 
   testWidgets('QR view draws a code', (tester) async {

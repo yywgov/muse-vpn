@@ -339,25 +339,27 @@ void main() {
     test('设置首页 has seven rows (备份与同步 gone)', () {
       // 1.20.2：「网络」下面加「分流规则」
       // 1.20.3：+ 隐私
-      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '隐私', '自动连接', '分应用代理', '网络', '分流规则', '活动', '内核与资源', '关于']);
+      // 1.20.3：十项（启动与断线、隐私与通知、诊断、备份与恢复）
+      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '启动与断线', '分流规则', '网络', '隐私与通知', '活动', '诊断', '内核与资源', '备份与恢复', '关于']);
     });
 
     test('removed settings are not found by search; moved ones point at 高级', () {
       for (final q in ['配色风格', '文字缩放', '隐藏桌面图标', '局域网同步', 'WebDAV', '每周本地快照', '连接质量提醒', 'CSV']) {
         expect(museSearchSettings(q, android: true, windows: true).map((e) => e.title), isNot(contains(q)), reason: q);
       }
-      expect(museSearchSettings('订阅 UA', android: true, windows: false).first.page, MuseSettingPage.nodesAdvanced);
+      // 1.20.3：订阅 UA 在 订阅 ⋯ › 订阅设置
+      expect(museSearchSettings('订阅 UA', android: true, windows: false).first.page, MuseSettingPage.subSettings);
       expect(museSearchSettings('重复判断', android: true, windows: false).first.page, MuseSettingPage.nodesAdvanced);
       expect(museSearchSettings('Fake-IP', android: true, windows: false).first.page, MuseSettingPage.advanced);
       expect(museSearchSettings('TLS 分片', android: true, windows: false).first.page, MuseSettingPage.network);
       expect(museSearchSettings('窗口置顶', android: false, windows: true).first.page, MuseSettingPage.windowAdvanced);
       expect(museSearchSettings('快捷键', android: false, windows: true).first.page, MuseSettingPage.windowAdvanced);
       expect(museSearchSettings('导出配置', android: true, windows: false).first.page, MuseSettingPage.sync);
-      expect(MuseSettingPage.sync.path, '设置 › 关于 › 导出 / 导入配置');
+      expect(MuseSettingPage.sync.path, '设置 › 备份与恢复'); // 1.20.3
       // old names still lead to the new place
       expect(museSearchSettings('备份与同步', android: true, windows: false).first.page, MuseSettingPage.sync);
       expect(museSearchSettings('自动运行', android: true, windows: false).first.title, '打开即连接');
-      expect(museSearchSettings('节点失效', android: true, windows: false).first.page, MuseSettingPage.nodes);
+      expect(museSearchSettings('节点失效', android: true, windows: false).first.page, MuseSettingPage.autoConnect); // 1.20.3：启动与断线 › 断线处理
     });
 
     test('migration 3→4 hides 内网 IP once, leaves everything else (removed settings are ignored, not deleted)', () {
@@ -403,16 +405,14 @@ void main() {
   });
 
   group('精简：页面', () {
+    // 1.20.3：「更多」取消，启动与断线页四组直接显示；按需运行在「Wi‑Fi 规则」页
     testWidgets('自动连接 (Android): only 打开即连接 until 「更多」', (t) async {
       await _pump(t, _screens[0], Brightness.light, 3, const MuseAutoConnectPage(android: true, windows: false));
       expect(find.text('打开即连接'), findsOneWidget);
-      expect(find.byKey(const ValueKey('keep_alive')), findsNothing);
-      expect(find.byKey(const ValueKey('settings_on_demand')), findsNothing);
-      expect(find.byKey(const ValueKey('network_schedule_connect')), findsNothing);
-      await t.tap(find.byKey(const ValueKey('auto_connect_more')));
-      await t.pump();
+      expect(find.byKey(const ValueKey('auto_connect_more')), findsNothing);
       expect(find.byKey(const ValueKey('keep_alive')), findsOneWidget);
-      expect(find.byKey(const ValueKey('settings_on_demand')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings_wifi_rules')), findsOneWidget);
+      await t.scrollUntilVisible(find.byKey(const ValueKey('network_schedule_connect')), 200, scrollable: _bodyScroll);
       expect(find.byKey(const ValueKey('network_schedule_connect')), findsOneWidget);
       await _done(t);
     });
@@ -420,9 +420,7 @@ void main() {
     testWidgets('自动连接 (Windows): 开机自启 in view, 静默启动 in 「更多」', (t) async {
       await _pump(t, _screens[2], Brightness.dark, 3, const MuseAutoConnectPage(android: false, windows: true));
       expect(find.text('打开即连接'), findsNothing);
-      expect(find.byKey(const ValueKey('settings_silent_start')), findsNothing);
-      await t.tap(find.byKey(const ValueKey('auto_connect_more')));
-      await t.pump();
+      // 1.20.3：静默启动和开机自启在同一组「启动」
       expect(find.byKey(const ValueKey('settings_silent_start')), findsOneWidget);
       await _done(t);
     });
@@ -466,28 +464,33 @@ void main() {
       await _done(t);
     });
 
+    // 1.20.3：节点失效自动切换 → 启动与断线；订阅 UA → 订阅设置；重复判断不再折叠
     testWidgets('节点设置: 节点失效自动切换 on top (on), 订阅 UA / 重复判断 behind 高级', (t) async {
       await _pump(t, _screens[0], Brightness.light, 3, const MuseNodeSettingsPage());
-      expect(find.text(museAutoFailoverTitle), findsOneWidget);
+      expect(find.text(museAutoFailoverTitle), findsNothing);
+      expect(find.byKey(const ValueKey('node_sub_ua')), findsNothing);
+      expect(find.byKey(const ValueKey('node_dedup_mode')), findsOneWidget);
+      await _done(t);
+      await _pump(t, _screens[0], Brightness.light, 3, const MuseAutoConnectPage(android: true, windows: false));
       final sw = t.widget<Switch>(find.descendant(of: find.byKey(const ValueKey('node_auto_failover')), matching: find.byType(Switch)));
       expect(sw.value, isTrue);
-      expect(find.byKey(const ValueKey('node_sub_ua')), findsNothing);
-      expect(find.byKey(const ValueKey('node_dedup_mode')), findsNothing);
-      await t.scrollUntilVisible(find.byKey(const ValueKey('node_advanced_fold')), 200, scrollable: _bodyScroll);
-      await t.tap(find.byKey(const ValueKey('node_advanced_fold')));
-      await t.pump();
+      await _done(t);
+      await _pump(t, _screens[0], Brightness.light, 3, const MuseSubSettingsPage());
       expect(find.byKey(const ValueKey('node_sub_ua')), findsOneWidget);
-      expect(find.byKey(const ValueKey('node_dedup_mode')), findsOneWidget);
       await _done(t);
     });
 
+    // 1.20.3：导出 / 导入配置搬到 设置 › 备份与恢复；关于底部只剩开源许可
     testWidgets('关于: 导出配置 / 导入配置 / 开源许可 at the bottom (1.20.3: renamed)', (t) async {
       await _pump(t, _screens[0], Brightness.light, 3, const AboutPage());
-      expect(find.text('导出配置'), findsOneWidget);
-      expect(find.text('导入配置'), findsOneWidget);
+      expect(find.text('导出配置'), findsNothing);
       expect(find.byKey(const ValueKey('about_open_source')), findsOneWidget);
       expect(find.text('开源许可'), findsOneWidget); // 1.20.3
-      await t.tap(find.byKey(const ValueKey('about_export_config')));
+      await _done(t);
+      await _pump(t, _screens[0], Brightness.light, 3, const MuseBackupPage());
+      expect(find.text('导出配置'), findsOneWidget);
+      expect(find.text('导入配置'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('backup_export')));
       await t.pump();
       expect(find.byType(MuseExportBackupDialog), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('backup_export_cancel')));

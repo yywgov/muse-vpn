@@ -382,7 +382,9 @@ void main() {
       expect(MuseActivityTab.fromKey(null), MuseActivityTab.connections);
       expect(museActivityLocation(MuseActivityTab.dns), '/settings/activity?tab=dns');
       final routes = File('lib/core/router/go_router/routing_config_notifier.dart').readAsStringSync();
-      expect(routes, contains("_slide(museActivityRoute, 'activity'"));
+      // 1.20.3：活动路由多了 ?tab=diagnose → 设置 › 诊断 的跳转
+      expect(routes, contains('name: museActivityRoute,'));
+      expect(routes, contains("state.uri.queryParameters['tab'] == 'diagnose' ? museDiagnosePath : null"));
       expect(routes, contains("GoRoute(name: 'connections', path: 'connections', redirect: (_, _) => museActivityLocation(MuseActivityTab.connections))"));
       expect(routes, contains("GoRoute(name: 'logs', path: 'logs', redirect: (_, _) => museActivityLocation(MuseActivityTab.logs))"));
       expect(museShellExtras(logCapture: true, logsAvailable: true).map((e) => e.title), ['活动']);

@@ -341,3 +341,41 @@ Future<bool> museScrollToKey(ScrollController scroll, GlobalKey key, {int maxSte
   }
   return reveal();
 }
+
+/// 1.20.3：逐层清除藏住节点的设置（同样的键：hideDuplicates、include/excludeRegex、subFilters、protocolFilter、nodeMeta）。
+Future<void> _showMuseNodeHiddenLayers(BuildContext context, WidgetRef ref, MuseNodeHiddenCounts c, {required String viewLabel, required MuseNodeMetas metas}) async {
+  final picked = await showDialog<String>(
+    context: context,
+    builder: (ctx) => SimpleDialog(
+      key: const ValueKey('node_hidden_dialog'),
+      title: Text('已隐藏 ${c.total} 个节点'),
+      children: [
+        if (c.duplicate > 0)
+          SimpleDialogOption(key: const ValueKey('node_hidden_clear_dup'), onPressed: () => Navigator.pop(ctx, 'dup'), child: Text('重复 ${c.duplicate} 个：关闭「隐藏重复节点」')),
+        if (c.global > 0)
+          SimpleDialogOption(key: const ValueKey('node_hidden_clear_global'), onPressed: () => Navigator.pop(ctx, 'global'), child: Text('全部订阅筛选 ${c.global} 个：清空只显示 / 排除')),
+        if (c.sub > 0)
+          SimpleDialogOption(key: const ValueKey('node_hidden_clear_sub'), onPressed: () => Navigator.pop(ctx, 'sub'), child: Text('此订阅筛选 ${c.sub} 个：清空这个订阅的节点筛选')),
+        if (c.view > 0)
+          SimpleDialogOption(key: const ValueKey('node_hidden_clear_view'), onPressed: () => Navigator.pop(ctx, 'view'), child: Text('只看$viewLabel ${c.view} 个：显示全部')),
+        if (c.manual > 0)
+          SimpleDialogOption(key: const ValueKey('node_hidden_clear_manual'), onPressed: () => Navigator.pop(ctx, 'manual'), child: Text('手动隐藏 ${c.manual} 个：全部显示')),
+      ],
+    ),
+  );
+  switch (picked) {
+    case 'dup':
+      await ref.read(MusePrefs.hideDuplicates.notifier).update(false);
+    case 'global':
+      await ref.read(MusePrefs.includeRegex.notifier).update('');
+      await ref.read(MusePrefs.excludeRegex.notifier).update('');
+    case 'sub':
+      final id = ref.read(museActiveProfileIdProvider);
+      final all = {...museParseSubFilters(ref.read(MusePrefs.subFilters))}..remove(id);
+      await ref.read(MusePrefs.subFilters.notifier).update(museSubFiltersToRaw(all));
+    case 'view':
+      await ref.read(MusePrefs.protocolFilter.notifier).update('');
+    case 'manual':
+      await ref.read(MusePrefs.nodeMeta.notifier).update(metas.setHidden(metas.hiddenTags, false).toRaw());
+  }
+}

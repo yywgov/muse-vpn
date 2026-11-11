@@ -155,7 +155,7 @@ class MuseWindowsSilentStartTile extends ConsumerWidget {
     key: const ValueKey('settings_silent_start'),
     leading: const Icon(Icons.visibility_off_outlined),
     title: '静默启动',
-    info: '打开穿云时不弹出窗口，只在托盘里运行（点托盘图标显示窗口）',
+    subtitle: '打开穿云时不弹出窗口，只在托盘里运行',
     value: ref.watch(Preferences.silentStart),
     onChanged: (v) => ref.read(Preferences.silentStart.notifier).update(v),
   );

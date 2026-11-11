@@ -138,7 +138,9 @@ void main() {
         expect(find.byKey(ValueKey(gone)), findsNothing, reason: gone);
       }
       expect(find.byKey(const ValueKey('appearance_motion')), findsOneWidget);
-      expect(find.text('从下次连接起生效'), findsOneWidget); // 原 footer 改为副标题
+      // 1.20.3：Android 通知一组搬到 隐私与通知，外观页不再有
+      expect(find.text('从下次连接起生效'), findsNothing);
+      expect(find.byKey(const ValueKey('appearance_android')), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -202,7 +204,8 @@ void main() {
 
   group('设置 › 隐私', () {
     test('设置首页第二行是隐私', () {
-      expect(museSettingsHomeRows(android: true, developer: false).take(2), ['外观', '隐私']);
+      // 1.20.3：改名「隐私与通知」，排在 网络 后面
+      expect(museSettingsHomeRows(android: true, developer: false), contains('隐私与通知'));
     });
 
     testWidgets('三项都在，敏感页禁止截屏只在安卓', (tester) async {
@@ -223,7 +226,7 @@ void main() {
     });
 
     test('搜索：移走的项打开隐私页；旧名（深浅色、纯黑、主题、首页样式）仍打开外观', () {
-      expect(MuseSettingPage.privacy.path, '设置 › 隐私');
+      expect(MuseSettingPage.privacy.path, '设置 › 隐私与通知'); // 1.20.3
       expect(_first('隐私模式'), MuseSettingPage.privacy);
       expect(_first('敏感页禁止截屏'), MuseSettingPage.privacy);
       expect(_first('截屏'), MuseSettingPage.privacy);

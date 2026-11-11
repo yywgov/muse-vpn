@@ -3,7 +3,7 @@
 //   安全模式       2 failed starts in a row → widget updates and the user's own rules are off; 退出安全模式
 //   被其他 VPN 断开  another VPN app took the VPN over (onRevoke); 穿云 does not reconnect by itself
 //   上次异常       an uncaught error or a failed start was written to the local log; 复制日志 / 知道了
-//   连接没有成功    the last connect failed → 一键诊断 (runs only when tapped)
+//   连接没有成功    the last connect failed → 设置 › 诊断（1.20.3；原一键诊断弹层，点了才查）
 // Read when 首页 opens and when the connection status changes; no timer, no animation.
 // Part of 穿云 (GPLv3).
 
@@ -21,7 +21,8 @@ import 'package:hiddify/features/muse/data/muse_health.dart';
 import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/health_tools.dart';
 import 'package:hiddify/features/muse/logic/redact.dart';
-import 'package:hiddify/features/muse/settings/connect_doctor_sheet.dart';
+import 'package:hiddify/features/muse/settings/diagnose_sheet.dart' show museDiagnosePath;
+import 'package:go_router/go_router.dart';
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -83,8 +84,9 @@ class MuseHealthBanner extends ConsumerWidget {
           icon: Icons.medical_services_outlined,
           color: MusePalette.red,
           title: '连接没有成功',
-          text: '可以一键检查网络、DNS、节点、端口占用和其他 VPN，找出连不上的原因。',
-          actions: [('一键诊断', () => showMuseConnectDoctor(context))],
+          text: '可以检查网络、DNS、节点、端口占用和其他 VPN，找出连不上的原因。',
+          // 1.20.3：跳到 设置 › 诊断（没连上时页顶就是「连不上」流程）
+          actions: [('诊断', () => GoRouter.of(context).go(museDiagnosePath))],
         ),
     ];
     if (cards.isEmpty) return const SizedBox.shrink();

@@ -25,7 +25,10 @@ void _toast(WidgetRef ref, String text, {bool error = false}) {
 // ======================================================================= 按需运行
 
 class MuseOnDemandPage extends HookConsumerWidget {
-  const MuseOnDemandPage({super.key});
+  const MuseOnDemandPage({super.key, this.embedded = false});
+
+  /// 1.20.3：作为「Wi‑Fi 规则」页的上半部分（不带标题栏、不自带滚动）
+  final bool embedded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -92,11 +95,9 @@ class MuseOnDemandPage extends HookConsumerWidget {
       await add(r.ssid!);
     }
 
-    return MuseScaffold(
-      title: '按需运行',
-      body: MuseGroupedBody(
-        children: [
+    final children = <Widget>[
           MuseSection(
+            header: embedded ? '暂停连接' : null,
             footer: android
                 ? '连上列表里的 Wi‑Fi（比如家里、公司）时自动暂停连接，离开后自动恢复。手动点了「连接」或「断开」以你的操作为准。'
                       '需要「位置信息」权限才能读到 Wi‑Fi 名称；穿云在后台时 Android 可能不提供，回到穿云时会立即检查。'
@@ -192,9 +193,9 @@ class MuseOnDemandPage extends HookConsumerWidget {
                 ),
               ),
             ),
-        ],
-      ),
-    );
+    ];
+    if (embedded) return Column(key: const ValueKey('on_demand_embedded'), crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+    return MuseScaffold(title: '按需运行', body: MuseGroupedBody(children: children));
   }
 }
 

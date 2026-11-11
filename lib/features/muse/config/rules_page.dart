@@ -25,9 +25,11 @@ class MuseRulesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => switch (initialTab) {
+    // 1.20.3：导入 / 导出 / 粘贴规则收进右上 ⋯
     MuseRulesTab.routing => const MuseScaffold(
       key: ValueKey('rules_routing_page'),
       title: '分流规则',
+      actions: [MuseRoutingMoreMenu()],
       body: MuseRoutingPage(embedded: true),
     ),
     MuseRulesTab.overrides => const MuseOverrideListPage(),
@@ -38,7 +40,7 @@ class MuseRulesPage extends StatelessWidget {
 Future<void> museOpenRules(BuildContext context, {MuseRulesTab tab = MuseRulesTab.routing}) =>
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MuseRulesPage(initialTab: tab)));
 
-/// 1.20.2：所有订阅的覆写一览（设置搜索「订阅覆写」）；右上 ⋯ ›「编辑覆写 JSON」。
+/// 1.20.2：所有订阅的覆写一览；右上 ⋯ ›「编辑覆写 JSON」。1.20.3：订阅弹层 ⋯ ›「全部覆写」也打开它。
 class MuseOverrideListPage extends ConsumerWidget {
   const MuseOverrideListPage({super.key});
 

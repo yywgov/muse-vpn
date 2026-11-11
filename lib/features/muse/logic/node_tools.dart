@@ -791,3 +791,58 @@ MuseRelayInfo? museRelayInfo(String name, {String? nameRegion, String exitCode =
   final fromName = nameRegion == 'CN' ? null : nameRegion;
   return MuseRelayInfo(entry: entry, exit: fromName ?? (short == null ? null : _relayExitChars[short[2]]));
 }
+
+// ---------------------------------------------------------------- 1.20.3：节点被哪一层藏起来
+
+/// 每层藏了几个节点（按 重复 → 全部订阅筛选 → 此订阅筛选 → 视图筛选 → 手动隐藏 的顺序，算在第一个藏住它的层上）。
+class MuseNodeHiddenCounts {
+  const MuseNodeHiddenCounts({this.duplicate = 0, this.global = 0, this.sub = 0, this.view = 0, this.manual = 0});
+
+  final int duplicate;
+  final int global;
+  final int sub;
+  final int view;
+  final int manual;
+
+  int get total => duplicate + global + sub + view + manual;
+  bool get isEmpty => total == 0;
+}
+
+MuseNodeHiddenCounts museNodeHiddenCounts<T>(
+  Iterable<T> nodes, {
+  required bool Function(T) duplicate,
+  required bool Function(T) passesGlobal,
+  required bool Function(T) passesSub,
+  required bool Function(T) passesView,
+  required bool Function(T) manual,
+}) {
+  var d = 0, g = 0, s = 0, v = 0, m = 0;
+  for (final n in nodes) {
+    if (duplicate(n)) {
+      d++;
+    } else if (!passesGlobal(n)) {
+      g++;
+    } else if (!passesSub(n)) {
+      s++;
+    } else if (!passesView(n)) {
+      v++;
+    } else if (manual(n)) {
+      m++;
+    }
+  }
+  return MuseNodeHiddenCounts(duplicate: d, global: g, sub: s, view: v, manual: m);
+}
+
+/// 节点页顶部那一行：「已隐藏 9 个：重复 3、全部订阅筛选 4、此订阅筛选 1、只看收藏 1」；没有隐藏时 null。
+/// [viewLabel] 是视图筛选的名字（「收藏」「VLESS」「标签：家用」）。
+String? museNodeHiddenNote(MuseNodeHiddenCounts c, {String viewLabel = ''}) {
+  if (c.isEmpty) return null;
+  final parts = [
+    if (c.duplicate > 0) '重复 ${c.duplicate}',
+    if (c.global > 0) '全部订阅筛选 ${c.global}',
+    if (c.sub > 0) '此订阅筛选 ${c.sub}',
+    if (c.view > 0) '只看$viewLabel ${c.view}',
+    if (c.manual > 0) '手动隐藏 ${c.manual}',
+  ];
+  return '已隐藏 ${c.total} 个：${parts.join('、')}';
+}

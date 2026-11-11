@@ -27,6 +27,9 @@ import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/muse/data/windows_proxy_guard.dart';
 import 'package:hiddify/features/muse/home/exit_card.dart';
+import 'package:hiddify/features/muse/home/muse_home_page.dart' show museServicesProvider, museServiceLabel;
+import 'package:hiddify/features/muse/logic/service_probe.dart' show museServices, MuseSvcState;
+import 'package:hiddify/features/muse/widget/muse_motion.dart' show museMotion;
 import 'package:hiddify/features/muse/home/reachability.dart';
 import 'package:hiddify/features/muse/logic/diagnosis.dart';
 import 'package:hiddify/features/muse/logic/exit_check.dart';
@@ -44,8 +47,30 @@ Future<void> showMuseDiagnoseSheet(BuildContext context) => showModalBottomSheet
   builder: (_) => const MuseDiagnoseView(),
 );
 
-/// 1.10.0: 设置 › 活动 › 诊断 — the same checks as the sheet, below the 活动 tabs. The checks run once
-/// when the tab opens (no polling).
+/// 1.20.3：诊断是设置一级（/settings/diagnose）。首页健康横幅「诊断」、出口详情「诊断」、服务状态弹层、
+/// 活动旧的 ?tab=diagnose 都跳到这里。
+const museDiagnoseRoute = 'diagnose';
+const museDiagnosePath = '/settings/diagnose';
+
+/// 打开诊断页的某一块：[section] = 'exit'（出口与解锁）；null = 页顶。
+String museDiagnoseLocation({String? section}) => section == null ? museDiagnosePath : '$museDiagnosePath?section=$section';
+
+/// 1.20.3：设置 › 诊断 —— 页顶「连不上」流程（原一键诊断，点了才查），下面依次是检查结果、出口与解锁、
+/// DNS 泄漏、日志与反馈。检查在打开时跑一次，不轮询。
+class MuseDiagnoseHubPage extends StatelessWidget {
+  const MuseDiagnoseHubPage({super.key, this.section});
+
+  final String? section;
+
+  @override
+  Widget build(BuildContext context) => MuseScaffold(
+    key: const ValueKey('diagnose_hub_page'),
+    title: '诊断',
+    body: MuseDiagnoseView(inSheet: false, hub: true, section: section),
+  );
+}
+
+/// 1.10.0–1.20.2 的「活动 › 诊断」tab；1.20.3 起活动不再有这个 tab，保留给旧调用方，内容与诊断页相同。
 class MuseDiagnosePage extends StatelessWidget {
   const MuseDiagnosePage({super.key, required this.header});
 
@@ -53,16 +78,22 @@ class MuseDiagnosePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MuseScaffold(
-    title: '活动',
-    body: Column(children: [header, const Expanded(child: MuseDiagnoseView(inSheet: false))]),
+    title: '诊断',
+    body: Column(children: [header, const Expanded(child: MuseDiagnoseView(inSheet: false, hub: true))]),
   );
 }
 
 class MuseDiagnoseView extends ConsumerStatefulWidget {
-  const MuseDiagnoseView({super.key, this.inSheet = true});
+  const MuseDiagnoseView({super.key, this.inSheet = true, this.hub = false, this.section});
 
   /// in the bottom sheet (closes itself for 切换节点 / 连接) rather than the 活动 tab
   final bool inSheet;
+
+  /// 1.20.3：设置 › 诊断（「连不上」流程直接放在页顶，不再另开弹层）
+  final bool hub;
+
+  /// 1.20.3：打开后滚到的区块（'exit' = 出口与解锁）
+  final String? section;
 
   @override
   ConsumerState<MuseDiagnoseView> createState() => _DiagnoseSheetState();
@@ -72,10 +103,18 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
   final _items = <MuseDiagItem>[];
   var _running = true;
 
+  final _exitKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     unawaited(_run());
+    if (widget.section == 'exit') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final c = _exitKey.currentContext;
+        if (c != null) Scrollable.ensureVisible(c, duration: museMotion(c));
+      });
+    }
   }
 
   void _add(MuseDiagItem item) {
@@ -251,7 +290,7 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
         child: Padding(
           key: const ValueKey('diagnose_sheet'),
           padding: widget.inSheet
-              ? const EdgeInsets.fromLTRB(MuseSpace.s24, 0, MuseSpace.s24, MuseSpace.s16)
+              ? const EdgeInsets.fromLTRB(MuseSpace.s4 / 24, 0, MuseSpace.s4 / 24, MuseSpace.s16)
               : EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), museScrollEndGap(context, MuseSpace.s16)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -261,6 +300,12 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
                 Text('诊断', style: MuseType.title(context)),
                 const SizedBox(height: MuseSpace.s8),
               ],
+              // 1.20.3：没连上时「连不上」流程放在页顶（原「连不上？一键诊断」弹层，点「开始诊断」才查）
+              if (widget.hub && !connected) ...[
+                const MuseConnectDoctorView(embedded: true),
+                const SizedBox(height: MuseSpace.s16),
+                Text('基础检查', style: MuseType.body(context).copyWith(fontWeight: FontWeight.w600)),
+              ],
               for (final item in _items)
                 line(
                   Icon(icon(item.level).$1, color: icon(item.level).$2, size: MuseIconSize.small),
@@ -268,6 +313,8 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
                   Text(item.text, style: MuseType.body(context)),
                 ),
               if (connected) ...[
+                SizedBox(key: _exitKey, height: MuseSpace.s8),
+                Text('出口与解锁', style: MuseType.body(context).copyWith(fontWeight: FontWeight.w600)),
                 line(
                   Icon(
                     info != null ? Icons.check_circle_outlined : Icons.travel_explore_outlined,
@@ -312,18 +359,9 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
                     ],
                   ),
                 ),
+                // 1.20.3：出口区和首页「服务状态」用同一套解锁检测数据，点了才检测（不再单独测 Google / ChatGPT / Netflix）
                 const SizedBox(height: MuseSpace.s4),
-                Row(
-                  children: [
-                    Expanded(child: _ServiceChip(name: 'Google', state: exit?.google ?? MuseServiceState.checking)),
-                    const SizedBox(width: MuseSpace.s8),
-                    Expanded(child: _ServiceChip(name: 'ChatGPT', state: exit?.chatGpt ?? MuseServiceState.checking)),
-                    const SizedBox(width: MuseSpace.s8),
-                    Expanded(
-                      child: _ServiceChip(name: 'Netflix', state: exit?.netflix ?? MuseServiceState.checking, partial: '仅自制剧'),
-                    ),
-                  ],
-                ),
+                const MuseDiagnoseUnlockBlock(),
               ],
               if (_running)
                 const Padding(
@@ -352,13 +390,14 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
                 ],
               ],
               // 1.13.0: 连不上 → the connect doctor (端口占用、其他 VPN、节点可达, with fixes)
-              if (!connected) ...[
+              // 1.20.3：诊断页上它在页顶（见上），这里只在旧弹层里留按钮
+              if (!connected && !widget.hub) ...[
                 const SizedBox(height: MuseSpace.s8),
                 TextButton.icon(
                   key: const ValueKey('diagnose_connect_doctor'),
                   onPressed: () => showMuseConnectDoctor(context),
                   icon: const Icon(Icons.medical_services_outlined, size: MuseIconSize.small),
-                  label: const Text('连不上？一键诊断'),
+                  label: const Text('连不上？查原因'),
                 ),
               ],
               // 1.15.0 R20: DNS 泄漏检测（点按才测）
@@ -437,41 +476,49 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
   }
 }
 
-class _ServiceChip extends StatelessWidget {
-  const _ServiceChip({required this.name, required this.state, this.partial = '部分'});
-
-  final String name;
-  final MuseServiceState state;
-  final String partial;
+/// 1.20.3：诊断页「出口与解锁」——读首页「服务状态」同一个 provider，点「检测解锁」才检测。
+class MuseDiagnoseUnlockBlock extends ConsumerWidget {
+  const MuseDiagnoseUnlockBlock({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final mt = MuseTheme.of(context);
-    final Color dot = switch (state) {
-      MuseServiceState.ok => MusePalette.green,
-      MuseServiceState.partial => MusePalette.orange,
-      MuseServiceState.blocked => MusePalette.red,
-      MuseServiceState.failed => MusePalette.red,
-      MuseServiceState.checking => mt.text3,
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: MuseSpace.s8, vertical: MuseSpace.s8),
-      decoration: BoxDecoration(color: mt.inner, borderRadius: MuseRadius.smallAll),
-      child: Row(
-        children: [
-          Container(width: MuseSize.dot, height: MuseSize.dot, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-          const SizedBox(width: MuseSpace.s8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.caption(context).copyWith(color: mt.text1)),
-                Text(museServiceStateLabel(state, partial: partial), maxLines: 1, overflow: TextOverflow.ellipsis, style: MuseType.caption(context)),
-              ],
+    final s = ref.watch(museServicesProvider);
+    return Column(
+      key: const ValueKey('diagnose_unlock'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (s.results.isEmpty && !s.checking)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: MuseSpace.s4),
+            child: Text('解锁检测还没做过，点下面按钮检测 ${museServices.length} 个常用服务', style: MuseType.caption(context).copyWith(color: mt.text2)),
+          )
+        else
+          for (final sv in museServices)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: MuseSpace.s4 / 2),
+              child: Row(
+                children: [
+                  SizedBox(width: MuseSize.labelColumnWide + MuseIconSize.small + MuseSpace.s12, child: Text(sv.name, style: MuseType.body(context).copyWith(color: mt.text2))),
+                  Expanded(
+                    child: Text(
+                      museServiceLabel(s.results[sv.key] ?? (s.checking ? MuseSvcState.checking : MuseSvcState.unknown), s.ms[sv.key], region: s.regions[sv.key]),
+                      style: MuseType.body(context).copyWith(fontFeatures: MuseType.tabular),
+                    ),
+                  ),
+                ],
+              ),
             ),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            key: const ValueKey('diagnose_unlock_check'),
+            onPressed: s.checking ? null : () => ref.read(museServicesProvider.notifier).check(force: true),
+            icon: const Icon(Icons.travel_explore_outlined, size: MuseIconSize.small),
+            label: Text(s.checking ? '正在检测' : (s.results.isEmpty ? '检测解锁' : '重新检测')),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

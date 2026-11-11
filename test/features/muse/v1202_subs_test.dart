@@ -247,7 +247,8 @@ void main() {
 
     test('设置：「分流规则」在「网络」下面；搜索路径随新位置', () {
       final rows = museSettingsHomeRows(android: true, developer: false);
-      expect(rows.indexOf('分流规则'), rows.indexOf('网络') + 1);
+      // 1.20.3：分流规则排在网络前面
+      expect(rows.indexOf('分流规则'), rows.indexOf('网络') - 1);
       expect(MuseSettingPage.routing.path, '设置 › 分流规则');
       expect(MuseSettingPage.subscriptions.path, '节点 › 订阅名 ▾ › ⋯');
       expect(museSearchSettings('订阅覆写', android: true, windows: false).first.page, MuseSettingPage.overrides);
@@ -332,7 +333,8 @@ void main() {
       await _settle(t);
       await t.tap(find.byKey(const ValueKey('subs_more')));
       await _settle(t);
-      for (final k in ['subs_more_order', 'auto_update_hours', 'test_new_nodes', 'subs_more_import', 'subs_more_export']) {
+      // 1.20.3：订阅自动更新、更新后测速收进「订阅设置」；+ 全部覆写
+      for (final k in ['subs_more_order', 'subs_more_settings', 'subs_more_overrides', 'subs_more_import', 'subs_more_export']) {
         expect(find.byKey(ValueKey(k)), findsOneWidget, reason: k);
       }
       await t.binding.handlePopRoute();

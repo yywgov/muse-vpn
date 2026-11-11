@@ -29,7 +29,10 @@ Future<void> showMuseConnectDoctor(BuildContext context) => showModalBottomSheet
 );
 
 class MuseConnectDoctorView extends ConsumerStatefulWidget {
-  const MuseConnectDoctorView({super.key});
+  const MuseConnectDoctorView({super.key, this.embedded = false});
+
+  /// 1.20.3：放在 设置 › 诊断 页顶（不另开弹层、不自带滚动）
+  final bool embedded;
 
   @override
   ConsumerState<MuseConnectDoctorView> createState() => _DoctorState();
@@ -159,14 +162,10 @@ class _DoctorState extends ConsumerState<MuseConnectDoctorView> {
       MuseDiagLevel.fail => (Icons.cancel_outlined, MusePalette.red),
       MuseDiagLevel.skip => (Icons.remove_circle_outlined, mt.text3),
     };
-    return SafeArea(
-      child: SingleChildScrollView(
-        key: const ValueKey('connect_doctor'),
-        padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s24),
-        child: Column(
+    final body = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('连不上？一键诊断', style: MuseType.title(context)),
+            Text(widget.embedded ? '连不上' : '连不上？诊断', style: widget.embedded ? MuseType.body(context).copyWith(fontWeight: FontWeight.w600) : MuseType.title(context)),
             const SizedBox(height: MuseSpace.s8),
             Text(
               '依次检查网络、DNS、节点能否连通、端口是否被占用、有没有其他 VPN，并给出结论和修复办法。点「开始诊断」才会检查。',
@@ -211,7 +210,13 @@ class _DoctorState extends ConsumerState<MuseConnectDoctorView> {
               ),
             ],
           ],
-        ),
+        );
+    if (widget.embedded) return KeyedSubtree(key: const ValueKey('connect_doctor'), child: body);
+    return SafeArea(
+      child: SingleChildScrollView(
+        key: const ValueKey('connect_doctor'),
+        padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s24),
+        child: body,
       ),
     );
   }

@@ -28,7 +28,8 @@ class RoutingOptionsPage extends HookConsumerWidget {
     });
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.pages.settings.routing.title),
+        // 1.20.3：入口在 设置 › 分流规则 ›「我的规则」，页标题跟着叫「我的规则」（原 Hiddify「路由」）
+        title: const Text('我的规则'),
         actions: [
           PopupMenuButton(
             icon: const Icon(Icons.more_vert_outlined),

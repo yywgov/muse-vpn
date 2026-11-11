@@ -24,12 +24,14 @@ class MuseNetworkPage extends HookConsumerWidget {
     final dns = museDnsPreset(ref.watch(MusePrefs.dnsPreset));
     final balancer = ref.watch(ConfigOptions.balancerStrategy);
     final ipv6 = MuseIpv6Policy.fromKey(ref.watch(MusePrefs.ipv6Policy));
+    final hosts = museParseHosts(ref.watch(MusePrefs.hosts));
     return MuseScaffold(
       title: '网络',
       body: MuseGroupedBody(
         children: [
           if (windows ?? PlatformUtils.isWindows) const MuseSection(children: [MuseWindowsModeTile(), MuseUwpLoopbackTile()]),
           MuseSection(
+            header: 'DNS',
             children: [
               MuseTile(
                 key: const ValueKey('network_dns'),
@@ -51,6 +53,24 @@ class MuseNetworkPage extends HookConsumerWidget {
                   subtitle: '改回「${museDnsPresets.first.title}」',
                   onTap: () => ref.read(MusePrefs.dnsPreset.notifier).update(museDnsPresets.first.key),
                 ),
+              // 1.20.3：自定义 hosts 属于域名解析，从分流规则挪到这里（同一个键 MusePrefs.hosts）
+              MuseTile(
+                key: const ValueKey('routing_hosts'),
+                leading: const Icon(Icons.edit_note_outlined),
+                title: '自定义 hosts',
+                trailing: Text(hosts.isEmpty ? '无' : '${hosts.length} 条'),
+                chevron: true,
+                onTap: () async {
+                  final v = await museAskText(
+                    context,
+                    '自定义 hosts',
+                    initial: ref.read(MusePrefs.hosts),
+                    hint: '每行一条：1.2.3.4 example.com',
+                    maxLines: 8,
+                  );
+                  if (v != null) await ref.read(MusePrefs.hosts.notifier).update(v);
+                },
+              ),
             ],
           ),
           MuseSection(
