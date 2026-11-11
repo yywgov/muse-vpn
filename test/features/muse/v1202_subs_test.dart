@@ -403,6 +403,26 @@ void main() {
     });
   });
 
+  testWidgets('弹层开着时整个界面被换掉（弹层的 Future 不会完成），之后仍能再打开', (t) async {
+    final c = await _container(t);
+    var router = await _pumpApp(t, c);
+    router.go('/nodes');
+    await _settle(t);
+    await t.tap(find.byKey(const ValueKey('nodes_sub_switcher')));
+    await _settle(t);
+    expect(museSubsSheetOpen, isTrue);
+    await t.pumpWidget(const SizedBox.shrink());
+    await t.pump(const Duration(seconds: 1));
+    expect(museSubsSheetOpen, isFalse);
+    router = await _pumpApp(t, c);
+    router.go('/nodes');
+    await _settle(t);
+    await t.tap(find.byKey(const ValueKey('nodes_sub_switcher')));
+    await _settle(t);
+    expect(_panel, findsOneWidget);
+    await _done(t);
+  });
+
   group('旧订阅地址 /config', () {
     testWidgets('从首页跳 /config：到节点页、弹层只开一次（同一帧里求值多次也一样）', (t) async {
       final c = await _container(t);

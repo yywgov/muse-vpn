@@ -37,8 +37,11 @@ final museSubsSheetPendingProvider = StateProvider<bool>((ref) => false);
 
 var _museSubsRequestQueued = false;
 
-/// 订阅弹层是否开着（再次要求打开时不叠第二个）。
-var museSubsSheetOpen = false;
+var _museSubsOpening = false;
+
+/// 订阅弹层是否开着（再次要求打开时不叠第二个）。看弹层路由本身是否还在导航里，导航被整个换掉
+/// （弹层的 Future 永远不会完成）时也不会卡在「开着」。
+bool get museSubsSheetOpen => _museSubsOpening || (_museSubsRoute?.isActive ?? false);
 
 /// 由路由重定向调用：下一帧置「待打开」（重定向可能在构建期间求值，不能当场改 provider）。同一帧内多次调用
 /// 只排一次。
@@ -59,8 +62,8 @@ ModalRoute<dynamic>? _museSubsRoute;
 void museCloseSubsSheet() {
   final r = _museSubsRoute;
   _museSubsRoute = null;
+  _museSubsOpening = false;
   if (r != null && r.isActive) r.navigator?.removeRoute(r);
-  museSubsSheetOpen = false;
 }
 
 /// 「订阅」现在在哪里打开：就地打开订阅弹层（首页流量 / 到期卡、设置搜索「订阅」）。
@@ -69,11 +72,11 @@ Future<void> museOpenSubscriptions(BuildContext context, WidgetRef ref) => museS
 /// The sheet (phone) or the panel under the title (wide window).
 Future<void> museShowSubsSheet(BuildContext context, {GlobalKey? anchor}) async {
   if (museSubsSheetOpen) return;
-  museSubsSheetOpen = true;
+  _museSubsOpening = true;
   try {
     await _showSubsSheet(context, anchor: anchor);
   } finally {
-    museSubsSheetOpen = false;
+    _museSubsOpening = false;
   }
 }
 
@@ -92,6 +95,7 @@ Future<void> _showSubsSheet(BuildContext context, {GlobalKey? anchor}) {
       constraints: BoxConstraints(maxHeight: h * 0.85),
       builder: (c) {
         _museSubsRoute = ModalRoute.of(c);
+        _museSubsOpening = false;
         return const MuseSubsPanel();
       },
     );
@@ -105,6 +109,7 @@ Future<void> _showSubsSheet(BuildContext context, {GlobalKey? anchor}) {
     barrierColor: Colors.black.withValues(alpha: 0.12),
     builder: (c) {
       _museSubsRoute = ModalRoute.of(c);
+      _museSubsOpening = false;
       return Dialog(
       alignment: Alignment.topLeft,
       insetPadding: EdgeInsets.only(left: at.dx, top: at.dy, right: MuseSpace.s24, bottom: MuseSpace.s24),
