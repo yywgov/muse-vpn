@@ -290,7 +290,7 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
         child: Padding(
           key: const ValueKey('diagnose_sheet'),
           padding: widget.inSheet
-              ? const EdgeInsets.fromLTRB(MuseSpace.s4 / 24, 0, MuseSpace.s4 / 24, MuseSpace.s16)
+              ? const EdgeInsets.fromLTRB(MuseSpace.s24, 0, MuseSpace.s24, MuseSpace.s16)
               : EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), museScrollEndGap(context, MuseSpace.s16)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -496,7 +496,7 @@ class MuseDiagnoseUnlockBlock extends ConsumerWidget {
         else
           for (final sv in museServices)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: MuseSpace.s4 / 2),
+              padding: const EdgeInsets.symmetric(vertical: MuseSpace.s4),
               child: Row(
                 children: [
                   SizedBox(width: MuseSize.labelColumnWide + MuseIconSize.small + MuseSpace.s12, child: Text(sv.name, style: MuseType.body(context).copyWith(color: mt.text2))),

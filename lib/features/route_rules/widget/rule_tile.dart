@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/muse/data/per_app_bypass.dart';
+import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/route_rules/widget/setting_detail_chips.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -117,7 +118,7 @@ class RuleTile extends HookConsumerWidget {
             if (museBypassedNote(museBypassedPackages(rule.packageNames, ref.watch(musePerAppStateProvider).valueOrNull ?? (mode: null, active: const <String>{}))) case final note?)
               Padding(
                 key: const ValueKey('rule_bypassed_note'),
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s4),
                 child: Text(note, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
               ),
             SettingDetailChips<MapEntry>(
