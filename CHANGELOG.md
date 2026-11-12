@@ -4,6 +4,12 @@
 
 穿云各版本的改动（新在前）。完整说明见 [Releases](https://github.com/yywgov/muse-vpn/releases)。
 
+### 1.20.5 - 2026-11-12
+
+- 兼容内核引擎由 mihomo v1.19.33 升级到上游最新稳定版 v1.19.34（只升级 muse-core `mihomo/` 模块的依赖，`go 1.26.10` 不变；Windows / Android 的兼容内核由客户端 CI 从 `muse.compat.ref` 构建，构建标签不变）。上游这一版没有配置格式上的破坏性变更：分享链接 `type=httpupgrade`（vless / vmess / trojan）改为 `network: ws` + `v2ray-http-upgrade`，与 sing-box JSON → mihomo 映射的结果一致（此前这类链接在兼容内核上没有按 HTTPUpgrade 传输处理）；tfo-go 在 Go 1.26.9+ 上失效的修复（本项目用 Go 1.26.10）；HTTP 代理 CONNECT 响应后紧跟的数据不再丢；SSH 写错误时关闭连接；sing-tun 0.4.29 修正 TUN 自动路由规则。新增的 Snell v6、Shadowsocks 多用户入站等对客户端无影响；.mrs 规则集与规则提供者代码未改
+- `muse.compat.ref` 66d82b1 → c456a83（muse 分支，chuanyun.25 之后只改兼容内核）：同时带上此前未进入兼容内核的 muse.24 mihomo 改动——测速失败原因（refused / dns / handshake / timeout）与「自动最快」限定地区（`muse-auto-filter`）
+- 「设置 › 内核与资源 › 内核版本」中兼容内核显示为「兼容内核 chuanyun.25 · 引擎 1.19.34」（`museCompatDisplay`；原来只显示 1.19.33），与标准内核「内核 chuanyun.25」命名一致；标准内核不变（5.0.0-chuanyun.25）
+
 ### 1.20.4 - 2026-11-12
 
 - 内核 5.0.0-chuanyun.25（内核版本名由 muse 改为 chuanyun，此前为 5.0.0-muse.N；仓库 yywgov/muse-core、分支 muse、release 产物名不变；muse-core 只改生成配置 `v2/config`，sing-box 本身不变）：远程 DNS 组（选中服务器 + tcp://1.1.1.1，都经节点）由顺序改为 sing-box 标准 `mode: parallel`——两台同时问，先回来的有记录答案即用，都为空才用空答案；HTTPS（type 65）、AAAA、NXDOMAIN 这类空答案首查从 2 个经节点往返降到 1 个。分组的接受规则（空答案只作后备、ignore_ranges）不变，直连组仍为顺序

@@ -761,7 +761,7 @@ void main() {
     final deps = _src('dependencies.properties');
     expect(deps, contains('muse.core.version=5.0.0-chuanyun.25'));
     expect(museCoreRelease, '5.0.0-chuanyun.25');
-    expect(deps, contains('muse.compat.ref=66d82b1502a3b735643faf0e8102aa95f217dd34'));
+    expect(deps, contains('muse.compat.ref=c456a830a321c60efcb53ffd18319177fc7f5513')); // 1.20.5: engine 1.19.34 (66d82b1 before)
     // 1.20.4: release names chuanyun.N (muse.N before) — both parse
     expect(museCoreReleaseNumber(RegExp(r'muse\.core\.version=(\S+)').firstMatch(deps)!.group(1)!), greaterThan(22));
   });

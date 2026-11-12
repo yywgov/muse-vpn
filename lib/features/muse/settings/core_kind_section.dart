@@ -21,7 +21,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 String museCoreKindVersion(MuseCoreKind kind) => switch (kind) {
   // 1.20.4: 「内核 chuanyun.25」
   MuseCoreKind.standard => museCoreDisplay(),
-  MuseCoreKind.compat => museCompatEngineVersion,
+  // 1.20.5: 「兼容内核 chuanyun.25 · 引擎 1.19.34」
+  MuseCoreKind.compat => museCompatDisplay(),
 };
 
 class MuseCoreKindSection extends ConsumerWidget {

@@ -153,7 +153,7 @@ void main() {
 
     test('versions: 标准内核 = the release in dependencies.properties, 兼容内核 = the pinned engine', () {
       expect(museCoreKindVersion(MuseCoreKind.standard), museCoreDisplay()); // 1.20.4: 「内核 chuanyun.25」
-      expect(museCoreKindVersion(MuseCoreKind.compat), museCompatEngineVersion);
+      expect(museCoreKindVersion(MuseCoreKind.compat), museCompatDisplay()); // 1.20.5: 「兼容内核 chuanyun.25 · 引擎 1.19.34」
     });
 
     test('settings search finds 内核', () {
@@ -184,7 +184,7 @@ void main() {
       expect(toasts.shown, ['下次连接时使用兼容内核']);
       expect(dialogs, isEmpty);
       expect(find.text('兼容内核'), findsOneWidget);
-      expect(find.text(museCompatEngineVersion), findsOneWidget, reason: 'Android runs the chosen core from the next connect');
+      expect(find.text(museCompatDisplay()), findsOneWidget, reason: 'Android runs the chosen core from the next connect');
     });
 
     testWidgets('connected: nothing is saved, asks to disconnect first', (t) async {

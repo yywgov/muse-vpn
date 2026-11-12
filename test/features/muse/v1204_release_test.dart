@@ -30,8 +30,9 @@ T Function<T>(ProviderListenable<T>) _reader(Map<ProviderListenable<Object?>, Ob
 void main() {
   group('版本 1.20.4', () {
     test('pubspec、更新说明、CHANGELOG.md', () {
-      expect(_src('pubspec.yaml'), contains('version: 1.20.4+217'));
-      expect(museChangelog.keys.first, '1.20.4');
+      // 1.20.5 起 pubspec 与最新一条是 1.20.5（v1205_release_test）；1.20.4 的条目保留
+      expect(_src('pubspec.yaml'), contains(RegExp(r'version: 1\.20\.\d+\+2\d\d')));
+      expect(museChangelog.keys, contains('1.20.4'));
       final lines = museChangelog['1.20.4']!;
       expect(lines, hasLength(3));
       final all = lines.join();
@@ -48,10 +49,10 @@ void main() {
   });
 
   group('内核版本引用', () {
-    test('dependencies.properties = chuanyun.25，兼容内核提交不变', () {
+    test('dependencies.properties = chuanyun.25（兼容内核提交 1.20.5 起见 v1205_release_test）', () {
       final props = _src('dependencies.properties');
       expect(RegExp(r'^muse\.core\.version=(\S+)$', multiLine: true).firstMatch(props)?.group(1), '5.0.0-chuanyun.25');
-      expect(RegExp(r'^muse\.compat\.ref=(\S+)$', multiLine: true).firstMatch(props)?.group(1), '66d82b1502a3b735643faf0e8102aa95f217dd34');
+      expect(RegExp(r'^muse\.compat\.ref=([0-9a-f]{40})$', multiLine: true).firstMatch(props)?.group(1), isNotNull);
       // every non-comment line is still key=value (the Makefile and CI read this file)
       for (final line in props.split('\n').where((l) => l.trim().isNotEmpty && !l.startsWith('#'))) {
         expect(line, matches(RegExp(r'^[a-z.]+=\S+$')), reason: line);

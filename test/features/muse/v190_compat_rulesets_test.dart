@@ -91,6 +91,7 @@ void main() {
     final ref = RegExp(r'^muse\.compat\.ref=([0-9a-f]{40})$', multiLine: true)
         .firstMatch(File('dependencies.properties').readAsStringSync())
         ?.group(1);
-    expect(ref, '66d82b1502a3b735643faf0e8102aa95f217dd34'); // 1.11.0: muse.23 (muse.22 + slimmer standard core)
+    // 1.11.0–1.20.4: 66d82b1 (muse.23); 1.20.5: c456a83 (muse branch after chuanyun.25, engine 1.19.34) keeps it
+    expect(ref, 'c456a830a321c60efcb53ffd18319177fc7f5513');
   });
 }

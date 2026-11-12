@@ -28,8 +28,21 @@ enum MuseCoreKind {
 /// Preference key of the choice (device-local).
 const museCoreKindPrefKey = 'muse_core_kind';
 
-/// Engine version of 兼容内核 (built from the core repository's rel-1.7.0 source, pinned there).
-const museCompatEngineVersion = '1.19.33';
+/// Engine version of 兼容内核 (built by the client CI from the core repository's commit pinned in
+/// dependencies.properties `muse.compat.ref`; the engine version is pinned there). 1.20.5: 1.19.34.
+const museCompatEngineVersion = '1.19.34';
+
+/// 1.20.5: the core release line 兼容内核 is built from — `muse.compat.ref` is on the muse branch
+/// after `v5.0.0-chuanyun.25` and differs from it only in the compatible core (engine 1.19.34).
+const museCompatRelease = '5.0.0-chuanyun.25';
+
+/// 1.20.5: how 设置 › 内核与资源 › 内核版本 shows 兼容内核, named like the standard core
+/// (「内核 chuanyun.25」): 「兼容内核 chuanyun.25 · 引擎 1.19.34」.
+String museCompatDisplay({String release = museCompatRelease, String engine = museCompatEngineVersion}) {
+  final i = release.lastIndexOf('-');
+  final short = i < 0 || i == release.length - 1 ? release : release.substring(i + 1);
+  return '兼容内核 $short · 引擎 $engine';
+}
 
 /// The core this process runs with. Windows reads it once when the app starts (the core library
 /// is loaded once per process); Android reads the preference again at every connect.
