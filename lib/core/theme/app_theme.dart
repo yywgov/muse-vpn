@@ -120,6 +120,8 @@ class AppTheme {
         elevation: 0,
         foregroundColor: s.onSurface,
       ),
+      // 1.21.0 V5：文字按钮 / 链接用主题色的文字色调（≥ 4.5:1），填充仍是主题色原值
+      textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: s.accentText)),
       cardTheme: CardThemeData(
         color: card,
         elevation: 0,

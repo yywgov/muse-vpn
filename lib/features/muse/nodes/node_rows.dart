@@ -274,8 +274,8 @@ class MuseNodeRow extends StatelessWidget {
     );
     final delayText = view.text;
     final Color delayColor = switch (view.kind) {
-      MuseDelayKind.live => MuseColors.delay(context, view.delay),
-      MuseDelayKind.timeout => MusePalette.red,
+      MuseDelayKind.live => MuseColors.delayText(context, view.delay), // 1.21.0 V3：字色
+      MuseDelayKind.timeout => Theme.of(context).colorScheme.errorText,
       // 1.5.0: untested / cached delays in the secondary grey (tertiary is for icons only)
       _ => mt.text2,
     };
@@ -577,8 +577,8 @@ class MuseNodeCard extends StatelessWidget {
       reason: proxy.urlTestError,
     );
     final delayColor = switch (view.kind) {
-      MuseDelayKind.live => MuseColors.delay(context, view.delay),
-      MuseDelayKind.timeout => MusePalette.red,
+      MuseDelayKind.live => MuseColors.delayText(context, view.delay), // 1.21.0 V3：字色
+      MuseDelayKind.timeout => Theme.of(context).colorScheme.errorText,
       _ => mt.text2,
     };
     final parts = museDelayParts(view);

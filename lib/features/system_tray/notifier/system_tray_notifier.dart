@@ -156,14 +156,17 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
     switch (status) {
       case Connected():
         return isWindows ? images.trayIconConnectedIco : images.trayIconConnectedPng.path;
+      // 1.21.0 I6：连接中单独一张（字形 + 琥珀色半圆角标）；断开中仍用灰色
       case Connecting():
+        return isWindows ? museTrayConnectingIco : museTrayConnectingPng;
       case Disconnecting():
         return isWindows ? images.trayIconDisconnectedIco : images.trayIconDisconnectedPng.path;
+      // 未连接只有字形：深色用浅色字形，浅色用景泰蓝字形（两个平台一致）
       case Disconnected():
         return isWindows
             ? isDarkMode
-                  ? images.trayIconIco
-                  : images.trayIconDarkIco
+                  ? images.trayIconDarkIco
+                  : images.trayIconIco
             : isDarkMode
             ? images.trayIconDarkPng.path
             : images.trayIconPng.path;
@@ -550,6 +553,8 @@ List<MuseTrayItem> museTrayMenuSpec(
 /// (connected, but the post-connect check found no internet through the node).
 const museTrayWarningIco = 'assets/images/tray_icon_warning.ico';
 const museTrayWarningPng = 'assets/images/tray_icon_warning.png';
+const museTrayConnectingIco = 'assets/images/tray_icon_connecting.ico';
+const museTrayConnectingPng = 'assets/images/tray_icon_connecting.png';
 
 bool museTrayWarning(ConnectionStatus connection, MuseReach reach) => connection is Connected && reach == MuseReach.failed;
 

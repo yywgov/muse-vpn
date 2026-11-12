@@ -63,6 +63,35 @@ const museStatusYellow = Color(0xFFFFA631);
 const museStatusRed = Color(0xFFFF461F);
 const museStatusGrey = Color(0xFF758A99);
 
+// 1.21.0 V3：状态字色（浅 / 深），对页面与卡片实测都 ≥ 4.5:1；灯色仍是上面四个原值。
+const museTextGreenLight = Color(0xFF0B7A3A);
+const museTextAmberLight = Color(0xFF965800);
+const museTextRedLight = Color(0xFFC0341D);
+const museTextGreyLight = Color(0xFF5C6877);
+const museTextGreenDark = Color(0xFF4ADE80);
+const museTextAmberDark = Color(0xFFFFB547);
+const museTextRedDark = Color(0xFFFF7A5C);
+const museTextGreyDark = Color(0xFF8C97A6);
+
+/// 1.21.0 V5：文字要读得清的底色（浅：白卡片、页面渐变最深的顶部；深：页面底、卡片、内嵌块）。
+const museLightTextBacks = [Color(0xFFFFFFFF), Color(0xFFE2EAFC), Color(0xFFF1F4F9)];
+const museDarkTextBacks = [Color(0xFF0B1222), Color(0xFF17213B), Color(0xFF1F2B4A), Color(0xFF000000), Color(0xFF111318)];
+
+/// 1.21.0 V5：[c] 同色相、同彩度，只调明度到对 [backs] 每个底色都 ≥ [min]（浅底压暗、深底提亮）。
+Color museReadableText(Color c, List<Color> backs, {double min = 4.5}) {
+  bool ok(Color x) => backs.every((b) => museContrast(x, b) >= min);
+  if (ok(c)) return c;
+  final h = Hct.fromInt(c.toARGB32());
+  final darkBacks = backs.every((b) => b.computeLuminance() < 0.2);
+  for (var i = 1; i <= 100; i++) {
+    final t = darkBacks ? h.tone + i : h.tone - i;
+    if (t < 0 || t > 100) break;
+    final x = Color(Hct.from(h.hue, h.chroma, t).toInt());
+    if (ok(x)) return x;
+  }
+  return darkBacks ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
+}
+
 /// Surface tones of the dark theme (page / card / block / inset).
 abstract final class MuseTone {
   static const darkPage = 6.0;
@@ -260,6 +289,16 @@ extension MuseSchemeStatus on ColorScheme {
   Color get idle => _dark ? Color(_idle.get(70)) : museStatusGrey;
   Color get secondSeries => primary.withValues(alpha: 0.45);
   Color get modalScrim => scrim.withValues(alpha: 0.32);
+
+  /// 1.21.0 V5：主题色作文字 / 小图标时用（分组标题、文字按钮、链接）。主题色原值（[primary]）只做填充、
+  /// 轨道、选中描边与地图；文字色同色相调明度到对页面、卡片都 ≥ 4.5:1（浅色压暗，深色提亮），够了就原样。
+  Color get accentText => museReadableText(primary, _dark ? museDarkTextBacks : museLightTextBacks);
+
+  /// 1.21.0 V3：状态「字色」（延迟数字、诊断文字）。灯色（点、条、地图）仍用 [museStatusGreen] 等原值。
+  Color get successText => _dark ? museTextGreenDark : museTextGreenLight;
+  Color get warningText => _dark ? museTextAmberDark : museTextAmberLight;
+  Color get errorText => _dark ? museTextRedDark : museTextRedLight;
+  Color get idleText => _dark ? museTextGreyDark : museTextGreyLight;
 
   /// Delay colour: ≤ 600 ms green, slower orange, timeout / failure red (null = not tested).
   Color? delayColor(int? ms) {

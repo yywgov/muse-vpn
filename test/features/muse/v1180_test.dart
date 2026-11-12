@@ -236,9 +236,9 @@ void main() {
     });
   });
 
-  // 1.20.0 方向 A：连接钮改为 56 圆形中性钮，1.18 的圆 ↔ 圆角方形形变随实心主色按钮一起去掉（断言随改）：
-  // 各状态都是圆，只剩 ▶ / ❚❚ 交叉淡入；一次性、结束后无帧，关闭档直接终态。
-  group('P2 连接按钮（1.20.0：始终圆形）', () {
+  // 1.20.0 方向 A 曾把形变去掉（始终圆形）；1.21.0 M3 恢复同一形状形变：未连接圆、已连接圆角方形，
+  // 中途是两者的插值；▶ / ❚❚ 交叉淡入；一次性、结束后无帧，关闭档直接终态（断言随改）。
+  group('P2 连接按钮（1.21.0：圆 ↔ 圆角方形）', () {
     ShapeBorder shape(WidgetTester tester) =>
         (tester.widget<DecoratedBox>(find.byKey(const ValueKey('home_connect_shape'))).decoration as ShapeDecoration)
             .shape;
@@ -246,26 +246,35 @@ void main() {
     Widget button(bool on, MuseMotionLevel level) =>
         _app(MuseStartButton(key: const ValueKey('b'), on: on, onTap: () {}, semanticLabel: '连接'), level: level);
 
-    testWidgets('标准：开 / 关都是圆，内容独立交叉淡入，结束后无帧', (tester) async {
+    testWidgets('标准：关是圆、开是圆角方形，中途形变；内容独立交叉淡入，结束后无帧', (tester) async {
       await tester.pumpWidget(button(false, MuseMotionLevel.standard));
       expect(shape(tester), isA<CircleBorder>());
       expect(tester.getSize(find.byKey(const ValueKey('home_connect_shape'))), const Size.square(MuseHomeA.button));
       await tester.pumpWidget(button(true, MuseMotionLevel.standard));
       await tester.pump(const Duration(milliseconds: 60));
-      expect(shape(tester), isA<CircleBorder>());
+      // mid-way: the corner radius is between the circle's (half the side) and the square's
+      final mid = (shape(tester) as RoundedSuperellipseBorder).borderRadius as BorderRadius;
+      expect(mid.topLeft.x, inExclusiveRange(MuseHomeA.button * MuseStartButton.squareRadius, MuseHomeA.button / 2));
       // the glyph cross-fades on its own (both icons present mid-way)
       expect(find.byIcon(Icons.pause_outlined), findsOneWidget);
       expect(find.byIcon(Icons.play_arrow_outlined), findsOneWidget);
       await tester.pumpAndSettle();
       expect(tester.binding.hasScheduledFrame, isFalse);
       expect(find.byIcon(Icons.play_arrow_outlined), findsNothing);
+      final square = shape(tester) as RoundedSuperellipseBorder;
+      expect((square.borderRadius as BorderRadius).topLeft.x, closeTo(MuseHomeA.button * MuseStartButton.squareRadius, 1e-9));
+      // and back to the circle
+      await tester.pumpWidget(button(false, MuseMotionLevel.standard));
+      await tester.pumpAndSettle();
+      expect(shape(tester), isA<CircleBorder>());
+      expect(tester.binding.hasScheduledFrame, isFalse);
     });
 
     testWidgets('关闭档：直接终态，无动画帧', (tester) async {
       await tester.pumpWidget(button(false, MuseMotionLevel.off));
       await tester.pumpWidget(button(true, MuseMotionLevel.off));
       await tester.pump();
-      expect(shape(tester), isA<CircleBorder>());
+      expect(shape(tester), isA<RoundedSuperellipseBorder>());
       expect(find.byIcon(Icons.play_arrow_outlined), findsNothing);
       expect(tester.binding.hasScheduledFrame, isFalse);
     });

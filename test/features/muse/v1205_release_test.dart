@@ -30,9 +30,10 @@ const _oldRef = '66d82b1502a3b735643faf0e8102aa95f217dd34';
 void main() {
   group('版本 1.20.5', () {
     test('pubspec、更新说明、CHANGELOG.md', () {
-      expect(_src('pubspec.yaml'), contains('version: 1.20.5+218'));
-      expect(museChangelog.keys.first, '1.20.5');
-      expect(museChangelog.keys.elementAt(1), '1.20.4');
+      // 1.21.0 起 pubspec 与最新一条更新说明是 1.21.0（v1210_test）；1.20.5 的条目保留在它后面
+      expect(_src('pubspec.yaml'), contains(RegExp(r'version: 1\.2\d\.\d+\+2\d\d')));
+      final keys = museChangelog.keys.toList();
+      expect(keys.indexOf('1.20.4'), keys.indexOf('1.20.5') + 1);
       final lines = museChangelog['1.20.5']!;
       expect(lines, hasLength(4));
       final all = lines.join();

@@ -1,7 +1,7 @@
 name: hiddify
 description: 穿云 - Android proxy client (fork of Hiddify, GPLv3).
 publish_to: "none"
-version: 1.20.5+218
+version: 1.21.0+219
 
 environment:
   sdk: ^3.10.4
@@ -161,6 +161,8 @@ flutter:
     - assets/images/tray_icon_dark.png
     - assets/images/tray_icon_connected.ico
     - assets/images/tray_icon_connected.png
+    - assets/images/tray_icon_connecting.ico
+    - assets/images/tray_icon_connecting.png
     - assets/images/tray_icon_disconnected.ico
     - assets/images/tray_icon_disconnected.png
     - assets/images/tray_icon_warning.ico
@@ -201,12 +203,14 @@ flutter_gen:
     flutter_svg: true
 
 flutter_native_splash:
-  color: "#ffffff"
-  image: assets/images/source/ic_launcher_splash.png
+  # 穿云 1.21.0 M13：底色跟随深浅色（浅 = 页面底 lightBgBottom，深 = darkBgBottom），源图是穿云圆形图标
+  color: "#F6F8FC"
+  color_dark: "#0B1222"
+  image: assets/images/source/splash.png
   android_gravity: center
   android_12:
-    color: "#ffffff"
-    image: assets/images/source/ic_launcher_foreground.png
+    color: "#F6F8FC"
+    color_dark: "#0B1222"
 
 ffigen:
   name: "HiddifyCoreNativeLibrary"

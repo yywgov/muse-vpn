@@ -6,7 +6,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:hiddify/features/muse/data/port_override.dart';
 import 'package:hiddify/features/muse/home/node_memory.dart' show museNodeSwitchingProvider;
@@ -843,8 +843,10 @@ class _ModePill extends ConsumerWidget {
 
 /// The hero card's start button.
 /// 1.20.0 方向 A: a 56 neutral circle (the card's inner tone) — ▶ in the 已连接 colour (the one accent
-/// while disconnected), ❚❚ in the text colour; the glyph cross-fades. The 1.18 circle ↔ rounded-square
-/// morph is gone with the filled accent button (方向 A keeps one round shape).
+/// while disconnected), ❚❚ in the text colour; the glyph cross-fades.
+/// 1.21.0 M3：恢复同一形状的形变——留白风格未连接是圆、已连接变圆角方形（[MuseStartButton.morph]），
+/// 底色 / 字色随同一进度过渡（数字风格药丸「连接」实心主色 ↔ 「断开」中性底不再瞬切）；
+/// 一次性，精简档 ×0.6、关闭档直接终态。
 class MuseStartButton extends StatefulWidget {
   const MuseStartButton({
     super.key,
@@ -864,6 +866,12 @@ class MuseStartButton extends StatefulWidget {
   final bool on;
   final VoidCallback? onTap;
   final String semanticLabel;
+
+  /// 1.21.0 M3：圆 ↔ 圆角方形形变时长。
+  static const morph = Duration(milliseconds: 300);
+
+  /// 已连接时圆角方形的圆角（按钮边长的比例）。
+  static const squareRadius = 0.3;
 
   @override
   State<MuseStartButton> createState() => MuseStartButtonState();
@@ -893,11 +901,9 @@ class MuseStartButtonState extends State<MuseStartButton> {
     final on = widget.on;
     final onTap = widget.onTap;
     final mt = MuseTheme.of(context);
-    final scheme = Theme.of(context).colorScheme;
     final level = museMotionLevel(context);
     final canPress = onTap != null && level != MuseMotionLevel.off;
     final scale = canPress && _pressed ? MuseMotion.pressScale : 1.0;
-    final glyph = on ? mt.text1 : museLinkedColor(scheme, mt.inner);
     return Semantics(
       button: true,
       toggled: on,
@@ -914,22 +920,34 @@ class MuseStartButtonState extends State<MuseStartButton> {
           scale: scale,
           duration: museScaleDuration(level, _pressed ? MuseMotion.pressIn : MuseMotion.pressOut),
           curve: museCurve(context),
-          child: museMinTapTarget(_face(context, mt, glyph, on, onTap), widget.look.button == MuseHomeButton.pill ? MuseSize.minTap : (widget.size ?? widget.look.buttonSize)),
+          child: museMinTapTarget(
+            TweenAnimationBuilder<double>(
+              tween: Tween(end: on ? 1.0 : 0.0),
+              duration: museScaleDuration(level, MuseStartButton.morph),
+              curve: museCurve(context),
+              builder: (context, t, _) => _face(context, mt, t, on, onTap),
+            ),
+            widget.look.button == MuseHomeButton.pill ? MuseSize.minTap : (widget.size ?? widget.look.buttonSize)),
         ),
       ),
     );
   }
 
-  Widget _face(BuildContext context, MuseTheme mt, Color glyph, bool on, VoidCallback? onTap) {
+  /// [t]：0 = 未连接，1 = 已连接（形变 / 颜色过渡的进度）；端点取精确值，不留插值误差。
+  Widget _face(BuildContext context, MuseTheme mt, double t, bool on, VoidCallback? onTap) {
     final look = widget.look;
     final size = widget.size ?? look.buttonSize;
     final scheme = Theme.of(context).colorScheme;
     final pill = look.button == MuseHomeButton.pill;
+    Color mix(Color off, Color onC) => t <= 0 ? off : (t >= 1 ? onC : Color.lerp(off, onC, t)!);
+    final glyph = mix(museLinkedColor(scheme, mt.inner), mt.text1);
     // 数字：未连接时「连接」是唯一的实心主色按钮；已连接 / 连接中是中性底的次按钮
-    final fill = pill && !on ? scheme.primary : mt.inner;
-    final fg = pill && !on ? scheme.onPrimary : glyph;
+    final fill = pill ? mix(scheme.primary, mt.inner) : mt.inner;
+    final fg = pill ? mix(scheme.onPrimary, glyph) : glyph;
+    // 圆角从半边长（≈ 圆）收到 30%；t = 0 时就是圆
     final ShapeBorder shape = switch (look.button) {
-      MuseHomeButton.circle => const CircleBorder(),
+      MuseHomeButton.circle =>
+        t <= 0 ? const CircleBorder() : MuseShape.of(lerpDouble(size / 2, size * MuseStartButton.squareRadius, t.clamp(0.0, 1.0))!),
       MuseHomeButton.square => MuseShape.of(look.radiusControl + 2, side: BorderSide(color: mt.hairline)),
       MuseHomeButton.pill => MuseShape.full,
     };
@@ -1710,6 +1728,9 @@ class MuseStackedBarsPainter extends CustomPainter {
       old.values != values || old.rest != rest || old.segments.toString() != segments.toString();
 }
 
+/// 1.21.0 V14：网速迷你图至少要这么多个采样才画折线。
+const museSparkMinSamples = 3;
+
 class _SparklinePainter extends CustomPainter {
   _SparklinePainter(this.values, this.color, this.baseline);
 
@@ -1720,7 +1741,8 @@ class _SparklinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final y0 = size.height - 1;
-    if (values.length < 2) {
+    // 1.21.0 V14：不到 [museSparkMinSamples] 个采样只画基线（两个点只会画出一条没信息的斜线）
+    if (values.length < museSparkMinSamples) {
       canvas.drawLine(
         Offset(0, y0),
         Offset(size.width, y0),

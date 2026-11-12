@@ -29,14 +29,29 @@ import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 
 /// 弧线图动效时长。
 abstract final class MuseRouteMotion {
-  /// 弧线画出
-  static const draw = Duration(milliseconds: 1100);
+  /// 弧线画出（1.21.0 方向 B：1100 → 900ms，彗星头随线头走；画完不再跑光点）
+  static const draw = Duration(milliseconds: 900);
 
-  /// 光点每跑一趟
-  static const lap = Duration(milliseconds: 900);
+  /// 1.21.0：到达终点一次性扩散涟漪 + 定位环落定（连上总长 draw + land ≈ 1.4s，之后零出帧）
+  static const land = Duration(milliseconds: 480);
 
-  /// 光点趟数（之后停）。1.19.1：2 → 1（连接后动效总长约 2.9s → 2.0s）
-  static const laps = 1;
+  /// 1.21.0：换节点时旧弧变暗后淡出
+  static const swapOut = Duration(milliseconds: 150);
+
+  /// 1.21.0：换节点时新弧重画
+  static const redraw = Duration(milliseconds: 450);
+
+  /// 彗星头占弧长的比例
+  static const comet = 0.18;
+
+  /// 涟漪半径（起 → 止）与起始透明度
+  static const rippleFrom = 4.0;
+  static const rippleTo = 22.0;
+  static const rippleAlpha = 0.55;
+
+  /// 终点虚线定位环：半径、段数
+  static const ringRadius = 7.0;
+  static const ringDashes = 6;
 
   /// 1.20.1：终点滑动、取景、国家高亮共用的时长（三者同步；1.19.1 起终点滑动为 450ms，取景 280、高亮 250）
   static const sync = Duration(milliseconds: 300);
@@ -71,6 +86,22 @@ double museRouteTailAlpha(double arcV) {
   const start = 1 - MuseRouteMotion.tailFade;
   return ((arcV - start) / MuseRouteMotion.tailFade).clamp(0.0, 1.0);
 }
+
+/// 1.21.0：两点间大圆距离（公里）。
+double museGeoDistanceKm(MuseGeoPoint a, MuseGeoPoint b) {
+  const r = 6371.0;
+  double rad(double d) => d * math.pi / 180;
+  final dLat = rad(b.lat - a.lat);
+  final dLon = rad(b.lon - a.lon);
+  final h = math.pow(math.sin(dLat / 2), 2) + math.cos(rad(a.lat)) * math.cos(rad(b.lat)) * math.pow(math.sin(dLon / 2), 2);
+  return 2 * r * math.asin(math.min(1.0, math.sqrt(h)));
+}
+
+/// 1.21.0：弧高按距离分 3 档（近 < 2000 km、中 < 6000 km、远），返回 0 / 1 / 2。
+int museArcLiftTier(double km) => km < 2000 ? 0 : (km < 6000 ? 1 : 2);
+
+/// 各档弧高：弧中点离开弦线的距离 / 弦长。
+const museArcLiftShares = [0.10, 0.16, 0.22];
 
 const museWorldDotsAsset = 'assets/map/world_dots.bin';
 
@@ -248,10 +279,11 @@ class MuseRouteMap extends StatefulWidget {
 
 class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixin {
   late final AnimationController _arc = AnimationController(vsync: this, duration: MuseRouteMotion.draw);
-  late final AnimationController _dot = AnimationController(
-    vsync: this,
-    duration: MuseRouteMotion.lap * MuseRouteMotion.laps,
-  );
+  /// 1.21.0：到达涟漪 + 定位环落定（一次性，只在标准档）
+  late final AnimationController _land = AnimationController(vsync: this, duration: MuseRouteMotion.land);
+
+  /// 1.21.0：换节点时旧弧（画到 [_from]）变暗淡出，完了再从 0 重画到 [_to]
+  late final AnimationController _swap = AnimationController(vsync: this, duration: MuseRouteMotion.swapOut);
   late final AnimationController _slide = AnimationController(vsync: this, duration: MuseRouteMotion.slide);
 
   /// 1.20.1 M5：断开时弧线随取景一起淡出（原来一下子消失）；淡完再清零
@@ -365,7 +397,8 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
   bool get animating =>
       _out.isAnimating ||
       _arc.isAnimating ||
-      _dot.isAnimating ||
+      _land.isAnimating ||
+      _swap.isAnimating ||
       _slide.isAnimating ||
       _tint.isAnimating ||
       _hl.isAnimating ||
@@ -374,8 +407,15 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
   /// 测试用：已连接色的混合程度（0 = 中性，1 = 已连接）。
   double get tint => _tint.value;
 
-  /// 测试用（1.20.1）：此刻的弧线终点（滑动中为插值）。
-  MuseGeoPoint? get endPoint => _current();
+  /// 测试用（1.20.1）：弧线终点（1.21.0 换节点不再滑动：旧弧淡出期间已是新终点）。
+  MuseGeoPoint? get endPoint => _to;
+
+  /// 测试用（1.21.0）：终点（实心点 + 定位环）此刻是否画出（新弧画到尾段之后）。
+  bool get endShown => _swap.value <= 0 && museRouteTailAlpha(_arc.value) > 0;
+
+  /// 测试用（1.21.0）：是否正在淡出旧弧 / 播到达涟漪。
+  bool get swapping => _swap.isAnimating;
+  bool get landing => _land.isAnimating;
 
   /// 测试用（1.20.1）：弧线此刻的整体透明度（断开淡出中 < 1，没有弧线为 0）。
   double get arcOpacity => _arc.value <= 0 ? 0 : 1 - MuseRouteMotion.curve.transform(_out.value);
@@ -414,8 +454,17 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
       }
     });
     _arc.addStatusListener((s) {
-      if (s == AnimationStatus.completed && _level == MuseMotionLevel.standard && widget.connected) {
-        _dot.forward(from: 0);
+      if (s == AnimationStatus.completed && _level == MuseMotionLevel.standard && widget.connected && !_instant) {
+        _land.forward(from: 0);
+      }
+    });
+    _swap.addStatusListener((s) {
+      if (s == AnimationStatus.completed) {
+        _swap.value = 0;
+        _from = _to;
+        if (!widget.connected) return;
+        _arc.duration = MuseRouteMotion.redraw;
+        _arc.forward(from: 0);
       }
     });
   }
@@ -457,8 +506,13 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
     }
     final city = widget.exit.city?.point;
     if (!widget.connected || city == null) {
-      _dot.stop();
-      _dot.value = 0;
+      _land.stop();
+      _land.value = 0;
+      if (_swap.isAnimating) {
+        _swap.stop();
+        _swap.value = 0;
+        _from = _to;
+      }
       final wasShown = old.connected && old.exit.known && _arc.value > 0;
       if (wasShown && !_instant && !widget.connected) {
         // 1.20.1 M5: the arc fades out with the reframe; the end stays where it was meanwhile
@@ -484,39 +538,54 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
       _from = _to = city;
       _reveal();
     } else if (city != _to) {
-      _from = _current();
-      _to = city;
-      _dot.stop();
-      _dot.value = 0;
-      if (_instant) {
-        _from = city;
-        _slide.value = 1;
+      // 1.21.0 方向 B：不再把终点横跨地图滑过去——旧弧变暗淡出 150ms，新弧 450ms 重画，再落地一次。
+      // 同一城市（只换了节点名）坐标不变，走不到这里：只换文字不重画。精简 / 关闭档直接画终态。
+      _land.stop();
+      _land.value = 0;
+      _slide.value = 1;
+      if (_instant || _level != MuseMotionLevel.standard) {
+        _swap.stop();
+        _swap.value = 0;
+        _arc.stop();
+        _from = _to = city;
+        _arc.value = 1;
+      } else if (_swap.isAnimating) {
+        _to = city; // 旧弧照常淡完，新弧画到最新的终点
+      } else if (_arc.value <= 0) {
+        _from = _to = city;
+        _arc.duration = MuseRouteMotion.redraw;
+        _arc.forward(from: 0);
       } else {
-        _slide.duration = museScaleDuration(_level, MuseRouteMotion.slide);
-        _slide.forward(from: 0);
+        _arc.stop();
+        _from = _to;
+        _to = city;
+        _swap.forward(from: 0);
       }
     }
   }
 
   void _reveal() {
-    _dot.value = 0;
+    _land.value = 0;
+    _swap.value = 0;
     _slide.value = 1;
-    switch (_instant ? MuseMotionLevel.off : _level) {
-      case MuseMotionLevel.off:
-        _arc.value = 1;
-      case MuseMotionLevel.reduced:
-        // 精简：整条弧直接淡入
-        _arc.duration = museScaleDuration(_level, MuseMotion.enter);
-        _arc.forward(from: 0);
-      case MuseMotionLevel.standard:
-        _arc.duration = MuseRouteMotion.draw;
-        _arc.forward(from: 0);
+    // 1.21.0：精简档 / 关闭档直接画终态（不画彗星头、不画涟漪）
+    if (_instant || _level != MuseMotionLevel.standard) {
+      _arc.value = 1;
+      return;
     }
+    _arc.duration = MuseRouteMotion.draw;
+    _arc.forward(from: 0);
   }
 
   void _finishAll() {
-    _dot.stop();
-    _dot.value = 0;
+    _land.stop();
+    _land.value = 0;
+    if (_swap.isAnimating) {
+      _swap.stop();
+      _swap.value = 0;
+      _from = _to;
+      _arc.value = widget.connected ? 1 : 0;
+    }
     if (_arc.isAnimating) _arc.value = 1;
     if (_slide.isAnimating) _slide.value = 1;
     if (_tint.isAnimating) _tint.value = widget.connected ? 1 : 0;
@@ -525,18 +594,18 @@ class MuseRouteMapState extends State<MuseRouteMap> with TickerProviderStateMixi
     if (_out.isAnimating) _out.value = 1;
   }
 
+  /// 此刻画弧线的终点：旧弧淡出期间是旧终点 [_from]，其余是 [_to]（1.21.0 起不再滑动）。
   MuseGeoPoint? _current() {
-    final a = _from;
-    final b = _to;
-    if (a == null || b == null) return b;
-    return museSlideLerp(a, b, MuseRouteMotion.curve.transform(_slide.value));
+    if (_swap.value > 0 && _from != null) return _from;
+    return _to;
   }
 
   @override
   void dispose() {
     _out.dispose();
     _arc.dispose();
-    _dot.dispose();
+    _land.dispose();
+    _swap.dispose();
     _slide.dispose();
     _tint.dispose();
     _hl.dispose();
@@ -881,7 +950,7 @@ class _ArcPainter extends CustomPainter {
     this.glow = true,
     this.look,
     this.bg,
-  }) : super(repaint: Listenable.merge([state._arc, state._dot, state._slide, state._tint, state._out]));
+  }) : super(repaint: Listenable.merge([state._arc, state._land, state._swap, state._slide, state._tint, state._out]));
 
   /// 1.20.0: the card's finer look (null = the 1.19 route card)
   final MuseMapLook? look;
@@ -930,9 +999,23 @@ class _ArcPainter extends CustomPainter {
     // 1.20.0：换了中央经线时把整条弧平移到视窗经度区间
     final shift = museWrapLon(pts.first.lon, center: view.center) - pts.first.lon;
     if (shift != 0) pts = [for (final p in pts) MuseGeoPoint(p.lat, p.lon + shift)];
+    // 1.21.0 方向 B：弧高按距离 3 档——屏幕上把弧线中段沿弦线法向（朝上）再抬一点
+    final screen = [for (final p in pts) _p(p, size)];
+    final chord = screen.last - screen.first;
+    final chordLen = chord.distance;
+    if (chordLen > 0) {
+      final tier = museArcLiftTier(museGeoDistanceKm(home, end));
+      var n = Offset(-chord.dy / chordLen, chord.dx / chordLen);
+      if (n.dy > 0) n = -n;
+      final lift = math.min(museArcLiftShares[tier] * chordLen, size.height * 0.18);
+      for (var i = 1; i < screen.length - 1; i++) {
+        final t = i / (screen.length - 1);
+        screen[i] = screen[i] + n * (lift * 4 * t * (1 - t));
+      }
+    }
     final path = Path();
-    for (var i = 0; i < pts.length; i++) {
-      final o = _p(pts[i], size);
+    for (var i = 0; i < screen.length; i++) {
+      final o = screen[i];
       i == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
     }
     final metric = path.computeMetrics().firstOrNull;
@@ -940,30 +1023,63 @@ class _ArcPainter extends CustomPainter {
       canvas.restore();
       return;
     }
+    final swapping = state._swap.value > 0;
     final progress = fade ? 1.0 : MuseMotion.curve.transform(arcV);
-    final alpha = (fade ? arcV : 1.0) * (1 - MuseRouteMotion.curve.transform(state._out.value));
-    final line = Paint()
-      ..color = color.withValues(alpha: 0.9 * alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = look?.arcWidth ?? 2
-      ..strokeCap = StrokeCap.round;
-    if (look?.arcFromNeutral ?? false) {
-      final b = path.getBounds();
-      final hp = _p(pts.first, size);
-      final ep = _p(pts.last, size);
-      if (b.width > 0) {
-        line.shader = ui.Gradient.linear(hp, ep, [homeColor.withValues(alpha: 0.55 * alpha), color.withValues(alpha: alpha)]);
+    // 换节点：旧弧先压暗到 55%，再随 [_swap] 淡出
+    final swapAlpha = swapping ? 0.55 * (1 - state._swap.value) : 1.0;
+    final alpha = (fade ? arcV : 1.0) * (1 - MuseRouteMotion.curve.transform(state._out.value)) * swapAlpha;
+    final core = look?.arcWidth ?? 2.0;
+    Paint layer(double width, double a) {
+      final paint = Paint()
+        ..color = color.withValues(alpha: a * alpha)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..strokeCap = StrokeCap.round;
+      if (look?.arcFromNeutral ?? false) {
+        paint.shader = ui.Gradient.linear(screen.first, screen.last, [
+          homeColor.withValues(alpha: 0.55 * a * alpha),
+          color.withValues(alpha: a * alpha),
+        ]);
+      }
+      return paint;
+    }
+
+    // 三层柔光：宽淡底 + 中层 + 细亮芯（同一条 Path 画三次，不用模糊滤镜）
+    final layers = [layer(core * 4, 0.10), layer(core * 2, 0.22), layer(core, 0.95)];
+    final drawn = metric.extractPath(0, metric.length * progress);
+    final shifts = [-size.width * 360 / view.span, 0.0, size.width * 360 / view.span];
+    // 1.19.2: an arc that runs past the map's east / west edge comes back in on the other side
+    for (final dx in shifts) {
+      final p = dx == 0 ? drawn : drawn.shift(Offset(dx, 0));
+      for (final l in layers) {
+        canvas.drawPath(p, l);
       }
     }
-    final drawn = metric.extractPath(0, metric.length * progress);
-    // 1.19.2: an arc that runs past the map's east / west edge comes back in on the other side
-    for (final dx in [-size.width * 360 / view.span, 0.0, size.width * 360 / view.span]) {
-      canvas.drawPath(dx == 0 ? drawn : drawn.shift(Offset(dx, 0)), line);
+    // 彗星头：画出过程中线头一段由透明到白芯，画完即消失（取代 1.20 的「光点再跑一趟」）
+    if (!fade && !swapping && state._arc.isAnimating && progress > 0 && progress < 1) {
+      final headAt = metric.length * progress;
+      final tailAt = math.max(0.0, headAt - metric.length * MuseRouteMotion.comet);
+      final head = metric.getTangentForOffset(headAt)?.position;
+      final tailP = metric.getTangentForOffset(tailAt)?.position;
+      if (head != null && tailP != null && head != tailP) {
+        final comet = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = core * 1.6
+          ..strokeCap = StrokeCap.round
+          ..shader = ui.Gradient.linear(tailP, head, [
+            color.withValues(alpha: 0),
+            Color.lerp(color, MusePalette.white, 0.7)!.withValues(alpha: alpha),
+          ]);
+        final seg = metric.extractPath(tailAt, headAt);
+        for (final dx in shifts) {
+          canvas.drawPath(dx == 0 ? seg : seg.shift(Offset(dx, 0)), comet);
+        }
+      }
     }
     // 1.19.1：分类线与终点随弧线尾段淡入（精简档整体已在淡入，不再叠加）
     final tail = fade ? alpha : alpha * museRouteTailAlpha(arcV);
-    if (tail > 0 && shares.isNotEmpty) {
-      for (final dx in [-size.width * 360 / view.span, 0.0, size.width * 360 / view.span]) {
+    if (tail > 0 && shares.isNotEmpty && !swapping) {
+      for (final dx in shifts) {
         canvas.save();
         canvas.translate(dx, 0);
         _paintShares(canvas, size, pts, tail);
@@ -974,16 +1090,31 @@ class _ArcPainter extends CustomPainter {
       final e = _p(pts.last, size, wrap: true);
       if (glow) canvas.drawCircle(e, 7, Paint()..color = color.withValues(alpha: 0.18 * tail));
       canvas.drawCircle(e, look?.endR ?? (glow ? 3.5 : 2.5), Paint()..color = color.withValues(alpha: tail));
-    }
-    final d = state._dot;
-    if (d.isAnimating && d.value > 0 && d.value < 1) {
-      final lapT = (d.value * MuseRouteMotion.laps) % 1.0;
-      final tan = metric.getTangentForOffset(metric.length * lapT);
-      if (tan != null) {
-        final x = tan.position.dx % size.width;
-        final pos = Offset(x < 0 ? x + size.width : x, tan.position.dy);
-        canvas.drawCircle(pos, 5, Paint()..color = color.withValues(alpha: 0.25));
-        canvas.drawCircle(pos, 2.5, Paint()..color = Colors.white);
+      final landing = state._land.isAnimating && !swapping;
+      final landT = landing ? state._land.value : 1.0;
+      // 虚线定位环：静止时保持（静态，不转）；落地时从 1.3 倍缩回 1.0
+      final settle = Curves.easeOutCubic.transform((landT / 0.4).clamp(0.0, 1.0));
+      final ringR = MuseRouteMotion.ringRadius * (1 + 0.3 * (1 - settle));
+      final ring = Paint()
+        ..color = color.withValues(alpha: 0.9 * tail * (landing ? settle : 1.0))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+      const step = 2 * math.pi / MuseRouteMotion.ringDashes;
+      for (var i = 0; i < MuseRouteMotion.ringDashes; i++) {
+        canvas.drawArc(Rect.fromCircle(center: e, radius: ringR), i * step - math.pi / 2, step * 0.6, false, ring);
+      }
+      // 到达涟漪：一次性扩散，透明度 0.55 → 0
+      if (landing && landT > 0 && landT < 1) {
+        final k = Curves.easeOutExpo.transform(landT);
+        final r = ui.lerpDouble(MuseRouteMotion.rippleFrom, MuseRouteMotion.rippleTo, k)!;
+        canvas.drawCircle(
+          e,
+          r,
+          Paint()
+            ..color = color.withValues(alpha: MuseRouteMotion.rippleAlpha * (1 - landT) * tail)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
       }
     }
     canvas.restore();
@@ -1395,7 +1526,7 @@ class _EndRingPainter extends CustomPainter {
     required this.view,
     required this.look,
     required this.bg,
-  }) : super(repaint: Listenable.merge([state._arc, state._slide, state._out]));
+  }) : super(repaint: Listenable.merge([state._arc, state._swap, state._slide, state._out]));
 
   final MuseRouteMapState state;
   final MuseGeoPoint home;

@@ -67,6 +67,8 @@ for name, px in [('mdpi', 48), ('hdpi', 72), ('xhdpi', 96), ('xxhdpi', 144), ('x
     icon(px, 'round').save(f'{res}/mipmap-{name}/ic_launcher_round.webp', 'WEBP', lossless=True)
 # pre-Android-12 splash: the round icon, centred by the layer-list
 icon(288, 'round').save(f'{res}/drawable-xxxhdpi/splash.png')
+# 1.21.0 I8：flutter_native_splash 的源图（pubspec 的 image）同一张
+icon(288, 'round').save('assets/images/source/splash.png')
 icon(512, 'square').save('android/app/src/main/ic_launcher-playstore.png')
 print('ok')
 

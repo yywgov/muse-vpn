@@ -34,6 +34,7 @@ Widget _app(Widget child, {MuseMotionLevel level = MuseMotionLevel.standard, boo
 final _dots = MuseWorldDots.parse(File('assets/map/world_dots.bin').readAsBytesSync())!;
 final _tokyo = museResolveExitPlace(nodeName: '日本 东京 01');
 final _la = museResolveExitPlace(nodeName: '🇺🇸 Los Angeles');
+final _tokyo2 = museResolveExitPlace(nodeName: '日本 东京 02'); // 1.21.0：同城另一个节点
 
 Widget _map(MuseMotionLevel level, {required bool connected, required MuseExitPlace exit}) => MaterialApp(
   home: MuseMotionScope(
@@ -206,9 +207,14 @@ void main() {
 
   group('6 / 7 / 8 弧线图', () {
     // 1.20.1：终点滑动与取景、高亮同步，450 → 300ms（v1201_map_test 断言三者同一时长）
-    test('令牌：终点 300ms（1.20.1 起，原 450ms）、光点 1 趟、尾段 15%', () {
+    // 1.21.0 方向 B：光点去掉（彗星头随线头），弧线 900ms + 到达涟漪 480ms；换节点旧弧 150ms 淡出、新弧 450ms 重画
+    test('令牌：取景同步 300ms、弧线 900 + 涟漪 480（约 1.4s）、换节点 150 + 450、尾段 15%', () {
       expect(MuseRouteMotion.slide.inMilliseconds, 300);
-      expect(MuseRouteMotion.laps, 1);
+      expect(MuseRouteMotion.draw.inMilliseconds, 900);
+      expect(MuseRouteMotion.land.inMilliseconds, 480);
+      expect((MuseRouteMotion.draw + MuseRouteMotion.land).inMilliseconds, inInclusiveRange(1300, 1500));
+      expect(MuseRouteMotion.swapOut.inMilliseconds, 150);
+      expect(MuseRouteMotion.redraw.inMilliseconds, 450);
       expect(MuseRouteMotion.tailFade, 0.15);
     });
 
@@ -223,7 +229,7 @@ void main() {
       expect(s, isNot(contains('if (progress >= 1')));
     });
 
-    testWidgets('8 连接：弧线 1100ms + 光点 1 趟 900ms 后停，之后无帧', (t) async {
+    testWidgets('8 连接（1.21.0）：弧线 900ms + 到达涟漪 480ms 后停（约 1.4s），之后无帧', (t) async {
       await t.pumpWidget(_map(MuseMotionLevel.standard, connected: false, exit: _tokyo));
       await t.pump();
       await t.pumpWidget(_map(MuseMotionLevel.standard, connected: true, exit: _tokyo));
@@ -234,26 +240,60 @@ void main() {
         await t.pump(const Duration(milliseconds: 50));
         ms += 50;
       }
-      // 弧线 1100 + 光点一趟 900 = 2000ms（两段之间各有一帧起步）；旧的 2 趟要 2900ms
-      expect(ms, inInclusiveRange(1950, 2150));
+      // 弧线 900 + 涟漪 480 = 1380ms（两段之间各有一帧起步）；1.20 是 2000ms
+      expect(ms, inInclusiveRange(1350, 1500));
       await t.pump();
       expect(_framePending(t), isFalse);
     });
 
-    testWidgets('6 切节点：300ms 内滑完（1.20.1 起，原 450ms）；精简档 ×0.6', (t) async {
-      for (final (level, ms) in [(MuseMotionLevel.standard, 300), (MuseMotionLevel.reduced, 180)]) {
-        await t.pumpWidget(_map(level, connected: true, exit: _tokyo));
-        await t.pumpAndSettle();
-        await t.pumpWidget(_map(level, connected: true, exit: _la));
-        await t.pump(); // 第一帧：Ticker 从这里开始计时
-        await t.pump(Duration(milliseconds: ms - 40));
-        final st = t.state<MuseRouteMapState>(find.byType(MuseRouteMap));
-        expect(st.animating, isTrue, reason: level.name);
+    // 1.21.0：换节点不再滑动终点——旧弧 150ms 淡出、新弧 450ms 重画、再落地 480ms；精简档直接终态
+    testWidgets('6 切节点（1.21.0）：旧弧淡出 → 新弧重画 → 落地，约 1.1s 后停；精简档直接到位', (t) async {
+      await t.pumpWidget(_map(MuseMotionLevel.standard, connected: true, exit: _tokyo));
+      await t.pumpAndSettle();
+      await t.pumpWidget(_map(MuseMotionLevel.standard, connected: true, exit: _la));
+      await t.pump(); // 第一帧：Ticker 从这里开始计时
+      final st = t.state<MuseRouteMapState>(find.byType(MuseRouteMap));
+      await t.pump(const Duration(milliseconds: 100));
+      expect(st.swapping, isTrue);
+      expect(st.endPoint, _la.city!.point);
+      await t.pump(const Duration(milliseconds: 100));
+      expect(st.swapping, isFalse);
+      var ms = 200;
+      while (st.animating && ms < 3000) {
         await t.pump(const Duration(milliseconds: 50));
-        expect(st.animating, isFalse, reason: level.name);
-        expect(_framePending(t), isFalse);
-        await t.pumpWidget(const SizedBox());
+        ms += 50;
       }
+      expect(ms, inInclusiveRange(1050, 1250));
+      expect(_framePending(t), isFalse);
+      await t.pumpWidget(const SizedBox());
+
+      await t.pumpWidget(_map(MuseMotionLevel.reduced, connected: true, exit: _tokyo));
+      await t.pumpAndSettle();
+      await t.pumpWidget(_map(MuseMotionLevel.reduced, connected: true, exit: _la));
+      await t.pump();
+      final r = t.state<MuseRouteMapState>(find.byType(MuseRouteMap));
+      expect(r.swapping, isFalse);
+      expect(r.landing, isFalse);
+      expect(r.arcOpacity, 1);
+      await t.pumpAndSettle();
+      expect(_framePending(t), isFalse);
+    });
+
+    testWidgets('6b 同一城市换节点：只换文字，不重画弧线', (t) async {
+      await t.pumpWidget(_map(MuseMotionLevel.standard, connected: true, exit: _tokyo));
+      await t.pumpAndSettle();
+      await t.pumpWidget(_map(MuseMotionLevel.standard, connected: true, exit: _tokyo2));
+      await t.pump();
+      final st = t.state<MuseRouteMapState>(find.byType(MuseRouteMap));
+      expect(st.animating, isFalse);
+      expect(_framePending(t), isFalse);
+    });
+
+    test('弧高按距离 3 档', () {
+      expect(museArcLiftTier(museGeoDistanceKm(museHomeCity.point, const MuseGeoPoint(37.57, 126.98))), 0); // 首尔
+      expect(museArcLiftTier(museGeoDistanceKm(museHomeCity.point, const MuseGeoPoint(1.35, 103.82))), 1); // 新加坡
+      expect(museArcLiftTier(museGeoDistanceKm(museHomeCity.point, const MuseGeoPoint(52.37, 4.90))), 2); // 阿姆斯特丹
+      expect(museArcLiftShares, [0.10, 0.16, 0.22]);
     });
   });
 

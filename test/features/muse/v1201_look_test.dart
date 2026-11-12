@@ -185,10 +185,10 @@ void main() {
   });
 
   group('B 首页风格：首页', () {
-    testWidgets('默认留白：56 圆形连接钮、没有状态小圆点、下方卡片各自分开', (tester) async {
+    testWidgets('默认留白：56 连接钮（1.21.0：已连接为圆角方形）、没有状态小圆点、下方卡片各自分开', (tester) async {
       await _pump(tester);
       final shape = tester.widget<DecoratedBox>(find.byKey(const ValueKey('home_connect_shape')));
-      expect((shape.decoration as ShapeDecoration).shape, isA<CircleBorder>());
+      expect((shape.decoration as ShapeDecoration).shape, isA<RoundedSuperellipseBorder>());
       expect(tester.getSize(find.byKey(const ValueKey('home_connect_shape'))), const Size.square(MuseHomeA.button));
       expect(find.byKey(const ValueKey('home_status_dot')), findsNothing);
       expect(find.byKey(const ValueKey('home_tiles_rule_1')), findsNothing);

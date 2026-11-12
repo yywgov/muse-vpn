@@ -15,7 +15,7 @@ void main() {
   group('版本 1.20.3', () {
     test('pubspec、更新说明、CHANGELOG.md', () {
       // 1.20.4 起 pubspec 与最新一条更新说明是 1.20.4（v1204_release_test）；1.20.3 的条目保留
-      expect(_src('pubspec.yaml'), contains(RegExp(r'version: 1\.20\.\d+\+2\d\d')));
+      expect(_src('pubspec.yaml'), contains(RegExp(r'version: 1\.2\d\.\d+\+2\d\d'))  /* 1.21.0 起小版本也在变 */);
       expect(museChangelog.keys, contains('1.20.3'));
       final lines = museChangelog['1.20.3']!;
       expect(lines, hasLength(3));

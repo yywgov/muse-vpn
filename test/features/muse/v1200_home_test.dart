@@ -381,7 +381,8 @@ void main() {
       expect((hero.decoration as BoxDecoration).borderRadius, MuseHomeA.cardAll);
       expect(tester.getSize(find.byKey(const ValueKey('home_connect_shape'))), const Size.square(MuseHomeA.button));
       final shape = tester.widget<DecoratedBox>(find.byKey(const ValueKey('home_connect_shape')));
-      expect((shape.decoration as ShapeDecoration).shape, isA<CircleBorder>());
+      // 1.21.0 M3：已连接是圆角方形（未连接是圆）
+      expect((shape.decoration as ShapeDecoration).shape, isA<RoundedSuperellipseBorder>());
       expect(find.byIcon(Icons.pause_outlined), findsOneWidget);
       await _done(tester);
     });

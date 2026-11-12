@@ -121,13 +121,16 @@ void main() {
       expect(_framePending(t), isFalse);
     });
 
-    testWidgets('切节点：终点 300ms 滑到新城市（1.20.1 起与取景同步，原 450ms），结束后不再出帧', (t) async {
+    // 1.21.0 方向 B：不再滑动终点——旧弧 150ms 淡出、新弧 450ms 重画、落地 480ms，结束后不再出帧
+    testWidgets('切节点（1.21.0）：旧弧淡出 → 新弧重画 → 落地，约 1.1s 后不再出帧', (t) async {
       await t.pumpWidget(_app(MuseMotionLevel.standard, connected: true, exit: _tokyo));
       await t.pumpAndSettle();
       await t.pumpWidget(_app(MuseMotionLevel.standard, connected: true, exit: _la));
       await t.pump(const Duration(milliseconds: 200));
       expect(_state(t).animating, isTrue);
-      await t.pump(const Duration(milliseconds: 400));
+      for (var ms = 200; ms < 1300; ms += 50) {
+        await t.pump(const Duration(milliseconds: 50));
+      }
       expect(_state(t).animating, isFalse);
       expect(_framePending(t), isFalse);
       expect(find.text('上海 → 洛杉矶 · 按名称'), findsOneWidget);

@@ -43,6 +43,17 @@ abstract final class MuseColors {
     MuseLatencyLevel.bad => MusePalette.red,
     MuseLatencyLevel.unknown => Theme.of(context).colorScheme.idle,
   };
+
+  /// 1.21.0 V3：延迟「数字」的字色（同一分级，深浅色各一套，≥ 4.5:1）；点 / 条仍用 [delay] 的灯色。
+  static Color delayText(BuildContext context, int delay) {
+    final s = Theme.of(context).colorScheme;
+    return switch (museLatencyLevel(delay)) {
+      MuseLatencyLevel.good => s.successText,
+      MuseLatencyLevel.fair => s.warningText,
+      MuseLatencyLevel.bad => s.errorText,
+      MuseLatencyLevel.unknown => s.idleText,
+    };
+  }
 }
 
 /// A page on the cloud background behind a transparent app bar. [large] = a tab's root page:
@@ -178,10 +189,11 @@ class MuseSection extends HookWidget {
               child: Row(
                 children: [
                   // 1.6.1: section headers in the accent, the way Material 3 lists label groups
+                  // (1.21.0 V5: the accent's text tone, ≥ 4.5:1)
                   Expanded(
                     child: Text(
                       header ?? '',
-                      style: MuseTextLevel.footnote.style(context, color: museBrandOf(context), weight: FontWeight.w600),
+                      style: MuseTextLevel.footnote.style(context, color: Theme.of(context).colorScheme.accentText, weight: FontWeight.w600),
                     ),
                   ),
                   ?headerTrailing,

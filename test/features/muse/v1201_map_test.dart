@@ -198,7 +198,8 @@ void main() {
           final zoom = (math.log(span2 / span)).abs();
           expect((r2 - r).abs(), lessThan(0.25 + r * zoom * 1.1), reason: '$region 第 $f 帧 点半径 $r → $r2（缩放 $zoom）');
           span = span2;
-          if (connected && s.endPoint != null) {
+          // 1.21.0：终点不再滑动——新终点在新弧画到尾段（取景早已到位）时才出现，只查那时
+          if (connected && s.endPoint != null && s.endShown) {
             final e = museProject(s.endPoint!.lat, s.endPoint!.lon, size, view: s.view!);
             expect(e.dy, inInclusiveRange(-1.0, size.height + 1), reason: '$region 第 $f 帧 终点 y=${e.dy}');
           }
