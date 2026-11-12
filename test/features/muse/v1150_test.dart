@@ -92,7 +92,7 @@ void main() {
       expect(d.rule, '域名后缀 .cn');
       expect(d.outbound, '直连');
       expect(d.node, '');
-      expect(museRouteWhy(_conn(rule: 'final', chains: ['select'])).rule, '未命中规则（默认出站）');
+      expect(museRouteWhy(_conn(rule: 'final', chains: ['select'])).rule, '未命中规则（交给默认）');
       expect(museRouteWhy(_conn(rule: 'domain=[ad.example.com] => reject')).summary, contains('已拦截'));
       expect(museRuleText('network=udp port=443 => reject'), '网络类型 udp 且 端口 443');
       expect(museRuleText('!(ip_is_private=true) => route(x)'), '不符合（局域网地址）');
@@ -101,7 +101,7 @@ void main() {
 
     test('兼容内核：RuleSet(payload) / Match', () {
       expect(museRouteWhy(_conn(rule: 'RuleSet(geosite-cn)', chains: ['DIRECT'])).rule, '规则集 geosite-cn');
-      expect(museRouteWhy(_conn(rule: 'Match', chains: ['a', 'Proxy'])).rule, '未命中规则（默认出站）');
+      expect(museRouteWhy(_conn(rule: 'Match', chains: ['a', 'Proxy'])).rule, '未命中规则（交给默认）');
       expect(museRouteWhy(_conn(rule: 'DomainSuffix(google.com)', chains: ['a', 'b', 'c'])).summary, contains('经 b'));
     });
 

@@ -74,7 +74,7 @@ MuseDnsLeakResult museParseDnsLeak(String body, {required bool connected}) {
   if (_isMainlandChina(geo)) {
     return MuseDnsLeakResult(
       verdict: MuseDnsLeakVerdict.leak,
-      text: '境外域名由国内服务器 $where 解析，运营商可能看到你访问的境外网站。可在「设置 › 网络 › 远程 DNS」更换后再测',
+      text: '境外域名由国内服务器 $where 解析，运营商可能看到你访问的境外网站。可在「设置 › 连接与网络 › 网络 › 远程 DNS」更换后再测',
       resolverIp: ip,
       resolverGeo: geo,
     );

@@ -21,6 +21,7 @@ import 'package:hiddify/features/muse/logic/sub_tools.dart';
 import 'package:hiddify/features/muse/nodes/muse_nodes_page.dart';
 import 'package:hiddify/features/muse/nodes/subs_sheet.dart' show museRequestSubsSheet, museSubsSheetPendingProvider;
 import 'package:hiddify/features/muse/settings/per_app_proxy_page.dart';
+import 'package:hiddify/features/muse/traffic/traffic_page.dart';
 import 'package:hiddify/features/profile/details/profile_details_page.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_notifier.dart';
 import 'package:hiddify/features/route_rules/overview/generic_list_page.dart';
@@ -38,6 +39,7 @@ part 'routing_config_notifier.g.dart';
 final branchesScope = <String, FocusScopeNode>{
   'home': FocusScopeNode(),
   'nodes': FocusScopeNode(),
+  'traffic': FocusScopeNode(),
   'settings': FocusScopeNode(),
 };
 
@@ -49,7 +51,8 @@ final loadingConfig = RoutingConfig(
 // 穿云 1.3.0: four tabs, 首页 / 节点 / 订阅 / 设置, on every form factor.
 // 1.20.2：三栏 首页 / 节点 / 设置——订阅并入节点页（标题「订阅名 ▾」打开订阅弹层），订阅子页挂在 /nodes 下，
 // 旧地址 /config（快捷方式、托盘、冒烟脚本、旧深链）重定向到 /nodes 并打开弹层（只开一次）。
-const mobileBranches = ['home', 'nodes', 'settings'];
+// 1.22.0 F1-A：四栏 首页 / 节点 / 流量 / 设置——「流量」= 原 设置 › 活动（连接）+ 设置 › 分流规则（规则）。
+const mobileBranches = ['home', 'nodes', 'traffic', 'settings'];
 
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => mobileBranches[index];
 
@@ -72,23 +75,11 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
     // 1.20.2：原订阅页的子页（订阅详情、路由选项…）挂在 /nodes 下，路由名不变
     final configChildren = <GoRoute>[
                     _slide('profileDetails', 'profile-details/:id', (state) => ProfileDetailsPage(id: state.pathParameters['id']!)),
-                    // 1.20.3：「我的规则」挂回 /settings；旧地址 /nodes/routing-options…（深链、旧书签）跳到新位置
-                    GoRoute(
-                      path: 'routing-options',
-                      redirect: (_, state) => museSettingsRulesLocation(state.uri),
-                      routes: <GoRoute>[
-                        GoRoute(
-                          path: 'rule/:orderId',
-                          redirect: (_, state) => museSettingsRulesLocation(state.uri),
-                          routes: <GoRoute>[
-                            GoRoute(path: 'generic-list/:ruleEnum', redirect: (_, state) => museSettingsRulesLocation(state.uri)),
-                            GoRoute(path: 'package-names', redirect: (_, state) => museSettingsRulesLocation(state.uri)),
-                          ],
-                        ),
-                      ],
-                    ),
+                    // 1.20.3：「我的规则」挂回 /settings；1.22.0：挂在 /traffic 下。旧地址 /nodes/routing-options…（深链、旧书签）跳到新位置
+                    _rulesRedirect(),
     ];
-    // 1.20.3：设置 › 分流规则 ›「我的规则」（原 Hiddify「路由」页）与它的子页，路由名不变
+    // 1.20.3：设置 › 分流规则 ›「我的规则」（原 Hiddify「路由」页）与它的子页，路由名不变。
+    // 1.22.0：挂在 流量 下（/traffic/routing-options…），旧的 /settings/routing-options… 跳过来
     final rulesChildren = <GoRoute>[
                     GoRoute(
                       name: 'routingOptions',
@@ -224,6 +215,32 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                 ),
               ],
             ),
+            // 1.22.0 F1-A：流量（连接 / 规则）
+            StatefulShellBranch(
+              routes: <GoRoute>[
+                GoRoute(
+                  name: museTrafficRoute,
+                  path: museTrafficPath,
+                  builder: (_, state) => FocusScope(
+                    node: branchesScope['traffic'],
+                    child: MuseTrafficPage(
+                      seg: MuseTrafficSeg.fromKey(state.uri.queryParameters['seg']),
+                      tab: MuseActivityTab.fromKey(state.uri.queryParameters['tab']),
+                    ),
+                  ),
+                  routes: <GoRoute>[
+                    ...rulesChildren,
+                    // 1.20.3：分应用代理进了分流规则页；1.22.0：随规则搬到 /traffic/per-app（旧 /settings/per-app 跳过来）
+                    _slide(
+                      'perAppProxy',
+                      'per-app',
+                      (_) => const PerAppProxyPage(),
+                      routes: [_slide('appList', 'app-list', (_) => const AppListPage())],
+                    ),
+                  ],
+                ),
+              ],
+            ),
             StatefulShellBranch(
               routes: <GoRoute>[
                 GoRoute(
@@ -231,29 +248,26 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                   path: '/settings',
                   builder: (_, _) => FocusScope(node: branchesScope['settings'], child: const SettingsPage()),
                   routes: <GoRoute>[
-                    _slide(
-                      'perAppProxy',
-                      'per-app',
-                      (_) => const PerAppProxyPage(),
-                      routes: [_slide('appList', 'app-list', (_) => const AppListPage())],
+                    GoRoute(
+                      path: 'per-app',
+                      redirect: (_, state) => museTrafficSubLocation(state.uri),
+                      routes: [GoRoute(path: 'app-list', redirect: (_, state) => museTrafficSubLocation(state.uri))],
                     ),
                     // 1.2.2: 高级 (a page with this one row) is gone; TLS 分片 opens from 设置 directly
                     _slide('tlsTricks', 'tls-tricks', (_) => const TlsTricksPage()),
                     // 1.8.0: 活动 = 连接 / 日志 / DNS (?tab=); the old 连接 and 日志 locations open its tab
                     // 1.20.3：活动只剩 连接 / 日志 / DNS / 统计；旧的 ?tab=diagnose 跳到 设置 › 诊断
+                    // 1.22.0 F1-A：活动成了 流量 › 连接；这里只剩跳转（路由名不变，旧深链、托盘、冒烟脚本照用）
                     GoRoute(
                       name: museActivityRoute,
                       path: 'activity',
-                      redirect: (_, state) => state.uri.queryParameters['tab'] == 'diagnose' ? museDiagnosePath : null,
-                      pageBuilder: (_, state) => customTransition(
-                        TransitionType.slide,
-                        state.pageKey,
-                        MuseActivityPage(initial: MuseActivityTab.fromKey(state.uri.queryParameters['tab'])),
-                      ),
+                      redirect: (_, state) =>
+                          state.uri.queryParameters['tab'] == 'diagnose' ? museDiagnosePath : museActivityRedirect(state.uri),
                     ),
                     GoRoute(name: 'connections', path: 'connections', redirect: (_, _) => museActivityLocation(MuseActivityTab.connections)),
                     GoRoute(name: 'logs', path: 'logs', redirect: (_, _) => museActivityLocation(MuseActivityTab.logs)),
-                    ...rulesChildren,
+                    // 1.22.0：我的规则搬到 /traffic/routing-options…
+                    _rulesRedirect(),
                     // 1.20.3：诊断升为设置一级；首页健康横幅、出口详情、活动旧 tab 都跳到这里
                     _slide(museDiagnoseRoute, 'diagnose', (state) => MuseDiagnoseHubPage(section: state.uri.queryParameters['section'])),
                     _slide(
@@ -273,8 +287,28 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
   }
 }
 
-/// 1.20.3：旧的 /nodes/routing-options[/…][?routeRule=] → /settings/routing-options[/…]（查询参数保留）。
-String museSettingsRulesLocation(Uri old) {
-  final path = old.path.replaceFirst('/nodes/routing-options', '/settings/routing-options');
+/// 1.20.3：旧的 /nodes/routing-options[/…][?routeRule=] → 我的规则（查询参数保留）。
+/// 1.22.0：我的规则在 /traffic/routing-options[/…]；/settings/routing-options… 也跳过去。
+String museSettingsRulesLocation(Uri old) => museTrafficSubLocation(old);
+
+/// 1.22.0：/settings/… 或 /nodes/… 下搬到流量页的子页（routing-options…、per-app…）→ /traffic/…（查询参数保留）。
+String museTrafficSubLocation(Uri old) {
+  final path = old.path.replaceFirst(RegExp(r'^/(settings|nodes)/'), '$museTrafficPath/');
   return old.hasQuery ? '$path?${old.query}' : path;
 }
+
+/// 旧的 routing-options 子树（只跳转，没有页面）。
+GoRoute _rulesRedirect() => GoRoute(
+  path: 'routing-options',
+  redirect: (_, state) => museTrafficSubLocation(state.uri),
+  routes: <GoRoute>[
+    GoRoute(
+      path: 'rule/:orderId',
+      redirect: (_, state) => museTrafficSubLocation(state.uri),
+      routes: <GoRoute>[
+        GoRoute(path: 'generic-list/:ruleEnum', redirect: (_, state) => museTrafficSubLocation(state.uri)),
+        GoRoute(path: 'package-names', redirect: (_, state) => museTrafficSubLocation(state.uri)),
+      ],
+    ),
+  ],
+);

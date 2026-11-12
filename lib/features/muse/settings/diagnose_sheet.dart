@@ -222,7 +222,7 @@ class _DiagnoseSheetState extends ConsumerState<MuseDiagnoseView> {
           return;
         case MuseDiagAction.testNodes:
           await museRunNodeTest(ref);
-          _toast('已开始测速');
+          _toast('已开始测延迟');
         case MuseDiagAction.updateSubs:
           await ref.read(foregroundProfilesUpdateNotifierProvider.notifier).trigger();
           _toast('正在更新订阅');

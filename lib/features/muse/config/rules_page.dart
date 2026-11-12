@@ -7,8 +7,10 @@
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hiddify/features/muse/config/sub_override_page.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart';
+import 'package:hiddify/features/muse/traffic/traffic_page.dart' show museGoTrafficRules;
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
@@ -36,9 +38,14 @@ class MuseRulesPage extends StatelessWidget {
   };
 }
 
-/// Opens 「分流规则」 or the 「订阅覆写」 list.
-Future<void> museOpenRules(BuildContext context, {MuseRulesTab tab = MuseRulesTab.routing}) =>
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MuseRulesPage(initialTab: tab)));
+/// Opens 「分流规则」 or the 「订阅修改」 list. 1.22.0 F1-A：分流规则在流量页「规则」段（有路由时跳过去）。
+Future<void> museOpenRules(BuildContext context, {MuseRulesTab tab = MuseRulesTab.routing}) async {
+  if (tab == MuseRulesTab.routing && GoRouter.maybeOf(context) != null) {
+    museGoTrafficRules(context);
+    return;
+  }
+  await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MuseRulesPage(initialTab: tab)));
+}
 
 /// 1.20.2：所有订阅的覆写一览；右上 ⋯ ›「编辑覆写 JSON」。1.20.3：订阅弹层 ⋯ ›「全部覆写」也打开它。
 class MuseOverrideListPage extends ConsumerWidget {
@@ -49,7 +56,7 @@ class MuseOverrideListPage extends ConsumerWidget {
     final profiles = ref.watch(profilesNotifierProvider).valueOrNull ?? const <ProfileEntity>[];
     return MuseScaffold(
       key: const ValueKey('rules_overrides_page'),
-      title: '订阅覆写',
+      title: '订阅修改',
       actions: [
         PopupMenuButton<String>(
           key: const ValueKey('rules_more'),
@@ -63,7 +70,7 @@ class MuseOverrideListPage extends ConsumerWidget {
               key: const ValueKey('rules_more_override_json'),
               value: 'override_json',
               enabled: profiles.isNotEmpty,
-              child: const Text('编辑覆写 JSON'),
+              child: const Text('编辑订阅修改 JSON'),
             ),
           ],
         ),

@@ -83,7 +83,7 @@ class AboutPage extends HookConsumerWidget {
           toast.showInfoToast('开发者选项已开启');
         } else {
           await ref.read(MusePrefs.devMode.notifier).update(true);
-          toast.showSuccessToast('已开启开发者选项（设置 › 开发者选项）');
+          toast.showSuccessToast('已开启开发者选项（设置 › 关于 › 开发者选项）');
         }
       } else if (left <= 3 && !on) {
         toast.showInfoToast('再点 $left 次开启开发者选项');

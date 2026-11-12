@@ -109,7 +109,7 @@ class _MuseDownloadTestRowState extends State<MuseDownloadTestRow> {
       if (!mounted) return;
       setState(() {
         _failed = true;
-        _result = '下载测速失败：$e';
+        _result = '测网速失败：$e';
       });
     } finally {
       if (mounted) setState(() => _test = null);
@@ -131,7 +131,7 @@ class _MuseDownloadTestRowState extends State<MuseDownloadTestRow> {
       children: [
         Expanded(
           child: Text(
-            running ? '正在下载 5 MB…' : (_result ?? '下载测速（约 5 MB 流量）'),
+            running ? '正在下载 5 MB…' : (_result ?? '测网速（下载约 5 MB）'),
             style: MuseType.body(context).copyWith(
               color: _failed ? MusePalette.red : (_result == null || running ? mt.text2 : null),
               fontFeatures: MuseType.tabular,

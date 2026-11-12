@@ -13,6 +13,7 @@ import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/data/quick_rules_provider.dart';
 import 'package:hiddify/features/muse/logic/quick_rules.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/activity/activity_page.dart' show museActivityTitle;
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
@@ -70,7 +71,7 @@ class MuseConnectionsPage extends HookConsumerWidget {
     }
 
     return MuseScaffold(
-      title: header == null ? '连接' : '活动',
+      title: header == null ? '连接' : museActivityTitle(context),
       actions: [
         PopupMenuButton<MuseConnSort>(
           key: const ValueKey('conn_sort'),
@@ -360,7 +361,7 @@ Future<void> showMuseConnDetail(BuildContext context, WidgetRef ref, MuseConn c,
             summary: why.summary,
             children: [
               kv('命中规则', why.rule),
-              kv('出站', why.outbound),
+              kv('交给', why.outbound),
               kv('节点', why.node),
             ],
           ),
@@ -370,8 +371,8 @@ Future<void> showMuseConnDetail(BuildContext context, WidgetRef ref, MuseConn c,
               kv('主机', c.host),
               kv('目标', c.destination),
               kv('协议', c.network),
-              kv('入站', c.inbound),
-              kv('链路', c.chains.reversed.join(' → ')),
+              kv('来自', c.inbound),
+              kv('经过', c.chains.reversed.join(' → ')),
               kv('规则', c.rule),
               kv('应用', museConnApp(c.process, ref.read(museAppLabelsProvider).valueOrNull ?? const {})?.name ?? ''),
               kv('进程', c.process),
@@ -479,7 +480,7 @@ Future<void> museAddQuickRule(WidgetRef ref, String host, MuseQuickWay way, {boo
   final n = ref.read(MusePrefs.quickRules.notifier);
   final raw = ref.read(MusePrefs.quickRules);
   await n.update(museQuickRulesToRaw(museSetQuickRule(museParseQuickRules(raw), host, way)));
-  toast.showSuccessToast('已设置 $host ${way.title}，可在 设置 › 分流规则 › 来自连接的规则 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
+  toast.showSuccessToast('已设置 $host ${way.title}，可在 流量 › 规则 › 来自连接的规则 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
 }
 
 /// 1.12.0: [host] 走指定节点 — pick one of the subscription's nodes.
@@ -517,7 +518,7 @@ Future<void> museAddHostToNode(BuildContext context, WidgetRef ref, String host,
   final n = ref.read(MusePrefs.nodeRules.notifier);
   final raw = ref.read(MusePrefs.nodeRules);
   await n.update(museNodeRulesToRaw(museAddHostToNodeRule(museParseNodeRules(raw), node, host)));
-  toast.showSuccessToast('已设置 $host 走所选节点，可在 设置 › 分流规则 › 指定节点 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
+  toast.showSuccessToast('已设置 $host 走所选节点，可在 流量 › 规则 › 指定节点 里修改', action: (label: '撤销', onPressed: () => n.update(raw)));
 }
 
 

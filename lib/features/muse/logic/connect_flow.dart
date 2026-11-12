@@ -145,7 +145,7 @@ MuseFriendlyError? museFriendlyError(String raw) {
     return const MuseFriendlyError('连接被中途切断', '可能是 SNI 被识别并阻断，或节点已失效。换个节点、或开启 TLS 分片后再试');
   }
   if (has(['no such host', 'server misbehaving', 'lookup ', 'dns'])) {
-    return const MuseFriendlyError('域名解析失败', '找不到节点服务器的地址。检查网络，或在设置 › 网络里换一个 DNS');
+    return const MuseFriendlyError('域名解析失败', '找不到节点服务器的地址。检查网络，或在 设置 › 连接与网络 › 网络 里换一个 DNS');
   }
   if (has(['i/o timeout', 'deadline exceeded', 'timeout', 'timed out'])) {
     return const MuseFriendlyError('连接超时', '服务器没有回应：网络不稳定、节点失效或被限速。换个节点或稍后再试');

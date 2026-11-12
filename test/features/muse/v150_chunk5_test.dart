@@ -54,7 +54,7 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('settings_search_field')), 'quic');
     await tester.pump();
     expect(find.text('屏蔽 QUIC'), findsOneWidget);
-    expect(find.text('设置 › 网络'), findsWidgets); // 1.11.0: 屏蔽 QUIC is on 网络 itself
+    expect(find.text('设置 › 连接与网络 › 网络'), findsWidgets); // 1.11.0: 屏蔽 QUIC is on 网络 itself; 1.22.0：网络在「连接与网络」里
     await tester.tap(find.byKey(const ValueKey('settings_hit_0')));
     await tester.pumpAndSettle();
     expect(picked?.title, '屏蔽 QUIC');

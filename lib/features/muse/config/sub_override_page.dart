@@ -29,7 +29,7 @@ String museOverrideSummary(MuseSubOverride o) {
   final parts = [
     if (o.rules.isNotEmpty) '规则 ${o.rules.length}',
     if (o.nodes.isNotEmpty) '节点 ${o.nodes.length}',
-    if (o.groups.isNotEmpty) '代理组 ${o.groups.length}',
+    if (o.groups.isNotEmpty) '分组 ${o.groups.length}',
     // 1.14.0 R21
     if (o.edits.isNotEmpty) '修改 ${o.edits.length}',
     // 1.15.0 R22
@@ -51,7 +51,7 @@ class MuseSubOverridePage extends HookConsumerWidget {
     Future<void> save(MuseSubOverride next) => museSaveOverride(ref, profileId, next);
 
     return MuseScaffold(
-      title: '覆写 · $profileName',
+      title: '订阅修改 · $profileName',
       // 1.20.2：编辑覆写 JSON（原在 规则 › ⋯）——这个订阅自己的
       actions: [
         PopupMenuButton<String>(
@@ -61,17 +61,17 @@ class MuseSubOverridePage extends HookConsumerWidget {
           onSelected: (_) => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => MuseOverrideJsonPage(profileId: profileId, profileName: profileName)),
           ),
-          itemBuilder: (_) => const [PopupMenuItem(key: ValueKey('override_more_json'), value: 'json', child: Text('编辑覆写 JSON'))],
+          itemBuilder: (_) => const [PopupMenuItem(key: ValueKey('override_more_json'), value: 'json', child: Text('编辑订阅修改 JSON'))],
         ),
       ],
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            footer: '覆写在连接时合成，不修改订阅本身；订阅更新后照样生效。标准内核与兼容内核都会使用。',
+            footer: '订阅修改在连接时合成，不改订阅本身；订阅更新后照样生效。标准内核与兼容内核都会使用。',
             children: [
               SwitchListTile(
                 key: const ValueKey('override_enabled'),
-                title: Text('启用覆写', style: MuseType.body(context)),
+                title: Text('启用订阅修改', style: MuseType.body(context)),
                 value: o.enabled,
                 onChanged: (v) => save(o.copyWith(enabled: v)),
               ),
@@ -104,7 +104,7 @@ class MuseSubOverridePage extends HookConsumerWidget {
             ],
           ),
           MuseSection(
-            header: '代理组',
+            header: '分组',
             footer: '按名称筛选订阅里的节点（正则，留空为全部）；与订阅自带的组同名时不添加。',
             children: [
               for (var i = 0; i < o.groups.length; i++)
@@ -121,7 +121,7 @@ class MuseSubOverridePage extends HookConsumerWidget {
               MuseTile(
                 key: const ValueKey('override_add_group'),
                 leading: const Icon(Icons.add_outlined),
-                title: '添加代理组',
+                title: '添加分组',
                 onTap: () async {
                   final g = await showDialog<MuseOverrideGroup>(context: context, builder: (_) => const _GroupDialog());
                   if (g != null) await save(o.copyWith(groups: [...o.groups, g]));
@@ -185,11 +185,11 @@ class MuseOverrideJsonPage extends HookConsumerWidget {
     final c = useTextEditingController(text: const JsonEncoder.withIndent('  ').convert(value.toJson()));
     final error = useState<String?>(null);
     return MuseScaffold(
-      title: '覆写 JSON · $profileName',
+      title: '订阅修改 JSON · $profileName',
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            footer: '与「订阅覆写」里的表单是同一份数据',
+            footer: '与「订阅修改」里的表单是同一份数据',
             children: [
               Padding(
                 padding: const EdgeInsets.all(MuseSpace.s12),
@@ -214,7 +214,7 @@ class MuseOverrideJsonPage extends HookConsumerWidget {
                     await museSaveOverride(ref, profileId, MuseSubOverride.fromJson(j));
                     if (context.mounted) Navigator.of(context).maybePop();
                   } catch (_) {
-                    error.value = '不是有效的覆写 JSON';
+                    error.value = '不是有效的订阅修改 JSON';
                   }
                 },
               ),
@@ -235,7 +235,7 @@ Future<void> museOpenOverrideJson(BuildContext context, List<ProfileEntity> prof
       context: context,
       builder: (c) => SimpleDialog(
         key: const ValueKey('override_json_pick'),
-        title: const Text('编辑哪个订阅的覆写'),
+        title: const Text('编辑哪个订阅的修改'),
         children: [
           for (final e in profiles)
             SimpleDialogOption(key: ValueKey('override_json_pick_${e.id}'), onPressed: () => Navigator.of(c).pop(e), child: Text(e.name)),
@@ -311,7 +311,7 @@ class _GroupDialog extends HookWidget {
     final filter = useTextEditingController();
     final urlTest = useState(false);
     return AlertDialog(
-      title: const Text('添加代理组'),
+      title: const Text('添加分组'),
       content: SizedBox(
         width: MuseSize.dialogWidth,
         child: Column(
@@ -359,7 +359,7 @@ class MuseOverrideList extends ConsumerWidget {
     return MuseGroupedBody(
       children: [
         MuseSection(
-          footer: '为单个订阅添加规则、节点和代理组。覆写在连接时合成，订阅本身不改，更新订阅后保留。',
+          footer: '为单个订阅添加规则、节点和分组。订阅修改在连接时合成，订阅本身不改，更新订阅后保留。',
           children: [
             if (profiles.isEmpty) const MuseTile(key: ValueKey('override_list_empty'), title: '还没有订阅'),
             for (final p in profiles)

@@ -380,14 +380,15 @@ void main() {
       expect(MuseActivityTab.fromKey('dns'), MuseActivityTab.dns);
       expect(MuseActivityTab.fromKey('logs'), MuseActivityTab.logs);
       expect(MuseActivityTab.fromKey(null), MuseActivityTab.connections);
-      expect(museActivityLocation(MuseActivityTab.dns), '/settings/activity?tab=dns');
+      // 1.22.0：活动在底栏「流量」里
+      expect(museActivityLocation(MuseActivityTab.dns), '/traffic?tab=dns');
       final routes = File('lib/core/router/go_router/routing_config_notifier.dart').readAsStringSync();
       // 1.20.3：活动路由多了 ?tab=diagnose → 设置 › 诊断 的跳转
       expect(routes, contains('name: museActivityRoute,'));
-      expect(routes, contains("state.uri.queryParameters['tab'] == 'diagnose' ? museDiagnosePath : null"));
+      expect(routes, contains("state.uri.queryParameters['tab'] == 'diagnose' ? museDiagnosePath : museActivityRedirect(state.uri)"));
       expect(routes, contains("GoRoute(name: 'connections', path: 'connections', redirect: (_, _) => museActivityLocation(MuseActivityTab.connections))"));
       expect(routes, contains("GoRoute(name: 'logs', path: 'logs', redirect: (_, _) => museActivityLocation(MuseActivityTab.logs))"));
-      expect(museShellExtras(logCapture: true, logsAvailable: true).map((e) => e.title), ['活动']);
+      expect(museShellExtras(logCapture: true, logsAvailable: true), isEmpty);
       expect(museShellActivity.path, museActivityPath);
 
       final byTitle = {for (final e in museSettingEntries) e.title: e};
@@ -400,7 +401,7 @@ void main() {
       expect(museSearchSettings('DNS 查询', android: true, windows: false).map((e) => e.title), contains('DNS 查询'));
 
       final settings = File('lib/features/settings/overview/settings_page.dart').readAsStringSync();
-      expect(settings, contains("ValueKey('settings_activity')"));
+      expect(settings, isNot(contains("ValueKey('settings_activity')")));
       expect(settings, contains('case MuseSettingPage.activity:'));
       expect(settings.contains("goNamed('connections')") || settings.contains("goNamed('logs')"), isFalse);
       final home = File('lib/features/muse/home/dashboard_cards.dart').readAsStringSync();

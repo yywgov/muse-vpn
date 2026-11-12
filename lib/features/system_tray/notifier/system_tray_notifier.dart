@@ -540,7 +540,7 @@ List<MuseTrayItem> museTrayMenuSpec(
           for (final n in nodes) MuseTrayItem('node:${n.tag}', n.label, checkable: true, checked: n.selected),
           const MuseTrayItem('-', ''),
           if (moreNodes) const MuseTrayItem('nodes:more', '更多…'),
-          const MuseTrayItem('urltest', '测速'),
+          const MuseTrayItem('urltest', '测延迟'),
         ],
       ),
     if (desktop.isNotEmpty) ...[...desktop, const MuseTrayItem('-', '')],

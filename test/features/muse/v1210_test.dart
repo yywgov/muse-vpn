@@ -178,9 +178,9 @@ void main() {
   });
 
   test('版本 1.21.0：pubspec、更新说明 4 条、CHANGELOG.md', () {
-    expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.21.0+219'));
-    expect(museChangelog.keys.first, '1.21.0');
-    expect(museChangelog.keys.elementAt(1), '1.20.5');
+    // 1.22.0 起不再是最新一条：版本号放宽到 1.2x
+    expect(File('pubspec.yaml').readAsStringSync(), contains(RegExp(r'version: 1\.2\d\.\d+\+2\d\d')));
+    expect(museChangelog.keys.toList().indexOf('1.21.0'), museChangelog.keys.toList().indexOf('1.20.5') - 1);
     final lines = museChangelog['1.21.0']!;
     expect(lines, hasLength(4));
     final all = lines.join();

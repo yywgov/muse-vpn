@@ -38,7 +38,7 @@ const _singKeys = <String, String>{
   'source_port': '来源端口',
   'network': '网络类型',
   'protocol': '协议',
-  'inbound': '入站',
+  'inbound': '来自',
   'package_name': '应用',
   'process_name': '进程',
   'process_path': '进程路径',
@@ -65,7 +65,7 @@ const _mihomoKeys = <String, String>{
   'network': '网络类型',
   'processname': '进程',
   'processpath': '进程路径',
-  'inbound': '入站',
+  'inbound': '来自',
 };
 
 const _outboundNames = <String, String>{
@@ -95,13 +95,13 @@ String museRuleText(String rule) {
   var r = rule.trim();
   final arrow = r.indexOf(' => ');
   if (arrow >= 0) r = r.substring(0, arrow).trim();
-  if (r.isEmpty || r == 'final' || r.toLowerCase() == 'match') return '未命中规则（默认出站）';
+  if (r.isEmpty || r == 'final' || r.toLowerCase() == 'match') return '未命中规则（交给默认）';
   // 兼容内核：RuleSet(geosite-cn)
   final mh = RegExp(r'^([A-Za-z0-9-]+)\((.*)\)$').firstMatch(r);
   if (mh != null && !r.contains('=')) {
     final k = mh.group(1)!.toLowerCase().replaceAll('-', '');
     final v = mh.group(2)!;
-    if (k == 'match') return '未命中规则（默认出站）';
+    if (k == 'match') return '未命中规则（交给默认）';
     final name = _mihomoKeys[k];
     return name == null ? r : (v.isEmpty ? name : '$name $v');
   }

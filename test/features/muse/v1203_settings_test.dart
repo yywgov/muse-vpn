@@ -71,14 +71,16 @@ List<MuseSettingEntry> _search(String q, {bool android = true, bool windows = fa
 void main() {
   group('设置一级结构', () {
     test('按审查清单的建议排', () {
-      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '启动与断线', '分流规则', '网络', '隐私与通知', '活动', '诊断', '内核与资源', '备份与恢复', '关于']);
-      expect(museSettingsHomeRows(android: false, developer: true).last, '开发者选项');
+      // 1.22.0 F2：6 组；开发者选项在「关于」组里
+      expect(museSettingsHomeRows(android: true, developer: false), ['连接与网络', '订阅与节点', '外观', '自动化', '诊断', '关于']);
+      expect(museSettingsHomeRows(android: false, developer: true), isNot(contains('开发者选项')));
       expect(museSettingsHomeRows(android: true, developer: false), isNot(contains('分应用代理'))); // 进了分流规则页
     });
 
     test('设置首页每一行都有入口（key 不变的沿用，新的三行新加）', () {
       final page = _src('lib/features/settings/overview/settings_page.dart');
-      for (final k in ['theme_mode', 'settings_auto_connect', 'settings_rules', 'settings_network', 'settings_privacy_home', 'settings_activity', 'settings_diagnose', 'settings_resources', 'settings_backup', 'settings_about']) {
+      // 1.22.0：分流规则、活动搬到底栏「流量」；其余在一级或二级
+      for (final k in ['theme_mode', 'settings_auto_connect', 'settings_network', 'settings_privacy_home', 'settings_diagnose', 'settings_resources', 'settings_backup', 'settings_about']) {
         expect(page, contains("ValueKey('$k')"), reason: k);
       }
       expect(page, isNot(contains("ValueKey('settings_per_app')")));
@@ -147,7 +149,7 @@ void main() {
 
   group('分流规则', () {
     test('生效顺序按实际拼接顺序写：覆写 → 已屏蔽 → 来自连接 → 自定义 → 预设 → 远程规则集', () {
-      final order = ['订阅覆写', '已屏蔽', '来自连接', '自定义规则', '预设', '远程规则集'];
+      final order = ['订阅修改', '已屏蔽', '来自连接', '自定义规则', '预设', '远程规则集'];
       var at = -1;
       for (final w in order) {
         final i = museRoutingOrderText.indexOf(w);
@@ -220,9 +222,10 @@ void main() {
     });
 
     test('「我的规则」挂在 /settings 下，旧地址带着子路径和查询参数跳过去', () {
-      expect(museSettingsRulesLocation(Uri.parse('/nodes/routing-options')), '/settings/routing-options');
-      expect(museSettingsRulesLocation(Uri.parse('/nodes/routing-options/rule/3/generic-list/domain')), '/settings/routing-options/rule/3/generic-list/domain');
-      expect(museSettingsRulesLocation(Uri.parse('/nodes/routing-options?routeRule=abc')), '/settings/routing-options?routeRule=abc');
+      // 1.22.0：我的规则搬到 /traffic 下
+      expect(museSettingsRulesLocation(Uri.parse('/nodes/routing-options')), '/traffic/routing-options');
+      expect(museSettingsRulesLocation(Uri.parse('/nodes/routing-options/rule/3/generic-list/domain')), '/traffic/routing-options/rule/3/generic-list/domain');
+      expect(museSettingsRulesLocation(Uri.parse('/nodes/routing-options?routeRule=abc')), '/traffic/routing-options?routeRule=abc');
       final router = _src('lib/core/router/go_router/routing_config_notifier.dart');
       expect(router, contains('...rulesChildren,'));
       expect(router, contains("name: 'routingOptions',"));
@@ -236,7 +239,7 @@ void main() {
       expect(museDiagnoseLocation(section: 'exit'), '/settings/diagnose?section=exit');
       expect(MuseActivityTab.values.map((e) => e.title), ['连接', '日志', 'DNS', '统计']);
       final router = _src('lib/core/router/go_router/routing_config_notifier.dart');
-      expect(router, contains("state.uri.queryParameters['tab'] == 'diagnose' ? museDiagnosePath : null"));
+      expect(router, contains("state.uri.queryParameters['tab'] == 'diagnose' ? museDiagnosePath : museActivityRedirect(state.uri)"));
       expect(router, contains('MuseDiagnoseHubPage('));
       expect(_src('lib/features/muse/home/health_banner.dart'), contains('go(museDiagnosePath)'));
       expect(_src('lib/features/muse/home/exit_detail_sheet.dart'), contains("museDiagnoseLocation(section: 'exit')"));

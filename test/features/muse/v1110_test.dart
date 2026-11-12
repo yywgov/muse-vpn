@@ -340,7 +340,8 @@ void main() {
       // 1.20.2：「网络」下面加「分流规则」
       // 1.20.3：+ 隐私
       // 1.20.3：十项（启动与断线、隐私与通知、诊断、备份与恢复）
-      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '启动与断线', '分流规则', '网络', '隐私与通知', '活动', '诊断', '内核与资源', '备份与恢复', '关于']);
+      // 1.22.0：6 组
+      expect(museSettingsHomeRows(android: true, developer: false), ['连接与网络', '订阅与节点', '外观', '自动化', '诊断', '关于']);
     });
 
     test('removed settings are not found by search; moved ones point at 高级', () {
@@ -355,7 +356,7 @@ void main() {
       expect(museSearchSettings('窗口置顶', android: false, windows: true).first.page, MuseSettingPage.windowAdvanced);
       expect(museSearchSettings('快捷键', android: false, windows: true).first.page, MuseSettingPage.windowAdvanced);
       expect(museSearchSettings('导出配置', android: true, windows: false).first.page, MuseSettingPage.sync);
-      expect(MuseSettingPage.sync.path, '设置 › 备份与恢复'); // 1.20.3
+      expect(MuseSettingPage.sync.path, '设置 › 关于 › 备份与恢复'); // 1.20.3；1.22.0：在「关于」组里
       // old names still lead to the new place
       expect(museSearchSettings('备份与同步', android: true, windows: false).first.page, MuseSettingPage.sync);
       // 1.20.5：「打开即连接」（旧名自动运行）已取消，搜不到这一项

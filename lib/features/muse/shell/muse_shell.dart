@@ -22,10 +22,12 @@ const desktopContentMaxWidth = MuseDesk.contentMax;
 /// 穿云 1.3.0: 首页 gets more room.
 const desktopHomeMaxWidth = 1280.0;
 
-/// 首页 / 节点 / 设置 (icon + label). 1.20.2：「订阅」并入节点页（标题「订阅名 ▾」与订阅弹层），底栏 4→3。
+/// 首页 / 节点 / 流量 / 设置 (icon + label). 1.20.2：「订阅」并入节点页（标题「订阅名 ▾」与订阅弹层），底栏 4→3。
+/// 1.22.0 F1-A：加「流量」（原 设置 › 活动 + 设置 › 分流规则），沿用原「活动」的图标。手机底栏与电脑侧栏同样四项。
 final museShellActions = [
   ShellRouteAction(Icons.home_outlined, '首页'),
   ShellRouteAction(Icons.language_outlined, '节点'),
+  ShellRouteAction(Icons.swap_vert_outlined, '流量'),
   ShellRouteAction(Icons.settings_outlined, '设置'),
 ];
 
@@ -45,6 +47,7 @@ class MuseShellExtra {
 }
 
 /// 1.8.0: one entry, 活动 (连接 / 日志 / DNS); the old 连接 / 日志 locations redirect into it.
+/// 1.22.0：活动成了侧栏一级「流量」，不再作为附加项显示（常量留给旧调用方）。
 const museShellActivity = MuseShellExtra('activity', Icons.swap_vert_outlined, '活动', '/settings/activity');
 
 /// Which navigation a window of [width] gets.
@@ -57,8 +60,8 @@ MuseNavForm museNavForm(double width) {
 }
 
 /// The sidebar extras. 1.8.0: always 活动 (日志 is its tab, so 日志记录 no longer adds an entry);
-/// the parameters stay for callers.
-List<MuseShellExtra> museShellExtras({required bool logCapture, bool logsAvailable = false}) => const [museShellActivity];
+/// the parameters stay for callers. 1.22.0 F1-A：活动是一级「流量」了，附加项为空（侧栏和底栏同样四项）。
+List<MuseShellExtra> museShellExtras({required bool logCapture, bool logsAvailable = false}) => const [];
 
 class MuseShellFrame extends ConsumerWidget {
   const MuseShellFrame({

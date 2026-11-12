@@ -425,7 +425,7 @@ class ProfileActionsMenu extends HookConsumerWidget {
       // 1.20.2：订阅覆写从 规则 › 订阅覆写 移到这里（这个订阅自己的规则 / 节点 / 分组）；压在订阅弹层上面，返回回到弹层
       AdaptiveMenuItem(
         leadingIcon: const Icon(Icons.tune_outlined),
-        title: '订阅覆写',
+        title: '订阅修改',
         onTap: () => museOpenSubOverride(context, profile),
       ),
       AdaptiveMenuItem(

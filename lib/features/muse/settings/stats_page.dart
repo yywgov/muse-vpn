@@ -110,7 +110,7 @@ class MuseStatsPage extends HookConsumerWidget {
         ],
       );
     return MuseScaffold(
-      title: header == null ? '统计' : '活动',
+      title: header == null ? '统计' : museActivityTitle(context),
       body: header == null ? body : Column(children: [header!, Expanded(child: body)]),
     );
   }

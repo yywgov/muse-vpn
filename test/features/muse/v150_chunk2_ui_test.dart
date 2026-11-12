@@ -277,6 +277,10 @@ void main() {
         // 1.10.0: the collapsed 「高级」 of the 设置 home page is a group on 设置 › 网络
         await _pump(tester, page: const SettingsPage(), brightness: b, size: s.$1, desktop: s.$3, tab: 3);
         expect(find.byKey(const ValueKey('advanced_toggle')), findsNothing);
+        // 1.22.0 F2：「网络」在 设置 › 连接与网络 里
+        expect(find.byKey(const ValueKey('settings_group_net')), findsOneWidget);
+        await _done(tester);
+        await _pump(tester, page: const MuseNetGroupPage(), brightness: b, size: s.$1, desktop: s.$3, tab: 3);
         expect(find.byKey(const ValueKey('settings_network')), findsOneWidget);
         await _done(tester);
         await _pump(tester, page: const MuseNetworkPage(), brightness: b, size: s.$1, desktop: s.$3, tab: 3);

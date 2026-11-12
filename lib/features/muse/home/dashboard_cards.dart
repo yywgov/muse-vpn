@@ -287,7 +287,7 @@ class _GroupsTile extends ConsumerWidget {
     final selected = group?.selected ?? '';
     final count = group?.items.length ?? 0;
     return _Tile(
-      title: '代理组',
+      title: '分组',
       titleTrailing: group == null ? null : Text(museGroupTitle(group.tag), style: museTileCaption(context)),
       value: selected.isEmpty ? '—' : museNodeShortName(selected),
       bottom: Align(
@@ -447,8 +447,8 @@ class _TakeoverTile extends ConsumerWidget {
     final mode = ref.watch(ConfigOptions.serviceMode);
     final tun = mode == ServiceMode.tun;
     return _Tile(
-      // 1.20.3：和 设置 › 网络 ›「运行模式」同一个设置，统一叫「运行模式」
-      title: '运行模式',
+      // 1.20.3：和 设置 › 网络 ›「运行模式」同一个设置；1.22.0 F20：统一叫「接管方式」
+      title: '接管方式',
       value: tun ? 'TUN' : '系统代理',
       bottomHeight: MuseSize.segmented,
       bottom: MuseSegmented<ServiceMode>(

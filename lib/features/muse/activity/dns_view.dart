@@ -5,6 +5,7 @@
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/activity/activity_page.dart' show museActivityTitle;
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
@@ -38,7 +39,7 @@ class MuseDnsPage extends HookConsumerWidget {
 
     final Widget content;
     if (state.unsupported) {
-      content = const _Hint(icon: Icons.dns_outlined, text: '$museDnsUnsupportedText\nDNS 查询记录需要标准内核（设置 › 内核与资源）');
+      content = const _Hint(icon: Icons.dns_outlined, text: '$museDnsUnsupportedText\nDNS 查询记录需要标准内核（设置 › 连接与网络 › 内核与资源）');
     } else if (state.queries.isEmpty && state.error != null) {
       content = _Hint(icon: Icons.cloud_off_outlined, text: state.error == '未连接' ? '连接后可查看 DNS 查询' : '暂不可用（${state.error}）');
     } else if (list.isEmpty) {
@@ -64,7 +65,7 @@ class MuseDnsPage extends HookConsumerWidget {
     }
 
     return MuseScaffold(
-      title: header == null ? 'DNS' : '活动',
+      title: header == null ? 'DNS' : museActivityTitle(context),
       actions: [
         // 1.15.0 R13: 清空 DNS 缓存 — 改了 hosts / 规则后立即生效（只在点按时调用内核）
         IconButton(

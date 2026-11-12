@@ -121,7 +121,7 @@ String museProtocolLabel(String type, {bool isGroup = false}) {
     'urltest' || 'url-test' => '自动最快',
     'selector' || 'select' => '手动选择',
     'loadbalance' || 'load-balance' || 'balancer' || 'round-robin' => '负载均衡',
-    _ when isGroup => '策略组',
+    _ when isGroup => '分组',
     _ => type.isEmpty ? '?' : type.toUpperCase(),
   };
 }

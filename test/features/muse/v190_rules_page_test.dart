@@ -72,7 +72,7 @@ void main() {
     final (c, sp) = await _pump(t, tab: MuseRulesTab.overrides);
     await t.tap(find.byKey(const ValueKey('override_profile_p0')));
     await t.pumpAndSettle();
-    expect(find.text('覆写 · 订阅甲'), findsOneWidget);
+    expect(find.text('订阅修改 · 订阅甲'), findsOneWidget); // 1.22.0 F20
 
     await t.tap(find.byKey(const ValueKey('override_add_rule')));
     await t.pumpAndSettle();
@@ -110,7 +110,7 @@ void main() {
     await t.enterText(find.byKey(const ValueKey('override_json_field')), '[1]');
     await t.tap(find.byKey(const ValueKey('override_json_apply')));
     await t.pumpAndSettle();
-    expect(find.text('不是有效的覆写 JSON'), findsOneWidget);
+    expect(find.text('不是有效的订阅修改 JSON'), findsOneWidget); // 1.22.0 F20
     expect(museParseOverrides(sp.getString('muse_sub_overrides')!)['p0']!.rules.single.value, 'example.com');
   });
 
@@ -122,13 +122,13 @@ void main() {
     expect(config, isNot(contains("goNamed('routingOptions')")));
     expect(config, isNot(contains('profile_override_placeholder')));
     final settings = File('lib/features/settings/overview/settings_page.dart').readAsStringSync();
-    expect(settings, contains("ValueKey('settings_rules')"));
-    expect(settings, contains("title: '分流规则'"));
+    // 1.22.0：分流规则是底栏「流量」的「规则」段，设置首页不再有这一行
+    expect(settings, isNot(contains("ValueKey('settings_rules')")));
     expect(settings, contains('case MuseSettingPage.routing:\n          museOpenRules(context);'));
     expect(settings, contains('museOpenRules(context, tab: MuseRulesTab.overrides)'));
     expect(settings, isNot(contains('musePushPage(context, const MuseRoutingPage())')));
     expect(museSearchSettings('覆写', android: true, windows: false).first.page, MuseSettingPage.overrides);
     expect(museSearchSettings('路由规则', android: true, windows: false).map((e) => e.page), contains(MuseSettingPage.routing));
-    expect(MuseSettingPage.routing.path, '设置 › 分流规则'); // 1.20.2：在设置「网络」下面（1.10.0 起在 订阅 › 规则）
+    expect(MuseSettingPage.routing.path, '流量 › 规则'); // 1.20.2：在设置「网络」下面（1.10.0 起在 订阅 › 规则）；1.22.0：底栏「流量」
   });
 }

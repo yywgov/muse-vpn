@@ -29,8 +29,8 @@ String museAutoConnectSummary({required bool onDemand, required MuseSchedule sch
   return on.isEmpty ? '关' : on.join('、');
 }
 
-/// 1.20.3：设置一级与页标题（原「自动连接」）。
-const museStartupTitle = '启动与断线';
+/// 1.20.3：设置一级与页标题（原「自动连接」）。1.22.0 F2：「启动与断线」→「自动化」（旧名留在搜索关键词里）。
+const museStartupTitle = '自动化';
 
 /// 1.11.0–1.20.2 的「更多」里的行；1.20.3 起「更多」取消，各行直接分组显示（保留给旧调用方）。
 const museAutoConnectMoreRows = ['智能保持连接', '按需运行', '每天定时连接', '每天定时断开', '静默启动'];

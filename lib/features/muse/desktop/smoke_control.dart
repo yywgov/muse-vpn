@@ -34,7 +34,7 @@ import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Route names the smoke tests may open with /go.
-const museSmokeRoutes = {'home', 'nodes', 'config', 'settings', 'about', 'connections', 'logs', 'activity', 'perAppProxy'};
+const museSmokeRoutes = {'home', 'nodes', 'traffic', 'config', 'settings', 'about', 'connections', 'logs', 'activity', 'perAppProxy'};
 
 abstract final class MuseSmokeControl {
   static final _logger = infraLogger('SmokeControl');

@@ -127,7 +127,7 @@ class MuseConfigPage extends HookConsumerWidget {
                 key: const ValueKey('profile_rules_entry'),
                 leading: const Icon(Icons.rule_outlined),
                 title: '规则',
-                subtitle: '分流 · 订阅覆写',
+                subtitle: '分流 · 订阅修改',
                 chevron: true,
                 onTap: () => museOpenRules(context),
               ),

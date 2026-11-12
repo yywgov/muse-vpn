@@ -95,7 +95,7 @@ MuseDiagItem museDiagStaleProxy({required bool stale, int? port}) => stale
 enum MuseDiagAction {
   repairProxy('修复系统代理'),
   switchNode('换个节点'),
-  testNodes('全部测速'),
+  testNodes('全部测延迟'),
   updateSubs('更新订阅'),
   reconnect('重新连接'),
   connect('连接'),

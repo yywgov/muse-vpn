@@ -3,6 +3,7 @@
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/muse/activity/activity_page.dart' show museActivityTitle;
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
@@ -51,7 +52,7 @@ class MuseLogsPage extends HookConsumerWidget {
     };
 
     return MuseScaffold(
-      title: header == null ? '日志' : '活动',
+      title: header == null ? '日志' : museActivityTitle(context),
       actions: [
         IconButton(
           key: const ValueKey('logs_pause'),

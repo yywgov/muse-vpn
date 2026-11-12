@@ -42,7 +42,7 @@ void main() {
     testWidgets('Android: 按需运行 row, 定时 rows; no Windows rows; 1.20.5 起没有自动运行开关', (t) async {
       await _pump(t, const MuseAutoConnectPage(android: true, windows: false), prefs: {'muse_schedule': '480,-1'});
       // 1.20.3：页标题「启动与断线」，「更多」取消；按需运行在「Wi‑Fi 规则」一页
-      expect(find.text('启动与断线'), findsOneWidget);
+      expect(find.text('自动化'), findsOneWidget); // 1.22.0：启动与断线 → 自动化
       expect(find.byKey(const ValueKey('settings_wifi_rules')), findsOneWidget);
       expect(find.text('08:00'), findsOneWidget);
       expect(find.byKey(const ValueKey('network_schedule_disconnect')), findsOneWidget);
@@ -263,8 +263,8 @@ void main() {
       // 1.11.0: no 备份与同步 row; 导出 / 导入配置 are on 关于
       expect(s, isNot(contains("title: '备份与同步'")));
       expect(s, isNot(contains("title: '同步与备份'")));
-      expect(MuseSettingPage.sync.path, '设置 › 备份与恢复'); // 1.20.3
-      expect(MuseSettingPage.resources.path, '设置 › 内核与资源');
+      expect(MuseSettingPage.sync.path, '设置 › 关于 › 备份与恢复'); // 1.20.3；1.22.0：在「关于」组里
+      expect(MuseSettingPage.resources.path, '设置 › 连接与网络 › 内核与资源'); // 1.22.0
     });
   });
 
@@ -348,7 +348,7 @@ void main() {
       expect(s, contains('case MuseSettingPage.resources:\n          musePushPage(context, const MuseResourcesPage());'));
       // the 资源 row (same key) now opens 内核与资源
       expect(s, contains("key: const ValueKey('settings_resources')"));
-      expect(_src('lib/features/muse/activity/dns_view.dart'), contains('设置 › 内核与资源'));
+      expect(_src('lib/features/muse/activity/dns_view.dart'), contains('设置 › 连接与网络 › 内核与资源'));
     });
   });
 }

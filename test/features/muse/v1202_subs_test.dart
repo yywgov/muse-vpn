@@ -224,9 +224,10 @@ void main() {
 
   group('结构', () {
     test('底栏三栏：首页 / 节点 / 设置；分支同序；剪贴板圆点在「节点」', () {
-      expect(museShellActions.map((a) => a.title), ['首页', '节点', '设置']);
-      expect(mobileBranches, ['home', 'nodes', 'settings']);
-      expect(getIndexOfBranch(true, false, 'settings'), 2);
+      // 1.22.0：四栏，加「流量」
+      expect(museShellActions.map((a) => a.title), ['首页', '节点', '流量', '设置']);
+      expect(mobileBranches, ['home', 'nodes', 'traffic', 'settings']);
+      expect(getIndexOfBranch(true, false, 'settings'), 3);
       expect(museOfferTabIndex, 1);
       expect(museShellActions[museOfferTabIndex].title, '节点');
     });
@@ -247,10 +248,10 @@ void main() {
 
     test('设置：「分流规则」在「网络」下面；搜索路径随新位置', () {
       final rows = museSettingsHomeRows(android: true, developer: false);
-      // 1.20.3：分流规则排在网络前面
-      expect(rows.indexOf('分流规则'), rows.indexOf('网络') - 1);
-      expect(MuseSettingPage.routing.path, '设置 › 分流规则');
-      expect(MuseSettingPage.subscriptions.path, '节点 › 订阅名 ▾ › ⋯');
+      // 1.22.0：分流规则搬到 流量 › 规则；订阅相关在 设置 › 订阅与节点
+      expect(rows, isNot(contains('分流规则')));
+      expect(MuseSettingPage.routing.path, '流量 › 规则');
+      expect(MuseSettingPage.subscriptions.path, '设置 › 订阅与节点 › 订阅列表');
       expect(museSearchSettings('订阅覆写', android: true, windows: false).first.page, MuseSettingPage.overrides);
       expect(museSearchSettings('订阅', android: true, windows: false).map((e) => e.page), contains(MuseSettingPage.subscriptions));
       final settings = _src('lib/features/settings/overview/settings_page.dart');
@@ -351,16 +352,16 @@ void main() {
       await _settle(t);
       await t.tap(find.byKey(const ValueKey('subs_row_menu_p2')));
       await _settle(t);
-      expect(find.text('订阅覆写'), findsOneWidget);
+      expect(find.text('订阅修改'), findsOneWidget);
       expect(find.text('编辑'), findsOneWidget);
       expect(find.text('节点筛选'), findsOneWidget);
-      await t.tap(find.text('订阅覆写'));
+      await t.tap(find.text('订阅修改'));
       await _settle(t);
-      expect(find.text('覆写 · 备用订阅'), findsOneWidget);
+      expect(find.text('订阅修改 · 备用订阅'), findsOneWidget);
 
       await t.binding.handlePopRoute();
       await _settle(t);
-      expect(find.text('覆写 · 备用订阅'), findsNothing);
+      expect(find.text('订阅修改 · 备用订阅'), findsNothing);
       expect(_panel, findsOneWidget, reason: 'back returns to the sheet');
 
       await t.binding.handlePopRoute();
@@ -411,14 +412,14 @@ void main() {
       // the same call the ⋮ menu makes
       unawaited(museOpenSubOverrideForTest(ctx, _two[0]));
       await _settle(t);
-      expect(find.text('覆写 · 机场订阅'), findsOneWidget);
-      final route = ModalRoute.of(t.element(find.text('覆写 · 机场订阅')))!;
+      expect(find.text('订阅修改 · 机场订阅'), findsOneWidget);
+      final route = ModalRoute.of(t.element(find.text('订阅修改 · 机场订阅')))!;
       expect(route, isA<MaterialPageRoute<void>>());
       expect(route.popGestureEnabled, isTrue);
       expect(route.navigator, same(Navigator.of(ctx, rootNavigator: true)));
 
       await _predictiveBack(t);
-      expect(find.text('覆写 · 机场订阅'), findsNothing);
+      expect(find.text('订阅修改 · 机场订阅'), findsNothing);
       expect(_panel, findsOneWidget);
       expect(router.state.uri.path, '/nodes');
       await _done(t);

@@ -13,13 +13,13 @@ enum MuseHomeTile {
   adBlock('adblock', '去广告'),
   // 1.6.0 C4: dashboard cards (hidden by default; added from 编辑首页)
   services('services', '服务状态'),
-  groups('groups', '代理组'),
+  groups('groups', '分组'),
   connections('connections', '连接统计'),
   lanIp('lanip', '内网 IP'),
   memory('memory', '内存'),
   // Windows: 系统代理 / TUN in one tap
   // 1.20.3：原「网络接管」，与 设置 › 网络 ›「运行模式」统一
-  takeover('takeover', '运行模式'),
+  takeover('takeover', '接管方式'),
   // 穿云 1.4.0 (Windows only): 网速 + 本次流量 in one tile
   flow('flow', '流量');
 

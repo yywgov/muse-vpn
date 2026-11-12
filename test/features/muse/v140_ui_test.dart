@@ -260,8 +260,12 @@ void main() {
 
   testWidgets('settings has the 1.10.0 rows (节点 / 分流 / 统计 moved off the home page)', (tester) async {
     await _pump(tester, page: const SettingsPage(), brightness: Brightness.light, size: phone, tab: 3);
-    for (final k in ['theme_mode', 'settings_auto_connect', 'settings_network', 'settings_activity', 'settings_resources', 'settings_about']) {
+    // 1.22.0 F2：一级 6 组（网络 / 内核与资源 在「连接与网络」，关于 / 备份在「关于」组；活动搬到底栏「流量」）
+    for (final k in ['settings_search', 'settings_group_net', 'settings_group_subs', 'theme_mode', 'settings_auto_connect', 'settings_diagnose', 'settings_group_about']) {
       expect(find.byKey(ValueKey(k)), findsOneWidget, reason: k);
+    }
+    for (final k in ['settings_network', 'settings_activity', 'settings_resources', 'settings_rules']) {
+      expect(find.byKey(ValueKey(k)), findsNothing, reason: k);
     }
     // 1.11.0: 备份与同步 removed (导出 / 导入配置 on 关于)
     for (final k in ['settings_nodes', 'settings_routing', 'settings_stats', 'settings_help', 'settings_sync']) {

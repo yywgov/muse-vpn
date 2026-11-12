@@ -5,6 +5,7 @@
 // Routes: /settings/activity?tab=connections|logs|dns|stats|diagnose; the old /settings/connections
 // and /settings/logs open the matching tab.
 // 1.20.3：诊断升为设置一级（/settings/diagnose），活动只留 连接 / 日志 / DNS / 统计；旧的 ?tab=diagnose 由路由跳过去。
+// 1.22.0 F1-A：活动成了底栏「流量」的「连接」段（/traffic?tab=…）；旧的 /settings/activity?tab=… 跳过去。
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'package:hiddify/features/muse/local_api/local_api_providers.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart' show museActivityTabKeyForSetting;
 import 'package:hiddify/features/muse/logs/logs_page.dart';
 import 'package:hiddify/features/muse/settings/more_settings.dart' show MuseStatsPage;
+import 'package:hiddify/features/muse/traffic/traffic_page.dart';
 import 'package:hiddify/features/muse/widget/muse_segmented.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -42,12 +44,18 @@ enum MuseActivityTab {
 /// The tab a 设置 search result opens.
 MuseActivityTab museActivityTabForSetting(String title) => MuseActivityTab.fromKey(museActivityTabKeyForSetting(title));
 
-/// Route name / path of 活动 (under 设置).
+/// Route name / path of 活动 (under 设置). 1.22.0：只剩一个跳转，打开流量页的「连接」段。
 const museActivityRoute = 'activity';
 const museActivityPath = '/settings/activity';
 
-/// The location that opens [tab].
-String museActivityLocation(MuseActivityTab tab) => '$museActivityPath?tab=${tab.key}';
+/// The location that opens [tab]. 1.22.0：在流量页里（/traffic?tab=…）。
+String museActivityLocation(MuseActivityTab tab) => '$museTrafficPath?tab=${tab.key}';
+
+/// 1.22.0：/settings/activity?tab=… → /traffic?tab=…（旧深链、托盘、旧书签；?tab=diagnose 另由路由送去诊断）。
+String museActivityRedirect(Uri old) => museActivityLocation(MuseActivityTab.fromKey(old.queryParameters['tab']));
+
+/// The title the four blocks show: 「流量」 inside the 流量 page, 「活动」 elsewhere (tests pump them alone).
+String museActivityTitle(BuildContext context) => MuseTrafficScope.maybeOf(context) == null ? '活动' : museTrafficTitle;
 
 /// The stream behind [tab]; ended when the tab is left (null = the tab has none).
 ProviderOrFamily? museActivityStream(MuseActivityTab tab) => switch (tab) {
@@ -82,15 +90,23 @@ class MuseActivityPage extends HookConsumerWidget {
       });
     }
 
+    // 1.22.0：在流量页里，上面一排「连接 / 规则」，下面一排「实时 / 日志 / DNS / 统计」
+    final traffic = MuseTrafficScope.maybeOf(context);
+    final tabs = MuseSegmented<MuseActivityTab>(
+      key: const ValueKey('activity_tabs'),
+      values: MuseActivityTab.values,
+      selected: tab.value,
+      label: traffic == null ? (t) => t.title : museTrafficTabLabel,
+      onChanged: select,
+    );
     final header = Padding(
       padding: EdgeInsets.fromLTRB(MuseSpace.page(context), 0, MuseSpace.page(context), MuseSpace.s8),
-      child: MuseSegmented<MuseActivityTab>(
-        key: const ValueKey('activity_tabs'),
-        values: MuseActivityTab.values,
-        selected: tab.value,
-        label: (t) => t.title,
-        onChanged: select,
-      ),
+      child: traffic == null
+          ? tabs
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [traffic.segmented, const SizedBox(height: MuseSpace.s8), tabs],
+            ),
     );
     return switch (tab.value) {
       MuseActivityTab.connections => MuseConnectionsPage(key: const ValueKey('activity_connections'), header: header),

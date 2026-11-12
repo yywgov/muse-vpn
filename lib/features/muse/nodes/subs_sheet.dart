@@ -243,7 +243,7 @@ class MuseSubsPanel extends ConsumerWidget {
             itemBuilder: (_) => [
               if (profiles.length > 1) const PopupMenuItem(key: ValueKey('subs_more_order'), value: 'order', child: Text('排序')),
               const PopupMenuItem(key: ValueKey('subs_more_settings'), value: 'sub_settings', child: Text(museSubSettingsTitle)),
-              if (profiles.isNotEmpty) const PopupMenuItem(key: ValueKey('subs_more_overrides'), value: 'overrides', child: Text('全部覆写')),
+              if (profiles.isNotEmpty) const PopupMenuItem(key: ValueKey('subs_more_overrides'), value: 'overrides', child: Text('全部订阅修改')),
               const PopupMenuDivider(),
               const PopupMenuItem(key: ValueKey('subs_more_import'), value: 'import', child: Text(museImportConfigTitle)),
               const PopupMenuItem(key: ValueKey('subs_more_export'), value: 'export', child: Text(museExportConfigTitle)),

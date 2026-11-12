@@ -469,14 +469,17 @@ void main() {
   });
 
   group('C10 开发者选项', () {
+    // 1.22.0 F2：开发者选项在 设置 › 关于 组里；内核与资源在 设置 › 连接与网络 组里
     testWidgets('设置: hidden by default, shown after it was turned on', (tester) async {
-      await _pump(tester, const SettingsPage());
-      await tester.scrollUntilVisible(find.byKey(const ValueKey('settings_about')), 300);
+      await _pump(tester, const MuseAboutGroupPage());
+      expect(find.byKey(const ValueKey('settings_about')), findsOneWidget);
       expect(find.byKey(const ValueKey('settings_developer')), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await _pump(tester, const MuseNetGroupPage());
       expect(find.byKey(const ValueKey('settings_resources')), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
 
-      await _pump(tester, const SettingsPage(), prefs: {'muse_dev_mode': true});
+      await _pump(tester, const MuseAboutGroupPage(), prefs: {'muse_dev_mode': true});
       await tester.scrollUntilVisible(find.byKey(const ValueKey('settings_developer')), 300);
       expect(find.byKey(const ValueKey('settings_developer')), findsOneWidget);
       expect(tester.takeException(), isNull);

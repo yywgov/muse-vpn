@@ -26,7 +26,7 @@ class MuseDeveloperPage extends HookConsumerWidget {
       body: MuseGroupedBody(
         children: [
           MuseSection(
-            header: '测速',
+            header: '延迟测试',
             children: [
               MuseTile(
                 key: const ValueKey('node_test_workers'),

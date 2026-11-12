@@ -205,7 +205,8 @@ void main() {
   group('设置 › 隐私', () {
     test('设置首页第二行是隐私', () {
       // 1.20.3：改名「隐私与通知」，排在 网络 后面
-      expect(museSettingsHomeRows(android: true, developer: false), contains('隐私与通知'));
+      // 1.22.0：隐私与通知在 设置 › 连接与网络 里
+      expect(museSettingsHomeRows(android: true, developer: false), contains('连接与网络'));
     });
 
     testWidgets('三项都在，敏感页禁止截屏只在安卓', (tester) async {
@@ -226,7 +227,7 @@ void main() {
     });
 
     test('搜索：移走的项打开隐私页；旧名（深浅色、纯黑、主题、首页样式）仍打开外观', () {
-      expect(MuseSettingPage.privacy.path, '设置 › 隐私与通知'); // 1.20.3
+      expect(MuseSettingPage.privacy.path, '设置 › 连接与网络 › 隐私与通知'); // 1.20.3；1.22.0
       expect(_first('隐私模式'), MuseSettingPage.privacy);
       expect(_first('敏感页禁止截屏'), MuseSettingPage.privacy);
       expect(_first('截屏'), MuseSettingPage.privacy);
@@ -244,7 +245,7 @@ void main() {
       final e = museSettingEntries.where((e) => e.page == MuseSettingPage.openSource).single;
       expect(e.title, '开源许可');
       expect(e.keywords, ['开源许可', '源代码', 'GPL', '许可证']);
-      expect(MuseSettingPage.openSource.path, '设置 › 关于 › 开源许可');
+      expect(MuseSettingPage.openSource.path, '设置 › 关于 › 关于穿云 › 开源许可'); // 1.22.0
       expect(museSearchSettings('致谢', android: true, windows: false), isEmpty);
       expect(_first('GPL'), MuseSettingPage.openSource);
     });

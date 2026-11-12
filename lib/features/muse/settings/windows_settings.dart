@@ -42,7 +42,7 @@ class MuseWindowsModeTile extends ConsumerWidget {
     return MuseTile(
       key: const ValueKey('settings_service_mode'),
       leading: const Icon(Icons.swap_horiz_outlined),
-      title: '运行模式',
+      title: '接管方式',
       trailing: tunNeedsAdmin
           ? const Icon(Icons.error_outlined, color: MusePalette.orange, size: MuseIconSize.small)
           : Text(mode == ServiceMode.tun ? 'TUN' : '系统代理'),
@@ -50,7 +50,7 @@ class MuseWindowsModeTile extends ConsumerWidget {
       onTap: () async {
         final dialogs = ref.read(dialogNotifierProvider.notifier);
         final picked = await dialogs.showSettingPicker<ServiceMode>(
-          title: '运行模式',
+          title: '接管方式',
           selected: mode,
           options: const [ServiceMode.systemProxy, ServiceMode.tun],
           getTitle: _modeTitle,

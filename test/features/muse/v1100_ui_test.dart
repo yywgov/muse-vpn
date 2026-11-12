@@ -22,12 +22,15 @@ void main() {
       // 1.20.2：「网络」下面加「分流规则」（订阅页并入节点页）
       // 1.20.3：+ 隐私（外观页的隐私三项搬来）
       // 1.20.3：一级结构改为 外观、启动与断线、分流规则、网络、隐私与通知、活动、诊断、内核与资源、备份与恢复、关于；分应用代理进了分流规则页
-      expect(museSettingsHomeRows(android: true, developer: false), ['外观', '启动与断线', '分流规则', '网络', '隐私与通知', '活动', '诊断', '内核与资源', '备份与恢复', '关于']);
+      // 1.22.0 F2：一级 6 组（分流规则、活动搬到底栏「流量」）
+      expect(museSettingsHomeRows(android: true, developer: false), ['连接与网络', '订阅与节点', '外观', '自动化', '诊断', '关于']);
     });
     test('Windows has no 分应用代理; 开发者选项 only once turned on', () {
-      expect(museSettingsHomeRows(android: false, developer: false), hasLength(10)); // 1.20.2：+ 分流规则；1.20.3：十项（见上）
+      expect(museSettingsHomeRows(android: false, developer: false), hasLength(6)); // 1.22.0：6 组
       expect(museSettingsHomeRows(android: false, developer: false), isNot(contains('分应用代理')));
-      expect(museSettingsHomeRows(android: true, developer: true).last, '开发者选项');
+      // 1.22.0：开发者选项在「关于」组里
+      expect(museSettingsHomeRows(android: true, developer: true), isNot(contains('开发者选项')));
+      expect(_src('lib/features/settings/overview/settings_page.dart'), contains("if (devMode)\n                MuseTile(\n                  key: const ValueKey('settings_developer')"));
     });
     test('the removed rows are not on the page any more', () {
       final page = _src('lib/features/settings/overview/settings_page.dart');
@@ -35,7 +38,9 @@ void main() {
         expect(page, isNot(contains("ValueKey('$k')")), reason: k);
       }
       expect(page, isNot(contains("ValueKey('settings_sync')")));
-      for (final k in ['settings_auto_connect', 'settings_network', 'settings_activity', 'settings_resources', 'settings_about']) {
+      // 1.22.0：活动成了底栏「流量」
+      expect(page, isNot(contains("ValueKey('settings_activity')")));
+      for (final k in ['settings_auto_connect', 'settings_network', 'settings_resources', 'settings_about']) {
         expect(page, contains("ValueKey('$k')"), reason: k);
       }
     });
@@ -60,9 +65,9 @@ void main() {
       moved.forEach((q, page) => expect(_first(q), page, reason: q));
       expect(_first('运行模式', android: false, windows: true), MuseSettingPage.network);
       expect(_first('窗口置顶', android: false, windows: true), MuseSettingPage.windowAdvanced);
-      expect(MuseSettingPage.stats.path, '设置 › 活动 › 统计');
-      expect(MuseSettingPage.advanced.path, '设置 › 网络 › 高级');
-      expect(MuseSettingPage.nodes.path, startsWith('节点 ›'));
+      expect(MuseSettingPage.stats.path, '流量 › 连接 › 统计');
+      expect(MuseSettingPage.advanced.path, '设置 › 连接与网络 › 网络 › 高级');
+      expect(MuseSettingPage.nodes.path, '设置 › 订阅与节点 › 节点设置');
     });
     test('统计 / 诊断 open as tabs of 活动', () {
       expect(museActivityTabKeyForSetting('统计'), 'stats');
@@ -103,9 +108,9 @@ void main() {
     test('分流 / 订阅覆写 search lands on the 规则 page under 订阅', () {
       expect(_first('分流'), MuseSettingPage.routing);
       // 1.20.2：订阅页并入节点页——分流规则在设置「网络」下面，订阅覆写跟着订阅的 ⋮
-      expect(MuseSettingPage.routing.path, '设置 › 分流规则');
-      // 1.20.3：订阅弹层 ⋯ › 全部覆写
-      expect(MuseSettingPage.overrides.path, '节点 › 订阅名 ▾ › ⋯ › 全部覆写');
+      // 1.22.0：分流规则在 流量 › 规则；订阅修改（原覆写）在 设置 › 订阅与节点（订阅弹层 ⋯ 里也有）
+      expect(MuseSettingPage.routing.path, '流量 › 规则');
+      expect(MuseSettingPage.overrides.path, '设置 › 订阅与节点 › 订阅修改');
     });
     test('覆写 JSON is in 规则 › ⋯, not in 设置', () {
       expect(_src('lib/features/muse/config/rules_page.dart'), contains("ValueKey('rules_more_override_json')"));

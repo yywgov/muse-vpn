@@ -9,7 +9,7 @@
 
 enum MuseCoreKind {
   standard('standard', '标准内核', '默认，稳定，支持的节点类型最全'),
-  compat('compat', '兼容内核', '新：原生读取订阅里的代理组与规则');
+  compat('compat', '兼容内核', '新：原生读取订阅里的分组与规则');
 
   const MuseCoreKind(this.key, this.title, this.blurb);
 

@@ -222,7 +222,7 @@ class _MuseNodeFormDialogState extends State<MuseNodeFormDialog> {
               if (_error != null)
                 Text(_error!, key: const ValueKey('node_add_error'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
               const SizedBox(height: MuseSpace.s8),
-              Text('保存在当前订阅的覆写里，订阅更新后仍会保留。', style: Theme.of(context).textTheme.bodySmall),
+              Text('保存在当前订阅的订阅修改里，订阅更新后仍会保留。', style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
         ),
@@ -298,7 +298,7 @@ class _MuseNodeEditDialogState extends State<MuseNodeEditDialog> {
             if (_error != null)
               Text(_error!, key: const ValueKey('node_edit_error'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
             const SizedBox(height: MuseSpace.s8),
-            Text('修改只保存在本机，作为本地覆写叠加在订阅上，订阅更新后仍会保留。', style: Theme.of(context).textTheme.bodySmall),
+            Text('修改只保存在本机，叠加在订阅上，订阅更新后仍会保留。', style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
       ),

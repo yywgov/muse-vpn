@@ -3,51 +3,62 @@
 
 import 'package:flutter/foundation.dart' show kDebugMode;
 
-/// The page a setting lives on. 1.20.3：设置一级 外观、启动与断线、分流规则、网络、隐私与通知、活动、诊断、内核与资源、
+/// The page a setting lives on. 1.22.0：设置一级 6 组（连接与网络、订阅与节点、外观、自动化、诊断、关于），
+/// 活动与分流规则在底栏「流量」。1.20.3：设置一级 外观、启动与断线、分流规则、网络、隐私与通知、活动、诊断、内核与资源、
 /// 备份与恢复、关于（+ 开发者选项）；旧名都留着能搜到。1.10.0: the 设置 home page has 8 rows (外观, 自动连接, 分应用代理,
 /// 网络, 活动, 备份与同步, 内核与资源, 关于); rows that moved elsewhere keep their old names here so
 /// search still finds them, with the path of their new place. 1.11.0: removed settings (配色风格, 文字缩放,
 /// 隐藏桌面图标, 局域网同步, WebDAV 同步, 每周本地快照, 连接质量提醒, 导出 CSV) are gone from search too.
 enum MuseSettingPage {
-  advanced('设置 › 网络 › 高级'),
+  // 1.22.0 F2：网络、内核与资源、隐私与通知 收进「连接与网络」
+  advanced('设置 › 连接与网络 › 网络 › 高级'),
   appearance('设置 › 外观'),
   // 1.20.3：隐私 → 隐私与通知（+ Android 通知栏断开按钮、隐藏通知、在最近任务中隐藏）
-  privacy('设置 › 隐私与通知'),
+  privacy('设置 › 连接与网络 › 隐私与通知'),
   // 1.20.3：节点设置只留显示相关
-  nodes('节点 › ⋯ › 节点设置'),
+  // 1.22.0：设置 › 订阅与节点 里也有（节点 › ⋯ › 节点设置 不变）
+  nodes('设置 › 订阅与节点 › 节点设置'),
   // 1.20.2：订阅页并入节点页；1.20.3：分流规则排在网络前面
-  routing('设置 › 分流规则'),
+  // 1.22.0 F1-A：分流规则成了底栏「流量」的「规则」段
+  routing('流量 › 规则'),
   // 1.20.3：自定义规则列表（原 Hiddify「路由」页）挂回 /settings，页标题「我的规则」
-  myRules('设置 › 分流规则 › 我的规则'),
-  network('设置 › 网络'),
+  myRules('流量 › 规则 › 我的规则'),
+  network('设置 › 连接与网络 › 网络'),
+  // 1.22.0 F2：一级分组
+  netGroup('设置 › 连接与网络'),
+  subsGroup('设置 › 订阅与节点'),
   // 1.20.3：导出 / 导入配置从关于页搬到设置一级「备份与恢复」
-  sync('设置 › 备份与恢复'),
-  stats('设置 › 活动 › 统计'),
-  developer('设置 › 开发者选项'),
+  // 1.22.0 F2：备份与恢复、开发者选项 收进「关于」
+  sync('设置 › 关于 › 备份与恢复'),
+  stats('流量 › 连接 › 统计'),
+  developer('设置 › 关于 › 开发者选项'),
   // 1.20.3：分应用代理进了分流规则页（路由 /settings/per-app 不变）
-  perApp('设置 › 分流规则 › 分应用代理'),
+  perApp('流量 › 规则 › 分应用代理'),
   // 1.20.3：诊断升为设置一级（原 活动 › 诊断）
   diagnose('设置 › 诊断'),
   about('设置 › 关于'),
   // 1.6.0 C10
-  resources('设置 › 内核与资源'),
-  themePreview('设置 › 开发者选项 › 主题预览'),
+  resources('设置 › 连接与网络 › 内核与资源'),
+  themePreview('设置 › 关于 › 开发者选项 › 主题预览'),
   // 1.8.0
-  activity('设置 › 活动'),
+  // 1.22.0 F1-A：活动成了「流量 › 连接」
+  activity('流量 › 连接'),
   // 1.9.0；1.20.3：自动连接 → 启动与断线
-  autoConnect('设置 › 启动与断线'),
+  // 1.22.0 F2：启动与断线 → 自动化
+  autoConnect('设置 › 自动化'),
   // 1.20.3：按需运行 + 按 Wi‑Fi 切换模式 合成一页
-  wifiRules('设置 › 启动与断线 › Wi‑Fi 规则'),
+  wifiRules('设置 › 自动化 › Wi‑Fi 规则'),
   // 1.9.0 #17；1.20.3：订阅弹层 ⋯ › 全部覆写（单个订阅在 订阅名 ▾ › ⋮ › 订阅覆写）
-  overrides('节点 › 订阅名 ▾ › ⋯ › 全部覆写'),
+  // 1.22.0 F20：覆写 → 订阅修改；设置 › 订阅与节点 里也有
+  overrides('设置 › 订阅与节点 › 订阅修改'),
   // 1.20.2：订阅弹层（节点页标题「订阅名 ▾」）
-  subscriptions('节点 › 订阅名 ▾ › ⋯'),
+  subscriptions('设置 › 订阅与节点 › 订阅列表'),
   // 1.20.3：订阅自动更新、更新后测速、更新方式、订阅 UA
-  subSettings('节点 › 订阅名 ▾ › ⋯ › 订阅设置'),
+  subSettings('设置 › 订阅与节点 › 订阅设置'),
   // 1.20.3：开源许可与致谢 → 开源许可（致谢分组已删）
-  openSource('设置 › 关于 › 开源许可'),
+  openSource('设置 › 关于 › 关于穿云 › 开源许可'),
   // 1.11.0；1.20.3：节点设置不再有「高级」，重复判断在「隐藏重复节点」下面（保留给旧条目）
-  nodesAdvanced('节点 › ⋯ › 节点设置'),
+  nodesAdvanced('设置 › 订阅与节点 › 节点设置'),
   windowAdvanced('设置 › 外观 › 窗口 › 高级');
 
   const MuseSettingPage(this.path);
@@ -85,7 +96,7 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('主题色', MuseSettingPage.appearance, keywords: ['颜色', '强调色', '中国传统色', '传统色', '景泰蓝', '宝蓝', '竹青', '松花', '胭脂', '枣红', '藤黄', '青碧', '丁香', '赭石', '蓝', '绿', '紫', '青', '红', '黄', '灰', '棕']),
   MuseSettingEntry('自定义主题色', MuseSettingPage.appearance, keywords: ['十六进制', 'hex', '#', '自定义颜色', '取色']),
   // 1.20.3：编辑首页卡片（首页标题栏 ✎ 或长按卡片；外观里的入口交给外观原型）
-  MuseSettingEntry('编辑首页卡片', MuseSettingPage.appearance, keywords: ['编辑首页', '首页卡片', '卡片', '服务状态', '代理组', '内存']),
+  MuseSettingEntry('编辑首页卡片', MuseSettingPage.appearance, keywords: ['编辑首页', '首页卡片', '卡片', '服务状态', '分组', '代理组', '内存']),
   // 1.20.3：隐私 → 隐私与通知
   MuseSettingEntry('隐私与通知', MuseSettingPage.privacy, keywords: ['隐私', '隐私模式', '截屏', '剪贴板', '安全', '通知', '最近任务']),
   MuseSettingEntry('隐私', MuseSettingPage.privacy, keywords: ['隐私模式', '截屏', '剪贴板', '安全']),
@@ -117,10 +128,16 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('订阅 UA', MuseSettingPage.subSettings, keywords: ['User-Agent', '格式', '客户端']),
   MuseSettingEntry('订阅更新方式', MuseSettingPage.subSettings, keywords: ['走代理', '直连', '订阅下载']),
   MuseSettingEntry('清除测速记录', MuseSettingPage.nodes, keywords: ['延迟', '缓存']),
-  MuseSettingEntry('订阅覆写', MuseSettingPage.overrides, keywords: ['覆写', '覆写脚本', '追加节点', '代理组', '自定义规则', 'override', '全部覆写']),
-  MuseSettingEntry('分流规则', MuseSettingPage.routing, keywords: ['规则', '路由规则', '分流', '生效顺序']),
+  // 1.22.0 F20：订阅覆写 → 订阅修改；旧名留一条
+  MuseSettingEntry('订阅修改', MuseSettingPage.overrides, keywords: ['订阅覆写', '覆写', '覆写脚本', '追加节点', '分组', '代理组', '自定义规则', 'override', '全部覆写', '全部订阅修改']),
+  MuseSettingEntry('订阅覆写', MuseSettingPage.overrides, keywords: ['覆写', '覆写脚本', '追加节点', '代理组', '自定义规则', 'override', '全部覆写', '订阅修改']),
+  MuseSettingEntry('分流规则', MuseSettingPage.routing, keywords: ['规则', '路由规则', '分流', '生效顺序', '流量']),
+  // 1.22.0 F1-A：底栏「流量」（连接 / 规则）
+  MuseSettingEntry('流量', MuseSettingPage.activity, keywords: ['活动', '连接', '规则', '分流', '实时连接', '日志', 'DNS', '统计']),
   // 1.20.3：规则 / 全局（原来只有首页胶囊、托盘能改）
-  MuseSettingEntry('规则 / 全局模式', MuseSettingPage.routing, keywords: ['模式', '规则模式', '全局模式', '全局', '代理模式']),
+  MuseSettingEntry('规则 / 全局模式', MuseSettingPage.routing, keywords: ['模式', '规则模式', '全局模式', '全局', '代理模式', '分流模式']),
+  // 1.22.0 F20：叫「分流模式」（旧名那条排在前面，搜旧词先出旧名）
+  MuseSettingEntry('分流模式', MuseSettingPage.routing, keywords: ['规则 / 全局模式', '模式', '规则模式', '全局模式', '全局', '代理模式']),
   // 1.20.3：自定义规则列表 → 我的规则（原 Hiddify「路由」页）
   MuseSettingEntry('我的规则', MuseSettingPage.myRules, keywords: ['自定义规则', '自定义规则列表', '路由', '规则列表', '恢复默认规则']),
   MuseSettingEntry('自定义规则列表', MuseSettingPage.myRules, keywords: ['路由', '我的规则']),
@@ -169,7 +186,9 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('出口与解锁', MuseSettingPage.diagnose, keywords: ['出口', '出口 IP', '解锁检测', '服务状态', 'Netflix', 'ChatGPT']),
   MuseSettingEntry('DNS 泄漏检测', MuseSettingPage.diagnose, keywords: ['DNS 泄漏', '泄露', '隐私']),
   // 1.20.3：首页卡片「网络接管」改名「运行模式」，旧名还能搜到
-  MuseSettingEntry('运行模式', MuseSettingPage.network, keywords: ['TUN', '系统代理', '虚拟网卡', '网络接管'], windowsOnly: true),
+  MuseSettingEntry('运行模式', MuseSettingPage.network, keywords: ['TUN', '系统代理', '虚拟网卡', '网络接管', '接管方式'], windowsOnly: true),
+  // 1.22.0 F20：运行模式 → 接管方式（旧名那条排在前面）
+  MuseSettingEntry('接管方式', MuseSettingPage.network, keywords: ['TUN', '系统代理', '虚拟网卡', '网络接管', '运行模式'], windowsOnly: true),
   MuseSettingEntry('开机自启', MuseSettingPage.autoConnect, keywords: ['启动', '开机'], windowsOnly: true),
   MuseSettingEntry('静默启动', MuseSettingPage.autoConnect, keywords: ['托盘', '后台启动', '不弹窗口', '隐藏窗口'], windowsOnly: true),
   MuseSettingEntry('关闭窗口时', MuseSettingPage.appearance, keywords: ['托盘', '最小化', '退出', '窗口'], windowsOnly: true),
@@ -184,15 +203,21 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('快捷键', MuseSettingPage.windowAdvanced, keywords: ['全局快捷键', '热键', '键盘'], windowsOnly: true),
   // 1.20.5：「打开即连接」（1.6.0 C9，旧名「自动运行」）已取消，不再有搜索项
   // 1.20.3：自动连接 → 启动与断线
-  MuseSettingEntry('启动与断线', MuseSettingPage.autoConnect, keywords: ['自动连接', '开机自启', '断线处理', 'Wi‑Fi 规则', '定时连接', '定时断开']),
+  // 1.22.0 F2：启动与断线 → 自动化
+  MuseSettingEntry('自动化', MuseSettingPage.autoConnect, keywords: ['启动与断线', '自动连接', '开机自启', '断线处理', 'Wi‑Fi 规则', '定时连接', '定时断开']),
+  MuseSettingEntry('启动与断线', MuseSettingPage.autoConnect, keywords: ['自动连接', '开机自启', '断线处理', 'Wi‑Fi 规则', '定时连接', '定时断开', '自动化']),
   MuseSettingEntry('自动连接', MuseSettingPage.autoConnect, keywords: ['开机自启', '按需运行', '定时连接', '定时断开', '启动与断线']),
   MuseSettingEntry('通知栏断开按钮', MuseSettingPage.privacy, keywords: ['通知', '断开', '停止按钮'], androidOnly: true),
   // 1.10.2；1.20.3：搬到 隐私与通知
   MuseSettingEntry('在最近任务中隐藏', MuseSettingPage.privacy, keywords: ['最近任务', '多任务', '后台列表', '隐藏', '不在最近任务显示'], androidOnly: true),
   MuseSettingEntry('检查更新', MuseSettingPage.about, keywords: ['版本', '更新内容']),
+  // 1.22.0 F2：一级分组本身
+  MuseSettingEntry('连接与网络', MuseSettingPage.netGroup, keywords: ['网络', '内核', '隐私', '通知', '接管方式']),
+  MuseSettingEntry('订阅与节点', MuseSettingPage.subsGroup, keywords: ['订阅', '节点', '订阅修改', '订阅设置', '节点设置']),
+  MuseSettingEntry('关于穿云', MuseSettingPage.about, keywords: ['关于', '版本', '检查更新', '开源许可']),
   // 1.6.0 C10；1.20.3：内核 / 内核与资源 / 内核版本 三条留着（旧名），关键词互相覆盖
   MuseSettingEntry('内核与资源', MuseSettingPage.resources, keywords: ['资源', '内核', '规则集', '规则文件', '更新规则', '数据库', '切换内核', '内核版本']),
-  MuseSettingEntry('内核', MuseSettingPage.resources, keywords: ['切换内核', '标准内核', '兼容内核', '双内核', '引擎', '代理组', '内核与资源']),
+  MuseSettingEntry('内核', MuseSettingPage.resources, keywords: ['切换内核', '标准内核', '兼容内核', '双内核', '引擎', '分组', '代理组', '内核与资源']),
   MuseSettingEntry('地理规则库', MuseSettingPage.resources, keywords: ['geosite', 'geoip', '数据库', '内置规则集', '检查并修复', '资源']),
   MuseSettingEntry('规则集', MuseSettingPage.resources, keywords: ['远程规则集', '规则文件', '下载状态', '资源']),
   MuseSettingEntry('主题预览', MuseSettingPage.themePreview, keywords: ['预览', '主题', '配色', '样式', '单选示例', '开关示例', '开发者选项'], debugOnly: true),

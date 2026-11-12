@@ -42,7 +42,7 @@ class MuseHealthBanner extends ConsumerWidget {
           icon: Icons.health_and_safety_outlined,
           color: MusePalette.orange,
           title: '安全模式',
-          text: '连续 $museSafeModeAfter 次启动失败，已停用桌面小组件更新和自定义规则（分流规则、规则集、从连接加的规则、屏蔽域名、订阅覆写），以最小配置连接。确认能正常连接后可退出。',
+          text: '连续 $museSafeModeAfter 次启动失败，已停用桌面小组件更新和自定义规则（分流规则、规则集、从连接加的规则、屏蔽域名、订阅修改），以最小配置连接。确认能正常连接后可退出。',
           actions: [
             ('退出安全模式', () async {
               await ref.read(museHealthProvider.notifier).exitSafeMode();

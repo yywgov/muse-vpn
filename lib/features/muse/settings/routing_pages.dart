@@ -31,7 +31,7 @@ List<Rule> museEffectiveRules(WidgetRef ref) {
 }
 
 /// 1.20.3：分流规则页顶的一行，按 config_option_repository 里实际拼接的顺序写（局域网始终第一，不列）。
-const museRoutingOrderText = '生效顺序：订阅覆写 → 已屏蔽 → 来自连接 → 自定义规则 → 预设 → 远程规则集 → 内置规则 → 其余走代理。指定节点在规则、全局模式下都生效。';
+const museRoutingOrderText = '生效顺序：订阅修改 → 已屏蔽 → 来自连接 → 自定义规则 → 预设 → 远程规则集 → 内置规则 → 其余走代理。指定节点在规则、全局模式下都生效。';
 
 /// 1.20.3：分流规则页「我的规则」组里那一行的标题（打开的页面标题是「我的规则」）。
 const museMyRulesTitle = '我的规则';
@@ -40,7 +40,10 @@ const museMyRulesTitle = '我的规则';
 bool museRouteModeByWifi({required String applied, required MuseRouteMode current}) => applied.isNotEmpty && applied == current.key;
 
 class MuseRoutingPage extends HookConsumerWidget {
-  const MuseRoutingPage({super.key, this.embedded = false, this.android});
+  const MuseRoutingPage({super.key, this.embedded = false, this.android, this.header});
+
+  /// 1.22.0：在流量页「规则」段里，最上面是「连接 / 规则」切换
+  final Widget? header;
 
   /// 1.9.0 #17: shown as the 「分流」 tab of 「规则」 (body only, plus the rule list entry)
   final bool embedded;
@@ -64,6 +67,7 @@ class MuseRoutingPage extends HookConsumerWidget {
 
     final body = MuseGroupedBody(
         children: [
+          ?header,
           // 1.20.3：谁先谁后，一行写清
           Padding(
             padding: EdgeInsets.fromLTRB(MuseSpace.page(context) + MuseSpace.s16, MuseSpace.s4, MuseSpace.page(context) + MuseSpace.s16, MuseSpace.s4),
@@ -75,7 +79,8 @@ class MuseRoutingPage extends HookConsumerWidget {
               MuseTile(
                 key: const ValueKey('routing_mode'),
                 leading: const Icon(Icons.alt_route_outlined),
-                title: '模式',
+                // 1.22.0 F20：「模式」→「分流模式」（和接管方式、首页风格分开）
+                title: '分流模式',
                 subtitle: byWifi ? '由「Wi‑Fi 规则」设定，手动改了以你的为准' : null,
                 subtitleMaxLines: 2,
                 trailing: SizedBox(
@@ -105,7 +110,7 @@ class MuseRoutingPage extends HookConsumerWidget {
             header: museMyRulesTitle,
             children: [
               // 1.20.3 第 2 轮：行顺序和页顶生效顺序一致（已屏蔽 → 来自连接 → 自定义规则）；指定节点不在这条链里，放最后
-              // 1.20.3：在「活动 › 连接」里屏蔽的网站，原来只能靠 toast 撤销
+              // 1.20.3：在「流量 › 连接」里屏蔽的网站，原来只能靠 toast 撤销
               MuseTile(
                 key: const ValueKey('routing_blocked_hosts'),
                 leading: const Icon(Icons.do_not_disturb_on_outlined),
@@ -114,7 +119,7 @@ class MuseRoutingPage extends HookConsumerWidget {
                 chevron: true,
                 onTap: () => showMuseBlockedHostsSheet(context),
               ),
-              // 1.12.0: 在「活动 › 连接」里加的 直连 / 走代理；1.20.3：没有时也显示，写「无」
+              // 1.12.0: 在「流量 › 连接」里加的 直连 / 走代理；1.20.3：没有时也显示，写「无」
               MuseTile(
                 key: const ValueKey('routing_quick_rules'),
                 leading: const Icon(Icons.bolt_outlined),
@@ -244,7 +249,7 @@ class MuseRoutingMoreMenu extends ConsumerWidget {
   }
 }
 
-/// 1.20.3：在「活动 › 连接」里屏蔽的网站（MusePrefs.blockedHosts），每个一行，可删除。
+/// 1.20.3：在「流量 › 连接」里屏蔽的网站（MusePrefs.blockedHosts），每个一行，可删除。
 Future<void> showMuseBlockedHostsSheet(BuildContext context) => showMuseSnapSheet<void>(
   context,
   title: '已屏蔽的网站',
@@ -257,7 +262,7 @@ Future<void> showMuseBlockedHostsSheet(BuildContext context) => showMuseSnapShee
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s8),
-            child: Text('在「活动 › 连接」里点「屏蔽」加入，含子域名；排在订阅覆写之后、其他规则之前。', style: MuseType.caption(ctx)),
+            child: Text('在「流量 › 连接」里点「屏蔽」加入，含子域名；排在订阅修改之后、其他规则之前。', style: MuseType.caption(ctx)),
           ),
           if (hosts.isEmpty) const ListTile(title: Text('没有屏蔽的网站')),
           for (final h in hosts)
@@ -590,7 +595,7 @@ Future<void> showMuseQuickRulesSheet(BuildContext context) => showMuseSnapSheet<
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(MuseSpace.s16, 0, MuseSpace.s16, MuseSpace.s8),
-            child: Text('在「活动 › 连接」详情里设置，优先于其他自定义规则（含子域名）。', style: MuseType.caption(ctx)),
+            child: Text('在「流量 › 连接」详情里设置，优先于其他自定义规则（含子域名）。', style: MuseType.caption(ctx)),
           ),
           if (rules.isEmpty) const ListTile(title: Text('没有规则')),
           for (final r in rules)

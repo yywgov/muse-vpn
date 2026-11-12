@@ -363,7 +363,7 @@ class MuseDeskToolRow extends ConsumerWidget {
                 // 测速 needs a running core (the same rule as on 节点)
                 onPressed: running && !testing ? () => museRunNodeTest(ref) : null,
                 icon: const Icon(Icons.speed_outlined, size: MuseIconSize.small),
-                label: Text(testing ? '测速中' : '测速'),
+                label: Text(testing ? '测延迟中' : '测延迟'),
               ),
             IconButton(
               key: const ValueKey('home_edit_button'),

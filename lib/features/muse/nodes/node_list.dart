@@ -308,7 +308,7 @@ class MuseNodeList extends HookConsumerWidget {
                         ),
                       ],
                     )
-                  : const Text('测速'),
+                  : const Text('测延迟'),
             ),
             if (moreItems.isNotEmpty)
               PopupMenuButton<String>(
@@ -360,9 +360,12 @@ class MuseNodeList extends HookConsumerWidget {
               return w;
             }
 
-            // 按钮行宽度估算：图标按钮 48 + 测速按钮（文字 + 左右 16 + 图标）
+            // 按钮行宽度估算：图标按钮 48 + 测延迟按钮（左右 16 + 较宽的那个标签：「测延迟」或测试中的「停止」+ 沙漏图标）
+            // 1.22.0 F20：标签由「测速」改为「测延迟」，估算改按实际较宽的状态算（原来按「测速」+ 图标 + 余量）
             final icons = toolbarActions.length - 1;
-            final buttonsW = icons * 48.0 + textW('测速', MuseType.body(context)) + MuseSpace.s32 + MuseIconSize.tiny + MuseSpace.s8 + 8;
+            final bodyStyle = MuseType.body(context);
+            final labelW = math.max(textW('测延迟', bodyStyle), textW('停止', bodyStyle) + MuseIconSize.tiny + MuseSpace.s4);
+            final buttonsW = icons * 48.0 + labelW + MuseSpace.s32 + MuseSpace.s4;
             final Widget titleText = subSwitcher
                 ? ConstrainedBox(constraints: BoxConstraints(maxWidth: c.maxWidth), child: MuseSubSwitcher(style: titleStyle))
                 : Text(title!, key: const ValueKey('muse_page_title'), maxLines: 1, style: titleStyle);
@@ -910,9 +913,9 @@ class MuseNodeList extends HookConsumerWidget {
                     onPressed: () => picked.value = sel.length == allNodes.length ? const {} : allNodes.toSet(),
                     child: Text(sel.length == allNodes.length ? '全不选' : '全选'),
                   ),
-                  action('test', Icons.speed_outlined, '测速', running ? () async {
+                  action('test', Icons.speed_outlined, '测延迟', running ? () async {
                     await museTestNodes(ref, sel);
-                    await done('已开始测速 ${sel.length} 个节点');
+                    await done('已开始测延迟 ${sel.length} 个节点');
                   } : null),
                   action('favorite', Icons.star_outlined, '收藏', () async {
                     var raw = ref.read(Preferences.museFavoriteNodes);
