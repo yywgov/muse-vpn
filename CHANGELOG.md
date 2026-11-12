@@ -6,10 +6,10 @@
 
 ### 1.20.4 - 2026-11-12
 
-- 内核 5.0.0-muse.25（muse-core 只改生成配置 `v2/config`，sing-box 本身不变）：远程 DNS 组（选中服务器 + tcp://1.1.1.1，都经节点）由顺序改为 sing-box 标准 `mode: parallel`——两台同时问，先回来的有记录答案即用，都为空才用空答案；HTTPS（type 65）、AAAA、NXDOMAIN 这类空答案首查从 2 个经节点往返降到 1 个。分组的接受规则（空答案只作后备、ignore_ranges）不变，直连组仍为顺序
+- 内核 5.0.0-chuanyun.25（内核版本名由 muse 改为 chuanyun，此前为 5.0.0-muse.N；仓库 yywgov/muse-core、分支 muse、release 产物名不变；muse-core 只改生成配置 `v2/config`，sing-box 本身不变）：远程 DNS 组（选中服务器 + tcp://1.1.1.1，都经节点）由顺序改为 sing-box 标准 `mode: parallel`——两台同时问，先回来的有记录答案即用，都为空才用空答案；HTTPS（type 65）、AAAA、NXDOMAIN 这类空答案首查从 2 个经节点往返降到 1 个。分组的接受规则（空答案只作后备、ignore_ranges）不变，直连组仍为顺序
 - 远程 DNS 答案不再改写为 86400 秒，保留服务器给的真实 TTL（不设下限：sing-box 的 rewrite_ttl 是固定值而非下限），沿用乐观缓存（过期先用旧答案、后台刷新，不增加等待）；直连侧与 Fake-IP 规则不变
 - 切换节点（手动、节点失效自动切换、自动最快入口、记住的节点）成功后清一次内核 DNS 缓存（复用「活动 › DNS › 清空缓存」同一接口 `POST /cache/dns/flush`，单次、静默、失败忽略，无轮询或定时器）
-- 关于 / 内核与资源页显示的标准内核版本 `museCoreRelease` 与 `dependencies.properties` 同步为 5.0.0-muse.25；兼容内核不变（`muse.compat.ref` 仍为 66d82b1）
+- 关于 / 内核与资源页显示的标准内核版本 `museCoreRelease` 与 `dependencies.properties` 同步为 5.0.0-chuanyun.25，「设置 › 内核与资源 › 内核版本」显示「内核 chuanyun.25」；版本号解析（museCoreReleaseNumber）同时认 chuanyun.N 与旧的 muse.N；兼容内核不变（`muse.compat.ref` 仍为 66d82b1）
 - 同时带上此前未随客户端发出的内核 muse.24 改动：测速失败原因字段、「自动最快」限定地区（`muse-auto-filter`，客户端 1.12.0 起已发送，旧内核 muse.23 忽略）
 
 ### 1.20.3 - 2026-11-12

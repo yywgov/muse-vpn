@@ -8,8 +8,23 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 /// The core release this build bundles (dependencies.properties `muse.core.version`; a test keeps
-/// the two equal).
-const museCoreRelease = '5.0.0-muse.25';
+/// the two equal). 1.20.4: release names are `5.0.0-chuanyun.N` from 25 on (`5.0.0-muse.N` up to
+/// 24); only the name changed — repository yywgov/muse-core, branch muse and the asset names stay.
+const museCoreRelease = '5.0.0-chuanyun.25';
+
+/// A core release name, new (`5.0.0-chuanyun.25`) or old (`5.0.0-muse.24`), with or without the
+/// tag's leading `v`.
+final museCoreReleasePattern = RegExp(r'^v?(\d+\.\d+\.\d+)-(chuanyun|muse)\.(\d+)$');
+
+/// The release number of [release] (25 for `5.0.0-chuanyun.25`, 24 for `v5.0.0-muse.24`), or null.
+/// Both prefixes count as one series, so chuanyun.25 is newer than muse.24.
+int? museCoreReleaseNumber(String release) {
+  final m = museCoreReleasePattern.firstMatch(release.trim());
+  return m == null ? null : int.parse(m.group(3)!);
+}
+
+/// 1.20.4: how 设置 › 内核与资源 › 内核版本 shows the standard core: 「内核 chuanyun.25」.
+String museCoreDisplay([String release = museCoreRelease]) => '内核 ${museCoreShort(release)}';
 
 /// While connected the core refreshes every rule-set in the background this often.
 const museRuleSetUpdateDays = 5;
@@ -85,7 +100,8 @@ String museRemoteRuleSetSource(String url) {
   return file == null ? u.host : '${u.host} · $file';
 }
 
-/// 1.10.0: the core release as 关于 shows it ('5.0.0-muse.20' → 'muse.20').
+/// 1.10.0: the core release as 关于 shows it ('5.0.0-muse.20' → 'muse.20'; 1.20.4:
+/// '5.0.0-chuanyun.25' → 'chuanyun.25').
 String museCoreShort([String release = museCoreRelease]) {
   final i = release.lastIndexOf('-');
   return i < 0 || i == release.length - 1 ? release : release.substring(i + 1);

@@ -152,7 +152,7 @@ void main() {
     });
 
     test('versions: 标准内核 = the release in dependencies.properties, 兼容内核 = the pinned engine', () {
-      expect(museCoreKindVersion(MuseCoreKind.standard), museCoreRelease);
+      expect(museCoreKindVersion(MuseCoreKind.standard), museCoreDisplay()); // 1.20.4: 「内核 chuanyun.25」
       expect(museCoreKindVersion(MuseCoreKind.compat), museCompatEngineVersion);
     });
 
@@ -168,7 +168,7 @@ void main() {
       await _pump(t, desktop: true);
       expect(find.text('内核'), findsWidgets);
       expect(find.text('标准内核'), findsOneWidget);
-      expect(find.text(museCoreRelease), findsOneWidget);
+      expect(find.text(museCoreDisplay()), findsOneWidget);
       expect(find.textContaining('重启应用后生效'), findsNothing);
     });
 
@@ -208,7 +208,7 @@ void main() {
       expect(dialogs, ['重启应用后生效|切换到兼容内核需要重新打开穿云。|立即重启']);
       expect(toasts.shown, isEmpty);
       expect(find.text('已选兼容内核，重启应用后生效'), findsOneWidget);
-      expect(find.text(museCoreRelease), findsOneWidget, reason: 'this run still uses 标准内核');
+      expect(find.text(museCoreDisplay()), findsOneWidget, reason: 'this run still uses 标准内核');
     });
 
     testWidgets('Windows: back to the loaded core needs no restart', (t) async {

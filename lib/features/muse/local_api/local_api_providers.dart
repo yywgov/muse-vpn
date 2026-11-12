@@ -261,7 +261,7 @@ Future<void> museCloseConnectionsAfterSwitch(T Function<T>(ProviderListenable<T>
 
 /// 1.20.4: after the node changes, the core's DNS cache is flushed once (the same call as 活动 ›
 /// DNS › 清空缓存, `POST /cache/dns/flush`, both cores): remote answers now keep the server's TTL
-/// (core muse.25) and a name looked up through the old node is resolved again through the new one
+/// (core chuanyun.25) and a name looked up through the old node is resolved again through the new one
 /// instead of reusing a CDN address chosen for the old node's location. One request, silent, any
 /// failure ignored; no timer, nothing runs while disconnected.
 Future<bool> museFlushDnsAfterSwitch(T Function<T>(ProviderListenable<T>) read) async {

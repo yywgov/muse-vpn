@@ -15,7 +15,7 @@ import 'package:hiddify/features/muse/home/widget_sync.dart';
 import 'package:hiddify/features/muse/logic/failover_tracker.dart';
 import 'package:hiddify/features/muse/logic/latency_cache.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart' show MuseNodeMetas;
-import 'package:hiddify/features/muse/logic/resources.dart' show museCoreRelease;
+import 'package:hiddify/features/muse/logic/resources.dart' show museCoreRelease, museCoreReleaseNumber;
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/logic/stats_tools.dart';
 import 'package:hiddify/features/muse/logic/subscription_bar.dart';
@@ -759,10 +759,11 @@ void main() {
   // a commit that already has the 1.10.4 测速 (muse.22)
   test('内核 5.0.0-muse.23（瘦身）', () {
     final deps = _src('dependencies.properties');
-    expect(deps, contains('muse.core.version=5.0.0-muse.25'));
-    expect(museCoreRelease, '5.0.0-muse.25');
+    expect(deps, contains('muse.core.version=5.0.0-chuanyun.25'));
+    expect(museCoreRelease, '5.0.0-chuanyun.25');
     expect(deps, contains('muse.compat.ref=66d82b1502a3b735643faf0e8102aa95f217dd34'));
-    expect(int.parse(RegExp(r'muse\.core\.version=5\.0\.0-muse\.(\d+)').firstMatch(deps)!.group(1)!), greaterThan(22));
+    // 1.20.4: release names chuanyun.N (muse.N before) — both parse
+    expect(museCoreReleaseNumber(RegExp(r'muse\.core\.version=(\S+)').firstMatch(deps)!.group(1)!), greaterThan(22));
   });
 }
 

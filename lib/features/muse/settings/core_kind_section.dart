@@ -11,7 +11,7 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/windows_admin.dart';
 import 'package:hiddify/features/muse/logic/core_kind.dart';
-import 'package:hiddify/features/muse/logic/resources.dart' show museCoreRelease;
+import 'package:hiddify/features/muse/logic/resources.dart' show museCoreDisplay;
 import 'package:hiddify/features/muse/widget/grouped_list.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -19,7 +19,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Version shown for [kind].
 String museCoreKindVersion(MuseCoreKind kind) => switch (kind) {
-  MuseCoreKind.standard => museCoreRelease,
+  // 1.20.4: 「内核 chuanyun.25」
+  MuseCoreKind.standard => museCoreDisplay(),
   MuseCoreKind.compat => museCompatEngineVersion,
 };
 

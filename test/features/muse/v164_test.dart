@@ -84,9 +84,10 @@ void main() {
 
     test('the app ships core 5.0.0-muse.18 or newer (the DNS / direct-routing fix)', () {
       final props = File('dependencies.properties').readAsStringSync();
-      final shipped = RegExp(r'muse\.core\.version=5\.0\.0-muse\.(\d+)').firstMatch(props)?.group(1);
-      expect(int.parse(shipped!), greaterThanOrEqualTo(18));
-      expect(museCoreRelease, '5.0.0-muse.$shipped');
+      // 1.20.4: the release name is chuanyun.N from 25 on (muse.N before); either counts
+      final shipped = RegExp(r'muse\.core\.version=(\S+)').firstMatch(props)!.group(1)!;
+      expect(museCoreReleaseNumber(shipped), greaterThanOrEqualTo(18));
+      expect(museCoreRelease, shipped);
     });
 
     test('1.7.0 carries the 1.6.4 fixes in its 更新说明 (newest entry = pubspec version)', () {

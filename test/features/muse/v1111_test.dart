@@ -123,7 +123,7 @@ void main() {
 
     test('1.11.0 features stay (no rollback): widget registered, core muse.23', () {
       expect(_read('android/app/src/main/AndroidManifest.xml'), contains('android:name=".bg.ChuanyunWidget"'));
-      expect(_read('dependencies.properties'), contains('muse.core.version=5.0.0-muse.25'));
+      expect(_read('dependencies.properties'), contains('muse.core.version=5.0.0-chuanyun.25'));
     });
   });
 

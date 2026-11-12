@@ -1,4 +1,4 @@
-// 穿云 1.20.4：标准内核 5.0.0-muse.25（远程 DNS 组并行、远程答案保留真实 TTL，只改内核生成配置），
+// 穿云 1.20.4：标准内核 5.0.0-chuanyun.25（版本名由 muse 改为 chuanyun；远程 DNS 组并行、远程答案保留真实 TTL，只改内核生成配置），
 // 切换节点后清一次内核 DNS 缓存；关于 / 内核与资源页显示的内核版本与 dependencies.properties 一致。
 // 普通 test（不是 testWidgets）：清缓存请求打到 127.0.0.1 上的假内核。
 // Part of 穿云 (GPLv3).
@@ -35,7 +35,7 @@ void main() {
       final lines = museChangelog['1.20.4']!;
       expect(lines, hasLength(3));
       final all = lines.join();
-      for (final w in ['同时问两台', '不再多等一次', '换节点', '清一次 DNS 缓存', '5.0.0-muse.25']) {
+      for (final w in ['同时问两台', '不再多等一次', '换节点', '清一次 DNS 缓存', '5.0.0-chuanyun.25', '内核 chuanyun.25']) {
         expect(all, contains(w), reason: w);
       }
       final md = _src('CHANGELOG.md');
@@ -48,9 +48,9 @@ void main() {
   });
 
   group('内核版本引用', () {
-    test('dependencies.properties = muse.25，兼容内核提交不变', () {
+    test('dependencies.properties = chuanyun.25，兼容内核提交不变', () {
       final props = _src('dependencies.properties');
-      expect(RegExp(r'^muse\.core\.version=(\S+)$', multiLine: true).firstMatch(props)?.group(1), '5.0.0-muse.25');
+      expect(RegExp(r'^muse\.core\.version=(\S+)$', multiLine: true).firstMatch(props)?.group(1), '5.0.0-chuanyun.25');
       expect(RegExp(r'^muse\.compat\.ref=(\S+)$', multiLine: true).firstMatch(props)?.group(1), '66d82b1502a3b735643faf0e8102aa95f217dd34');
       // every non-comment line is still key=value (the Makefile and CI read this file)
       for (final line in props.split('\n').where((l) => l.trim().isNotEmpty && !l.startsWith('#'))) {
@@ -63,13 +63,47 @@ void main() {
       final shipped = RegExp(r'muse\.core\.version=(\S+)').firstMatch(props)!.group(1);
       expect(museCoreRelease, shipped);
       expect(museCoreRelease, isNot(contains('muse.23')));
-      expect(museCoreKindVersion(MuseCoreKind.standard), '5.0.0-muse.25');
-      expect(museCoreShort(), contains('25'));
-      expect(museCoreVersionLabel(), '5.0.0-muse.25');
+      expect(museCoreRelease, '5.0.0-chuanyun.25');
+      expect(museCoreShort(), 'chuanyun.25');
+      expect(museCoreDisplay(), '内核 chuanyun.25');
+      expect(museCoreKindVersion(MuseCoreKind.standard), '内核 chuanyun.25');
+      expect(museCoreVersionLabel(), '5.0.0-chuanyun.25');
       // no other hard-coded standard-core release constant in lib/
       for (final f in Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'))) {
         if (f.path.endsWith('resources.dart')) continue;
         expect(f.readAsStringSync().contains(RegExp(r"'5\.0\.0-muse\.\d+'")), isFalse, reason: f.path);
+      }
+    });
+  });
+
+  group('内核版本名 muse → chuanyun：两种前缀都能解析', () {
+    test('museCoreReleaseNumber / museCoreShort 认 chuanyun.N 与旧的 muse.N，带不带 v 都行', () {
+      expect(museCoreReleaseNumber('5.0.0-chuanyun.25'), 25);
+      expect(museCoreReleaseNumber('v5.0.0-chuanyun.25'), 25);
+      expect(museCoreReleaseNumber('5.0.0-muse.24'), 24);
+      expect(museCoreReleaseNumber('v5.0.0-muse.18'), 18);
+      expect(museCoreReleaseNumber(' 5.0.0-chuanyun.100 '), 100);
+      for (final bad in ['5.0.0', '5.0.0-beta.1', 'chuanyun.25', '5.0.0-chuanyun.', '5.0.0-musex.3', '']) {
+        expect(museCoreReleaseNumber(bad), isNull, reason: bad);
+      }
+      // one series: the renamed release is newer than the last muse one
+      expect(museCoreReleaseNumber('5.0.0-chuanyun.25'), greaterThan(museCoreReleaseNumber('5.0.0-muse.24')!));
+      expect(museCoreShort('5.0.0-muse.24'), 'muse.24');
+      expect(museCoreShort('v5.0.0-chuanyun.25'), 'chuanyun.25');
+      expect(museCoreDisplay('5.0.0-muse.24'), '内核 muse.24');
+    });
+
+    test('只改了版本名：仓库、下载地址与产物名、兼容内核引用键不变', () {
+      final make = _src('Makefile');
+      expect(make, contains(r'MUSE_CORE_URL=https://github.com/yywgov/muse-core/releases/download/v$(muse.core.version)'));
+      expect(make, contains(r'$(MUSE_CORE_URL)/$(CORE_NAME)-windows-amd64.tar.gz'));
+      final props = _src('dependencies.properties');
+      expect(props, contains('muse.core.version='));
+      expect(props, contains('muse.compat.ref='));
+      // CI reads the release only through the Makefile; nothing there parses a "muse." prefix
+      for (final wf in ['.github/workflows/muse-android.yml', '.github/workflows/muse-windows.yml']) {
+        final s = _src(wf);
+        expect(s.contains(RegExp(r'5\.0\.0-muse|-muse\.')), isFalse, reason: wf);
       }
     });
   });
