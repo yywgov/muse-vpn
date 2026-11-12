@@ -64,7 +64,6 @@ class SettingsPage extends HookConsumerWidget {
     final devMode = ref.watch(MusePrefs.devMode);
     // 1.9.0 #5
     final autoSummary = museAutoConnectSummary(
-      autoRun: android && ref.watch(MusePrefs.autoRun),
       onDemand: ref.watch(MusePrefs.onDemand) && museOnDemandSsids(ref.watch(MusePrefs.wifiRules)).isNotEmpty,
       schedule: MuseSchedule.parse(ref.watch(MusePrefs.schedule)),
       autoStart: PlatformUtils.isWindows && (ref.watch(autoStartNotifierProvider).valueOrNull ?? false),

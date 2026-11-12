@@ -464,9 +464,9 @@ void main() {
       expect(app.contains('museLogsProvider'), isFalse);
       // the Windows / Android start-up listeners stay behind their platform check
       expect(RegExp(r'if \(PlatformUtils\.isWindows\) \{\s*ref\.listen\(museHotkeysProvider').hasMatch(app), isTrue);
-      // 按需运行 waits 3 s before its first look; 自动运行 waits for the first frame
+      // 按需运行 waits 3 s before its first look (1.20.5: 自动运行 is gone)
       expect(File('lib/features/muse/desktop/on_demand.dart').readAsStringSync().contains('Timer(const Duration(seconds: 3), tick)'), isTrue);
-      expect(File('lib/features/muse/home/auto_run.dart').readAsStringSync().contains('Timer(museAutoRunDelay'), isTrue);
+      expect(File('lib/features/muse/home/auto_run.dart').existsSync(), isFalse);
       // the resource page reads its files after its first frame
       expect(File('lib/features/muse/settings/resources_page.dart').readAsStringSync().contains('microtask'), isTrue);
     });

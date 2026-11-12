@@ -61,7 +61,7 @@ const _oldTitles = <(String, String)>[
   ('流量统计', ''), ('高级', ''), ('负载均衡策略', ''), ('TLS 分片', ''), ('IPv6', ''), ('Fake-IP', ''), ('屏蔽 QUIC', ''), ('活动', ''),
   ('连接', ''), ('日志', ''), ('DNS 查询', ''), ('切换节点时关闭旧连接', ''), ('导入后清空剪贴板', ''), ('导出为 sing-box 格式', ''),
   ('恢复推荐 DNS', ''), ('诊断', ''), ('运行模式', 'w'), ('开机自启', 'w'), ('静默启动', 'w'), ('关闭窗口时', 'w'), ('开机自启时静默', 'w'),
-  ('穿云标题栏', 'w'), ('窗口置顶', 'w'), ('按需运行', ''), ('快捷键', 'w'), ('打开即连接', 'a'), ('自动连接', ''), ('通知栏断开按钮', 'a'),
+  ('穿云标题栏', 'w'), ('窗口置顶', 'w'), ('按需运行', ''), ('快捷键', 'w'), ('自动连接', ''), ('通知栏断开按钮', 'a'),
   ('在最近任务中隐藏', 'a'), ('检查更新', ''), ('内核', ''), ('内核与资源', ''), ('地理规则库', ''), ('规则集', ''), ('内核版本', ''),
   ('版本与构建号', ''), ('开源许可', ''), ('恢复范围 / 恢复策略', ''),
 ];
@@ -124,7 +124,8 @@ void main() {
       expect(_search('路由').map((e) => e.page), contains(MuseSettingPage.myRules));
       expect(_search('网络接管', android: false, windows: true).first.title, '运行模式');
       expect(_search('网络诊断').first.page, MuseSettingPage.diagnose);
-      expect(_search('自动运行').first.title, '打开即连接');
+      // 1.20.5：「打开即连接」（旧名自动运行）已取消
+      expect(_search('自动运行').map((e) => e.title), isNot(contains('打开即连接')));
       expect(_search('自定义 hosts').first.page, MuseSettingPage.network);
       expect(_search('节点失效').first.page, MuseSettingPage.autoConnect);
       expect(_search('在最近任务中隐藏').first.page, MuseSettingPage.privacy);

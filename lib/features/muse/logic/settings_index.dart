@@ -182,11 +182,10 @@ const museSettingEntries = <MuseSettingEntry>[
   MuseSettingEntry('按需运行', MuseSettingPage.wifiRules, keywords: ['Wi-Fi', 'WiFi', '无线', '暂停', '家里', '公司']),
   MuseSettingEntry('按 Wi‑Fi 切换模式', MuseSettingPage.wifiRules, keywords: ['Wi-Fi', 'WiFi', '无线', '规则', '全局', '模式']),
   MuseSettingEntry('快捷键', MuseSettingPage.windowAdvanced, keywords: ['全局快捷键', '热键', '键盘'], windowsOnly: true),
-  // 1.6.0 C9 (Android 通用)；「自动运行」是旧名，仍能搜到
-  MuseSettingEntry('打开即连接', MuseSettingPage.autoConnect, keywords: ['自动运行', '自动连接', '启动时连接'], androidOnly: true),
+  // 1.20.5：「打开即连接」（1.6.0 C9，旧名「自动运行」）已取消，不再有搜索项
   // 1.20.3：自动连接 → 启动与断线
-  MuseSettingEntry('启动与断线', MuseSettingPage.autoConnect, keywords: ['自动连接', '打开即连接', '开机自启', '断线处理', 'Wi‑Fi 规则', '定时连接', '定时断开']),
-  MuseSettingEntry('自动连接', MuseSettingPage.autoConnect, keywords: ['打开即连接', '自动运行', '开机自启', '按需运行', '定时连接', '定时断开', '启动与断线']),
+  MuseSettingEntry('启动与断线', MuseSettingPage.autoConnect, keywords: ['自动连接', '开机自启', '断线处理', 'Wi‑Fi 规则', '定时连接', '定时断开']),
+  MuseSettingEntry('自动连接', MuseSettingPage.autoConnect, keywords: ['开机自启', '按需运行', '定时连接', '定时断开', '启动与断线']),
   MuseSettingEntry('通知栏断开按钮', MuseSettingPage.privacy, keywords: ['通知', '断开', '停止按钮'], androidOnly: true),
   // 1.10.2；1.20.3：搬到 隐私与通知
   MuseSettingEntry('在最近任务中隐藏', MuseSettingPage.privacy, keywords: ['最近任务', '多任务', '后台列表', '隐藏', '不在最近任务显示'], androidOnly: true),

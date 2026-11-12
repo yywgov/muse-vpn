@@ -1,16 +1,26 @@
 // 穿云 1.20.5：兼容内核引擎 1.19.33 → 1.19.34（上游稳定版），muse.compat.ref 66d82b1 → muse 分支新提交；
 // 设置 › 内核与资源 › 内核版本里兼容内核显示为「兼容内核 chuanyun.25 · 引擎 1.19.34」，与标准内核命名一致。
 // 标准内核不变（5.0.0-chuanyun.25）。
+// 用户 2026-11-12 15:50 要求并入本版：取消「打开即连接」（打开软件自动连接）——开关、搜索项、启动时的自动连接都删掉；
+// 旧键 muse_auto_run 留在存储里不读（降级可读）；开机自启、恢复连接、Wi‑Fi 规则、小组件 / 磁贴 / 快捷方式不动。
 // Part of 穿云 (GPLv3).
 
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/muse/data/changelog.dart';
+import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/core_kind.dart';
+import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/resources.dart';
+import 'package:hiddify/features/muse/logic/settings_index.dart';
+import 'package:hiddify/features/muse/settings/android_settings.dart' show museAndroidAutomationNote;
+import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
 import 'package:hiddify/features/muse/settings/core_kind_section.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 String _src(String p) => File(p).readAsStringSync();
 
@@ -24,9 +34,9 @@ void main() {
       expect(museChangelog.keys.first, '1.20.5');
       expect(museChangelog.keys.elementAt(1), '1.20.4');
       final lines = museChangelog['1.20.5']!;
-      expect(lines, hasLength(3));
+      expect(lines, hasLength(4));
       final all = lines.join();
-      for (final w in ['兼容内核', '1.19.34', 'HTTPUpgrade', '测速失败原因', '限定地区', '兼容内核 chuanyun.25 · 引擎 1.19.34', '内核 chuanyun.25']) {
+      for (final w in ['取消「打开即连接」', '不再自动连接', '开机自启', '恢复连接', '兼容内核', '1.19.34', 'HTTPUpgrade', '测速失败原因', '限定地区', '兼容内核 chuanyun.25 · 引擎 1.19.34', '内核 chuanyun.25']) {
         expect(all, contains(w), reason: w);
       }
       // in-app copy names no upstream project
@@ -36,7 +46,7 @@ void main() {
       final md = _src('CHANGELOG.md');
       expect(md, contains(RegExp(r'### 1\.20\.5 - 2026-\d\d-\d\d')));
       expect(md.indexOf('### 1.20.5'), lessThan(md.indexOf('### 1.20.4')));
-      for (final w in ['v1.19.33', 'v1.19.34', 'muse.compat.ref', 'v2ray-http-upgrade', '.mrs', 'museCompatDisplay']) {
+      for (final w in ['v1.19.33', 'v1.19.34', 'muse.compat.ref', 'v2ray-http-upgrade', '.mrs', 'museCompatDisplay', '打开即连接', 'muse_auto_run']) {
         expect(md, contains(w), reason: w);
       }
     });
@@ -105,6 +115,73 @@ void main() {
       expect(find.textContaining('兼容内核 chuanyun.25 · 引擎 1.19.34'), findsOneWidget);
       expect(find.textContaining('内核 chuanyun.25'), findsNWidgets(2));
       expect(t.takeException(), isNull);
+    });
+  });
+  group('取消「打开即连接」', () {
+    test('没有开关、没有搜索项；旧名也搜不到它', () {
+      expect(museSettingEntries.where((e) => e.title == '打开即连接'), isEmpty);
+      for (final e in museSettingEntries) {
+        expect(e.keywords, isNot(contains('打开即连接')), reason: e.title);
+      }
+      for (final q in ['打开即连接', '自动运行', '启动时连接']) {
+        expect(museSearchSettings(q, android: true, windows: false).map((e) => e.title), isNot(contains('打开即连接')), reason: q);
+      }
+      // the page itself is still found under its names
+      expect(museSearchSettings('自动连接', android: true, windows: false).first.page, MuseSettingPage.autoConnect);
+      expect(museAutoConnectSummary(onDemand: false, schedule: const MuseSchedule(), autoStart: false), '关');
+    });
+
+    test('启动时不再自动连接：自动运行的代码与监听都删了，lib 里没有任何地方读旧键', () {
+      expect(File('lib/features/muse/home/auto_run.dart').existsSync(), isFalse);
+      final app = _src('lib/features/app/widget/app.dart');
+      expect(app, isNot(contains('museAutoRun')));
+      expect(app, isNot(contains('auto_run.dart')));
+      for (final f in Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'))) {
+        final src = f.readAsStringSync();
+        expect(src.contains('MusePrefs.autoRun'), isFalse, reason: f.path);
+        expect(src.contains('museShouldAutoRun'), isFalse, reason: f.path);
+        if (!f.path.endsWith('muse_prefs.dart')) {
+          expect(src.contains('muse_auto_run') || src.contains('legacyAutoRunKey'), isFalse, reason: f.path);
+        }
+      }
+      // the key name is kept (documented, never read) so an older build still finds it
+      expect(MusePrefs.legacyAutoRunKey, 'muse_auto_run');
+      expect(_src('lib/features/muse/data/muse_prefs.dart'), isNot(contains('PreferencesNotifier.create<bool, bool>("muse_auto_run"')));
+    });
+
+    test('不动的几项还在：开机自启、恢复连接、Wi‑Fi 规则（按需运行）、快捷方式 / 磁贴 / 小组件的连接入口', () {
+      final app = _src('lib/features/app/widget/app.dart');
+      expect(app, contains('ref.listen(museOnDemandProvider'));
+      expect(app, contains('ref.listen(museWifiModeProvider'));
+      expect(File('lib/features/muse/logic/startup_restore.dart').existsSync(), isTrue);
+      expect(_src('lib/features/muse/settings/auto_connect_page.dart'), contains("title: '开机自启'"));
+      expect(_src('lib/features/muse/settings/auto_connect_page.dart'), contains("ValueKey('settings_wifi_rules')"));
+      expect(museAndroidAutomationNote, contains('com.chuanyun.app.action.START'));
+      for (final kt in ['QuickActionActivity.kt', 'ShortcutActivity.kt']) {
+        expect(File('android/app/src/main/kotlin/com/hiddify/hiddify/$kt').existsSync(), isTrue, reason: kt);
+      }
+    });
+
+    testWidgets('已开启过的用户：启动与断线页（Android）没有这个开关，旧键原样留在存储里', (t) async {
+      SharedPreferences.setMockInitialValues({'muse_auto_run': true});
+      final sp = await SharedPreferences.getInstance();
+      final c = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) async => sp)]);
+      addTearDown(c.dispose);
+      await t.runAsync(() => c.read(sharedPreferencesProvider.future));
+      t.view.physicalSize = const Size(400, 860);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(
+        UncontrolledProviderScope(container: c, child: const MaterialApp(home: MuseAutoConnectPage(android: true, windows: false))),
+      );
+      await t.pump(const Duration(milliseconds: 300));
+      expect(find.text('打开即连接'), findsNothing);
+      expect(find.byKey(const ValueKey('settings_auto_run')), findsNothing);
+      expect(find.byKey(const ValueKey('keep_alive')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings_wifi_rules')), findsOneWidget);
+      expect(t.takeException(), isNull);
+      // downgrade-readable: nothing removed or rewritten it
+      expect(sp.getBool('muse_auto_run'), isTrue);
     });
   });
 }

@@ -5,7 +5,6 @@ import 'package:hiddify/features/muse/settings/android_settings.dart' show museR
 import 'package:hiddify/features/muse/desktop/hidden_release.dart';
 import 'package:hiddify/features/muse/desktop/hotkeys.dart';
 import 'package:hiddify/features/muse/desktop/on_demand.dart';
-import 'package:hiddify/features/muse/home/auto_run.dart';
 import 'package:hiddify/features/muse/desktop/title_bar.dart';
 import 'package:hiddify/features/muse/data/core_extras_provider.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
@@ -142,9 +141,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
       // 1.15.0 R23: 按 Wi‑Fi 切换模式（列表为空时什么都不做）
       ref.listen(museWifiModeProvider, (_, _) {});
     }
-    // 1.6.0 C9 (Android): 自动运行 (once per launch, after the first frame) and 按需运行
+    // 1.6.0 C9 (Android): 按需运行（1.20.5：「打开即连接」已取消，打开软件不再自动连接）
     if (PlatformUtils.isAndroid) {
-      ref.listen(museAutoRunProvider, (_, _) {});
       ref.listen(museOnDemandProvider, (_, _) {});
       ref.listen(museWifiModeProvider, (_, _) {});
       // 1.11.0: 隐藏桌面图标 removed — an icon hidden before comes back once

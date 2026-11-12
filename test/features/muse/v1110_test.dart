@@ -358,7 +358,8 @@ void main() {
       expect(MuseSettingPage.sync.path, '设置 › 备份与恢复'); // 1.20.3
       // old names still lead to the new place
       expect(museSearchSettings('备份与同步', android: true, windows: false).first.page, MuseSettingPage.sync);
-      expect(museSearchSettings('自动运行', android: true, windows: false).first.title, '打开即连接');
+      // 1.20.5：「打开即连接」（旧名自动运行）已取消，搜不到这一项
+      expect(museSearchSettings('打开即连接', android: true, windows: false).map((e) => e.title), isNot(contains('打开即连接')));
       expect(museSearchSettings('节点失效', android: true, windows: false).first.page, MuseSettingPage.autoConnect); // 1.20.3：启动与断线 › 断线处理
     });
 
@@ -406,9 +407,9 @@ void main() {
 
   group('精简：页面', () {
     // 1.20.3：「更多」取消，启动与断线页四组直接显示；按需运行在「Wi‑Fi 规则」页
-    testWidgets('自动连接 (Android): only 打开即连接 until 「更多」', (t) async {
+    testWidgets('自动连接 (Android): 1.20.5 起没有打开即连接，断线处理在最上', (t) async {
       await _pump(t, _screens[0], Brightness.light, 3, const MuseAutoConnectPage(android: true, windows: false));
-      expect(find.text('打开即连接'), findsOneWidget);
+      expect(find.text('打开即连接'), findsNothing);
       expect(find.byKey(const ValueKey('auto_connect_more')), findsNothing);
       expect(find.byKey(const ValueKey('keep_alive')), findsOneWidget);
       expect(find.byKey(const ValueKey('settings_wifi_rules')), findsOneWidget);

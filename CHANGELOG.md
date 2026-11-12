@@ -9,6 +9,7 @@
 - 兼容内核引擎由 mihomo v1.19.33 升级到上游最新稳定版 v1.19.34（只升级 muse-core `mihomo/` 模块的依赖，`go 1.26.10` 不变；Windows / Android 的兼容内核由客户端 CI 从 `muse.compat.ref` 构建，构建标签不变）。上游这一版没有配置格式上的破坏性变更：分享链接 `type=httpupgrade`（vless / vmess / trojan）改为 `network: ws` + `v2ray-http-upgrade`，与 sing-box JSON → mihomo 映射的结果一致（此前这类链接在兼容内核上没有按 HTTPUpgrade 传输处理）；tfo-go 在 Go 1.26.9+ 上失效的修复（本项目用 Go 1.26.10）；HTTP 代理 CONNECT 响应后紧跟的数据不再丢；SSH 写错误时关闭连接；sing-tun 0.4.29 修正 TUN 自动路由规则。新增的 Snell v6、Shadowsocks 多用户入站等对客户端无影响；.mrs 规则集与规则提供者代码未改
 - `muse.compat.ref` 66d82b1 → c456a83（muse 分支，chuanyun.25 之后只改兼容内核）：同时带上此前未进入兼容内核的 muse.24 mihomo 改动——测速失败原因（refused / dns / handshake / timeout）与「自动最快」限定地区（`muse-auto-filter`）
 - 「设置 › 内核与资源 › 内核版本」中兼容内核显示为「兼容内核 chuanyun.25 · 引擎 1.19.34」（`museCompatDisplay`；原来只显示 1.19.33），与标准内核「内核 chuanyun.25」命名一致；标准内核不变（5.0.0-chuanyun.25）
+- 取消「打开即连接」（Android「设置 › 启动与断线」里的打开软件自动连接，1.6.0 C9 起）：删除开关、搜索项（含旧名「自动运行」）与启动时的自动连接（`auto_run.dart`、`museAutoRunProvider`）；旧存储键 `muse_auto_run` 保留不读（装回旧版仍能读到），已开启的用户升级后打开软件不再自动连接。「启动」组因此去掉，自动化广播说明移到「定时」组页脚。开机自启、崩溃 / 重启后的恢复连接（startup_restore）、按需运行 / Wi‑Fi 规则、小组件 / 磁贴 / 快捷方式连接不变
 
 ### 1.20.4 - 2026-11-12
 

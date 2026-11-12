@@ -20,8 +20,6 @@ import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/data/wifi_ssid.dart';
 import 'package:hiddify/features/muse/desktop/on_demand.dart';
-import 'package:hiddify/features/muse/home/auto_run.dart';
-import 'package:hiddify/features/muse/home/home_data.dart';
 import 'package:hiddify/features/muse/logic/per_app_tools.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/android_settings.dart';
@@ -29,14 +27,6 @@ import 'package:hiddify/features/muse/settings/wifi_mode_page.dart';
 import 'package:hiddify/features/muse/widget/muse_tokens_color.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-Future<ProviderContainer> _container(Map<String, Object> prefs, {List<Override> overrides = const []}) async {
-  SharedPreferences.setMockInitialValues(prefs);
-  final sp = await SharedPreferences.getInstance();
-  final c = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) async => sp), ...overrides]);
-  await c.read(sharedPreferencesProvider.future);
-  return c;
-}
 
 Future<ProviderContainer> _pump(
   WidgetTester t,
@@ -283,79 +273,8 @@ void main() {
     });
   });
 
-  group('自动运行', () {
-    test('decision', () {
-      expect(museShouldAutoRun(isAndroid: true, on: true, alreadyRan: false, hasActiveProfile: true), isTrue);
-      expect(museShouldAutoRun(isAndroid: false, on: true, alreadyRan: false, hasActiveProfile: true), isFalse);
-      expect(museShouldAutoRun(isAndroid: true, on: false, alreadyRan: false, hasActiveProfile: true), isFalse);
-      expect(museShouldAutoRun(isAndroid: true, on: true, alreadyRan: true, hasActiveProfile: true), isFalse);
-      expect(museShouldAutoRun(isAndroid: true, on: true, alreadyRan: false, hasActiveProfile: false), isFalse);
-      expect(
-        museShouldAutoRun(
-          isAndroid: true,
-          on: true,
-          alreadyRan: false,
-          hasActiveProfile: true,
-          launchedForControl: true,
-        ),
-        isFalse,
-      );
-    });
-
-    test('connects once per launch only; turning it on later waits for the next launch', () async {
-      var connects = 0;
-      Future<ProviderContainer> launch(bool on) => _container(
-        {'muse_auto_run': on},
-        overrides: [
-          museAutoRunForceProvider.overrideWithValue(true),
-          museActiveProfileIdProvider.overrideWithValue('p1'),
-          museAutoRunActionProvider.overrideWithValue(() async => connects++),
-        ],
-      );
-
-      museAutoRunResetForTest();
-      var c = await launch(true);
-      c.listen(museAutoRunProvider, (_, _) {});
-      expect(connects, 0, reason: 'not before the first frame');
-      await Future<void>.delayed(museAutoRunDelay + const Duration(milliseconds: 200));
-      expect(connects, 1);
-      // the app UI is rebuilt in the same launch (activity re-created): no second connect
-      c.dispose();
-      c = await launch(true);
-      c.listen(museAutoRunProvider, (_, _) {});
-      await Future<void>.delayed(museAutoRunDelay + const Duration(milliseconds: 200));
-      expect(connects, 1);
-      c.dispose();
-
-      // a launch with the switch off, switched on afterwards: nothing until the next launch
-      museAutoRunResetForTest();
-      c = await launch(false);
-      c.listen(museAutoRunProvider, (_, _) {});
-      await c.read(MusePrefs.autoRun.notifier).update(true);
-      await Future<void>.delayed(museAutoRunDelay + const Duration(milliseconds: 200));
-      expect(connects, 1);
-      c.dispose();
-      museAutoRunResetForTest();
-    });
-
-    test('no subscription: nothing to connect', () async {
-      var connects = 0;
-      museAutoRunResetForTest();
-      final c = await _container(
-        {'muse_auto_run': true},
-        overrides: [
-          museAutoRunForceProvider.overrideWithValue(true),
-          museActiveProfileIdProvider.overrideWithValue(null),
-          museAutoRunActionProvider.overrideWithValue(() async => connects++),
-        ],
-      );
-      c.listen(museAutoRunProvider, (_, _) {});
-      await Future<void>.delayed(museAutoRunDelay + const Duration(seconds: 4));
-      expect(connects, 0);
-      c.dispose();
-      museAutoRunResetForTest();
-    });
-  });
+  // 1.20.5：「打开即连接」（自动运行）已取消，自动运行的决策 / 只连一次测试随之删除；
+  // 「打开软件不再自动连接」由 v1205_release_test 覆盖。
 
   group('按需运行 (Android)', () {
     test('Wi‑Fi answers of the platform channel', () {
@@ -474,7 +393,9 @@ void main() {
     });
 
     test('search entries', () {
-      for (final title in ['打开即连接', '通知栏断开按钮']) { // 1.11.0: 自动运行 → 打开即连接
+      // 1.20.5：「打开即连接」已取消（v1205_release_test）
+      expect(museSettingEntries.where((x) => x.title == '打开即连接'), isEmpty);
+      for (final title in ['通知栏断开按钮']) {
         expect(museSettingEntries.where((x) => x.title == title).single.androidOnly, isTrue, reason: title);
       }
       final onDemand = museSettingEntries.where((x) => x.title == '按需运行').single;
@@ -553,7 +474,6 @@ void main() {
     test('new code and text never name the upstream projects', () {
       for (final p in [
         'lib/features/muse/logic/per_app_tools.dart',
-        'lib/features/muse/home/auto_run.dart',
         'lib/features/muse/settings/android_settings.dart',
         '$kt/QuickActionActivity.kt',
       ]) {

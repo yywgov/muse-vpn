@@ -172,8 +172,10 @@ abstract final class MusePrefs {
   static final wifiRules = PreferencesNotifier.create<String, String>("muse_wifi_rules", "");
 
   // ---- 1.6.0 C9 Android (per device, not synced)
-  /// 自动运行: connect when 穿云 is opened (cold start only, once per launch)
-  static final autoRun = PreferencesNotifier.create<bool, bool>("muse_auto_run", false);
+  /// 1.20.5: 「打开即连接」(自动运行, 1.6.0 C9) is gone. Its key stays in storage untouched and is no longer
+  /// read, so an older build installed again still finds the user's choice; opening 穿云 never connects
+  /// by itself any more (开机自启, 恢复连接, Wi‑Fi 规则 and the widget / tile / shortcuts are unchanged).
+  static const legacyAutoRunKey = "muse_auto_run";
 
   /// 通知栏「断开」按钮 (read by the Android notification, flutter.muse_notify_stop_button)
   static final notifyStopButton = PreferencesNotifier.create<bool, bool>("muse_notify_stop_button", true);

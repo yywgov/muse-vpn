@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
-import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/logic/net_tools.dart';
 import 'package:hiddify/features/muse/logic/settings_index.dart';
 import 'package:hiddify/features/muse/settings/auto_connect_page.dart';
@@ -40,18 +39,16 @@ String _src(String p) => File(p).readAsStringSync();
 
 void main() {
   group('#5 自动连接', () {
-    testWidgets('Android: 自动运行 switch, 按需运行 row, 定时 rows; no Windows rows', (t) async {
-      final c = await _pump(t, const MuseAutoConnectPage(android: true, windows: false), prefs: {'muse_schedule': '480,-1'});
+    testWidgets('Android: 按需运行 row, 定时 rows; no Windows rows; 1.20.5 起没有自动运行开关', (t) async {
+      await _pump(t, const MuseAutoConnectPage(android: true, windows: false), prefs: {'muse_schedule': '480,-1'});
       // 1.20.3：页标题「启动与断线」，「更多」取消；按需运行在「Wi‑Fi 规则」一页
       expect(find.text('启动与断线'), findsOneWidget);
       expect(find.byKey(const ValueKey('settings_wifi_rules')), findsOneWidget);
       expect(find.text('08:00'), findsOneWidget);
       expect(find.byKey(const ValueKey('network_schedule_disconnect')), findsOneWidget);
       expect(find.byKey(const ValueKey('settings_autostart')), findsNothing);
-      expect(c.read(MusePrefs.autoRun), isFalse);
-      await t.tap(find.byKey(const ValueKey('settings_auto_run')));
-      await t.pumpAndSettle();
-      expect(c.read(MusePrefs.autoRun), isTrue);
+      expect(find.byKey(const ValueKey('settings_auto_run')), findsNothing);
+      expect(find.text('打开即连接'), findsNothing);
       expect(t.takeException(), isNull);
     });
 
@@ -78,17 +75,17 @@ void main() {
 
     test('summary', () {
       const off = MuseSchedule();
-      expect(museAutoConnectSummary(autoRun: false, onDemand: false, schedule: off, autoStart: false), '关');
+      expect(museAutoConnectSummary(onDemand: false, schedule: off, autoStart: false), '关');
       expect(
-        museAutoConnectSummary(autoRun: true, onDemand: true, schedule: const MuseSchedule(connectAt: 60), autoStart: true),
-        '打开即连接、按需、定时、开机自启',
+        museAutoConnectSummary(onDemand: true, schedule: const MuseSchedule(connectAt: 60), autoStart: true),
+        '按需、定时、开机自启', // 1.20.5：没有「打开即连接」
       );
-      expect(museAutoConnectSummary(autoRun: false, onDemand: false, schedule: const MuseSchedule(disconnectAt: 60), autoStart: false), '定时');
+      expect(museAutoConnectSummary(onDemand: false, schedule: const MuseSchedule(disconnectAt: 60), autoStart: false), '定时');
     });
 
     test('search finds every moved row on 自动连接', () {
       // 1.20.3：按需运行在 启动与断线 › Wi‑Fi 规则
-      for (final (q, android, windows) in [('自动运行', true, false), ('定时', true, false), ('开机自启', false, true), ('开机自启时静默', false, true), ('自动连接', true, false)]) {
+      for (final (q, android, windows) in [('定时', true, false), ('开机自启', false, true), ('开机自启时静默', false, true), ('自动连接', true, false)]) {
         final hits = museSearchSettings(q, android: android, windows: windows);
         expect(hits.first.page, MuseSettingPage.autoConnect, reason: q);
       }
@@ -321,7 +318,7 @@ void main() {
         'geoip': MuseSettingPage.resources,
         '地理规则库': MuseSettingPage.resources,
         '内置规则集': MuseSettingPage.resources,
-        '自动运行': MuseSettingPage.autoConnect,
+        // 1.20.5：「自动运行」（打开即连接）已取消，不再有搜索项
         '按需运行': MuseSettingPage.wifiRules, // 1.20.3
         '定时连接': MuseSettingPage.autoConnect,
       };

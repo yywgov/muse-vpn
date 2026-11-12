@@ -6,6 +6,7 @@
 // 按需运行, 每天定时连接 / 断开 and Windows 静默启动 fold into 「更多」 on the same page. Same preferences.
 // 1.20.3：改名「启动与断线」，取消「更多」折叠，分 启动 / 断线处理 / Wi‑Fi 规则 / 定时 四组；节点失效自动切换从节点设置搬来，
 // 按需运行与按 Wi‑Fi 切换模式合成一页「Wi‑Fi 规则」。键与行为不变。
+// 1.20.5：取消「打开即连接」（Android「启动」组只剩这一项，整组去掉；自动化广播说明移到「定时」组页脚）。
 // Part of 穿云 (GPLv3).
 
 import 'package:flutter/material.dart';
@@ -23,8 +24,8 @@ import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// One-line summary for the 设置 row: which automatic ways are on.
-String museAutoConnectSummary({required bool autoRun, required bool onDemand, required MuseSchedule schedule, required bool autoStart}) {
-  final on = [if (autoRun) '打开即连接', if (onDemand) '按需', if (schedule.connectAt >= 0 || schedule.disconnectAt >= 0) '定时', if (autoStart) '开机自启'];
+String museAutoConnectSummary({required bool onDemand, required MuseSchedule schedule, required bool autoStart}) {
+  final on = [if (onDemand) '按需', if (schedule.connectAt >= 0 || schedule.disconnectAt >= 0) '定时', if (autoStart) '开机自启'];
   return on.isEmpty ? '关' : on.join('、');
 }
 
@@ -79,20 +80,6 @@ class MuseAutoConnectPage extends HookConsumerWidget {
       title: museStartupTitle,
       body: MuseGroupedBody(
         children: [
-          if (isAndroid)
-            MuseSection(
-              header: '启动',
-              footer: museAndroidAutomationNote,
-              children: [
-                MuseSwitchTile(
-                  key: const ValueKey('settings_auto_run'),
-                  leading: const Icon(Icons.play_circle_outlined),
-                  title: '打开即连接',
-                  value: ref.watch(MusePrefs.autoRun),
-                  onChanged: (v) => ref.read(MusePrefs.autoRun.notifier).update(v),
-                ),
-              ],
-            ),
           if (isWindows) const _WindowsStartSection(),
           // 1.20.3：智能保持连接与节点失效自动切换放在一起（原来一个在这里、一个在节点设置）
           MuseSection(
@@ -131,7 +118,9 @@ class MuseAutoConnectPage extends HookConsumerWidget {
           ),
           MuseSection(
             header: '定时',
-            footer: '穿云需在运行（可在后台）；时间到时只执行一次，手动操作随时优先',
+            footer: isAndroid
+                ? '穿云需在运行（可在后台）；时间到时只执行一次，手动操作随时优先。$museAndroidAutomationNote'
+                : '穿云需在运行（可在后台）；时间到时只执行一次，手动操作随时优先',
             children: [
               MuseTile(
                 key: const ValueKey('network_schedule_connect'),
