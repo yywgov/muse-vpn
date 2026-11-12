@@ -6,12 +6,15 @@
 // (no timer, no extra tests). Logic: lib/features/muse/logic/failover_tracker.dart.
 // Part of 穿云, a fork of Hiddify (https://github.com/hiddify/hiddify-app), GPLv3.
 
+import 'dart:async';
+
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/muse/data/chuanyun_platform.dart';
 import 'package:hiddify/features/muse/data/muse_prefs.dart';
 import 'package:hiddify/features/muse/home/node_label.dart';
+import 'package:hiddify/features/muse/local_api/local_api_providers.dart' show museFlushDnsAfterSwitch;
 import 'package:hiddify/features/muse/logic/failover_tracker.dart';
 import 'package:hiddify/features/muse/logic/keep_alive.dart';
 import 'package:hiddify/features/muse/logic/node_tools.dart';
@@ -59,6 +62,8 @@ final museNodeFailoverProvider = Provider<void>((ref) {
     switching = true;
     try {
       await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy(group.tag, target);
+      // 1.20.4: names resolved through the failing node are looked up again through the stand-in
+      unawaited(museFlushDnsAfterSwitch(ref.read));
       String nameOf(String tag) {
         final e = group.items.where((i) => i.tag == tag).firstOrNull;
         return e == null ? tag : (e.tagDisplay.isNotEmpty ? e.tagDisplay : e.tag);

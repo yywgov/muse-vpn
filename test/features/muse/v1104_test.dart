@@ -258,8 +258,8 @@ void main() {
     test('core 5.0.0-muse.22 for both cores', () {
       final deps = _src('dependencies.properties');
       // 1.11.0: 5.0.0-muse.23 (muse.22 + slimmer standard core), still carries the 1.10.4 测速
-      expect(deps, contains('muse.core.version=5.0.0-muse.23'));
-      expect(museCoreRelease, '5.0.0-muse.23');
+      expect(deps, contains('muse.core.version=5.0.0-muse.25'));
+      expect(museCoreRelease, '5.0.0-muse.25');
       final ref = RegExp(r'muse\.compat\.ref=([0-9a-f]{40})').firstMatch(deps)!.group(1);
       expect(ref, isNot('0b29e71e991143cd1b0db0a075a863d2688a6182'), reason: 'the compatible core builds the 1.10.4 commit');
     });

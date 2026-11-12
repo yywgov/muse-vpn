@@ -32,6 +32,8 @@ Future<void> _select(T Function<T>(ProviderListenable<T>) read, String groupTag,
   }
   // 1.6.0 C3: 切换节点时关闭旧连接 (设置 › 通用, on by default)
   unawaited(museCloseConnectionsAfterSwitch(read));
+  // 1.20.4: and resolve names again through the new node
+  unawaited(museFlushDnsAfterSwitch(read));
   final profileId = read(activeProfileProvider).valueOrNull?.id;
   if (profileId == null) return;
   final raw = read(Preferences.museLastNodes);

@@ -759,8 +759,8 @@ void main() {
   // a commit that already has the 1.10.4 测速 (muse.22)
   test('内核 5.0.0-muse.23（瘦身）', () {
     final deps = _src('dependencies.properties');
-    expect(deps, contains('muse.core.version=5.0.0-muse.23'));
-    expect(museCoreRelease, '5.0.0-muse.23');
+    expect(deps, contains('muse.core.version=5.0.0-muse.25'));
+    expect(museCoreRelease, '5.0.0-muse.25');
     expect(deps, contains('muse.compat.ref=66d82b1502a3b735643faf0e8102aa95f217dd34'));
     expect(int.parse(RegExp(r'muse\.core\.version=5\.0\.0-muse\.(\d+)').firstMatch(deps)!.group(1)!), greaterThan(22));
   });

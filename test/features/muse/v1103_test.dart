@@ -111,10 +111,10 @@ void main() {
       expect(md.indexOf('### 1.10.3'), lessThan(md.indexOf('### 1.10.2')));
     });
 
-    test('both cores from the same core commit (1.11.0: muse.23, a descendant of muse.22)', () {
+    test('cores: 1.11.0 muse.23 for both; 1.20.4 标准内核 muse.25 (remote DNS), 兼容内核 still 66d82b1', () {
       final props = _src('dependencies.properties');
-      expect(props, contains('muse.core.version=5.0.0-muse.23'));
-      expect(museCoreRelease, '5.0.0-muse.23');
+      expect(props, contains('muse.core.version=5.0.0-muse.25'));
+      expect(museCoreRelease, '5.0.0-muse.25');
       expect(props, contains('muse.compat.ref=66d82b1502a3b735643faf0e8102aa95f217dd34'));
     });
   });
